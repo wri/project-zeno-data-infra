@@ -32,9 +32,11 @@ def get_uri(feature):
 
 @task
 def get_new_dist_version() -> str:
-    latest = requests.get("https://data-api.globalforestwatch.org/dataset/umd_glad_dist_alerts/latest").json()
-    # todo, check if we've already created this
-    return latest["data"]["version"]
+    # latest = requests.get("https://data-api.globalforestwatch.org/dataset/umd_glad_dist_alerts/latest").json()
+    # # todo, check if we've already created this
+    # return latest["data"]["version"]
+    pass
+
 
 @task
 def create_zarr(dist_version: str) -> str:
@@ -108,7 +110,6 @@ def analyze_gadm_dist(dist_zarr_uri):
         's3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm2_clipped_to_dist.zarr'
     ).band_data
     
-
     countries_from_clipped.name = "countries"
     regions_from_clipped.name = "regions"
     subregions_from_clipped.name = "subregions"
