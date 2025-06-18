@@ -1,7 +1,12 @@
+from pydoc import describe
 from typing import Any, Dict
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
+from fastapi import HTTPException, Request
 from pydantic import BaseModel, Extra
+from pydantic import Field, root_validator, validator
+from typing import Any, Dict, List, Literal, Optional, Union
+from uuid import UUID
 
 from dask.distributed import Client, LocalCluster
 from flox.xarray import xarray_reduce
@@ -74,6 +79,7 @@ def analyze(data: AnalysisInput):
     }
 
 API_URL="http:"
+DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
 class StrictBaseModel(BaseModel):
     class Config:
@@ -93,12 +99,80 @@ class DataMartResourceLink(StrictBaseModel):
 class DataMartResourceLinkResponse(Response):
     data: DataMartResourceLink
 
+
+class AreaOfInterest(StrictBaseModel):
+    async def get_geostore_id(self) -> UUID:
+        """Return the unique identifier for the area of interest."""
+        raise NotImplementedError("This method is not implemented.")
+
+
+class AdminAreaOfInterest(AreaOfInterest):
+    type: Literal["admin"] = "admin"
+    id: str = Field(..., title="Dot-delimited identifier")
+    provider: str = Field("gadm", title="Administrative Boundary Provider")
+    version: str = Field("4.1", title="Administrative Boundary Version")
+
+    async def get_geostore_id(self) -> UUID:
+        admin_level = self.get_admin_level()
+        geostore_id = None
+        return geostore_id
+
+    def get_admin_level(self):
+        admin_level = (
+                sum(
+                    1
+                    for field in (self.country, self.region, self.subregion)
+                    if field is not None
+                )
+                - 1
+        )
+        return admin_level
+
+    @root_validator(skip_on_failure=True)
+    def check_region_subregion(cls, values):
+        id = values.get("id")
+        # parse id to get region and subregion (if they exist)
+        subregion = None
+        region = None
+        if subregion is not None and region is None:
+            raise ValueError("region must be specified if subregion is provided")
+        return values
+
+    @validator("provider", pre=True, always=True)
+    def set_provider_default(cls, v):
+        return v or "gadm"
+
+    @validator("version", pre=True, always=True)
+    def set_version_default(cls, v):
+        return v or "4.1"
+
+
+class DistAlertsAnalyticsIn(StrictBaseModel):
+    aoi: Union[AdminAreaOfInterest] = Field(..., discriminator="type")
+    start_date: str = Field(
+        None,
+        title="Start Date",
+        description="Must be either year or YYYY-MM-DD date format.",
+        pattern=DATE_REGEX
+    )
+    end_date: str = Field(
+        None,
+        title="End Date",
+        description="Must be either year or YYYY-MM-DD date format.",
+        pattern=DATE_REGEX
+    )
+    intersection: Union[Literal["driver"] | Literal["natural_lands"]]
+
 @app.post("/v0/land_change/dist_alerts/analytics",
           response_class=ORJSONResponse,
           response_model=DataMartResourceLinkResponse,
           tags=["Beta LandChange"],
           status_code=202)
-def create():
+def create(
+    *,
+    data: DistAlertsAnalyticsIn,
+    request: Request,
+):
     resource_id="my_fake_id"
     link = DataMartResourceLink(link=f"{API_URL}/v0/land_change/dist_alerts/analytics/{resource_id}")
     return DataMartResourceLinkResponse(data=link)
