@@ -1,5 +1,8 @@
 from typing import Any, Dict
 from fastapi import FastAPI
+from fastapi.responses import ORJSONResponse
+from pydantic import BaseModel, Extra
+
 from dask.distributed import Client, LocalCluster
 from flox.xarray import xarray_reduce
 import xarray as xr
@@ -70,4 +73,32 @@ def analyze(data: AnalysisInput):
         "status": "success"
     }
 
+API_URL="http:"
 
+class StrictBaseModel(BaseModel):
+    class Config:
+        extra = Extra.forbid
+        validate_assignment = True
+
+
+class Response(StrictBaseModel):
+    data: Any
+    status: str = "success"
+
+
+class DataMartResourceLink(StrictBaseModel):
+    link: str
+
+
+class DataMartResourceLinkResponse(Response):
+    data: DataMartResourceLink
+
+@app.post("/v0/land_change/dist_alerts/analytics",
+          response_class=ORJSONResponse,
+          response_model=DataMartResourceLinkResponse,
+          tags=["Beta LandChange"],
+          status_code=202)
+def create():
+    resource_id="my_fake_id"
+    link = DataMartResourceLink(link=f"{API_URL}/v0/land_change/dist_alerts/analytics/{resource_id}")
+    return DataMartResourceLinkResponse(data=link)
