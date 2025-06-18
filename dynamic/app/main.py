@@ -159,13 +159,15 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         None,
         title="Start Date",
         description="Must be either year or YYYY-MM-DD date format.",
-        pattern=DATE_REGEX
+        pattern=DATE_REGEX,
+        examples=["2020", "2020-01-01"]
     )
     end_date: str = Field(
         None,
         title="End Date",
         description="Must be either year or YYYY-MM-DD date format.",
-        pattern=DATE_REGEX
+        pattern=DATE_REGEX,
+        examples=["2023", "2023-12-31"]
     )
     intersection: Union[Literal["driver"] | Literal["natural_lands"]]
 
