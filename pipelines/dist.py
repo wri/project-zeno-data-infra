@@ -21,6 +21,8 @@ from flox.xarray import xarray_reduce
 import numpy as np
 import boto3
 
+from pipelines.dist import validate_dist_input
+
 
 CONTEXTUAL_LAYERS = [None, "wri_natural_lands"] #, "ldacs", "umd_land_cover"]
 AOIs = ["gadm_administrative_boundaries"] #, "birdlife_key_biodiversity_areas", "wdpa_protected_areas", "landmark_indigenous_areas"]
@@ -61,7 +63,7 @@ def create_zarr(dist_version: str) -> str:
     logging.getLogger("distributed.client").setLevel(logging.ERROR) 
 
     dist_alerts_tiles = pd.read_json(
-        
+       f"s3://gfw-data-lake/umd_glad_dist_alerts/{dist_version}/raster/epsg-4326/10/400000/tiles.geojson"
     )
     dist_alerts_tile_uris = dist_alerts_tiles.features.apply(get_uri)
     dist_alerts = xr.open_mfdataset(
@@ -155,8 +157,13 @@ def analyze_gadm_dist(dist_zarr_uri):
     cluster.close()
 
 @task
-def run_validation_suite():
-    pass
+def validate_dist_input_task(curr_cog_uri: str, prev_cog_uri: str):
+    """
+    Validate the current input DIST raster doesn't have any issues since the previous version. Current checks:
+    - The total count of alerts hasn't change more than 5% since last version globally. That's unusual and
+        would likely indicate certain tiles are missing in the latest version.
+    """
+    validate_dist_input(curr_cog_uri, prev_cog_uri)
 
 @flow
 def main() -> list[str]:
@@ -168,7 +175,6 @@ def main() -> list[str]:
 
     #results = analyze_dist.map(itertools.product(AOIs, CONTEXTUAL_LAYERS), dist_zarr_uri)
     result = analyze_gadm_dist(dist_zarr_uri)
-
     return [result]
 
 
