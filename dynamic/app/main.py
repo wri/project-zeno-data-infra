@@ -84,7 +84,7 @@ def analyze(data: AnalysisInput):
 ######################################################################
 
 
-API_URL="http:"
+API_URL="http://"
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
 class StrictBaseModel(BaseModel):
@@ -156,14 +156,14 @@ class AdminAreaOfInterest(AreaOfInterest):
 class DistAlertsAnalyticsIn(StrictBaseModel):
     aoi: Union[AdminAreaOfInterest] = Field(..., discriminator="type")
     start_date: str = Field(
-        None,
+        ...,
         title="Start Date",
         description="Must be either year or YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
         examples=["2020", "2020-01-01"]
     )
     end_date: str = Field(
-        None,
+        ...,
         title="End Date",
         description="Must be either year or YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
@@ -182,5 +182,5 @@ def create(
     request: Request,
 ):
     resource_id="my_fake_id"
-    link = DataMartResourceLink(link=f"{API_URL}/v0/land_change/dist_alerts/analytics/{resource_id}")
+    link = DataMartResourceLink(link=f"{API_URL}v0/land_change/dist_alerts/analytics/{resource_id}")
     return DataMartResourceLinkResponse(data=link)

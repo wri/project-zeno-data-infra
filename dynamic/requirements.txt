@@ -11,3 +11,4 @@ zarr
 rioxarray
 s3fs
 pydantic
+orjson
