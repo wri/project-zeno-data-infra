@@ -91,6 +91,7 @@ PAYLOAD_STORE_DIR = Path("/tmp/dist_alerts_analytics_payloads")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
 API_URL="http://"
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
+ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 
 class StrictBaseModel(BaseModel):
     class Config:
@@ -119,7 +120,12 @@ class AreaOfInterest(StrictBaseModel):
 
 class AdminAreaOfInterest(AreaOfInterest):
     type: Literal["admin"] = "admin"
-    id: str = Field(..., title="Dot-delimited identifier")
+    id: str = Field(
+        ...,
+        title="Dot-delimited identifier",
+        pattern=ADMIN_REGEX,
+        examples=["BRA.12.3", "IND", "IDN.12"]
+    )
     provider: str = Field("gadm", title="Administrative Boundary Provider")
     version: str = Field("4.1", title="Administrative Boundary Version")
 
@@ -186,6 +192,34 @@ def create(
     data: DistAlertsAnalyticsIn,
     request: Request,
 ):
+    """
+    | Dataset Key Aspects | Detailed Description |
+    |---------------------|----------------------|
+    | **Title** | Global all ecosystem disturbance alerts (DIST-ALERT) |
+    | **Description** <br> A descriptive summary of what the dataset is and key details, such as information on geographic coverage, temporal range, and the data sources used. | Monitors global vegetation disturbance in near-real-time using harmonized Landsat-Sentinel-2 (HLS) imagery |
+    | **Function / usage notes in Zeno** <br> The intended use of the dataset. How might users employ this data in order to have some impact in the world?<br>When should Zeno suggest/use this dataset? Please include examples of use cases (e.g. X dataset can be used for XYZ). You can also include these examples in the prompt spreadsheet. | Users are informed about significant changes to the vegetation, which can indicate human induced changes such as deforestation, as well as drought and other events where actions by land managers may be required. Crucially, this dataset covers all vegetation, not just forest, so that new non-conversion of natural ecosystems commitments can be monitored. |
+    | **Methodology** <br> How was this dataset created? | This dataset is a derivative of the OPERA’s DIST-ALERT product (OPERA Land Surface Disturbance Alert from Harmonized Landsat Sentinel-2 product), which is derived through a time-series analysis of harmonized data from the NASA/USGS Landsat and ESA Sentinel-2 satellites (known as the HLS dataset). The product identifies and continuously monitors vegetation cover change in 30-m pixels across the globe. It can be accessed through the LPDAAC website here: Earthdata Search , and on Google Earth Engine (GEE) as an Image Collection with asset ID: projects/glad/HLSDIST/current/[Insert Layer Name].<br>The DIST-ALERT on GFW is a derivative of this, and additional data layers not used in the GFW product are available through the LPDAAC and GEE such as initial vegetation fraction, and disturbance duration. While the version on the LPDAAC is updated every 2-4 days, the data is updated weekly on GFW.  The product detects notable reductions in vegetation cover (measured as “vegetation fraction” or the percent of the ground that is covered by vegetation) for every pixel every time the new satellite data is acquired and the ground is not obscured by clouds or snow.  <br>The current vegetation fraction estimate is compared to the minimum fraction for the same time period (within 15 days before and after) in the previous 3 years, and if there is a reduction, then the system identifies an alert in that pixel. Anomalies of at least a 10% reduction from the minimum become alerts in the original product, and on GFW, a higher threshold of 30% is used, to reduce noise, and false alerts in the dataset. Because the product compares each pixel to the minimum for the same time period in previous years, it takes into account regular seasonal variation in vegetation cover. As the product is global and detects vegetation anomalies, much of the data may not be applicable to GFW users monitoring forests. Therefore, we also offer the option to mask the alerts with UMD’s tree cover map, allowing users to view only alerts within 30% canopy cover. |
+    | **Cautions in Zeno**<br>What should be kept in mind when using this dataset?<br>When should Zeno not suggest/use this dataset? Feel free to include examples of when the data should not be used (e.g. X dataset cannot be used for XYZ).<br>Generates a persistent resource link for deforestation alerts analytics requests. | These alerts detect vegetation cover loss or disturbance. This product does not distinguish between human-caused and other disturbance types. For example, where alerts are detected within plantation forests, alerts may indicate timber harvesting operations, without a conversion to a non-forest land use, and when alerts are detected within crop land, alerts may represent crop harvesting<br>We do not recommend using the alerts for global or regional trend assessment, nor for area estimates. Rather, we recommend using the annual tree cover loss data for a more accurate comparison of the trends in forest change over time, and for area estimates. For global land cover changes, 20 year data may be more useful for certain purposes and should be explored. Additionally, updates to the methodologies and variation in cloud cover between months and years pose additional risks to using alerts for inter/intra-annual comparison.<br>The alerts can be ‘curated’ to identify those alerts of interest to a user, such as those alerts which are likely to be deforestation and might be prioritized for action. A user can do this by overlaying other contextual datasets, such as protected areas, or planted trees. The non-curated data are provided here in order that users can define their own prioritization approaches. Curated alert locations within tree cover are provided in the Places to Watch data layer.<br>We provide a masked version of the product within “tree cover” which is defined as all vegetation greater than 5 meters in height (2020) with greater than 30% canopy cover (2010), and may take the form of natural forests or plantations. Annual tree cover loss from 2021 is masked out. <br>In contrast to other alert systems available on GFW, DIST-ALERT continues to monitor pixels where it has identified an alert in the past. The DIST-ALERT retains the date of the most recent detection of disturbance, keeping users informed of the most up-to-date changes within tree cover.<br>Two confidence levels are provided. The approach determines confidence level by the number of anomalous observations, with more observations meaning a higher confidence level. That is, two to three anomalies detected result in a low confidence alert, whereas four or more mean a high confidence alert. UMD’s Google Earth Engine app DIST-ALERT ) displays alerts, with a different approach used to define confidence, and a different threshold for the vegetation reduction which triggers alerts. |
+    | **Resolution** | 30 x 30 meters |
+    | **Geographic Coverage** | Global |
+    | **Update Frequency** | Underlying product updated daily, with image revisit time every 2-4 days. Product on GFW updated weekly. |
+    | **Content Date** | 1 January 2023 – present (GFW has data since 1 December 2023, and in future, will display only the most recent 2 years of alert data) |
+    | **Keywords** | land cover, alerts, deforestation, conversion, vegetation disturbance |
+    | **Band values/meaning**<br>What does the pixel values of each band mean? What are the possible values? | The input layers and their encoding can be found in the documentation<br>Single bands<br>Type: discrete<br>default.tif (formula is (10000 * confidence) + (days since Dec 31, 2020))<br>20000-29999: Low confidence (Ex. 21431 = Low confidence alert on Dec 1, 2024)<br>30000-39999: High confidence (Ex. 31433 = High confidence alert on Dec 3, 2024)<br>intensity.tif<br>All alerts set to 255 and use bilinear resampling on the overviews so that areas with dense alerts have higher values<br>Possible values of the final GFW product:<br>either low or high confidence, based on the alert count<br>date of the alert based on the VEG-DIST-DATE (this represents the Day of first loss anomaly detection of the most recent disturbance event. Day denoted as the number of days since December 31, 2020.) |
+
+    **Key Features:**
+    - 🆔 Deterministic UUID generation using SHA-1 hashing (UUIDv5)
+    - 💾 Automatic payload storage in temporary storage
+    - 🔗 Returns a URL to check analytics status
+    - ♻️ Idempotent: Identical payloads return the same resource ID
+
+    **Flow:**
+    1. Accepts `DistAlertsAnalyticsIn` payload
+    2. Generates UUID based on payload content
+    3. Stores payload as JSON file
+    4. Returns resource URL for status checking
+    """
+
     # Convert model to JSON with sorted keys
     payload_dict = data.model_dump()
 
