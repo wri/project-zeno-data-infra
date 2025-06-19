@@ -200,3 +200,35 @@ def create(
 
     link = DataMartResourceLink(link=f"{API_URL}v0/land_change/dist_alerts/analytics/{resource_id}")
     return DataMartResourceLinkResponse(data=link)
+
+
+@app.get("/v0/land_change/dist_alerts/analytics/{resource_id}",
+         response_class=ORJSONResponse,
+         tags=["Beta LandChange"],
+         status_code=200)
+async def get_analytics_result(resource_id: str):
+    # Validate UUID format
+    try:
+        uuid.UUID(resource_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid resource ID format. Must be a valid UUID."
+        )
+
+    # Construct file path
+    file_path = PAYLOAD_STORE_DIR / f"{resource_id}.json"
+
+    # Check if file exists
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Requested resource not found. Either expired or never existed."
+        )
+
+    # Read and parse JSON file
+    json_content = file_path.read_text()
+    data_content = json.loads(json_content)  # Convert JSON to Python object
+
+    # Return using your custom response model
+    return Response(data=data_content)
