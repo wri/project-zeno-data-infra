@@ -1,5 +1,6 @@
 import json
 import uuid
+from enum import Enum
 from pathlib import Path
 from pydoc import describe
 from typing import Any, Dict
@@ -202,8 +203,44 @@ def create(
     return DataMartResourceLinkResponse(data=link)
 
 
+class AnalysisStatus(str, Enum):
+    saved = "saved"
+    pending = "pending"
+    failed = "failed"
+
+
+class DistAlertsAnalytics(StrictBaseModel):
+    result: Optional[dict] = {  # column oriented for loading into a dataframe
+        "__dtypes__": {
+            "country": "str",
+            "region": "int",
+            "subregion": "int",
+            "alert_date": "int",
+            "confidence": "int",
+            "value": "int",
+        },
+        "country": ["BRA", "BRA", "BRA"],
+        "region": [1, 1, 1],
+        "subregion": [12, 12, 12],
+        "alert_date": [731, 733, 733],
+        "confidence": [2, 2, 3],
+        "value": [38, 5, 3],
+    }
+    metadata: Optional[dict] = None
+    message: Optional[str] = None
+    status: AnalysisStatus
+
+    class Config:
+        orm_mode = True
+        allow_population_by_field_name = True
+
+class DistAlertsAnalyticsResponse(Response):
+    data: DistAlertsAnalytics
+
+
 @app.get("/v0/land_change/dist_alerts/analytics/{resource_id}",
          response_class=ORJSONResponse,
+         response_model=DistAlertsAnalyticsResponse,
          tags=["Beta LandChange"],
          status_code=200)
 async def get_analytics_result(resource_id: str):
@@ -228,7 +265,10 @@ async def get_analytics_result(resource_id: str):
 
     # Read and parse JSON file
     json_content = file_path.read_text()
-    data_content = json.loads(json_content)  # Convert JSON to Python object
+    metadata_content = json.loads(json_content)  # Convert JSON to Python object
 
     # Return using your custom response model
-    return Response(data=data_content)
+    return DistAlertsAnalyticsResponse(data={
+        "metadata": metadata_content,
+        "status": AnalysisStatus.saved,
+    })
