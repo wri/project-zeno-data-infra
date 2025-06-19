@@ -1,3 +1,6 @@
+import json
+import uuid
+from pathlib import Path
 from pydoc import describe
 from typing import Any, Dict
 from fastapi import FastAPI
@@ -83,7 +86,8 @@ def analyze(data: AnalysisInput):
 # Analytics Endpoint                                                 #
 ######################################################################
 
-
+PAYLOAD_STORE_DIR = Path("/tmp/dist_alerts_analytics_payloads")
+PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
 API_URL="http://"
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
@@ -181,6 +185,18 @@ def create(
     data: DistAlertsAnalyticsIn,
     request: Request,
 ):
-    resource_id="my_fake_id"
+    # Convert model to JSON with sorted keys
+    payload_dict = data.model_dump()
+
+    # Convert to JSON string with sorted keys
+    payload_json = json.dumps(payload_dict, sort_keys=True)
+
+    # Generate deterministic UUID from payload
+    resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
+
+    # Store payload in /tmp directory
+    payload_file = PAYLOAD_STORE_DIR / f"{resource_id}.json"
+    payload_file.write_text(payload_json)
+
     link = DataMartResourceLink(link=f"{API_URL}v0/land_change/dist_alerts/analytics/{resource_id}")
     return DataMartResourceLinkResponse(data=link)
