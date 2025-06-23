@@ -166,7 +166,7 @@ class AdminAreaOfInterest(AreaOfInterest):
 AoiUnion = Union[AdminAreaOfInterest]
 
 class DistAlertsAnalyticsIn(StrictBaseModel):
-    aoi: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
+    aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
         ...,
         min_items=1,
         max_items=1,
@@ -186,7 +186,7 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2023-12-31"]
     )
-    intersection: List[Literal["driver", "natural_lands"]] = Field(
+    intersections: List[Literal["driver", "natural_lands"]] = Field(
         ...,
         min_items=1,
         max_items=1,
