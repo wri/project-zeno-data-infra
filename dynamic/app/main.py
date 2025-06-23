@@ -3,7 +3,7 @@ import uuid
 from enum import Enum
 from pathlib import Path
 from pydoc import describe
-from typing import Any, Dict
+from typing import Any, Dict, Annotated
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi import HTTPException, Request
@@ -89,7 +89,6 @@ def analyze(data: AnalysisInput):
 
 PAYLOAD_STORE_DIR = Path("/tmp/dist_alerts_analytics_payloads")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
-API_URL="http://"
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 
@@ -164,8 +163,15 @@ class AdminAreaOfInterest(AreaOfInterest):
         return v or "4.1"
 
 
+AoiUnion = Union[AdminAreaOfInterest]
+
 class DistAlertsAnalyticsIn(StrictBaseModel):
-    aoi: Union[AdminAreaOfInterest] = Field(..., discriminator="type")
+    aoi: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
+        ...,
+        min_items=1,
+        max_items=1,
+        description="List of areas of interest."
+    )
     start_date: str = Field(
         ...,
         title="Start Date",
@@ -180,7 +186,12 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2023-12-31"]
     )
-    intersection: Union[Literal["driver"] | Literal["natural_lands"]]
+    intersection: List[Literal["driver", "natural_lands"]] = Field(
+        ...,
+        min_items=1,
+        max_items=1,
+        description="List of intersection types"
+    )
 
 @app.post("/v0/land_change/dist_alerts/analytics",
           response_class=ORJSONResponse,
@@ -270,7 +281,7 @@ def create(
     payload_file = PAYLOAD_STORE_DIR / f"{resource_id}.json"
     payload_file.write_text(payload_json)
 
-    link = DataMartResourceLink(link=f"{API_URL}v0/land_change/dist_alerts/analytics/{resource_id}")
+    link = DataMartResourceLink(link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}")
     return DataMartResourceLinkResponse(data=link)
 
 
