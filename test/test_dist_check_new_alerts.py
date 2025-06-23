@@ -5,7 +5,6 @@ from botocore.exceptions import ClientError
 from pipelines.dist.check_for_new_alerts import (
     get_latest_version,
     s3_object_exists,
-    check_zarr_exists,
 )
 
 
@@ -68,14 +67,3 @@ def test_s3_object_exists_other_error(mock_boto_client):
 
     with pytest.raises(ClientError):
         s3_object_exists("my-bucket", "forbidden/key.zarr")
-
-
-@patch("pipelines.dist.check_for_new_alerts.s3_object_exists")
-def test_check_zarr_exists(mock_s3_check):
-    mock_s3_check.return_value = True
-    result = check_zarr_exists("umd_glad_dist_alerts", "v20250501")
-    assert result is True
-    mock_s3_check.assert_called_once_with(
-        "gfw-data-lake",
-        "umd_glad_dist_alerts/v20250501/zarr/umd_glad_dist_alerts_v20250501.zarr",
-    )
