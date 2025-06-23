@@ -10,10 +10,10 @@ from fastapi.responses import ORJSONResponse
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, Extra
 from pydantic import Field, root_validator, validator
-from typing import Any, Dict, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
 
-from dask.distributed import LocalCluster
+from dask.distributed import Client, LocalCluster
 from flox.xarray import xarray_reduce
 import xarray as xr
 import numpy as np
@@ -349,7 +349,7 @@ async def get_analytics_result(resource_id: str):
     # Read and parse JSON file
     json_content = file_path.read_text()
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
-    
+
     # GADM IDs are coming joined by '.', e.g. IDN.24.9
     gadm_ids = metadata_content["aois"][0]["id"].split(".")
     intersections = metadata_content["intersections"]
