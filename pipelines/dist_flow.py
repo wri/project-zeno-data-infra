@@ -39,12 +39,6 @@ AOIs = [
 ]  # , "birdlife_key_biodiversity_areas", "wdpa_protected_areas", "landmark_indigenous_areas"]
 
 
-def get_uri(feature):
-    raw = feature["properties"]["name"].split("/")[2:]
-    uri = "/".join(["s3:/"] + raw)
-    return uri
-
-
 @task
 def get_new_dist_version() -> str:
     return get_latest_version("umd_glad_dist_alerts")
