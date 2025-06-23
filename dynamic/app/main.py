@@ -4,15 +4,16 @@ from enum import Enum
 from pathlib import Path
 from pydoc import describe
 from typing import Any, Dict
+import duckdb
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi import HTTPException, Request
 from pydantic import BaseModel, Extra
 from pydantic import Field, root_validator, validator
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Optional, Union
 from uuid import UUID
 
-from dask.distributed import Client, LocalCluster
+from dask.distributed import LocalCluster
 from flox.xarray import xarray_reduce
 import xarray as xr
 import numpy as np
@@ -180,7 +181,7 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2023-12-31"]
     )
-    intersection: Union[Literal["driver"] | Literal["natural_lands"]]
+    intersection: Optional[Union[Literal["driver"] | Literal["natural_lands"]]] = None
 
 @app.post("/v0/land_change/dist_alerts/analytics",
           response_class=ORJSONResponse,
@@ -337,9 +338,74 @@ async def get_analytics_result(resource_id: str):
     # Read and parse JSON file
     json_content = file_path.read_text()
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
+    
+    # GADM IDs are coming joined by '.', e.g. IDN.24.9
+    gadm_ids = metadata_content["aoi"]["id"].split(".")
+    intersection = metadata_content["intersection"]
+
+    # Each intersection will be in a different parquet file
+    if intersection is None:
+        table = "gadm_dist_alerts"
+    elif intersection == "driver":
+        table = "gadm_dist_alerts_by_driver"
+        intersection_col = "ldacs_driver"
+    elif intersection == "natural_lands":
+        table = "gadm_dist_alerts_by_natural_lands"
+        intersection_col = "natural_land_class"
+    else:
+        raise ValueError(f"No way to calculate intersection {intersection}")
+    
+    # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
+    # TODO use final pipeline locations and schema for parquet files 
+    # TODO this should be done in a background task and written to file
+    # Build up the DuckDB query based on GADM ID and intersection
+    from_clause = f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
+    select_clause = "SELECT country"
+    where_clause = f"WHERE country = '{gadm_ids[0]}'"
+    group_by_clause = f"GROUP BY country"
+
+    # Includes region, so add relevant filters, selects and group bys
+    if len(gadm_ids) > 1:
+        select_clause += ", region"
+        where_clause += f" AND region = '{gadm_ids[1]}'"
+        group_by_clause += ", region"
+
+    # Includes subregion, so add relevant filters, selects and group bys
+    if len(gadm_ids) > 2:
+        select_clause += ", subregion"
+        where_clause += f" AND subregion = '{gadm_ids[2]}'"
+        group_by_clause += ", subregion"
+
+    # Includes an intersection, so group by the appropriate column
+    if intersection:
+        select_clause += f", {intersection_col}"
+        group_by_clause += f", {intersection_col}"
+
+    group_by_clause += ", alert_date, alert_confidence"
+    
+    # Query and make sure output names match the expected schema (?)
+    select_clause += ", alert_date, alert_confidence as confidence, sum(count) as value"
+    query = f"{select_clause} {from_clause} {where_clause} {group_by_clause}"
+    
+    # Dumbly doing this per request since the STS token expires eventually otherwise
+    # According to this issue, duckdb should auto refresh the token in 1.3.0, 
+    # but it doesn't seem to work for us and people are reporting the same on the issue
+    # https://github.com/duckdb/duckdb-aws/issues/26
+    # TODO do this on lifecycle start once autorefresh works
+    duckdb.query('''
+        CREATE OR REPLACE SECRET secret (
+            TYPE s3,
+            PROVIDER credential_chain
+        );
+    ''')
+
+    # Send query to DuckDB and convert to return format
+    alerts_df = duckdb.query(query).df()
+    alerts_dict = alerts_df.to_dict(orient="list")
 
     # Return using your custom response model
     return DistAlertsAnalyticsResponse(data={
+        "result": alerts_dict,
         "metadata": metadata_content,
         "status": AnalysisStatus.saved,
     })
