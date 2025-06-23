@@ -351,20 +351,20 @@ async def get_analytics_result(resource_id: str):
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
     
     # GADM IDs are coming joined by '.', e.g. IDN.24.9
-    gadm_ids = metadata_content["aoi"]["id"].split(".")
-    intersection = metadata_content["intersection"]
+    gadm_ids = metadata_content["aois"][0]["id"].split(".")
+    intersections = metadata_content["intersections"]
 
     # Each intersection will be in a different parquet file
-    if intersection is None:
+    if not intersections :
         table = "gadm_dist_alerts"
-    elif intersection == "driver":
+    elif intersections[0] == "driver":
         table = "gadm_dist_alerts_by_driver"
         intersection_col = "ldacs_driver"
-    elif intersection == "natural_lands":
+    elif intersections[0] == "natural_lands":
         table = "gadm_dist_alerts_by_natural_lands"
         intersection_col = "natural_land_class"
     else:
-        raise ValueError(f"No way to calculate intersection {intersection}")
+        raise ValueError(f"No way to calculate intersection {intersections[0]}")
     
     # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
     # TODO use final pipeline locations and schema for parquet files 
@@ -388,7 +388,7 @@ async def get_analytics_result(resource_id: str):
         group_by_clause += ", subregion"
 
     # Includes an intersection, so group by the appropriate column
-    if intersection:
+    if intersections:
         select_clause += f", {intersection_col}"
         group_by_clause += f", {intersection_col}"
 
