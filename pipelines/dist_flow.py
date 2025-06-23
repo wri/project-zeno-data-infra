@@ -15,7 +15,7 @@ from .dist.create_zarr import (
     get_tiles as get_tiles_func,
 )
 from .dist.check_for_new_alerts import get_latest_version
-
+from .dist.gadm_dist_alerts_by_natural_lands import gadm_dist_alerts_by_natural_lands
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
@@ -123,7 +123,7 @@ def run_validation_suite():
 
 
 @flow(name="DIST alerts count")
-def main(overwrite=False) -> list[str]:
+def main(overwrite=False) -> str:
     dask_client = None
     logger = get_run_logger()
     try:
@@ -131,7 +131,8 @@ def main(overwrite=False) -> list[str]:
         tile_uris = get_tiles(dist_version)
         dask_client = create_cluster()
         dist_zarr_uri = create_zarr(dist_version, tile_uris, overwrite=overwrite)
-        result = analyze_gadm_dist(dist_zarr_uri, dist_version)
+        #result = analyze_gadm_dist(dist_zarr_uri, dist_version)
+        result = gadm_dist_alerts_by_natural_lands(dist_zarr_uri, dist_version)
     except Exception:
         logger.error("DIST alerts analysis failed.")
         raise
