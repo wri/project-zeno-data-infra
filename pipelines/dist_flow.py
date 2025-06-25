@@ -139,7 +139,7 @@ def main(overwrite=False) -> list[str]:
         if dask_client:
             dask_client.shutdown()
 
-    return [result]
+    return result
 
 
 if __name__ == "__main__":
