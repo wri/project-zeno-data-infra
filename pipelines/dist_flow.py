@@ -1,28 +1,14 @@
-import itertools
 import logging
-from typing import Optional
-from prefect import flow, task
+
 import coiled
-
 import numpy as np
-import requests
-import xarray as xr
-import fsspec
 import pandas as pd
-from flox.xarray import xarray_reduce
-import numpy as np
+import xarray as xr
+
 from flox import ReindexArrayType, ReindexStrategy
-import fsspec
-import numpy as np
-import xarray as xr
-import fsspec
-import pandas as pd
 from flox.xarray import xarray_reduce
-import numpy as np
-import boto3
-import logging
-
-logging.getLogger("distributed.client").setLevel(logging.ERROR)
+from prefect import flow, task
+from prefect.logging import get_run_logger
 
 from .dist.create_zarr import (
     create_zarr as create_zarr_func,
@@ -31,12 +17,9 @@ from .dist.create_zarr import (
 from .dist.check_for_new_alerts import get_latest_version
 
 
-CONTEXTUAL_LAYERS = [None, "wri_natural_lands"]  # , "ldacs", "umd_land_cover"]
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
-AOIs = [
-    "gadm_administrative_boundaries"
-]  # , "birdlife_key_biodiversity_areas", "wdpa_protected_areas", "landmark_indigenous_areas"]
+logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
 
 @task
