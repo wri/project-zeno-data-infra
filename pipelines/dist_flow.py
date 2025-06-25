@@ -140,14 +140,20 @@ def run_validation_suite():
     pass
 
 
-@flow
-def dist_alerts_count(overwrite=False) -> list[str]:
-    dist_version = get_new_dist_version()
-    tile_uris = get_tiles(dist_version)
-    client = create_cluster()
-    dist_zarr_uri = create_zarr(dist_version, tile_uris, overwrite=overwrite)
-    result = analyze_gadm_dist(dist_zarr_uri, dist_version)
-    client.shutdown()
+    dask_client = None
+    logger = get_run_logger()
+    try:
+        dist_version = get_new_dist_version()
+        tile_uris = get_tiles(dist_version)
+        dask_client = create_cluster()
+        dist_zarr_uri = create_zarr(dist_version, tile_uris, overwrite=overwrite)
+        result = analyze_gadm_dist(dist_zarr_uri, dist_version)
+    except Exception:
+        logger.error("DIST alerts analysis failed.")
+        raise
+    finally:
+        if dask_client:
+            dask_client.shutdown()
 
     return [result]
 
