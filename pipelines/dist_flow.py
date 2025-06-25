@@ -37,13 +37,13 @@ def create_cluster():
     cluster = coiled.Cluster(
         name="dist_alerts_zonal_stat_count",
         region="us-east-1",
-        n_workers=1,
+        n_workers=10,
         tags={"project": "dist_alerts_zonal_stat"},
         scheduler_vm_types="r7g.xlarge",
         worker_vm_types="r7g.2xlarge",
         compute_purchase_option="spot_with_fallback",
     )
-    cluster.adapt(minimum=1, maximum=50)
+    cluster.adapt(minimum=10, maximum=50)
     client = cluster.get_client()
 
     return client
@@ -52,7 +52,6 @@ def create_cluster():
 @task
 def create_zarr(dist_version: str, tile_uris, overwrite=False) -> str:
     zarr_uri = create_zarr_func(dist_version, tile_uris, overwrite=overwrite)
-
     return zarr_uri
 
 
