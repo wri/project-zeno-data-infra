@@ -140,6 +140,8 @@ def run_validation_suite():
     pass
 
 
+@flow(name="DIST alerts count")
+def main(overwrite=False) -> list[str]:
     dask_client = None
     logger = get_run_logger()
     try:
@@ -159,4 +161,4 @@ def run_validation_suite():
 
 
 if __name__ == "__main__":
-    dist_alerts_count(overwrite=False)
+    main(overwrite=False)
