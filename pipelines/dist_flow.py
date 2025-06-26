@@ -10,10 +10,7 @@ from flox.xarray import xarray_reduce
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from .dist.create_zarr import (
-    create_zarr as create_zarr_func,
-    get_tiles as get_tiles_func,
-)
+from .dist.create_zarr import create_zarr as create_zarr_func
 from .dist.check_for_new_alerts import get_latest_version
 
 
@@ -25,11 +22,6 @@ logging.getLogger("distributed.client").setLevel(logging.ERROR)
 @task
 def get_new_dist_version() -> str:
     return get_latest_version("umd_glad_dist_alerts")
-
-
-@task
-def get_tiles(dist_version):
-    return get_tiles_func("umd_glad_dist_alerts", dist_version)
 
 
 @task
@@ -50,8 +42,8 @@ def create_cluster():
 
 
 @task
-def create_zarr(dist_version: str, tile_uris, overwrite=False) -> str:
-    zarr_uri = create_zarr_func(dist_version, tile_uris, overwrite=overwrite)
+def create_zarr(dist_version: str, overwrite=False) -> str:
+    zarr_uri = create_zarr_func(dist_version, overwrite=overwrite)
     return zarr_uri
 
 
@@ -128,9 +120,8 @@ def main(overwrite=False) -> list[str]:
     logger = get_run_logger()
     try:
         dist_version = get_new_dist_version()
-        tile_uris = get_tiles(dist_version)
         dask_client = create_cluster()
-        dist_zarr_uri = create_zarr(dist_version, tile_uris, overwrite=overwrite)
+        dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
         result = analyze_gadm_dist(dist_zarr_uri, dist_version)
     except Exception:
         logger.error("DIST alerts analysis failed.")

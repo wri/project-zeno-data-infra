@@ -59,22 +59,18 @@ def test_decode_alert_data():
 
 @patch("pipelines.dist.create_zarr.data_lake_bucket", "test-bucket")
 @patch("pipelines.dist.create_zarr.s3_object_exists")
-@patch("pipelines.dist.create_zarr.xr.open_mfdataset")
-def test_create_zarr_new_file(mock_open_mfdataset, mock_s3_exists, mock_dataset):
+@patch("pipelines.dist.create_zarr.xr.open_dataset")
+def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     """Test creating a new zarr file when it doesn't exist."""
     mock_s3_exists.return_value = False
-    mock_open_mfdataset.return_value = mock_dataset
+    mock_open_dataset.return_value = mock_dataset
 
     version = "v20250102"
-    sample_tile_uris = [
-        "s3://bucket/tile1.tif",
-        "s3://bucket/tile2.tif",
-        "s3://bucket/tile3.tif",
-    ]
+    cog_uri = f"s3://test-bucket/umd_glad_dist_alerts/{version}/raster/epsg-4326/cog/default.tif"
 
     with patch.object(xr.Dataset, "to_zarr") as mock_to_zarr:
 
-        result = create_zarr(version, sample_tile_uris, overwrite=False)
+        result = create_zarr(version, overwrite=False)
 
         expected_uri = f"s3://test-bucket/umd_glad_dist_alerts/{version}/raster/epsg-4326/zarr/umd_glad_dist_alerts_{version}.zarr"
         assert result == expected_uri
@@ -84,8 +80,6 @@ def test_create_zarr_new_file(mock_open_mfdataset, mock_s3_exists, mock_dataset)
             f"umd_glad_dist_alerts/{version}/raster/epsg-4326/zarr/umd_glad_dist_alerts_{version}.zarr/zarr.json",
         )
 
-        mock_open_mfdataset.assert_called_once_with(
-            sample_tile_uris, parallel=True, chunks={"x": 10000, "y": 10000}
-        )
+        mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
 
         mock_to_zarr.assert_called_once_with(expected_uri, mode="w")
