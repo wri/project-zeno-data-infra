@@ -12,6 +12,7 @@ from pydantic import BaseModel, Extra
 from pydantic import Field, root_validator, validator
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
+import httpx
 
 from dask.distributed import Client, LocalCluster
 from flox.xarray import xarray_reduce
@@ -23,6 +24,10 @@ from rasterio.features import rasterize
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import pandas as pd
+import os
+
+API_KEY = os.environ["API_KEY"]
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -171,6 +176,12 @@ class KeyBiodiversityAreaOfInterest(AreaOfInterest):
         title="Key Biodiversity Area site code",
         examples=[36, 18, 8111]
     )
+    
+    async def get_geojson(self) -> Dict[str, Any]:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select * from data where sitrecid = {self.id}&x-api-key=bc4cccc7-079b-4b2a-88b3-1667152e1f6c").json()
+            if response["data"]:
+                return json.loads(response["data"][0]["gfw_geojson"])
 
 
 class ProtectedAreaOfInterest(AreaOfInterest):
@@ -443,22 +454,30 @@ async def get_analytics_result(resource_id: str):
         alerts_df = duckdb.query(query).df()
         alerts_dict = alerts_df.to_dict(orient="list")
     else:
-        mock_data = {
-            "key_biodiversity_area_id": [aoi["id"]] * 6,
-            "alert_date": ["2025-01-01", "2025-01-01", "2025-01-02", "2025-01-02", "2025-01-10", "2025-01-10"],
-            "confidence": ["high", "low"] * 3,
-            "value": list(range(10, 40, 5))
-        }
+        # mock_data = {
+        #     "key_biodiversity_area_id": [aoi["id"]] * 6,
+        #     "alert_date": ["2025-01-01", "2025-01-01", "2025-01-02", "2025-01-02", "2025-01-10", "2025-01-10"],
+        #     "confidence": ["high", "low"] * 3,
+        #     "value": list(range(10, 40, 5))
+        # }
 
-        intersections = metadata_content["intersections"]
-        if intersections[0] == "driver":
-            mock_data["ldacs_driver"] = ["Conversion of natural lands", "Wildfires"] * 3
-        elif intersections[0] == "natural_lands":
-            mock_data["natural_lands_class"] = ["Forest", "Short Vegetation"] * 3
+        # intersections = metadata_content["intersections"]
+        # if intersections[0] == "driver":
+        #     mock_data["ldacs_driver"] = ["Conversion of natural lands", "Wildfires"] * 3
+        # elif intersections[0] == "natural_lands":
+        #     mock_data["natural_lands_class"] = ["Forest", "Short Vegetation"] * 3
 
-        print(mock_data)
-        df = pd.DataFrame(mock_data)
-        alerts_dict = df.to_dict(orient="list")
+        # print(mock_data)
+        # df = pd.DataFrame(mock_data)
+        # alerts_dict = df.to_dict(orient="list")
+        # async with httpx.AsyncClient() as client:
+        import requests
+        response = requests.get(f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select * from data where sitrecid = {aoi['id']}&x-api-key={API_KEY}")
+        response = response.json()
+        if response["data"]:
+            geojson = json.loads(response["data"][0]["gfw_geojson"])
+
+        alerts_dict = await _analyze(aoi["id"], geojson)
 
     # Return using your custom response model
     return DistAlertsAnalyticsResponse(data={
@@ -466,3 +485,36 @@ async def get_analytics_result(resource_id: str):
         "metadata": metadata_content,
         "status": AnalysisStatus.saved,
     })
+
+
+async def _analyze(id, geojson):
+    # rasterize
+    geom = shape(geojson)
+
+    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
+    dist_alerts = xr.open_zarr(dist_obj_name)
+
+    sliced = dist_alerts.sel(x=slice(geom.bounds[0],geom.bounds[2]), y=slice(geom.bounds[3],geom.bounds[1]),).squeeze("band")
+    clipped = sliced.rio.clip([geojson])
+
+    alerts_count = xarray_reduce(
+        clipped.alert_date, 
+        *(
+            clipped.alert_date,
+            clipped.confidence
+        ),
+        func='count',
+        expected_groups=(
+            np.arange(731, 1590),
+            [1, 2, 3]
+        )
+    ).compute()
+    alerts_count.name = 'value'
+
+    alerts_df = alerts_count.to_dataframe().drop("band", axis=1).drop("spatial_ref", axis=1).reset_index()
+    alerts_df.confidence = alerts_df.confidence.map({2: 'low', 3: 'high'})
+    alerts_df.alert_date = pd.to_datetime(alerts_df.alert_date + JULIAN_DATE_2015 + JULIAN_DATE_DIST_OFFSET, origin='julian', unit='D').dt.strftime('%Y-%m-%d')
+    alerts_df["key_biodiversity_area"] = id
+    alerts_dict = alerts_df[alerts_df.value > 0].to_dict(orient="list")
+
+    return alerts_dict
