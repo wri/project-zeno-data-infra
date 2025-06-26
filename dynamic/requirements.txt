@@ -12,3 +12,4 @@ rioxarray
 s3fs
 pydantic
 orjson
+duckdb
