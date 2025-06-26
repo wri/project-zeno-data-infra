@@ -24,10 +24,3 @@ def s3_object_exists(bucket_name, object_key):
             return False
         else:
             raise
-
-
-def check_zarr_exists(dataset, version):
-    object_key = f"{dataset}/{version}/zarr/{dataset}_{version}.zarr"
-    bucket = "gfw-data-lake"
-
-    return s3_object_exists(bucket, object_key)
