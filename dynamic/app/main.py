@@ -164,7 +164,34 @@ class AdminAreaOfInterest(AreaOfInterest):
         return v or "4.1"
 
 
-AoiUnion = Union[AdminAreaOfInterest]
+class KeyBiodiversityAreaOfInterest(AreaOfInterest):
+    type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
+    id: int = Field(
+        ...,
+        title="Key Biodiversity Area site code",
+        examples=[36, 18, 8111]
+    )
+
+
+class ProtectedAreaOfInterest(AreaOfInterest):
+    type: Literal["protected_area"] = "protected_area"
+    id: int = Field(
+        ...,
+        title="WDPA protected area ID",
+        examples=[555625448, 148322, 555737674]
+    )
+
+
+class IndigneousAreaOfInterest(AreaOfInterest):
+    type: Literal["indigenous_land"] = "indigenous_land"
+    id: int = Field(
+        ...,
+        title="Landmark Indigenous lands object ID",
+        examples=[1931, 1918, 43053]
+    )
+
+
+AoiUnion = Union[AdminAreaOfInterest, KeyBiodiversityAreaOfInterest, ProtectedAreaOfInterest, IndigneousAreaOfInterest]
 
 class DistAlertsAnalyticsIn(StrictBaseModel):
     aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
@@ -350,69 +377,88 @@ async def get_analytics_result(resource_id: str):
     json_content = file_path.read_text()
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
 
-    # GADM IDs are coming joined by '.', e.g. IDN.24.9
-    gadm_ids = metadata_content["aois"][0]["id"].split(".")
-    intersections = metadata_content["intersections"]
+    aoi = metadata_content["aois"][0]
+    if aoi["type"] == "admin":
+        # GADM IDs are coming joined by '.', e.g. IDN.24.9
+        gadm_ids = aoi["id"].split(".")
+        intersections = metadata_content["intersections"]
 
-    # Each intersection will be in a different parquet file
-    if not intersections :
-        table = "gadm_dist_alerts"
-    elif intersections[0] == "driver":
-        table = "gadm_dist_alerts_by_driver"
-        intersection_col = "ldacs_driver"
-    elif intersections[0] == "natural_lands":
-        table = "gadm_dist_alerts_by_natural_lands"
-        intersection_col = "natural_land_class"
+        # Each intersection will be in a different parquet file
+        if not intersections:
+            table = "gadm_dist_alerts"
+        elif intersections[0] == "driver":
+            table = "gadm_dist_alerts_by_driver"
+            intersection_col = "ldacs_driver"
+        elif intersections[0] == "natural_lands":
+            table = "gadm_dist_alerts_by_natural_lands"
+            intersection_col = "natural_land_class"
+        else:
+            raise ValueError(f"No way to calculate intersection {intersections[0]}")
+        
+        # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
+        # TODO use final pipeline locations and schema for parquet files 
+        # TODO this should be done in a background task and written to file
+        # Build up the DuckDB query based on GADM ID and intersection
+        from_clause = f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
+        select_clause = "SELECT country"
+        where_clause = f"WHERE country = '{gadm_ids[0]}'"
+        group_by_clause = f"GROUP BY country"
+
+        # Includes region, so add relevant filters, selects and group bys
+        if len(gadm_ids) > 1:
+            select_clause += ", region"
+            where_clause += f" AND region = '{gadm_ids[1]}'"
+            group_by_clause += ", region"
+
+        # Includes subregion, so add relevant filters, selects and group bys
+        if len(gadm_ids) > 2:
+            select_clause += ", subregion"
+            where_clause += f" AND subregion = '{gadm_ids[2]}'"
+            group_by_clause += ", subregion"
+
+        # Includes an intersection, so group by the appropriate column
+        if intersections:
+            select_clause += f", {intersection_col}"
+            group_by_clause += f", {intersection_col}"
+
+        group_by_clause += ", alert_date, alert_confidence"
+        
+        # Query and make sure output names match the expected schema (?)
+        select_clause += ", alert_date, alert_confidence as confidence, sum(count) as value"
+        query = f"{select_clause} {from_clause} {where_clause} {group_by_clause}"
+        
+        # Dumbly doing this per request since the STS token expires eventually otherwise
+        # According to this issue, duckdb should auto refresh the token in 1.3.0, 
+        # but it doesn't seem to work for us and people are reporting the same on the issue
+        # https://github.com/duckdb/duckdb-aws/issues/26
+        # TODO do this on lifecycle start once autorefresh works
+        duckdb.query('''
+            CREATE OR REPLACE SECRET secret (
+                TYPE s3,
+                PROVIDER credential_chain
+            );
+        ''')
+
+        # Send query to DuckDB and convert to return format
+        alerts_df = duckdb.query(query).df()
+        alerts_dict = alerts_df.to_dict(orient="list")
     else:
-        raise ValueError(f"No way to calculate intersection {intersections[0]}")
-    
-    # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
-    # TODO use final pipeline locations and schema for parquet files 
-    # TODO this should be done in a background task and written to file
-    # Build up the DuckDB query based on GADM ID and intersection
-    from_clause = f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
-    select_clause = "SELECT country"
-    where_clause = f"WHERE country = '{gadm_ids[0]}'"
-    group_by_clause = f"GROUP BY country"
+        mock_data = {
+            "key_biodiversity_area_id": [aoi["id"]] * 6,
+            "alert_date": ["2025-01-01", "2025-01-01", "2025-01-02", "2025-01-02", "2025-01-10", "2025-01-10"],
+            "confidence": ["high", "low"] * 3,
+            "value": list(range(10, 40, 5))
+        }
 
-    # Includes region, so add relevant filters, selects and group bys
-    if len(gadm_ids) > 1:
-        select_clause += ", region"
-        where_clause += f" AND region = '{gadm_ids[1]}'"
-        group_by_clause += ", region"
+        intersections = metadata_content["intersections"]
+        if intersections[0] == "driver":
+            mock_data["ldacs_driver"] = ["Conversion of natural lands", "Wildfires"] * 3
+        elif intersections[0] == "natural_lands":
+            mock_data["natural_lands_class"] = ["Forest", "Short Vegetation"] * 3
 
-    # Includes subregion, so add relevant filters, selects and group bys
-    if len(gadm_ids) > 2:
-        select_clause += ", subregion"
-        where_clause += f" AND subregion = '{gadm_ids[2]}'"
-        group_by_clause += ", subregion"
-
-    # Includes an intersection, so group by the appropriate column
-    if intersections:
-        select_clause += f", {intersection_col}"
-        group_by_clause += f", {intersection_col}"
-
-    group_by_clause += ", alert_date, alert_confidence"
-    
-    # Query and make sure output names match the expected schema (?)
-    select_clause += ", alert_date, alert_confidence as confidence, sum(count) as value"
-    query = f"{select_clause} {from_clause} {where_clause} {group_by_clause}"
-    
-    # Dumbly doing this per request since the STS token expires eventually otherwise
-    # According to this issue, duckdb should auto refresh the token in 1.3.0, 
-    # but it doesn't seem to work for us and people are reporting the same on the issue
-    # https://github.com/duckdb/duckdb-aws/issues/26
-    # TODO do this on lifecycle start once autorefresh works
-    duckdb.query('''
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain
-        );
-    ''')
-
-    # Send query to DuckDB and convert to return format
-    alerts_df = duckdb.query(query).df()
-    alerts_dict = alerts_df.to_dict(orient="list")
+        print(mock_data)
+        df = pd.DataFrame(mock_data)
+        alerts_dict = df.to_dict(orient="list")
 
     # Return using your custom response model
     return DistAlertsAnalyticsResponse(data={
