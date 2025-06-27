@@ -37,11 +37,12 @@ def create_cluster():
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
         compute_purchase_option="spot_with_fallback",
+        no_client_timeout="5 seconds"
     )
     cluster.adapt(minimum=10, maximum=50)
-    client = cluster.get_client()
 
-    return client
+    client = cluster.get_client()
+    return client, cluster
 
 
 @task
@@ -63,20 +64,20 @@ def run_validation_suite():
 
 @flow(name="DIST alerts count")
 def main(overwrite=False) -> list[str]:
-    dask_client = None
+    client, cluster = (None, None)
     logger = get_run_logger()
     try:
         dist_version = get_new_dist_version()
         tile_uris = get_tiles(dist_version)
-        dask_client = create_cluster()
+        client, cluster = create_cluster()
         dist_zarr_uri = create_zarr(dist_version, tile_uris, overwrite=overwrite)
         result = analyze_gadm_dist(dist_zarr_uri, dist_version)
     except Exception:
         logger.error("DIST alerts analysis failed.")
         raise
     finally:
-        if dask_client:
-            dask_client.shutdown()
+        if client:
+            client.close()
 
     return [result]
 
