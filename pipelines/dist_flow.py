@@ -15,6 +15,7 @@ from .dist.create_zarr import (
     get_tiles as get_tiles_func,
 )
 from .dist.check_for_new_alerts import get_latest_version
+from .dist.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
 
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
