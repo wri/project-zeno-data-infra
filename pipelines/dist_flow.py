@@ -38,6 +38,7 @@ def create_cluster():
         name="dist_alerts_zonal_stat_count",
         region="us-east-1",
         n_workers=10,
+        container="danielmannarino/zeno_dockerized:3",
         tags={"project": "dist_alerts_zonal_stat"},
         scheduler_vm_types="r7g.xlarge",
         worker_vm_types="r7g.2xlarge",

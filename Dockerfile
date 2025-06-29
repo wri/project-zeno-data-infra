@@ -1,37 +1,39 @@
-FROM ghcr.io/osgeo/gdal:ubuntu-small-latest
+FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.3
 
+ENV USR_LOCAL_BIN=/usr/local/bin
 ENV VENV_DIR=/app/.venv
-ENV PYTHON_VERSION="3.12"
+ENV PYTHON_VERSION="3.13"
+ENV PATH=${USR_LOCAL_BIN}:${PATH} \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=${VENV_DIR} \
+    UV_UNMANAGED_INSTALL=${USR_LOCAL_BIN}
 
-# Update package lists and install Python 3.12
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+# Update package lists
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl gcc build-essential \
     && rm -rf /var/lib/apt/lists
 
-# # Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && install -m 0755 /root/.local/bin/uv /usr/local/bin/uv
+# TODO: Restore the non-root user stuff
 
-ENV PATH="/root/.local/bin:$PATH"
+# RUN useradd -m -s /bin/bash appuser
+# RUN chown -R appuser:appuser /app
 
-RUN useradd -m -s /bin/bash appuser
+# USER appuser
+# COPY --chown=appuser . .
+# RUN chown -R appuser:appuser /app
 
+COPY . /app
 WORKDIR /app
-RUN chown -R appuser:appuser /app
 
-USER appuser
-
-COPY --chown=appuser . .
-
-RUN chown -R appuser:appuser /app
-
-RUN uv venv ${VENV_DIR} --python ${PYTHON_VERSION}
-RUN uv pip sync pyproject.toml
-
-RUN . /app/.venv/bin/activate
+# Create a virtual environment with uv inside the container
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && uv venv ${VENV_DIR} --python ${PYTHON_VERSION} --seed --system-site-packages
 
 # Verify GDAL and core Python package installation
-RUN python -c "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}')" \
+RUN . ${VENV_DIR}/bin/activate \
+    && uv sync --locked --no-install-project --no-dev \
+    && python -c "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}')" \
     && python -c "import numpy, xarray; print('Core packages imported successfully')"
 
-# Default command
-CMD ["/bin/bash"]
+ENV PATH=${VENV_DIR}/bin:${USR_LOCAL_BIN}:${PATH}

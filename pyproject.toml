@@ -6,19 +6,25 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3",
     "coiled",
-    "dask",
+    "dask[complete]",  # Slim down, might be overkill
+    "distributed",
     "fastparquet",
     "flox",
     "fsspec",
+    "gdal==3.10.3",    # Match the version in the Docker image
+    "numba>=0.61.2",
     "numpy",
     "pandas",
     "prefect",
     "rioxarray",
     "s3fs",
     "sparse",
-    "xarray"
+    "xarray[complete]"  # Slim down, definitely overkill
 ]
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pipelines"]
