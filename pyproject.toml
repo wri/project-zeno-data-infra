@@ -6,20 +6,22 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3",
     "coiled",
-    "dask[complete]",  # Slim down, might be overkill
-    "distributed",
+    "dask[array,dataframe,distributed,diagnostics]",
+    "distributed==2025.5.1",
     "fastparquet",
     "flox",
     "fsspec",
-    "gdal==3.10.3",    # Match the version in the Docker image
     "numba>=0.61.2",
+    "numbagg",
     "numpy",
     "pandas",
     "prefect",
+    "rasterio==1.4.3",
     "rioxarray",
     "s3fs",
     "sparse",
-    "xarray[complete]"  # Slim down, definitely overkill
+    "xarray",
+    "zarr"
 ]
 
 [build-system]
