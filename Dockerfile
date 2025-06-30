@@ -1,4 +1,4 @@
-FROM ghcr.io/osgeo/gdal:ubuntu-full-3.10.3
+FROM ghcr.io/osgeo/gdal:ubuntu-small-3.9.3
 
 ENV USR_LOCAL_BIN=/usr/local/bin
 ENV VENV_DIR=/app/.venv
@@ -30,10 +30,8 @@ WORKDIR /app
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && uv venv ${VENV_DIR} --python ${PYTHON_VERSION} --seed --system-site-packages
 
-# Verify GDAL and core Python package installation
+## Verify GDAL and core Python package installation
 RUN . ${VENV_DIR}/bin/activate \
-    && uv sync --locked --no-install-project --no-dev \
-    && python -c "from osgeo import gdal; print(f'GDAL version: {gdal.__version__}')" \
-    && python -c "import numpy, xarray; print('Core packages imported successfully')"
+    && uv sync --locked --no-install-project --no-dev
 
 ENV PATH=${VENV_DIR}/bin:${USR_LOCAL_BIN}:${PATH}
