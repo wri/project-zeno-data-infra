@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+dask[distributed]
+flox
+xarray
+numpy
+shapely
+rasterio
+pandas
+zarr
+rioxarray
+s3fs
+pydantic
+orjson
+duckdb
+requests

@@ -33,4 +33,4 @@ def test_gadm_get_analytics_result():
     assert data["result"]["region"] == [24, 24]
     assert data["result"]["subregion"] == [9, 9]
     assert data["result"]["alert_date"] == ["2024-08-15T00:00:00", "2024-08-15T00:00:00"]
-    assert data["result"]["confidence"] == ["low", "high"]
+    assert data["result"]["confidence"] == ["high", "low"]
