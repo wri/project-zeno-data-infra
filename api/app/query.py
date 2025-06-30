@@ -3,7 +3,7 @@
 from typing import List, Tuple
 
 
-def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[str], ):
+def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[str]) -> str:
     # Each intersection will be in a different parquet file
     if not intersections:
         table = "gadm_dist_alerts"
@@ -28,13 +28,13 @@ def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[st
     # Includes region, so add relevant filters, selects and group bys
     if len(gadm_id) > 1:
         select_clause += ", region"
-        where_clause += f" AND region = '{gadm_id[1]}'"
+        where_clause += f" AND region = {gadm_id[1]}"
         by_clause += ", region"
 
     # Includes subregion, so add relevant filters, selects and group bys
     if len(gadm_id) > 2:
         select_clause += ", subregion"
-        where_clause += f" AND subregion = '{gadm_id[2]}'"
+        where_clause += f" AND subregion = {gadm_id[2]}"
         by_clause += ", subregion"
 
     # Includes an intersection, so group by the appropriate column
@@ -47,7 +47,7 @@ def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[st
     order_by_clause = f"ORDER {by_clause}"
 
     # Query and make sure output names match the expected schema (?)
-    select_clause += ", alert_date, alert_confidence as confidence, sum(count) as value"
+    select_clause += ", alert_date, alert_confidence AS confidence, SUM(count) AS value"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
     return query

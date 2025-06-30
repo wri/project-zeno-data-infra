@@ -7,15 +7,6 @@ client = TestClient(app)
 
 
 def test_gadm_get_analytics_result():
-    aoi = AdminAreaOfInterest(id="IDN.24.9")
-
-    query = DistAlertsAnalyticsIn(
-        aois=[aoi],
-        start_date="2024-08-15",
-        end_date="2024-08-16",
-        intersections=[],
-    )
-    
     resource = client.post(
         "/v0/land_change/dist_alerts/analytics", 
         json={
