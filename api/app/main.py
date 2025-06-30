@@ -26,7 +26,7 @@ from contextlib import asynccontextmanager
 import pandas as pd
 import os
 
-from api.app.analysis import get_geojson
+from api.app.analysis import get_geojson, zonal_statistics
 from api.app.query import create_gadm_dist_query
 
 
@@ -46,36 +46,7 @@ class AnalysisInput(BaseModel):
     geojson: Dict[str, Any]
     dataset: str
 
-JULIAN_DATE_2021 = 2459215
-NATURAL_LANDS_CLASSES = {
-    2: "Forest",
-    3: "Short vegetation",
-    4: "Water",
-    5: "Mangroves",
-    6: "Bare",
-    7: "Snow/Ice",
-    8: "Wetland forest",
-    9: "Peat forest",
-    10: "Wetland short vegetation",
-    11: "Peat short vegetation",
-    12: "Cropland",
-    13: "Built-up",
-    14: "Tree cover",
-    15: "Short vegetation",
-    16: "Water",
-    17: "Wetland tree cover",
-    18: "Peat tree cover",
-    19: "Wetland short vegetation",
-    20: "Peat short vegetation",
-    21: "Bare"
-}
-DIST_DRIVERS = {
-    1: "Wildfire",
-    2: "Flooding",
-    3: "Crop management",
-    4: "Potential conversion",
-    5: "Unclassified",
-}
+
 @app.get("/")
 def read_root():
     return {"message": "Hello from FastAPI!"}
@@ -446,7 +417,7 @@ async def get_analytics_result(resource_id: str):
         else:
             intersection = None
 
-        alerts_df = await _analyze(geojson, aoi, intersection)
+        alerts_df = await zonal_statistics(geojson, aoi, intersection)
         
     if metadata_content["start_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
@@ -463,56 +434,3 @@ async def get_analytics_result(resource_id: str):
     })
 
 
-async def _analyze(geojson, aoi, intersection=None):
-    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
-    dist_alerts = _clip_xarr_to_geojson(xr.open_zarr(dist_obj_name), geojson)
-
-    groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
-    expected_groups = [np.arange(731, 1590), [1, 2, 3]]
-    if intersection == 'natural_lands':
-        natural_lands = _clip_xarr_to_geojson(xr.open_zarr(
-            's3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr'
-        ).band_data, geojson)
-        natural_lands.name = "natural_land_class"
-
-        groupby_layers.append(natural_lands)
-        expected_groups.append(np.arange(22))
-    elif intersection == 'driver':
-        dist_drivers = _clip_xarr_to_geojson(xr.open_zarr(
-            "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
-        ).band_data, geojson)
-        dist_drivers.name = "ldacs_driver"
-
-        groupby_layers.append(dist_drivers) 
-        expected_groups.append(np.arange(5))
-
-    alerts_count = xarray_reduce(
-        dist_alerts.alert_date, 
-        *tuple(groupby_layers),
-        func='count',
-        expected_groups=tuple(expected_groups),
-    ).compute()
-    alerts_count.name = 'value'
-
-    alerts_df = alerts_count.to_dataframe().drop("band", axis=1).drop("spatial_ref", axis=1).reset_index()
-    alerts_df.confidence = alerts_df.confidence.map({2: 'low', 3: 'high'})
-    alerts_df.alert_date = pd.to_datetime(alerts_df.alert_date + JULIAN_DATE_2021, origin='julian', unit='D').dt.strftime('%Y-%m-%d')
-    
-    if "id" in aoi:
-        alerts_df[aoi["type"]] = aoi["id"]
-    
-    
-    if intersection == 'natural_lands':
-        alerts_df.natural_land_class = alerts_df.natural_land_class.apply(lambda x: NATURAL_LANDS_CLASSES.get(x, 'Unclassified'))
-    elif intersection == 'driver':
-        alerts_df.ldacs_driver = alerts_df.ldacs_driver.apply(lambda x: DIST_DRIVERS.get(x, 'Unclassified'))
-
-    alerts_df = alerts_df[alerts_df.value > 0]
-    return alerts_df
-
-
-def _clip_xarr_to_geojson(xarr, geojson):
-    geom = shape(geojson)
-    sliced = xarr.sel(x=slice(geom.bounds[0],geom.bounds[2]), y=slice(geom.bounds[3],geom.bounds[1]),).squeeze("band")
-    clipped = sliced.rio.clip([geojson])
-    return clipped
