@@ -20,6 +20,7 @@ def create_zarr(version, tile_uris, overwrite=False) -> str:
         tile_uris,
         parallel=True,
         chunks={"x": 10000, "y": 10000},
+        engine="rasterio"
     ).band_data
 
     alert_date = (dataset % 10000).astype(np.uint16)
