@@ -1,13 +1,9 @@
-<<<<<<< HEAD
-*.ipynb
-*/__pycache__/*
-=======
 */__pycache__/*
 *.pyc
+*.ipynb
 
 .venv*
 
 .DS_Store
 
 **/.ipynb_checkpoints/
->>>>>>> main
