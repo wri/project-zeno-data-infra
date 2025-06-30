@@ -26,9 +26,8 @@ from contextlib import asynccontextmanager
 import pandas as pd
 import os
 
+from api.app.analysis import get_geojson
 from api.app.query import create_gadm_dist_query
-
-API_KEY = os.environ["API_KEY"]
 
 
 @asynccontextmanager
@@ -440,20 +439,7 @@ async def get_analytics_result(resource_id: str):
         # Send query to DuckDB and convert to return format
         alerts_df = duckdb.query(query).df()
     else:
-        if aoi["type"] == "geojson":
-            geojson = aoi["geojson"]
-        else:
-            if aoi["type"] == "key_biodiversity_area":
-                url = f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select gfw_geojson from data where sitrecid = {aoi['id']}&x-api-key={API_KEY}"
-            elif aoi["type"] == "protected_area":
-                url = f"https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query?sql=select gfw_geojson from data where wdpaid = {aoi['id']}&x-api-key={API_KEY}"
-            elif aoi["type"] == "indigenous_land":
-                url = f"https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query?sql=select gfw_geojson from data where objectid = {aoi['id']}&x-api-key={API_KEY}"
-
-            response = requests.get(url)
-            response = response.json()
-            if response["data"]:
-                geojson = json.loads(response["data"][0]["gfw_geojson"])
+        geojson = get_geojson(aoi)
 
         if metadata_content["intersections"]:
             intersection = metadata_content["intersections"][0]
