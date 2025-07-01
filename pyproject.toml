@@ -6,19 +6,26 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3",
     "coiled",
-    "dask",
+    "dask[array,dataframe,distributed,diagnostics]",
     "fastparquet",
     "flox",
     "fsspec",
+    "numba>=0.61.2",
+    "numbagg",
     "numpy",
     "pandas",
     "prefect",
+    "rasterio==1.4.3",
     "rioxarray",
     "s3fs",
     "sparse",
-    "xarray"
+    "xarray",
+    "zarr"
 ]
 
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pipelines"]
