@@ -2,6 +2,7 @@
 /.vscode
 *__pycache__*
 *.idea*
+__marimo__
 
 # MyPy
 .mypy_cache/*
