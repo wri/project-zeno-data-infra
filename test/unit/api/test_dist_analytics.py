@@ -115,3 +115,12 @@ def test_get_geojson_url_for_data_api_kba():
     url = get_geojson_url_for_data_api(aoi)
     assert url == f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select gfw_geojson from data where sitrecid = 1241"
 
+
+def test_get_geojson_url_for_data_api_notreal():
+    aoi = {"type": "notreal", "id": 1241}
+    
+    try:
+        get_geojson_url_for_data_api(aoi)
+    except ValueError:
+        assert True
+
