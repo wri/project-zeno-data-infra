@@ -5,13 +5,13 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 
 from pipelines.dist.gadm_dist_alerts import gadm_dist_alerts
-from .dist.create_zarr import (
+from pipelines.dist.create_zarr import (
     create_zarr as create_zarr_func,
-    get_tiles as get_tiles_func,
 )
-from .dist.check_for_new_alerts import get_latest_version
-from .dist.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
-from .dist.gadm_dist_alerts_by_natural_lands import gadm_dist_alerts_by_natural_lands
+from pipelines.dist.check_for_new_alerts import get_latest_version
+from pipelines.dist.gadm_dist_alerts_by_natural_lands import (
+    gadm_dist_alerts_by_natural_lands,
+)
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
@@ -24,11 +24,6 @@ def get_new_dist_version() -> str:
 
 
 @task
-def get_tiles(dist_version):
-    return get_tiles_func("umd_glad_dist_alerts", dist_version)
-
-
-@task
 def create_cluster():
     cluster = coiled.Cluster(
         name="dist_alerts_zonal_stat_count",
@@ -38,7 +33,7 @@ def create_cluster():
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
         compute_purchase_option="spot_with_fallback",
-        no_client_timeout="5 seconds"
+        no_client_timeout="5 seconds",
     )
     cluster.adapt(minimum=10, maximum=50)
 
@@ -47,8 +42,8 @@ def create_cluster():
 
 
 @task
-def create_zarr(dist_version: str, tile_uris, overwrite=False) -> str:
-    zarr_uri = create_zarr_func(dist_version, tile_uris, overwrite=overwrite)
+def create_zarr(dist_version: str, overwrite=False) -> str:
+    zarr_uri = create_zarr_func(dist_version, overwrite=overwrite)
     return zarr_uri
 
 
@@ -65,23 +60,28 @@ def run_validation_suite():
 
 @flow(name="DIST alerts count")
 def main(overwrite=False) -> list[str]:
-    client, cluster = (None, None)
     logger = get_run_logger()
+    dask_client = None
+    result_uris = []
     try:
         dist_version = get_new_dist_version()
-        tile_uris = get_tiles(dist_version)
-        client, cluster = create_cluster()
-        dist_zarr_uri = create_zarr(dist_version, tile_uris, overwrite=overwrite)
-        result = analyze_gadm_dist(dist_zarr_uri, dist_version)
-        result = gadm_dist_alerts_by_natural_lands(dist_zarr_uri, dist_version)
+        dask_client = create_cluster()
+        dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
+        gadm_dist_result = analyze_gadm_dist(dist_zarr_uri, dist_version)
+        result_uris.append(gadm_dist_result)
+
+        gadm_dist_by_natural_lands_result = gadm_dist_alerts_by_natural_lands(
+            dist_zarr_uri, dist_version
+        )
+        result_uris.append(gadm_dist_by_natural_lands_result)
     except Exception:
         logger.error("DIST alerts analysis failed.")
         raise
     finally:
-        if client:
-            client.close()
+        if dask_client:
+            dask_client.shutdown()
 
-    return [result]
+    return result_uris
 
 
 if __name__ == "__main__":
