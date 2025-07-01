@@ -4,14 +4,16 @@ import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.dist.gadm_dist_alerts import gadm_dist_alerts
 from pipelines.dist.create_zarr import (
     create_zarr as create_zarr_func,
 )
 from pipelines.dist.check_for_new_alerts import get_latest_version
+
+from pipelines.dist.gadm_dist_alerts import gadm_dist_alerts
 from pipelines.dist.gadm_dist_alerts_by_natural_lands import (
     gadm_dist_alerts_by_natural_lands,
 )
+from pipelines.dist.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
@@ -49,12 +51,6 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 
 @task
-def analyze_gadm_dist(dist_zarr_uri, version):
-
-    return gadm_dist_alerts(dist_zarr_uri, version)
-
-
-@task
 def run_validation_suite():
     pass
 
@@ -66,15 +62,20 @@ def main(overwrite=False) -> list[str]:
     result_uris = []
     try:
         dist_version = get_new_dist_version()
-        dask_client = create_cluster()
+        dask_client, _ = create_cluster()
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = analyze_gadm_dist(dist_zarr_uri, dist_version)
+        gadm_dist_result = gadm_dist_alerts(dist_zarr_uri, dist_version)
         result_uris.append(gadm_dist_result)
 
         gadm_dist_by_natural_lands_result = gadm_dist_alerts_by_natural_lands(
             dist_zarr_uri, dist_version
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
+
+        gadm_dist_by_driver_result = gadm_dist_alerts_by_driver(
+            dist_zarr_uri, dist_version
+        )
+        result_uris.append(gadm_dist_by_driver_result)
     except Exception:
         logger.error("DIST alerts analysis failed.")
         raise

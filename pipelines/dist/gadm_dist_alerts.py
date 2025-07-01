@@ -5,7 +5,9 @@ import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
+from prefect import task
 
+from .check_for_new_alerts import s3_object_exists
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
 GADM_VERSION = "v4.1.85"
@@ -14,10 +16,14 @@ country_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{GAD
 region_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{GADM_VERSION}/raster/epsg-4326/zarr/adm1_clipped_to_dist.zarr"
 subregion_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{GADM_VERSION}/raster/epsg-4326/zarr/adm2_clipped_to_dist.zarr"
 
-
+@task
 def gadm_dist_alerts(dist_zarr_uri: str, dist_version: str):
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
-    results_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
+    results_key = f"umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2.parquet"
+    results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
+
+    if s3_object_exists(DATA_LAKE_BUCKET, results_key):
+        return results_uri
 
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 

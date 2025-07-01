@@ -6,12 +6,19 @@ from flox.xarray import xarray_reduce
 from flox import ReindexArrayType, ReindexStrategy
 from prefect import task
 
+from .check_for_new_alerts import s3_object_exists
+
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
-def gadm_dist_alerts_by_driver(zarr_uri: str) -> str:
+@task
+def gadm_dist_alerts_by_driver(zarr_uri: str, version: str) -> str:
     """Run DIST alerts analysis by driver using Dask to create parquet, upload to S3 and return URI."""
-    
-    results_uri = "s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/{version}/dist_alerts_by_driver_adm2_raw_1.parquet"
+
+    results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/umd_glad_dist_alerts_by_adm2_driver.parquet"
+    results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
+
+    if s3_object_exists(DATA_LAKE_BUCKET, results_key):
+        return results_uri
 
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -28,8 +35,8 @@ def gadm_dist_alerts_by_driver(zarr_uri: str) -> str:
     ).band_data
     dist_drivers_from_clipped = xr.open_zarr(
         "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
-    )
-    
+    ).band_data
+
     adm0_ids = [
         0, 4, 8, 10, 12, 16, 20, 24, 28, 31, 32, 36, 40, 44, 48, 50, 51, 52, 56, 60,
         64, 68, 70, 72, 74, 76, 84, 86, 90, 92, 96, 100, 104, 108, 112, 116, 120,

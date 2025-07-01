@@ -5,13 +5,20 @@ import logging
 from flox.xarray import xarray_reduce
 from prefect import task
 
+from .check_for_new_alerts import s3_object_exists
+
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
 @task
 def gadm_dist_alerts_by_natural_lands(zarr_uri: str, version: str) -> str:
     """Run DIST alerts analysis by natural lands using Dask to create parquet, upload to S3 and return URI."""
 
-    results_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{version}/raster/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
+    results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_natural_lands.parquet"
+    results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
+
+    if s3_object_exists(DATA_LAKE_BUCKET, results_key):
+        return results_uri
+
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
     dist_alerts = xr.open_zarr(zarr_uri)
