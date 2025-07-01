@@ -410,7 +410,7 @@ async def get_analytics_result(resource_id: str):
         # Send query to DuckDB and convert to return format
         alerts_df = duckdb.query(query).df()
     else:
-        geojson = get_geojson(aoi)
+        geojson = await get_geojson(aoi)
 
         if metadata_content["intersections"]:
             intersection = metadata_content["intersections"][0]
