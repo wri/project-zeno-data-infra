@@ -12,9 +12,8 @@ from pydantic import BaseModel, Extra
 from pydantic import Field, root_validator, validator
 from typing import Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
-import requests
 
-from dask.distributed import Client, LocalCluster
+from dask.distributed import LocalCluster
 from flox.xarray import xarray_reduce
 import xarray as xr
 import numpy as np
@@ -170,28 +169,28 @@ class AdminAreaOfInterest(AreaOfInterest):
 
 class KeyBiodiversityAreaOfInterest(AreaOfInterest):
     type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
-    id: int = Field(
+    id: str = Field(
         ...,
         title="Key Biodiversity Area site code",
-        examples=[36, 18, 8111]
+        examples=["36", "18", "8111"]
     )
 
 
 class ProtectedAreaOfInterest(AreaOfInterest):
     type: Literal["protected_area"] = "protected_area"
-    id: int = Field(
+    id: str = Field(
         ...,
         title="WDPA protected area ID",
-        examples=[555625448, 148322, 555737674]
+        examples=["555625448", "148322", "555737674"]
     )
 
 
 class IndigneousAreaOfInterest(AreaOfInterest):
     type: Literal["indigenous_land"] = "indigenous_land"
-    id: int = Field(
+    id: str = Field(
         ...,
         title="Landmark Indigenous lands object ID",
-        examples=[1931, 1918, 43053]
+        examples=["1931", "1918", "43053"]
     )
 
 class CustomAreaOfInterest(AreaOfInterest):

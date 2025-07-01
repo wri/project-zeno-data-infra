@@ -31,7 +31,7 @@ def test_kba_dist_analytics_no_intersection():
     resource = client.post(
         "/v0/land_change/dist_alerts/analytics", 
         json={
-            "aois": [{"type": "key_biodiversity_area", "id": 8111}],
+            "aois": [{"type": "key_biodiversity_area", "id": "8111"}],
             "start_date": "2024-08-15",
             "end_date": "2024-08-16",
             "intersections": [],
@@ -42,7 +42,7 @@ def test_kba_dist_analytics_no_intersection():
 
     data = client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}").json()["data"]
     print(data)
-    assert data["result"]["key_biodiversity_area"] == [8111]
+    assert data["result"]["key_biodiversity_area"] == ["8111"]
     assert data["result"]["alert_date"] == ["2024-08-15"]
     assert data["result"]["confidence"] == ["high"]
     assert data["result"]["value"] == [123]

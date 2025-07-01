@@ -23,7 +23,7 @@ def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[st
     from_clause = f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
     select_clause = "SELECT country"
     where_clause = f"WHERE country = '{gadm_id[0]}'"
-    by_clause = f"BY country"
+    by_clause = "BY country"
 
     # Includes region, so add relevant filters, selects and group bys
     if len(gadm_id) > 1:

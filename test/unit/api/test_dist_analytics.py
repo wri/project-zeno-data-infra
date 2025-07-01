@@ -4,7 +4,7 @@ import re
 import pytest
 
 def test_create_gadm_adm2_dist_query_no_intersection():
-    query = create_gadm_dist_query(["IDN", 24, 9], [])
+    query = create_gadm_dist_query(["IDN", "24", "9"], [])
     
     assert query == strip_extra_whitespace("""
         SELECT country, region, subregion, alert_date, alert_confidence AS confidence, SUM(count) AS value
@@ -16,7 +16,7 @@ def test_create_gadm_adm2_dist_query_no_intersection():
 
 
 def test_create_gadm_adm1_dist_query_no_intersection():
-    query = create_gadm_dist_query(["IDN", 24], [])
+    query = create_gadm_dist_query(["IDN", "24"], [])
     
     assert query == strip_extra_whitespace("""
         SELECT country, region, alert_date, alert_confidence AS confidence, SUM(count) AS value
@@ -39,7 +39,7 @@ def test_create_gadm_iso_dist_query_no_intersection():
     """)
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection():
-    query = create_gadm_dist_query(["IDN", 24, 9], ["natural_lands"])
+    query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
     
     assert query == strip_extra_whitespace("""
         SELECT country, region, subregion, natural_land_class, alert_date, alert_confidence AS confidence, SUM(count) AS value
@@ -51,7 +51,7 @@ def test_create_gadm_adm2_dist_query_natural_lands_intersection():
 
 
 def test_create_gadm_adm2_dist_query_drivers_intersection():
-    query = create_gadm_dist_query(["IDN", 24, 9], ["driver"])
+    query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
     
     assert query == strip_extra_whitespace("""
         SELECT country, region, subregion, ldacs_driver, alert_date, alert_confidence AS confidence, SUM(count) AS value
@@ -78,7 +78,7 @@ async def test_get_geojson_from_data_api():
             "status": "success"
         }
     
-    aoi = {"type": "protected_area", "id": 555625448}
+    aoi = {"type": "protected_area", "id": "555625448"}
     geojson = await get_geojson_from_data_api(aoi, send_request=send_request_to_data_api_test)
     assert geojson["type"] == "MultiPolygon"
 
@@ -91,7 +91,7 @@ async def test_get_geojson_from_data_api_failed():
             "status": "failed"
         }
     
-    aoi = {"type": "protected_area", "id": 555625448}
+    aoi = {"type": "protected_area", "id": "555625448"}
     try:
         await get_geojson_from_data_api(aoi, send_request=send_request_to_data_api_test_failed)
     except ValueError as e:
@@ -99,25 +99,25 @@ async def test_get_geojson_from_data_api_failed():
 
 
 def test_get_geojson_url_for_data_api_protected_areas():
-    aoi = {"type": "protected_area", "id": 555625448}
+    aoi = {"type": "protected_area", "id": "555625448"}
     url = get_geojson_url_for_data_api(aoi)
     assert url == f"https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query?sql=select gfw_geojson from data where wdpaid = 555625448"
 
 
 def test_get_geojson_url_for_data_api_indigenous_lands():
-    aoi = {"type": "indigenous_land", "id": 8111}
+    aoi = {"type": "indigenous_land", "id": "8111"}
     url = get_geojson_url_for_data_api(aoi)
     assert url == f"https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query?sql=select gfw_geojson from data where objectid = 8111"
 
 
 def test_get_geojson_url_for_data_api_kba():
-    aoi = {"type": "key_biodiversity_area", "id": 1241}
+    aoi = {"type": "key_biodiversity_area", "id": "1241"}
     url = get_geojson_url_for_data_api(aoi)
     assert url == f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select gfw_geojson from data where sitrecid = 1241"
 
 
 def test_get_geojson_url_for_data_api_notreal():
-    aoi = {"type": "notreal", "id": 1241}
+    aoi = {"type": "notreal", "id": "1241"}
     
     try:
         get_geojson_url_for_data_api(aoi)
