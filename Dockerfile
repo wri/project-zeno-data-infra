@@ -3,6 +3,7 @@ FROM ghcr.io/osgeo/gdal:ubuntu-small-3.9.3
 ENV USR_LOCAL_BIN=/usr/local/bin
 ENV VENV_DIR=/app/.venv
 ENV PYTHON_VERSION="3.13"
+ENV UV_VERSION="0.7.17"
 ENV PATH=${USR_LOCAL_BIN}:${PATH} \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
@@ -14,7 +15,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl gcc build-essential \
     && rm -rf /var/lib/apt/lists
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl -LsSf https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh | sh
 
 RUN useradd -m -s /bin/bash appuser
 RUN mkdir -p /app
