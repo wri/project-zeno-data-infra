@@ -7,7 +7,6 @@ dependencies = [
     "boto3",
     "coiled",
     "dask[array,dataframe,distributed,diagnostics]",
-    "distributed==2025.5.1",
     "fastparquet",
     "flox",
     "fsspec",

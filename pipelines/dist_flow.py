@@ -35,10 +35,10 @@ def get_tiles(dist_version):
 @task
 def create_cluster():
     cluster = coiled.Cluster(
-        name="dist_alerts_zonal_stat_count_multi",
+        name="dist_alerts_zonal_stat_count",
         region="us-east-1",
         n_workers=10,
-        container="globalforestwatch/zeno:1",
+        container="globalforestwatch/zeno:2",
         tags={"project": "dist_alerts_zonal_stat"},
         scheduler_vm_types="r7g.xlarge",
         worker_vm_types="r7g.2xlarge",
