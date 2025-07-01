@@ -1,4 +1,4 @@
-from api.app.analysis import get_geojson_from_data_api
+from api.app.analysis import get_geojson_from_data_api, get_geojson_url_for_data_api
 from api.app.query import create_gadm_dist_query
 import re
 import pytest
@@ -81,3 +81,37 @@ async def test_get_geojson_from_data_api():
     aoi = {"type": "protected_area", "id": 555625448}
     geojson = await get_geojson_from_data_api(aoi, send_request=send_request_to_data_api_test)
     assert geojson["type"] == "MultiPolygon"
+
+
+@pytest.mark.asyncio
+async def test_get_geojson_from_data_api_failed():
+    async def send_request_to_data_api_test_failed(url):
+        return {
+            "detail": "you suck",
+            "status": "failed"
+        }
+    
+    aoi = {"type": "protected_area", "id": 555625448}
+    try:
+        await get_geojson_from_data_api(aoi, send_request=send_request_to_data_api_test_failed)
+    except ValueError as e:
+        assert True
+
+
+def test_get_geojson_url_for_data_api_protected_areas():
+    aoi = {"type": "protected_area", "id": 555625448}
+    url = get_geojson_url_for_data_api(aoi)
+    assert url == f"https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query?sql=select gfw_geojson from data where wdpaid = 555625448"
+
+
+def test_get_geojson_url_for_data_api_indigenous_lands():
+    aoi = {"type": "indigenous_land", "id": 8111}
+    url = get_geojson_url_for_data_api(aoi)
+    assert url == f"https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query?sql=select gfw_geojson from data where objectid = 8111"
+
+
+def test_get_geojson_url_for_data_api_kba():
+    aoi = {"type": "key_biodiversity_area", "id": 1241}
+    url = get_geojson_url_for_data_api(aoi)
+    assert url == f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select gfw_geojson from data where sitrecid = 1241"
+

@@ -50,11 +50,11 @@ async def get_geojson_from_data_api(aoi, send_request=send_request_to_data_api):
     url = get_geojson_url_for_data_api(aoi)
     response = await send_request(url)
 
-    if response["data"]:
-        geojson = json.loads(response["data"][0]["gfw_geojson"])
-        return geojson
+    if "data" not in response:
+        raise ValueError("Unable to get GeoJSON from Data API.")
     
-    raise ValueError("Unable to get GeoJSON from Data API.")
+    geojson = json.loads(response["data"][0]["gfw_geojson"])
+    return geojson
 
 
 def get_geojson_url_for_data_api(aoi):
@@ -63,7 +63,7 @@ def get_geojson_url_for_data_api(aoi):
     elif aoi["type"] == "protected_area":
         url = f"https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query?sql=select gfw_geojson from data where wdpaid = {aoi['id']}"
     elif aoi["type"] == "indigenous_land":
-        url = f"https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query?sql=select gfw_geojson from data where objectid = {aoi['id']}="
+        url = f"https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query?sql=select gfw_geojson from data where objectid = {aoi['id']}"
 
     return url
 
