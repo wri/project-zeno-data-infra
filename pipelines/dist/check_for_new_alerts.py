@@ -1,11 +1,11 @@
 import boto3
-import requests
+import httpx
 from botocore.exceptions import ClientError
 
 
 def get_latest_version(dataset):
     url = f"https://data-api.globalforestwatch.org/dataset/{dataset}/latest"
-    resp = requests.get(url)
+    resp = httpx.get(url, follow_redirects=True)
     resp.raise_for_status()
     data = resp.json()
     if data["status"] != "success":
