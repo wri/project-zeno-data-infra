@@ -14,21 +14,19 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl gcc build-essential \
     && rm -rf /var/lib/apt/lists
 
-# TODO: Restore the non-root user stuff
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# RUN useradd -m -s /bin/bash appuser
-# RUN chown -R appuser:appuser /app
+RUN useradd -m -s /bin/bash appuser
+RUN mkdir -p /app
+RUN chown appuser:appuser /app
+COPY --chown=appuser . /app
 
-# USER appuser
-# COPY --chown=appuser . .
-# RUN chown -R appuser:appuser /app
+USER appuser
 
-COPY . /app
 WORKDIR /app
 
 # Create a virtual environment with uv inside the container
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && uv venv ${VENV_DIR} --python ${PYTHON_VERSION} --seed --system-site-packages
+RUN uv venv ${VENV_DIR} --python ${PYTHON_VERSION} --seed --system-site-packages
 
 ## Verify GDAL and core Python package installation
 RUN . ${VENV_DIR}/bin/activate \
