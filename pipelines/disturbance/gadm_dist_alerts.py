@@ -1,4 +1,5 @@
 import logging
+from functools import reduce
 from typing import Callable, Tuple, Optional
 import numpy as np
 import pandas as pd
@@ -42,13 +43,14 @@ def gadm_dist_alerts(
 ) -> str:
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
-    dist_alerts, country, region, subregion = loader(dist_zarr_uri)
-    reduce_mask, reduce_groupbys, expected_groups = _setup(
-        dist_alerts, country, region, subregion, groups
+
+    return pipe(
+        loader(dist_zarr_uri),
+        lambda d: _setup(*d, groups),
+        lambda s: _compute(*s),
+        _create_data_frame,
+        lambda df: _save_results(df, dist_version, saver),
     )
-    alerts_count = _compute(reduce_mask, reduce_groupbys, expected_groups)
-    alerts_count_df = _create_data_frame(alerts_count)
-    return _save_results(alerts_count_df, dist_version, saver)
 
 
 def _setup(
@@ -117,3 +119,7 @@ def _save_results(
     results_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
     saver(alerts_count_df, results_uri)
     return results_uri
+
+
+def pipe(value, *functions):
+    return reduce(lambda v, f: f(v), functions, value)
