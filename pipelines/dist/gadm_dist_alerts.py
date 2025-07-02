@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -34,7 +34,7 @@ def gadm_dist_alerts(
         dist_zarr_uri: str,
         dist_version: str,
         loader: LoaderType = _s3_loader,
-        groups: ExpectedGroupsType = None,
+        groups: Optional[ExpectedGroupsType] = None,
         saver: SaverType = _default_saver,
 ) -> str:
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
