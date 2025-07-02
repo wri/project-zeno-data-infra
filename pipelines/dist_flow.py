@@ -4,12 +4,12 @@ import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.dist.gadm_dist_alerts import gadm_dist_alerts
-from pipelines.dist.create_zarr import (
+from pipelines.disturbance.gadm_dist_alerts import gadm_dist_alerts
+from pipelines.disturbance.create_zarr import (
     create_zarr as create_zarr_func,
 )
-from pipelines.dist.check_for_new_alerts import get_latest_version
-from pipelines.dist.gadm_dist_alerts_by_natural_lands import (
+from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.disturbance.gadm_dist_alerts_by_natural_lands import (
     gadm_dist_alerts_by_natural_lands,
 )
 

@@ -1,5 +1,5 @@
 from pandera.pandas import DataFrameSchema, Column, Check
-from pipelines.dist.gadm_dist_alerts import gadm_dist_alerts
+from pipelines.disturbance.gadm_dist_alerts import gadm_dist_alerts
 
 
 def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, mock_saver):

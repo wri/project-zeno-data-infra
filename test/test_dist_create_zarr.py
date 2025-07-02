@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 from unittest.mock import patch
 
-from pipelines.dist.create_zarr import create_zarr, decode_alert_data
+from pipelines.disturbance.create_zarr import create_zarr, decode_alert_data
 
 
 @pytest.fixture
@@ -58,9 +58,9 @@ def test_decode_alert_data():
 
 
 @pytest.mark.xfail
-@patch("pipelines.dist.create_zarr.data_lake_bucket", "test-bucket")
-@patch("pipelines.dist.create_zarr.s3_object_exists")
-@patch("pipelines.dist.create_zarr.xr.open_dataset")
+@patch("pipelines.disturbance.create_zarr.data_lake_bucket", "test-bucket")
+@patch("pipelines.disturbance.create_zarr.s3_object_exists")
+@patch("pipelines.disturbance.create_zarr.xr.open_dataset")
 def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     """Test creating a new zarr file when it doesn't exist."""
     mock_s3_exists.return_value = False
