@@ -8,12 +8,13 @@ import xarray as xr
 def expected_groups():
     return (
         # Match expected groups to minimal data values
-        [12],             # Country values in minimal data
-        [7],              # Region values
-        [124, 125],       # Subregion values
+        [12],  # Country values in minimal data
+        [7],  # Region values
+        [124, 125],  # Subregion values
         [731, 750, 800],  # Alert date values in minimal data
-        [2, 3]            # Confidence values in minimal data
+        [2, 3],  # Confidence values in minimal data
     )
+
 
 @pytest.fixture
 def mock_loader():
@@ -24,15 +25,15 @@ def mock_loader():
         dist_alerts = xr.Dataset(
             data_vars={
                 "confidence": (("band", "y", "x"), confidence_data),
-                "alert_date": (("band", "y", "x"), alert_date_data)
+                "alert_date": (("band", "y", "x"), alert_date_data),
             },
             coords={
                 "band": ("band", [1], {}),
                 "y": ("y", [60.0, 59.99975], {}),
                 "x": ("x", [-180.0, -179.99975], {}),
-                "spatial_ref": ((), 0, {})
+                "spatial_ref": ((), 0, {}),
             },
-            attrs={}
+            attrs={},
         )
 
         # 2. GADM datasets
@@ -64,11 +65,14 @@ def mock_loader():
         )
 
         return dist_alerts, country, region, subregion
+
     return _loader
+
 
 @pytest.fixture
 def mock_saver():
     def _saver(df: pd.DataFrame, uri: str):
         _saver.saved_data = df
         _saver.results_uri = uri
+
     return _saver

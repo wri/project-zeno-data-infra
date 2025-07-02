@@ -12,7 +12,10 @@ def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, mock_saver):
         saver=mock_saver,
     )
 
-    assert result_uri == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
+    assert (
+        result_uri
+        == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
+    )
 
 
 def test_gadm_dist_alerts_result(mock_loader, expected_groups, mock_saver):
@@ -26,8 +29,8 @@ def test_gadm_dist_alerts_result(mock_loader, expected_groups, mock_saver):
                 int,
                 checks=[
                     Check.greater_than_or_equal_to(731),
-                    Check.less_than_or_equal_to(800)
-                ]
+                    Check.less_than_or_equal_to(800),
+                ],
             ),
             "confidence": Column(int, Check.isin([2, 3])),
             "value": Column(int, Check.isin([0, 1, 2])),
@@ -35,14 +38,15 @@ def test_gadm_dist_alerts_result(mock_loader, expected_groups, mock_saver):
         unique=["country", "region", "subregion", "alert_date", "confidence"],
         checks=Check(
             lambda df: (
-                    df.groupby(["country", "region", "subregion", "alert_date"])
-                    ["confidence"].transform("nunique") == 2
+                df.groupby(["country", "region", "subregion", "alert_date"])[
+                    "confidence"
+                ].transform("nunique")
+                == 2
             ),
             name="two_confidences_per_group",
-            error="Each location-date must have exactly 2 confidence levels"
-        )
+            error="Each location-date must have exactly 2 confidence levels",
+        ),
     )
-
 
     gadm_dist_alerts(
         dist_zarr_uri="s3://dummy_zarr_uri",
@@ -56,6 +60,3 @@ def test_gadm_dist_alerts_result(mock_loader, expected_groups, mock_saver):
     result = mock_saver.saved_data
     print(f"\nGADM dist alerts result:\n{result}")
     alert_schema.validate(result)
-
-
-

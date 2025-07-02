@@ -12,7 +12,10 @@ LoaderType = Callable[[str], Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Datase
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
-def _s3_loader(dist_zarr_uri: str) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]:
+
+def _s3_loader(
+    dist_zarr_uri: str,
+) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]:
     gadm_version = "v4.1.85"
     country_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm0_clipped_to_dist.zarr"
     region_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm1_clipped_to_dist.zarr"
@@ -31,35 +34,41 @@ def _default_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
 
 
 def gadm_dist_alerts(
-        dist_zarr_uri: str,
-        dist_version: str,
-        loader: LoaderType = _s3_loader,
-        groups: Optional[ExpectedGroupsType] = None,
-        saver: SaverType = _default_saver,
+    dist_zarr_uri: str,
+    dist_version: str,
+    loader: LoaderType = _s3_loader,
+    groups: Optional[ExpectedGroupsType] = None,
+    saver: SaverType = _default_saver,
 ) -> str:
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
     dist_alerts, country, region, subregion = loader(dist_zarr_uri)
-    reduce_mask, reduce_groupbys, expected_groups = _processor(dist_alerts, country, region, subregion, groups)
+    reduce_mask, reduce_groupbys, expected_groups = _processor(
+        dist_alerts, country, region, subregion, groups
+    )
     alerts_count = _compute(reduce_mask, reduce_groupbys, expected_groups)
     alerts_count_df = _create_data_frame(alerts_count)
     return _save_results(alerts_count_df, dist_version, saver)
 
 
 def _processor(
-        dist_alerts: xr.Dataset,
-        country: xr.Dataset,
-        region: xr.Dataset,
-        subregion: xr.Dataset,
-        expected_groups: Tuple,
+    dist_alerts: xr.Dataset,
+    country: xr.Dataset,
+    region: xr.Dataset,
+    subregion: xr.Dataset,
+    expected_groups: Tuple,
 ) -> Tuple:
     groups = (
-        np.arange(894),
-        np.arange(86),
-        np.arange(854),
-        np.arange(731, 1590),
-        [1, 2, 3],
-    ) if expected_groups is None else expected_groups
+        (
+            np.arange(894),
+            np.arange(86),
+            np.arange(854),
+            np.arange(731, 1590),
+            [1, 2, 3],
+        )
+        if expected_groups is None
+        else expected_groups
+    )
 
     return (
         dist_alerts.confidence,
@@ -102,7 +111,9 @@ def _create_data_frame(alerts_count: xr.Dataset) -> pd.DataFrame:
     return pd.DataFrame(coord_dict)
 
 
-def _save_results(alerts_count_df: pd.DataFrame, dist_version: str, saver: Callable) -> str:
+def _save_results(
+    alerts_count_df: pd.DataFrame, dist_version: str, saver: Callable
+) -> str:
     results_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
     saver(alerts_count_df, results_uri)
     return results_uri
