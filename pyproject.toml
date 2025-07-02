@@ -29,3 +29,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["pipelines"]
+
+[dependency-groups]
+development = [
+    "pandera>=0.24.0",
+    "pytest>=8.4.1",
+]

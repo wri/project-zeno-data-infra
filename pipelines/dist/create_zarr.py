@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from .check_for_new_alerts import s3_object_exists

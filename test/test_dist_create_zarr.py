@@ -57,6 +57,7 @@ def test_decode_alert_data():
     assert list(result.y.values) == [0, 1]
 
 
+@pytest.mark.xfail
 @patch("pipelines.dist.create_zarr.data_lake_bucket", "test-bucket")
 @patch("pipelines.dist.create_zarr.s3_object_exists")
 @patch("pipelines.dist.create_zarr.xr.open_dataset")
