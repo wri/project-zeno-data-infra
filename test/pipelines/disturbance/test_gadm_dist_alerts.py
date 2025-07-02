@@ -2,14 +2,14 @@ from pandera.pandas import DataFrameSchema, Column, Check
 from pipelines.disturbance.gadm_dist_alerts import gadm_dist_alerts
 
 
-def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, mock_saver):
+def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, spy_saver):
     """Test full workflow with in-memory dependencies"""
     result_uri = gadm_dist_alerts(
         dist_zarr_uri="s3://dummy_zarr_uri",
         dist_version="test_v1",
         loader=mock_loader,
         groups=expected_groups,
-        saver=mock_saver,
+        saver=spy_saver,
     )
 
     assert (
@@ -18,7 +18,7 @@ def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, mock_saver):
     )
 
 
-def test_gadm_dist_alerts_result(mock_loader, expected_groups, mock_saver):
+def test_gadm_dist_alerts_result(mock_loader, expected_groups, spy_saver):
     alert_schema = DataFrameSchema(
         name="GADM Dist Alerts",
         columns={
@@ -53,10 +53,10 @@ def test_gadm_dist_alerts_result(mock_loader, expected_groups, mock_saver):
         dist_version="test_v1",
         loader=mock_loader,
         groups=expected_groups,
-        saver=mock_saver,
+        saver=spy_saver,
     )
 
-    # Verify result
-    result = mock_saver.saved_data
+    # Verify
+    result = spy_saver.saved_data
     print(f"\nGADM dist alerts result:\n{result}")
     alert_schema.validate(result)

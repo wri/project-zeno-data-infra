@@ -29,7 +29,7 @@ def _s3_loader(
     )
 
 
-def _default_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
+def _parquet_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
     alerts_count_df.to_parquet(results_uri, index=False)
 
 
@@ -38,7 +38,7 @@ def gadm_dist_alerts(
     dist_version: str,
     loader: LoaderType = _s3_loader,
     groups: Optional[ExpectedGroupsType] = None,
-    saver: SaverType = _default_saver,
+    saver: SaverType = _parquet_saver,
 ) -> str:
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
     logging.getLogger("distributed.client").setLevel(logging.ERROR)

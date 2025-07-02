@@ -70,9 +70,9 @@ def mock_loader():
 
 
 @pytest.fixture
-def mock_saver():
+def spy_saver():
     def _saver(df: pd.DataFrame, uri: str):
+        """Capture the DataFrame passed in to be later used in assertions"""
         _saver.saved_data = df
-        _saver.results_uri = uri
 
     return _saver
