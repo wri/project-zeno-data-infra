@@ -12,7 +12,7 @@ LoaderType = Callable[[str], Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Datase
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
-def _default_loader(dist_zarr_uri: str) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]:
+def _s3_loader(dist_zarr_uri: str) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]:
     gadm_version = "v4.1.85"
     country_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm0_clipped_to_dist.zarr"
     region_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm1_clipped_to_dist.zarr"
@@ -33,7 +33,7 @@ def _default_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
 def gadm_dist_alerts(
         dist_zarr_uri: str,
         dist_version: str,
-        loader: LoaderType = _default_loader,
+        loader: LoaderType = _s3_loader,
         groups: ExpectedGroupsType = None,
         saver: SaverType = _default_saver,
 ) -> str:
