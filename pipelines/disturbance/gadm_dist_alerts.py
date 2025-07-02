@@ -43,7 +43,7 @@ def gadm_dist_alerts(
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
     dist_alerts, country, region, subregion = loader(dist_zarr_uri)
-    reduce_mask, reduce_groupbys, expected_groups = _processor(
+    reduce_mask, reduce_groupbys, expected_groups = _setup(
         dist_alerts, country, region, subregion, groups
     )
     alerts_count = _compute(reduce_mask, reduce_groupbys, expected_groups)
@@ -51,7 +51,7 @@ def gadm_dist_alerts(
     return _save_results(alerts_count_df, dist_version, saver)
 
 
-def _processor(
+def _setup(
     dist_alerts: xr.Dataset,
     country: xr.Dataset,
     region: xr.Dataset,
