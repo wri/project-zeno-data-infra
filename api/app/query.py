@@ -1,9 +1,9 @@
-
-
 from typing import List, Tuple
 
 
-def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[str]) -> str:
+def create_gadm_dist_query(
+    gadm_id: Tuple[str, int, int], intersections: List[str]
+) -> str:
     # Each intersection will be in a different parquet file
     if not intersections:
         table = "gadm_dist_alerts"
@@ -15,12 +15,14 @@ def create_gadm_dist_query(gadm_id: Tuple[str, int, int], intersections: List[st
         intersection_col = "natural_land_class"
     else:
         raise ValueError(f"No way to calculate intersection {intersections[0]}")
-    
+
     # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
-    # TODO use final pipeline locations and schema for parquet files 
+    # TODO use final pipeline locations and schema for parquet files
     # TODO this should be done in a background task and written to file
     # Build up the DuckDB query based on GADM ID and intersection
-    from_clause = f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
+    from_clause = (
+        f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
+    )
     select_clause = "SELECT country"
     where_clause = f"WHERE country = '{gadm_id[0]}'"
     by_clause = "BY country"
