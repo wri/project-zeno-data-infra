@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import xarray as xr
 
 from .check_for_new_alerts import s3_object_exists
@@ -28,7 +27,7 @@ def create_zarr(version, overwrite=False) -> str:
         return zarr_uri
 
     dataset = xr.open_mfdataset(
-        tile_uris,
+        cog_uri,
         parallel=True,
         chunks={"x": 10000, "y": 10000},
         engine="rasterio"

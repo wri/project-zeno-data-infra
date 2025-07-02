@@ -3,20 +3,19 @@ import xarray as xr
 import pandas as pd
 import logging
 from flox.xarray import xarray_reduce
-from prefect import task
+from flox import ReindexArrayType, ReindexStrategy
 
 from .check_for_new_alerts import s3_object_exists
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
-@task
-def gadm_dist_alerts_by_natural_lands(zarr_uri: str, version: str) -> str:
+def gadm_dist_alerts_by_natural_lands(zarr_uri: str, version: str, overwrite: bool) -> str:
     """Run DIST alerts analysis by natural lands using Dask to create parquet, upload to S3 and return URI."""
 
     results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_natural_lands.parquet"
     results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
 
-    if s3_object_exists(DATA_LAKE_BUCKET, results_key):
+    if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, results_key):
         return results_uri
 
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
@@ -56,8 +55,6 @@ def gadm_dist_alerts_by_natural_lands(zarr_uri: str, version: str) -> str:
     ]
 
     alert_dates = np.arange(731, 1590)  # we should get this from metadata which includes `content_date_range`
-
-    from flox import ReindexArrayType, ReindexStrategy
 
     countries_from_clipped.name = "countries"
     regions_from_clipped.name = "regions"

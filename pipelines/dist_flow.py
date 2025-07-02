@@ -51,6 +51,24 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 
 @task
+def analyze_gadm_dist(dist_zarr_uri, version, overwrite: bool):
+
+    return gadm_dist_alerts(dist_zarr_uri, version, overwrite)
+
+
+@task
+def analyze_gadm_dist_by_natural_lands(dist_zarr_uri, version, overwrite: bool):
+
+    return gadm_dist_alerts_by_natural_lands(dist_zarr_uri, version, overwrite)
+
+
+@task
+def analyze_gadm_dist_by_driver(dist_zarr_uri, version, overwrite: bool):
+
+    return gadm_dist_alerts_by_driver(dist_zarr_uri, version, overwrite)
+
+
+@task
 def run_validation_suite():
     pass
 
@@ -64,16 +82,16 @@ def main(overwrite=False) -> list[str]:
         dist_version = get_new_dist_version()
         dask_client, _ = create_cluster()
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = gadm_dist_alerts(dist_zarr_uri, dist_version)
+        gadm_dist_result = analyze_gadm_dist(dist_zarr_uri, dist_version, overwrite=overwrite)
         result_uris.append(gadm_dist_result)
 
-        gadm_dist_by_natural_lands_result = gadm_dist_alerts_by_natural_lands(
-            dist_zarr_uri, dist_version
+        gadm_dist_by_natural_lands_result = analyze_gadm_dist_by_natural_lands(
+            dist_zarr_uri, dist_version, overwrite
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
-        gadm_dist_by_driver_result = gadm_dist_alerts_by_driver(
-            dist_zarr_uri, dist_version
+        gadm_dist_by_driver_result = analyze_gadm_dist_by_driver(
+            dist_zarr_uri, dist_version, overwrite
         )
         result_uris.append(gadm_dist_by_driver_result)
     except Exception:
