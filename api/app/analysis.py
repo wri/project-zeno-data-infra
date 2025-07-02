@@ -41,9 +41,9 @@ DIST_DRIVERS = {
 
 
 async def send_request_to_data_api(url):
-    api_key = os.environ["API_KEY"]
-    url += f"&x-api-key={api_key}"
-    return requests.get(url).json()
+    params = {"x-api-key": _get_api_key()}
+    response = requests.get(url, params=params)
+    return response.json()
 
 
 async def get_geojson_from_data_api(aoi, send_request=send_request_to_data_api):
@@ -131,3 +131,7 @@ def clip_xarr_to_geojson(xarr, geojson):
     sliced = xarr.sel(x=slice(geom.bounds[0],geom.bounds[2]), y=slice(geom.bounds[3],geom.bounds[1]),).squeeze("band")
     clipped = sliced.rio.clip([geojson])
     return clipped
+
+
+def _get_api_key():
+    return os.environ["API_KEY"]
