@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 import pandas as pd
 import os
 
-from api.app.analysis import get_geojson, zonal_statistics
+from api.app.analysis import JULIAN_DATE_2021, get_geojson, zonal_statistics
 from api.app.query import create_gadm_dist_query
 
 

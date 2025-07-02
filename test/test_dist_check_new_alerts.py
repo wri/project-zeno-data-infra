@@ -8,7 +8,7 @@ from pipelines.dist.check_for_new_alerts import (
 )
 
 
-@patch("pipelines.dist.check_for_new_alerts.requests.get")
+@patch("pipelines.dist.check_for_new_alerts.httpx.get")
 def test_get_latest_version_success(mock_get):
     mock_response = MagicMock()
     mock_response.raise_for_status.return_value = None
@@ -21,11 +21,12 @@ def test_get_latest_version_success(mock_get):
     version = get_latest_version("umd_glad_dist_alerts")
     assert version == "v20250501"
     mock_get.assert_called_once_with(
-        "https://data-api.globalforestwatch.org/dataset/umd_glad_dist_alerts/latest"
+        "https://data-api.globalforestwatch.org/dataset/umd_glad_dist_alerts/latest",
+        follow_redirects=True,
     )
 
 
-@patch("pipelines.dist.check_for_new_alerts.requests.get")
+@patch("pipelines.dist.check_for_new_alerts.httpx.get")
 def test_get_latest_version_failure_status(mock_get):
     mock_response = MagicMock()
     mock_response.raise_for_status.return_value = None

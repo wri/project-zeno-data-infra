@@ -1,0 +1,27 @@
+# IDE Fragments
+/.vscode
+*__pycache__*
+*.idea*
+__marimo__
+
+# MyPy
+.mypy_cache/*
+
+# GIT
+.git
+
+# Ignore Files
+.gitignore
+
+# Mac stuff
+*.DS_Store
+
+# Test stuff
+tests/cobertura.xml
+tests_v2/cobertura.xml
+
+# Terraform stuff
+*terraform*
+
+# Virtual Environments
+.venv*
