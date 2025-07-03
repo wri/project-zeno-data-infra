@@ -1,7 +1,7 @@
 import xarray as xr
 import numpy as np
 
-from pipelines.dist.validate_dist_input import _check_percent_diff
+from pipelines.disturbance.validate_dist_input import _check_percent_diff
 
 def test_check_percentage_diff_below_threshold():
     """

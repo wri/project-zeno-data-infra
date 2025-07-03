@@ -2,13 +2,13 @@ import pytest
 from unittest.mock import patch, MagicMock
 from botocore.exceptions import ClientError
 
-from pipelines.dist.check_for_new_alerts import (
+from pipelines.disturbance.check_for_new_alerts import (
     get_latest_version,
     s3_object_exists,
 )
 
 
-@patch("pipelines.dist.check_for_new_alerts.httpx.get")
+@patch("pipelines.disturbance.check_for_new_alerts.httpx.get")
 def test_get_latest_version_success(mock_get):
     mock_response = MagicMock()
     mock_response.raise_for_status.return_value = None
@@ -26,7 +26,7 @@ def test_get_latest_version_success(mock_get):
     )
 
 
-@patch("pipelines.dist.check_for_new_alerts.httpx.get")
+@patch("pipelines.disturbance.check_for_new_alerts.httpx.get")
 def test_get_latest_version_failure_status(mock_get):
     mock_response = MagicMock()
     mock_response.raise_for_status.return_value = None
@@ -37,7 +37,7 @@ def test_get_latest_version_failure_status(mock_get):
         get_latest_version("invalid_dataset")
 
 
-@patch("pipelines.dist.check_for_new_alerts.boto3.client")
+@patch("pipelines.disturbance.check_for_new_alerts.boto3.client")
 def test_s3_object_exists_true(mock_boto_client):
     mock_s3 = MagicMock()
     mock_boto_client.return_value = mock_s3
@@ -47,7 +47,7 @@ def test_s3_object_exists_true(mock_boto_client):
     mock_s3.head_object.assert_called_once_with(Bucket="my-bucket", Key="my/key.zarr")
 
 
-@patch("pipelines.dist.check_for_new_alerts.boto3.client")
+@patch("pipelines.disturbance.check_for_new_alerts.boto3.client")
 def test_s3_object_exists_false(mock_boto_client):
     mock_s3 = MagicMock()
     mock_boto_client.return_value = mock_s3
@@ -58,7 +58,7 @@ def test_s3_object_exists_false(mock_boto_client):
     assert s3_object_exists("my-bucket", "missing/key.zarr") is False
 
 
-@patch("pipelines.dist.check_for_new_alerts.boto3.client")
+@patch("pipelines.disturbance.check_for_new_alerts.boto3.client")
 def test_s3_object_exists_other_error(mock_boto_client):
     mock_s3 = MagicMock()
     mock_boto_client.return_value = mock_s3
@@ -70,7 +70,7 @@ def test_s3_object_exists_other_error(mock_boto_client):
         s3_object_exists("my-bucket", "forbidden/key.zarr")
 
 
-@patch("pipelines.dist.check_for_new_alerts.boto3.client")
+@patch("pipelines.disturbance.check_for_new_alerts.boto3.client")
 def test_s3_object_exists_other_error(mock_boto_client):
     mock_s3 = MagicMock()
     mock_boto_client.return_value = mock_s3

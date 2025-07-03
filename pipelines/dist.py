@@ -21,7 +21,7 @@ from flox.xarray import xarray_reduce
 import numpy as np
 import boto3
 
-from pipelines.dist import validate_dist_input
+from pipelines.disturbance import validate_dist_input
 
 
 CONTEXTUAL_LAYERS = [None, "wri_natural_lands"] #, "ldacs", "umd_land_cover"]
