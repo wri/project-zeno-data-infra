@@ -4,16 +4,16 @@ import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.dist.create_zarr import (
+from pipelines.disturbance.create_zarr import (
     create_zarr as create_zarr_func,
 )
-from pipelines.dist.check_for_new_alerts import get_latest_version
+from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
-from pipelines.dist.gadm_dist_alerts import gadm_dist_alerts
-from pipelines.dist.gadm_dist_alerts_by_natural_lands import (
+from pipelines.disturbance.gadm_dist_alerts import gadm_dist_alerts
+from pipelines.disturbance.gadm_dist_alerts_by_natural_lands import (
     gadm_dist_alerts_by_natural_lands,
 )
-from pipelines.dist.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
+from pipelines.disturbance.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
 
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
@@ -53,7 +53,7 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 @task
 def analyze_gadm_dist(dist_zarr_uri, version, overwrite: bool):
 
-    return gadm_dist_alerts(dist_zarr_uri, version, overwrite)
+    return gadm_dist_alerts(dist_zarr_uri, version, overwrite=overwrite)
 
 
 @task

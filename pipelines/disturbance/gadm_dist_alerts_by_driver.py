@@ -11,8 +11,7 @@ DATA_LAKE_BUCKET = "gfw-data-lake"
 
 def gadm_dist_alerts_by_driver(zarr_uri: str, version: str, overwrite: bool) -> str:
     """Run DIST alerts analysis by driver using Dask to create parquet, upload to S3 and return URI."""
-
-    results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/umd_glad_dist_alerts_by_adm2_driver.parquet"
+    results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_driver.parquet"
     results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
 
     if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, results_key):
