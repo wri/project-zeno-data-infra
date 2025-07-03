@@ -27,12 +27,9 @@ def create_zarr(version, overwrite=False) -> str:
     if s3_object_exists(data_lake_bucket, f"{key}/zarr.json") and not overwrite:
         return zarr_uri
 
-    dataset = xr.open_mfdataset(
-        tile_uris,
-        parallel=True,
-        chunks={"x": 10000, "y": 10000},
-        engine="rasterio"
-    ).band_data
+    dataset = xr.open_dataset(cog_uri, chunks="auto").band_data.chunk(
+        {"x": 10000, "y": 10000}
+    )
 
     alert_date = (dataset % 10000).astype(np.uint16)
     alert_conf = (dataset // 10000).astype(np.uint8)

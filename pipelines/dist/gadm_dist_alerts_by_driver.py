@@ -10,7 +10,6 @@ DATA_LAKE_BUCKET = "gfw-data-lake"
 
 def gadm_dist_alerts_by_driver(zarr_uri: str) -> str:
     """Run DIST alerts analysis by driver using Dask to create parquet, upload to S3 and return URI."""
-    
     results_uri = "s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/{version}/dist_alerts_by_driver_adm2_raw_1.parquet"
 
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
@@ -102,3 +101,4 @@ def gadm_dist_alerts_by_driver(zarr_uri: str) -> str:
     df.to_parquet(results_uri, index=False)
     print("Finished parquet")
     return results_uri
+

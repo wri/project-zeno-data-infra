@@ -1,32 +1,24 @@
 import json
 import uuid
+from contextlib import asynccontextmanager
 from enum import Enum
 from pathlib import Path
-from pydoc import describe
-from typing import Any, Dict, Annotated, List
-import duckdb
-from fastapi import FastAPI
-from fastapi.responses import ORJSONResponse
-from fastapi import HTTPException, Request
-from pydantic import BaseModel, Extra
-from pydantic import Field, root_validator, validator
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from uuid import UUID
-import requests
 
-from dask.distributed import Client, LocalCluster
-from flox.xarray import xarray_reduce
-import xarray as xr
+import duckdb
 import numpy as np
-from shapely.geometry import shape
-from rasterio import Affine
-from rasterio.features import rasterize
-from pydantic import BaseModel
-from contextlib import asynccontextmanager
 import pandas as pd
-import os
+import xarray as xr
+from dask.distributed import LocalCluster
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import ORJSONResponse
+from flox.xarray import xarray_reduce
+from pydantic import BaseModel, Extra, Field, root_validator, validator
+from shapely.geometry import shape
 
-API_KEY = os.environ["API_KEY"]
+from api.app.analysis import JULIAN_DATE_2021, get_geojson, zonal_statistics
+from api.app.query import create_gadm_dist_query
 
 
 @asynccontextmanager
@@ -39,45 +31,19 @@ async def lifespan(app: FastAPI):
     if close_call is not None:
         await close_call
 
+
 app = FastAPI(lifespan=lifespan)
+
 
 class AnalysisInput(BaseModel):
     geojson: Dict[str, Any]
     dataset: str
 
-JULIAN_DATE_2021 = 2459215
-NATURAL_LANDS_CLASSES = {
-    2: "Forest",
-    3: "Short vegetation",
-    4: "Water",
-    5: "Mangroves",
-    6: "Bare",
-    7: "Snow/Ice",
-    8: "Wetland forest",
-    9: "Peat forest",
-    10: "Wetland short vegetation",
-    11: "Peat short vegetation",
-    12: "Cropland",
-    13: "Built-up",
-    14: "Tree cover",
-    15: "Short vegetation",
-    16: "Water",
-    17: "Wetland tree cover",
-    18: "Peat tree cover",
-    19: "Wetland short vegetation",
-    20: "Peat short vegetation",
-    21: "Bare"
-}
-DIST_DRIVERS = {
-    1: "Wildfire",
-    2: "Flooding",
-    3: "Crop management",
-    4: "Potential conversion",
-    5: "Unclassified",
-}
+
 @app.get("/")
 def read_root():
     return {"message": "Hello from FastAPI!"}
+
 
 # You can add your custom route here
 @app.post("/analysis")
@@ -88,32 +54,33 @@ def analyze(data: AnalysisInput):
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = xr.open_zarr(dist_obj_name)
 
-    sliced = dist_alerts.sel(x=slice(geom.bounds[0],geom.bounds[2]), y=slice(geom.bounds[3],geom.bounds[1]),).squeeze("band")
+    sliced = dist_alerts.sel(
+        x=slice(geom.bounds[0], geom.bounds[2]),
+        y=slice(geom.bounds[3], geom.bounds[1]),
+    ).squeeze("band")
     clipped = sliced.rio.clip([data.geojson])
 
     alerts_count = xarray_reduce(
-        clipped.alert_date, 
-        *(
-            clipped.alert_date,
-            clipped.confidence
-        ),
-        func='count',
-        expected_groups=(
-            np.arange(731, 1590),
-            [1, 2, 3]
-        )
+        clipped.alert_date,
+        *(clipped.alert_date, clipped.confidence),
+        func="count",
+        expected_groups=(np.arange(731, 1590), [1, 2, 3]),
     ).compute()
-    alerts_count.name = 'alert_count'
+    alerts_count.name = "alert_count"
 
-    alerts_df = alerts_count.to_dataframe().drop("band", axis=1).drop("spatial_ref", axis=1).reset_index()
-    alerts_df.confidence = alerts_df.confidence.map({2: 'low', 3: 'high'})
-    alerts_df.alert_date = pd.to_datetime(alerts_df.alert_date + JULIAN_DATE_2021, origin='julian', unit='D').dt.strftime('%Y-%m-%d')
+    alerts_df = (
+        alerts_count.to_dataframe()
+        .drop("band", axis=1)
+        .drop("spatial_ref", axis=1)
+        .reset_index()
+    )
+    alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"})
+    alerts_df.alert_date = pd.to_datetime(
+        alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
+    ).dt.strftime("%Y-%m-%d")
     alerts_json = alerts_df[alerts_df.alert_count > 0].to_dict(orient="records")
 
-    return {
-        "data": alerts_json,
-        "status": "success"
-    }
+    return {"data": alerts_json, "status": "success"}
 
 
 ######################################################################
@@ -124,6 +91,7 @@ PAYLOAD_STORE_DIR = Path("/tmp/dist_alerts_analytics_payloads")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
+
 
 class StrictBaseModel(BaseModel):
     class Config:
@@ -145,7 +113,7 @@ class DataMartResourceLinkResponse(Response):
 
 
 class AreaOfInterest(StrictBaseModel):
-    async def get_geostore_id(self) -> UUID:
+    async def get_geostore_id(self) -> Optional[UUID]:
         """Return the unique identifier for the area of interest."""
         raise NotImplementedError("This method is not implemented.")
 
@@ -156,30 +124,30 @@ class AdminAreaOfInterest(AreaOfInterest):
         ...,
         title="Dot-delimited identifier",
         pattern=ADMIN_REGEX,
-        examples=["BRA.12.3", "IND", "IDN.12"]
+        examples=["BRA.12.3", "IND", "IDN.12"],
     )
     provider: str = Field("gadm", title="Administrative Boundary Provider")
     version: str = Field("4.1", title="Administrative Boundary Version")
 
-    async def get_geostore_id(self) -> UUID:
-        admin_level = self.get_admin_level()
+    async def get_geostore_id(self) -> Optional[UUID]:
+        # admin_level = self.get_admin_level()
         geostore_id = None
         return geostore_id
 
     def get_admin_level(self):
         admin_level = (
-                sum(
-                    1
-                    for field in (self.country, self.region, self.subregion)
-                    if field is not None
-                )
-                - 1
+            sum(
+                1
+                for field in (self.country, self.region, self.subregion)
+                if field is not None
+            )
+            - 1
         )
         return admin_level
 
     @root_validator(skip_on_failure=True)
     def check_region_subregion(cls, values):
-        id = values.get("id")
+        # id = values.get("id")
         # parse id to get region and subregion (if they exist)
         subregion = None
         region = None
@@ -198,29 +166,28 @@ class AdminAreaOfInterest(AreaOfInterest):
 
 class KeyBiodiversityAreaOfInterest(AreaOfInterest):
     type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
-    id: int = Field(
-        ...,
-        title="Key Biodiversity Area site code",
-        examples=[36, 18, 8111]
+    id: str = Field(
+        ..., title="Key Biodiversity Area site code", examples=["36", "18", "8111"]
     )
 
 
 class ProtectedAreaOfInterest(AreaOfInterest):
     type: Literal["protected_area"] = "protected_area"
-    id: int = Field(
+    id: str = Field(
         ...,
         title="WDPA protected area ID",
-        examples=[555625448, 148322, 555737674]
+        examples=["555625448", "148322", "555737674"],
     )
 
 
 class IndigneousAreaOfInterest(AreaOfInterest):
     type: Literal["indigenous_land"] = "indigenous_land"
-    id: int = Field(
+    id: str = Field(
         ...,
         title="Landmark Indigenous lands object ID",
-        examples=[1931, 1918, 43053]
+        examples=["1931", "1918", "43053"],
     )
+
 
 class CustomAreaOfInterest(AreaOfInterest):
     type: Literal["geojson"] = "geojson"
@@ -229,41 +196,46 @@ class CustomAreaOfInterest(AreaOfInterest):
         title="GeoJSON of one geometry",
     )
 
-AoiUnion = Union[AdminAreaOfInterest, KeyBiodiversityAreaOfInterest, ProtectedAreaOfInterest, IndigneousAreaOfInterest, CustomAreaOfInterest]
+
+AoiUnion = Union[
+    AdminAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
+    ProtectedAreaOfInterest,
+    IndigneousAreaOfInterest,
+    CustomAreaOfInterest,
+]
+
 
 class DistAlertsAnalyticsIn(StrictBaseModel):
     aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
-        ...,
-        min_items=1,
-        max_items=1,
-        description="List of areas of interest."
+        ..., min_items=1, max_items=1, description="List of areas of interest."
     )
     start_date: str = Field(
         ...,
         title="Start Date",
         description="Must be either year or YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
-        examples=["2020", "2020-01-01"]
+        examples=["2020", "2020-01-01"],
     )
     end_date: str = Field(
         ...,
         title="End Date",
         description="Must be either year or YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
-        examples=["2023", "2023-12-31"]
+        examples=["2023", "2023-12-31"],
     )
     intersections: List[Literal["driver", "natural_lands"]] = Field(
-        ...,
-        min_items=0,
-        max_items=1,
-        description="List of intersection types"
+        ..., min_items=0, max_items=1, description="List of intersection types"
     )
 
-@app.post("/v0/land_change/dist_alerts/analytics",
-          response_class=ORJSONResponse,
-          response_model=DataMartResourceLinkResponse,
-          tags=["Beta LandChange"],
-          status_code=202)
+
+@app.post(
+    "/v0/land_change/dist_alerts/analytics",
+    response_class=ORJSONResponse,
+    response_model=DataMartResourceLinkResponse,
+    tags=["Beta LandChange"],
+    status_code=202,
+)
 def create(
     *,
     data: DistAlertsAnalyticsIn,
@@ -347,7 +319,9 @@ def create(
     payload_file = PAYLOAD_STORE_DIR / f"{resource_id}.json"
     payload_file.write_text(payload_json)
 
-    link = DataMartResourceLink(link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}")
+    link = DataMartResourceLink(
+        link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
+    )
     return DataMartResourceLinkResponse(data=link)
 
 
@@ -382,23 +356,25 @@ class DistAlertsAnalytics(StrictBaseModel):
         orm_mode = True
         allow_population_by_field_name = True
 
+
 class DistAlertsAnalyticsResponse(Response):
     data: DistAlertsAnalytics
 
 
-@app.get("/v0/land_change/dist_alerts/analytics/{resource_id}",
-         response_class=ORJSONResponse,
-         response_model=DistAlertsAnalyticsResponse,
-         tags=["Beta LandChange"],
-         status_code=200)
+@app.get(
+    "/v0/land_change/dist_alerts/analytics/{resource_id}",
+    response_class=ORJSONResponse,
+    response_model=DistAlertsAnalyticsResponse,
+    tags=["Beta LandChange"],
+    status_code=200,
+)
 async def get_analytics_result(resource_id: str):
     # Validate UUID format
     try:
         uuid.UUID(resource_id)
     except ValueError:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid resource ID format. Must be a valid UUID."
+            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
         )
 
     # Construct file path
@@ -408,7 +384,7 @@ async def get_analytics_result(resource_id: str):
     if not file_path.exists():
         raise HTTPException(
             status_code=404,
-            detail="Requested resource not found. Either expired or never existed."
+            detail="Requested resource not found. Either expired or never existed.",
         )
 
     # Read and parse JSON file
@@ -418,90 +394,37 @@ async def get_analytics_result(resource_id: str):
     aoi = metadata_content["aois"][0]
     if aoi["type"] == "admin":
         # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_ids = aoi["id"].split(".")
+        gadm_id = aoi["id"].split(".")
         intersections = metadata_content["intersections"]
 
-        # Each intersection will be in a different parquet file
-        if not intersections:
-            table = "gadm_dist_alerts"
-        elif intersections[0] == "driver":
-            table = "gadm_dist_alerts_by_driver"
-            intersection_col = "ldacs_driver"
-        elif intersections[0] == "natural_lands":
-            table = "gadm_dist_alerts_by_natural_lands"
-            intersection_col = "natural_land_class"
-        else:
-            raise ValueError(f"No way to calculate intersection {intersections[0]}")
-        
-        # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
-        # TODO use final pipeline locations and schema for parquet files 
-        # TODO this should be done in a background task and written to file
-        # Build up the DuckDB query based on GADM ID and intersection
-        from_clause = f"FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet'"
-        select_clause = "SELECT country"
-        where_clause = f"WHERE country = '{gadm_ids[0]}'"
-        group_by_clause = f"GROUP BY country"
+        query = create_gadm_dist_query(gadm_id, intersections)
 
-        # Includes region, so add relevant filters, selects and group bys
-        if len(gadm_ids) > 1:
-            select_clause += ", region"
-            where_clause += f" AND region = '{gadm_ids[1]}'"
-            group_by_clause += ", region"
-
-        # Includes subregion, so add relevant filters, selects and group bys
-        if len(gadm_ids) > 2:
-            select_clause += ", subregion"
-            where_clause += f" AND subregion = '{gadm_ids[2]}'"
-            group_by_clause += ", subregion"
-
-        # Includes an intersection, so group by the appropriate column
-        if intersections:
-            select_clause += f", {intersection_col}"
-            group_by_clause += f", {intersection_col}"
-
-        group_by_clause += ", alert_date, alert_confidence"
-        
-        # Query and make sure output names match the expected schema (?)
-        select_clause += ", alert_date, alert_confidence as confidence, sum(count) as value"
-        query = f"{select_clause} {from_clause} {where_clause} {group_by_clause}"
-        
         # Dumbly doing this per request since the STS token expires eventually otherwise
-        # According to this issue, duckdb should auto refresh the token in 1.3.0, 
+        # According to this issue, duckdb should auto refresh the token in 1.3.0,
         # but it doesn't seem to work for us and people are reporting the same on the issue
         # https://github.com/duckdb/duckdb-aws/issues/26
         # TODO do this on lifecycle start once autorefresh works
-        duckdb.query('''
+        duckdb.query(
+            """
             CREATE OR REPLACE SECRET secret (
                 TYPE s3,
                 PROVIDER credential_chain
             );
-        ''')
+        """
+        )
 
         # Send query to DuckDB and convert to return format
         alerts_df = duckdb.query(query).df()
     else:
-        if aoi["type"] == "geojson":
-            geojson = aoi["geojson"]
-        else:
-            if aoi["type"] == "key_biodiversity_area":
-                url = f"https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query?sql=select gfw_geojson from data where sitrecid = {aoi['id']}&x-api-key={API_KEY}"
-            elif aoi["type"] == "protected_area":
-                url = f"https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query?sql=select gfw_geojson from data where wdpaid = {aoi['id']}&x-api-key={API_KEY}"
-            elif aoi["type"] == "indigenous_land":
-                url = f"https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query?sql=select gfw_geojson from data where objectid = {aoi['id']}&x-api-key={API_KEY}"
-
-            response = requests.get(url)
-            response = response.json()
-            if response["data"]:
-                geojson = json.loads(response["data"][0]["gfw_geojson"])
+        geojson = await get_geojson(aoi)
 
         if metadata_content["intersections"]:
             intersection = metadata_content["intersections"][0]
         else:
             intersection = None
 
-        alerts_df = await _analyze(geojson, aoi, intersection)
-        
+        alerts_df = await zonal_statistics(geojson, aoi, intersection)
+
     if metadata_content["start_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
     if metadata_content["end_date"] is not None:
@@ -510,63 +433,10 @@ async def get_analytics_result(resource_id: str):
     alerts_dict = alerts_df.to_dict(orient="list")
 
     # Return using your custom response model
-    return DistAlertsAnalyticsResponse(data={
-        "result": alerts_dict,
-        "metadata": metadata_content,
-        "status": AnalysisStatus.saved,
-    })
-
-
-async def _analyze(geojson, aoi, intersection=None):
-    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
-    dist_alerts = _clip_xarr_to_geojson(xr.open_zarr(dist_obj_name), geojson)
-
-    groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
-    expected_groups = [np.arange(731, 1590), [1, 2, 3]]
-    if intersection == 'natural_lands':
-        natural_lands = _clip_xarr_to_geojson(xr.open_zarr(
-            's3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr'
-        ).band_data, geojson)
-        natural_lands.name = "natural_land_class"
-
-        groupby_layers.append(natural_lands)
-        expected_groups.append(np.arange(22))
-    elif intersection == 'driver':
-        dist_drivers = _clip_xarr_to_geojson(xr.open_zarr(
-            "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
-        ).band_data, geojson)
-        dist_drivers.name = "ldacs_driver"
-
-        groupby_layers.append(dist_drivers) 
-        expected_groups.append(np.arange(5))
-
-    alerts_count = xarray_reduce(
-        dist_alerts.alert_date, 
-        *tuple(groupby_layers),
-        func='count',
-        expected_groups=tuple(expected_groups),
-    ).compute()
-    alerts_count.name = 'value'
-
-    alerts_df = alerts_count.to_dataframe().drop("band", axis=1).drop("spatial_ref", axis=1).reset_index()
-    alerts_df.confidence = alerts_df.confidence.map({2: 'low', 3: 'high'})
-    alerts_df.alert_date = pd.to_datetime(alerts_df.alert_date + JULIAN_DATE_2021, origin='julian', unit='D').dt.strftime('%Y-%m-%d')
-    
-    if "id" in aoi:
-        alerts_df[aoi["type"]] = aoi["id"]
-    
-    
-    if intersection == 'natural_lands':
-        alerts_df.natural_land_class = alerts_df.natural_land_class.apply(lambda x: NATURAL_LANDS_CLASSES.get(x, 'Unclassified'))
-    elif intersection == 'driver':
-        alerts_df.ldacs_driver = alerts_df.ldacs_driver.apply(lambda x: DIST_DRIVERS.get(x, 'Unclassified'))
-
-    alerts_df = alerts_df[alerts_df.value > 0]
-    return alerts_df
-
-
-def _clip_xarr_to_geojson(xarr, geojson):
-    geom = shape(geojson)
-    sliced = xarr.sel(x=slice(geom.bounds[0],geom.bounds[2]), y=slice(geom.bounds[3],geom.bounds[1]),).squeeze("band")
-    clipped = sliced.rio.clip([geojson])
-    return clipped
+    return DistAlertsAnalyticsResponse(
+        data={
+            "result": alerts_dict,
+            "metadata": metadata_content,
+            "status": AnalysisStatus.saved,
+        }
+    )
