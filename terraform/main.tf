@@ -1,219 +1,158 @@
-provider "aws" {
-  region = "us-east-1"
-}
-
-# Create a VPC
-resource "aws_vpc" "main" {
-  cidr_block           = "10.0.0.0/16"
-  enable_dns_support   = true
-  enable_dns_hostnames = true
-  tags = {
-    Name = "zeno-analytics"
-  }
-}
-
-# Create subnets
-resource "aws_subnet" "public_subnet" {
-  count                   = 2
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-  map_public_ip_on_launch = true
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
-  tags = {
-    Name = "zeno-public-subnet-${count.index}"
-  }
-}
-
-data "aws_availability_zones" "available" {}
-
-# Create an Internet Gateway
-resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "zeno-internet-gateway"
-  }
-}
-
-# Create a Route Table
-resource "aws_route_table" "main" {
-  vpc_id = aws_vpc.main.id
-  tags = {
-    Name = "zeno-route-table"
-  }
-}
-
-resource "aws_route" "internet_access" {
-  route_table_id         = aws_route_table.main.id
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
-}
-
-resource "aws_route_table_association" "public_subnet_association" {
-  count          = length(aws_subnet.public_subnet)
-  subnet_id      = aws_subnet.public_subnet[count.index].id
-  route_table_id = aws_route_table.main.id
-}
-
-# Security Group for ALB
-resource "aws_security_group" "alb_sg" {
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "zeno-alb-sg"
-  }
-}
-
-# Security Group for ECS tasks
-resource "aws_security_group" "ecs_sg" {
-  vpc_id = aws_vpc.main.id
-
-  ingress {
-    from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "zeno-tasks-sg"
-  }
-}
-
-# Create an ECS Cluster
-resource "aws_ecs_cluster" "main" {
-  name = "zeno-analytics"
-}
-
-# Create a Load Balancer
-resource "aws_lb" "main" {
-  name               = "zeno-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = aws_subnet.public_subnet[*].id
-
-  tags = {
-    Name = "zeno-alb"
-  }
-}
-
-# Create a Target Group
-resource "aws_lb_target_group" "main" {
-  name        =  "zeno-target-group"
-  port        = 80
-  protocol    = "HTTP"
-  vpc_id      = aws_vpc.main.id
-  target_type = "ip"
-
-  health_check {
-    path                = "/"
-    interval            = 30
-    timeout             = 5
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
-
-  tags = {
-    Name = "zeno-target-group"
-  }
-}
-
-# Create a Listener
-resource "aws_lb_listener" "main" {
-  load_balancer_arn = aws_lb.main.arn
-  port              = 80
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.main.arn
-  }
-}
-
-# Create an ECS Task Execution Role
-resource "aws_iam_role" "ecs_task_execution_role" {
-    name = "ecs_task_execution_role"
-
-    assume_role_policy = jsonencode({
-        Version = "2012-10-17"
-        Statement = [
-            {
-                Effect = "Allow"
-                Principal = {
-                    Service = "ecs-tasks.amazonaws.com"
-                }
-                Action = "sts:AssumeRole"
-            }
-        ]
-    })
-}
-
-# Attach the necessary policies to the ECS Task Execution Role
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-    role       = aws_iam_role.ecs_task_execution_role.name
-    policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-# Create a Task Definition
-resource "aws_ecs_task_definition" "main" {
-  family                   = "ecs-task"
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = "8192" # 8 vCPU
-  memory                   = "32768" # 32 GB
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = "app-container"
-      image     = "nginx:latest"
-      essential = true
-      portMappings = [
-        {
-          containerPort = 80
-          hostPort      = 80
-          protocol      = "tcp"
+terraform {
+    required_providers {
+        aws = {
+            source  = "hashicorp/aws"
+            version = "<6.0.0"
         }
-      ]
     }
-  ])
 }
 
-# Create an ECS Service
-resource "aws_ecs_service" "main" {
-  name            = "zeno-analytics"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.main.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-  network_configuration {
-    subnets         = aws_subnet.public_subnet[*].id
-    security_groups = [aws_security_group.ecs_sg.id]
+provider "aws" {
+    region = "us-east-1" # Replace with your desired region
+}
+
+
+module "ecs" {
+  source = "terraform-aws-modules/ecs/aws"
+
+  cluster_name = "zeno-data-infra"
+
+  cluster_configuration = {
+    execute_command_configuration = {
+      logging = "OVERRIDE"
+      log_configuration = {
+        cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
+      }
+    }
   }
-  load_balancer {
-    target_group_arn = aws_lb_target_group.main.arn
-    container_name   = "app-container"
-    container_port   = 80
+
+  fargate_capacity_providers = {
+    FARGATE = {
+      default_capacity_provider_strategy = {
+        weight = 50
+      }
+    }
+    FARGATE_SPOT = {
+      default_capacity_provider_strategy = {
+        weight = 50
+      }
+    }
+  }
+
+  services = {
+    zeno-analytics = {
+      cpu    = 1024
+      memory = 4096
+
+      # Container definition(s)
+      container_definitions = {
+        nginx = {
+          cpu       = 512
+          memory    = 1024
+          essential = true
+          image     = "public.ecr.aws/nginx/nginx"
+        }
+      }
+
+      load_balancer = {
+        service = {
+          target_group_arn = module.alb.target_groups["ex_ecs"].arn
+          container_name   = "zeno-analytics"
+          container_port   = 80
+        }
+      }
+
+      subnet_ids = ["subnet-00564600fc0109d5f", "subnet-0c9a24adf6985b148", "subnet-0e9ba580b832e58ab"]
+      security_group_rules = {
+        alb_ingress_3000 = {
+          type                     = "ingress"
+          from_port                = 80
+          to_port                  = 80
+          protocol                 = "tcp"
+          description              = "Service port"
+          source_security_group_id = "sg-02f79d9422c79d174"
+        }
+        egress_all = {
+          type        = "egress"
+          from_port   = 0
+          to_port     = 0
+          protocol    = "-1"
+          cidr_blocks = ["0.0.0.0/0"]
+        }
+      }
+    }
+  }
+
+  tags = {
+    Environment = "Production"
+    Project     = "Zeno"
+  }
+}
+
+module "alb" {
+  source  = "terraform-aws-modules/alb/aws"
+  version = "~> 9.0"
+
+  name = "zeno-analytics"
+
+  load_balancer_type = "application"
+
+  vpc_id  = module.vpc.vpc_id
+  subnets = module.vpc.public_subnets
+
+  # For example only
+  enable_deletion_protection = false
+
+  # Security Group
+  security_group_ingress_rules = {
+    all_http = {
+      from_port   = 80
+      to_port     = 80
+      ip_protocol = "tcp"
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+  }
+  security_group_egress_rules = {
+    all = {
+      ip_protocol = "-1"
+      cidr_ipv4   = module.vpc.vpc_cidr_block
+    }
+  }
+
+  listeners = {
+    ex_http = {
+      port     = 80
+      protocol = "HTTP"
+
+      forward = {
+        target_group_key = "ex_ecs"
+      }
+    }
+  }
+
+  target_groups = {
+    ex_ecs = {
+      backend_protocol                  = "HTTP"
+      backend_port                      = 80
+      target_type                       = "ip"
+      deregistration_delay              = 5
+      load_balancing_cross_zone_enabled = true
+
+      health_check = {
+        enabled             = true
+        healthy_threshold   = 5
+        interval            = 30
+        matcher             = "200"
+        path                = "/"
+        port                = "traffic-port"
+        protocol            = "HTTP"
+        timeout             = 5
+        unhealthy_threshold = 2
+      }
+
+      # Theres nothing to attach here in this definition. Instead,
+      # ECS will attach the IPs of the tasks to this target group
+      create_attachment = false
+    }
   }
 }
