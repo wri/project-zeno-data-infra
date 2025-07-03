@@ -8,7 +8,7 @@ from api.app.query import create_gadm_dist_query
 
 def test_create_gadm_adm2_dist_query_no_intersection_select_clause():
     query = create_gadm_dist_query(["IDN", "24", "9"], [])
-    expected_clause = "SELECT country, region, subregion, alert_date, alert_confidence AS confidence, SUM(count) AS value"
+    expected_clause = "SELECT country, region, subregion, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
@@ -42,7 +42,7 @@ def test_create_gadm_adm2_dist_query_no_intersection_order_by_clause():
 
 def test_create_gadm_adm1_dist_query_no_intersection_select_clause():
     query = create_gadm_dist_query(["IDN", "24"], [])
-    expected_clause = "SELECT country, region, alert_date, alert_confidence AS confidence, SUM(count) AS value"
+    expected_clause = "SELECT country, region, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
@@ -72,7 +72,7 @@ def test_create_gadm_adm1_dist_query_no_intersection_order_by_clause():
 
 def test_create_gadm_iso_dist_query_no_intersection_select_clause():
     query = create_gadm_dist_query(["IDN"], [])
-    expected_clause = "SELECT country, alert_date, alert_confidence AS confidence, SUM(count) AS value"
+    expected_clause = "SELECT country, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
@@ -102,7 +102,7 @@ def test_create_gadm_iso_dist_query_no_intersection_order_by_clause():
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_select_clause():
     query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "SELECT country, region, subregion, natural_land_class, alert_date, alert_confidence AS confidence, SUM(count) AS value"
+    expected_clause = "SELECT country, region, subregion, natural_land_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
@@ -132,7 +132,7 @@ def test_create_gadm_adm2_dist_query_natural_lands_intersection_order_by_clause(
 
 def test_create_gadm_adm2_dist_query_drivers_intersection_select_clause():
     query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
-    expected_clause = "SELECT country, region, subregion, ldacs_driver, alert_date, alert_confidence AS confidence, SUM(count) AS value"
+    expected_clause = "SELECT country, region, subregion, ldacs_driver, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 

@@ -29,11 +29,11 @@ def test_gadm_dist_analytics_no_intersection():
             "region": [24, 24],
             "subregion": [9, 9],
             "alert_date": [
-                "2024-08-15T00:00:00",
-                "2024-08-15T00:00:00",
-            ],  # TODO use YYYY-MM-DD
+                "2024-08-15",
+                "2024-08-15",
+            ],
             "confidence": ["high", "low"],
-            "value": [1490.0, 95.0],  # TODO use int
+            "value": [1490, 95],
         }
     )
 
