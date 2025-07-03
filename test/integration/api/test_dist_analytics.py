@@ -38,7 +38,9 @@ def test_gadm_dist_analytics_no_intersection():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    pd.testing.assert_frame_equal(expected_df, actual_df)
+    print(actual_df)
+
+    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
 
 def test_kba_dist_analytics_no_intersection():
@@ -57,8 +59,17 @@ def test_kba_dist_analytics_no_intersection():
     data = client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}").json()[
         "data"
     ]
-    print(data)
-    assert data["result"]["key_biodiversity_area"] == ["8111"]
-    assert data["result"]["alert_date"] == ["2024-08-15"]
-    assert data["result"]["confidence"] == ["high"]
-    assert data["result"]["value"] == [123]
+
+    expected_df = pd.DataFrame(
+        {
+            "key_biodiversity_area": ["8111"],
+            "alert_date": ["2024-08-15"],
+            "confidence": ["high"],
+            "value": [123],
+        }
+    )
+
+    actual_df = pd.DataFrame(data["result"])
+    print(actual_df)
+
+    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
