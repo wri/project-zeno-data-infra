@@ -19,7 +19,7 @@ def decode_alert_data(band_data) -> xr.Dataset:
 def create_zarr(version, overwrite=False) -> str:
     """create a full extent zarr file in s3."""
     base_folder = f"umd_glad_dist_alerts/{version}/raster/epsg-4326"
-    key = f"{base_folder}/zarr/umd_glad_dist_alerts_{version}.zarr"
+    key = f"{base_folder}/zarr/umd_glad_dist_alerts.zarr"
     zarr_uri = f"s3://{data_lake_bucket}/{key}"
     cog_uri = f"s3://{data_lake_bucket}/{base_folder}/cog/default.tif"
 

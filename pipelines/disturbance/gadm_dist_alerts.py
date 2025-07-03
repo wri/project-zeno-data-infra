@@ -7,6 +7,8 @@ import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
 
+from .check_for_new_alerts import s3_object_exists
+
 DATA_LAKE_BUCKET = "gfw-data-lake"
 
 LoaderType = Callable[[str], Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]]
@@ -40,16 +42,23 @@ def gadm_dist_alerts(
     loader: LoaderType = _s3_loader,
     groups: Optional[ExpectedGroupsType] = None,
     saver: SaverType = _parquet_saver,
+    overwrite: bool = False
 ) -> str:
     """Count DIST alerts by GADM boundary, confidence, and date, and export grouped results to a Parquet file in S3."""
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
+
+    results_key = f"umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2.parquet"
+    results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
+
+    if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, results_key):
+        return results_uri
 
     return pipe(
         loader(dist_zarr_uri),
         lambda d: _setup(*d, groups),
         lambda s: _compute(*s),
         _create_data_frame,
-        lambda df: _save_results(df, dist_version, saver),
+        lambda df: _save_results(df, dist_version, saver, results_uri),
     )
 
 
@@ -114,9 +123,8 @@ def _create_data_frame(alerts_count: xr.Dataset) -> pd.DataFrame:
 
 
 def _save_results(
-    alerts_count_df: pd.DataFrame, dist_version: str, saver: Callable
+    alerts_count_df: pd.DataFrame, dist_version: str, saver: Callable, results_uri: str
 ) -> str:
-    results_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
     saver(alerts_count_df, results_uri)
     return results_uri
 
