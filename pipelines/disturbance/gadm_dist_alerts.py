@@ -8,8 +8,7 @@ from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
 
 from .check_for_new_alerts import s3_object_exists
-
-DATA_LAKE_BUCKET = "gfw-data-lake"
+from ..globals import DATA_LAKE_BUCKET, country_zarr_uri, region_zarr_uri, subregion_zarr_uri
 
 LoaderType = Callable[[str], Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]]
 ExpectedGroupsType = Tuple
@@ -19,16 +18,20 @@ SaverType = Callable[[pd.DataFrame, str], None]
 def _s3_loader(
     dist_zarr_uri: str,
 ) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]:
-    gadm_version = "v4.1.85"
-    country_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm0_clipped_to_dist.zarr"
-    region_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm1_clipped_to_dist.zarr"
-    subregion_zarr_uri = f"s3://{DATA_LAKE_BUCKET}/gadm_administrative_boundaries/{gadm_version}/raster/epsg-4326/zarr/adm2_clipped_to_dist.zarr"
 
+    dist_alerts = xr.open_zarr(dist_zarr_uri)
+
+    country = xr.open_zarr(country_zarr_uri)
+    country_from_clipped = xr.align(dist_alerts, country, join='left')[1]
+    region = xr.open_zarr(region_zarr_uri)
+    region_from_clipped = xr.align(dist_alerts, region, join='left')[1]
+    subregion = xr.open_zarr(subregion_zarr_uri)
+    subregion_from_clipped = xr.align(dist_alerts, subregion, join='left')[1]
     return (
-        xr.open_zarr(dist_zarr_uri),
-        xr.open_zarr(country_zarr_uri),
-        xr.open_zarr(region_zarr_uri),
-        xr.open_zarr(subregion_zarr_uri),
+        dist_alerts,
+        country_from_clipped,
+        region_from_clipped,
+        subregion_from_clipped
     )
 
 
