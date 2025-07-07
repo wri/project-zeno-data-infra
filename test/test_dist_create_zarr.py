@@ -72,12 +72,13 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
 
         result = create_zarr(version, overwrite=False)
 
-        expected_uri = f"s3://test-bucket/umd_glad_dist_alerts/{version}/raster/epsg-4326/zarr/umd_glad_dist_alerts_{version}.zarr"
+        expected_uri = f"s3://test-bucket/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+
         assert result == expected_uri
 
         mock_s3_exists.assert_called_once_with(
             "test-bucket",
-            f"umd_glad_dist_alerts/{version}/raster/epsg-4326/zarr/umd_glad_dist_alerts_{version}.zarr/zarr.json",
+            f"umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
         )
 
         mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
