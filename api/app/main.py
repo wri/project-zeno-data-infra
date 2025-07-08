@@ -11,7 +11,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from dask.distributed import LocalCluster
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from flox.xarray import xarray_reduce
 from pydantic import BaseModel, Field, model_validator, field_validator
@@ -241,6 +242,8 @@ def create(
     *,
     data: DistAlertsAnalyticsIn,
     request: Request,
+    response: FastAPIResponse,
+    background_tasks: BackgroundTasks
 ):
     """
     # Primary Dataset
@@ -323,7 +326,11 @@ def create(
     link = DataMartResourceLink(
         link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
     )
-    return DataMartResourceLinkResponse(data=link)
+
+    # no previous result found
+    background_tasks.add_task(do_analytics, file_path=payload_file)
+    response.headers["Retry-After"] = '1'
+    return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
 
 
 class AnalysisStatus(str, Enum):
@@ -388,10 +395,22 @@ async def get_analytics_result(resource_id: str):
             detail="Requested resource not found. Either expired or never existed.",
         )
 
+    alerts_dict, metadata_content = await do_analytics(file_path)
+
+    # Return using your custom response model
+    return DistAlertsAnalyticsResponse(
+        data={
+            "result": alerts_dict,
+            "metadata": metadata_content,
+            "status": AnalysisStatus.saved,
+        }
+    )
+
+
+async def do_analytics(file_path):
     # Read and parse JSON file
     json_content = file_path.read_text()
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
-
     aoi = metadata_content["aois"][0]
     if aoi["type"] == "admin":
         # GADM IDs are coming joined by '.', e.g. IDN.24.9
@@ -425,19 +444,9 @@ async def get_analytics_result(resource_id: str):
             intersection = None
 
         alerts_df = await zonal_statistics(geojson, aoi, intersection)
-
     if metadata_content["start_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
     if metadata_content["end_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
-
     alerts_dict = alerts_df.to_dict(orient="list")
-
-    # Return using your custom response model
-    return DistAlertsAnalyticsResponse(
-        data={
-            "result": alerts_dict,
-            "metadata": metadata_content,
-            "status": AnalysisStatus.saved,
-        }
-    )
+    return alerts_dict, metadata_content

@@ -1,9 +1,61 @@
+import os
+
+import pytest
+
 import pandas as pd
 from fastapi.testclient import TestClient
 
 from api.app.main import app
 
 client = TestClient(app)
+
+class TestDistAnalyticsWithNoPreviousResult:
+    @pytest.fixture(autouse=True)
+    def setup_before_each(self):
+        """Runs before each test in this class"""
+        dir_path = "/tmp/dist_alerts_analytics_payloads"
+
+        if not os.path.exists(dir_path):
+            return
+
+        for filename in os.listdir(dir_path):
+            file_path = os.path.join(dir_path, filename)
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+
+        self.test_request = client.post(
+            "/v0/land_change/dist_alerts/analytics",
+            json={
+                "aois": [{"type": "admin", "id": "IDN.24.9"}],
+                "start_date": "2024-08-15",
+                "end_date": "2024-08-16",
+                "intersections": [],
+            },
+        )
+
+
+    def test_post_with_no_previous_result_returns_pending_status(self):
+        resource = self.test_request.json()
+
+        assert resource["status"] == "pending"
+
+
+    def test_post_with_no_previous_result_returns_resource_link(self):
+        resource = self.test_request.json()
+
+        assert resource["data"]["link"] == 'http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59'
+
+
+    def test_post_with_no_previous_result_returns_retry_after_in_response_header(self):
+        response = self.test_request
+
+        assert response.headers["Retry-After"] == '1'
+
+
+    def test_post_with_no_previous_result_returns_202_accepted_response_code(self):
+        response = self.test_request
+
+        assert response.status_code == 202
 
 
 def test_gadm_dist_analytics_no_intersection():
