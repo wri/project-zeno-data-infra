@@ -320,17 +320,21 @@ def create(
     resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
 
     # Store payload in /tmp directory
-    payload_file = PAYLOAD_STORE_DIR / f"{resource_id}.json"
-    payload_file.write_text(payload_json)
+    payload_dir = PAYLOAD_STORE_DIR / resource_id
+    payload_file = payload_dir / "metadata.json"
 
     link = DataMartResourceLink(
         link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
     )
 
-    # no previous result found
-    background_tasks.add_task(do_analytics, file_path=payload_file)
-    response.headers["Retry-After"] = '1'
-    return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
+    if payload_file.exists():
+        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
+    else:
+        payload_dir.mkdir(parents=True, exist_ok=True)
+        payload_file.write_text(payload_json)
+        background_tasks.add_task(do_analytics, file_path=payload_file)
+        response.headers["Retry-After"] = '1'
+        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
 
 
 class AnalysisStatus(str, Enum):
@@ -386,7 +390,7 @@ async def get_analytics_result(resource_id: str):
         )
 
     # Construct file path
-    file_path = PAYLOAD_STORE_DIR / f"{resource_id}.json"
+    file_path = PAYLOAD_STORE_DIR / resource_id / "metadata.json"
 
     # Check if file exists
     if not file_path.exists():
