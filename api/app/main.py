@@ -14,7 +14,7 @@ from dask.distributed import LocalCluster
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import ORJSONResponse
 from flox.xarray import xarray_reduce
-from pydantic import BaseModel, Extra, Field, root_validator, validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 from shapely.geometry import shape
 
 from api.app.analysis import JULIAN_DATE_2021, get_geojson, zonal_statistics
@@ -94,9 +94,10 @@ ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 
 
 class StrictBaseModel(BaseModel):
-    class Config:
-        extra = Extra.forbid
-        validate_assignment = True
+    model_config = {
+        'extra': 'forbid',
+        'validate_assignment': True,
+    }
 
 
 class Response(StrictBaseModel):
@@ -145,7 +146,7 @@ class AdminAreaOfInterest(AreaOfInterest):
         )
         return admin_level
 
-    @root_validator(skip_on_failure=True)
+    @model_validator(mode='after')
     def check_region_subregion(cls, values):
         # id = values.get("id")
         # parse id to get region and subregion (if they exist)
@@ -155,11 +156,11 @@ class AdminAreaOfInterest(AreaOfInterest):
             raise ValueError("region must be specified if subregion is provided")
         return values
 
-    @validator("provider", pre=True, always=True)
+    @field_validator("provider", mode='before')
     def set_provider_default(cls, v):
         return v or "gadm"
 
-    @validator("version", pre=True, always=True)
+    @field_validator("version", mode='before')
     def set_version_default(cls, v):
         return v or "4.1"
 
@@ -208,7 +209,7 @@ AoiUnion = Union[
 
 class DistAlertsAnalyticsIn(StrictBaseModel):
     aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
-        ..., min_items=1, max_items=1, description="List of areas of interest."
+        ..., min_length=1, max_length=1, description="List of areas of interest."
     )
     start_date: str = Field(
         ...,
@@ -225,7 +226,7 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         examples=["2023", "2023-12-31"],
     )
     intersections: List[Literal["driver", "natural_lands"]] = Field(
-        ..., min_items=0, max_items=1, description="List of intersection types"
+        ..., min_length=0, max_length=1, description="List of intersection types"
     )
 
 
@@ -352,10 +353,10 @@ class DistAlertsAnalytics(StrictBaseModel):
     message: Optional[str] = None
     status: AnalysisStatus
 
-    class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
-
+    model_config = {
+        'from_attributes': True,
+        'validate_by_name': True,
+    }
 
 class DistAlertsAnalyticsResponse(Response):
     data: DistAlertsAnalytics
