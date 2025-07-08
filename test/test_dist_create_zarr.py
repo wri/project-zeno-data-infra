@@ -57,7 +57,6 @@ def test_decode_alert_data():
     assert list(result.y.values) == [0, 1]
 
 
-@patch("pipelines.disturbance.create_zarr.data_lake_bucket", "test-bucket")
 @patch("pipelines.disturbance.create_zarr.s3_object_exists")
 @patch("pipelines.disturbance.create_zarr.xr.open_dataset")
 def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
@@ -66,18 +65,18 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     mock_open_dataset.return_value = mock_dataset
 
     version = "v20250102"
-    cog_uri = f"s3://test-bucket/umd_glad_dist_alerts/{version}/raster/epsg-4326/cog/default.tif"
+    cog_uri = f"s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/cog/default.tif"
 
     with patch.object(xr.Dataset, "to_zarr") as mock_to_zarr:
 
         result = create_zarr(version, overwrite=False)
 
-        expected_uri = f"s3://test-bucket/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+        expected_uri = f"s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
 
         assert result == expected_uri
 
         mock_s3_exists.assert_called_once_with(
-            "test-bucket",
+            "gfw-data-lake",
             f"umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
         )
 
