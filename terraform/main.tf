@@ -48,7 +48,7 @@ module "ecs" {
             }
           ]
           image     = "public.ecr.aws/b7u8b0a6/analytics:latest"
-          command   = ["uvicorn", "dynamic.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          command   = ["uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           readonlyRootFilesystem = false
         }
       }
