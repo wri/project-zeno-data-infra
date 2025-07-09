@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from dask.distributed import LocalCluster
 from fastapi import FastAPI
 
-from api.app.routers import dist_alerts
+from api.app.routers import land_change
 
 
 @asynccontextmanager
@@ -18,11 +18,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(
-    dist_alerts.router,
-    prefix="/v0/land_change/dist_alerts",
-    tags=["β Land Change"]
-)
+
+app.include_router(land_change.router)
 
 
 @app.get("/")
