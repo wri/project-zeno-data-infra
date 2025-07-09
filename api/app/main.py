@@ -338,7 +338,6 @@ def create(
     payload_dir.mkdir(parents=True, exist_ok=True)
     metadata_data.write_text(payload_json)
     background_tasks.add_task(do_analytics, file_path=payload_dir)
-    response.headers["Retry-After"] = '1'
     return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
 
 
@@ -385,7 +384,10 @@ class DistAlertsAnalyticsResponse(Response):
     tags=["Beta LandChange"],
     status_code=200,
 )
-async def get_analytics_result(resource_id: str):
+async def get_analytics_result(
+        resource_id: str,
+        response: FastAPIResponse,
+):
     # Validate UUID format
     try:
         uuid.UUID(resource_id)
@@ -398,25 +400,41 @@ async def get_analytics_result(resource_id: str):
     file_path = PAYLOAD_STORE_DIR / resource_id
     analytics_metadata = file_path / "metadata.json"
     analytics_data = file_path / "data.json"
+    metadata_content = None
+    alerts_dict = None
 
-    # Check if resource exists
-    if not (analytics_metadata.exists() and analytics_data.exists()):
+    if analytics_metadata.exists() and analytics_data.exists():
+        # load resource from filesystem
+        alerts_dict = json.loads(analytics_data.read_text())
+        metadata_content = json.loads(analytics_metadata.read_text())
+
+        return DistAlertsAnalyticsResponse(
+            data={
+                "result": alerts_dict,
+                "metadata": metadata_content,
+                "status": AnalysisStatus.saved,
+            },
+            status="success",
+        )
+
+    if metadata_content:
+        response.headers["Retry-After"] = '1'
+        return DistAlertsAnalyticsResponse(
+            data={
+                "status": AnalysisStatus.pending,
+                "message": "Resource is still processing, follow Retry-After header.",
+                "result": alerts_dict,
+                "metadata": metadata_content,
+            },
+            status="success",
+        )
+
+
+    if not analytics_metadata.exists():
         raise HTTPException(
             status_code=404,
             detail="Requested resource not found. Either expired or never existed.",
         )
-
-    # load resource from filesystem
-    alerts_dict = json.loads(analytics_data.read_text())
-    metadata_content = json.loads(analytics_metadata.read_text())
-
-    return DistAlertsAnalyticsResponse(
-        data={
-            "result": alerts_dict,
-            "metadata": metadata_content,
-            "status": AnalysisStatus.saved,
-        }
-    )
 
 
 async def do_analytics(file_path):

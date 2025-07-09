@@ -44,12 +44,6 @@ class TestDistAnalyticsWithNoPreviousResult:
         assert resource["data"]["link"] == 'http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59'
 
 
-    def test_post_returns_retry_after_in_response_header(self):
-        response = self.test_request
-
-        assert response.headers["Retry-After"] == '1'
-
-
     def test_post_returns_202_accepted_response_code(self):
         response = self.test_request
 
@@ -94,12 +88,6 @@ class TestDistAnalyticsWithPreviousResult:
         resource = self.test_request.json()
 
         assert resource["data"]["link"] == 'http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59'
-
-
-    def test_post_does_not_have_retry_after_in_response_header(self):
-        response = self.test_request
-
-        assert response.headers.get("Retry-After") is None
 
 
     def test_post_202_accepted_response_code(self):
