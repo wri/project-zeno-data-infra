@@ -35,6 +35,7 @@ DIST_DRIVERS = {
     5: "Unclassified",
 }
 
+
 async def zonal_statistics(geojson, aoi, intersection=None):
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = clip_xarr_to_geojson(xr.open_zarr(dist_obj_name), geojson)

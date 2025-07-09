@@ -27,8 +27,8 @@ PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
 class StrictBaseModel(BaseModel):
     model_config = {
-        'extra': 'forbid',
-        'validate_assignment': True,
+        "extra": "forbid",
+        "validate_assignment": True,
     }
 
 
@@ -69,16 +69,16 @@ class AdminAreaOfInterest(AreaOfInterest):
 
     def get_admin_level(self):
         admin_level = (
-                sum(
-                    1
-                    for field in (self.country, self.region, self.subregion)
-                    if field is not None
-                )
-                - 1
+            sum(
+                1
+                for field in (self.country, self.region, self.subregion)
+                if field is not None
+            )
+            - 1
         )
         return admin_level
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def check_region_subregion(cls, values):
         # id = values.get("id")
         # parse id to get region and subregion (if they exist)
@@ -88,11 +88,11 @@ class AdminAreaOfInterest(AreaOfInterest):
             raise ValueError("region must be specified if subregion is provided")
         return values
 
-    @field_validator("provider", mode='before')
+    @field_validator("provider", mode="before")
     def set_provider_default(cls, v):
         return v or "gadm"
 
-    @field_validator("version", mode='before')
+    @field_validator("version", mode="before")
     def set_version_default(cls, v):
         return v or "4.1"
 
@@ -128,7 +128,7 @@ class CustomAreaOfInterest(AreaOfInterest):
         ...,
         title="GeoJSON of one geometry",
     )
-    
+
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -169,10 +169,7 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
     status_code=202,
 )
 def create(
-        *,
-        data: DistAlertsAnalyticsIn,
-        request: Request,
-        background_tasks: BackgroundTasks
+    *, data: DistAlertsAnalyticsIn, request: Request, background_tasks: BackgroundTasks
 ):
     # Convert model to JSON with sorted keys
     payload_dict = data.model_dump()
@@ -197,7 +194,6 @@ def create(
 
     if metadata_data.exists():
         return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
-
 
     payload_dir.mkdir(parents=True, exist_ok=True)
     metadata_data.write_text(payload_json)
@@ -233,9 +229,10 @@ class DistAlertsAnalytics(StrictBaseModel):
     status: AnalysisStatus
 
     model_config = {
-        'from_attributes': True,
-        'validate_by_name': True,
+        "from_attributes": True,
+        "validate_by_name": True,
     }
+
 
 class DistAlertsAnalyticsResponse(Response):
     data: DistAlertsAnalytics
@@ -285,7 +282,7 @@ async def do_analytics(file_path):
         alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
     alerts_dict = alerts_df.to_dict(orient="list")
 
-    data = file_path / 'data.json'
+    data = file_path / "data.json"
     data.write_text(json.dumps(alerts_dict))
 
     return alerts_dict, metadata_content
@@ -298,8 +295,8 @@ async def do_analytics(file_path):
     status_code=200,
 )
 async def get_analytics_result(
-        resource_id: str,
-        response: FastAPIResponse,
+    resource_id: str,
+    response: FastAPIResponse,
 ):
     print("In the GET")
     # Validate UUID format
@@ -332,7 +329,7 @@ async def get_analytics_result(
         )
 
     if metadata_content:
-        response.headers["Retry-After"] = '1'
+        response.headers["Retry-After"] = "1"
         return DistAlertsAnalyticsResponse(
             data={
                 "status": AnalysisStatus.pending,
