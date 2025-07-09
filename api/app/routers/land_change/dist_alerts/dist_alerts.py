@@ -12,8 +12,10 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field, model_validator, field_validator
 
-from api.app.analysis import get_geojson, zonal_statistics
-from api.app.query import create_gadm_dist_query
+from api.app.analysis.common.analysis import get_geojson
+from api.app.analysis.dist_alerts.analysis import zonal_statistics
+
+from api.app.analysis.dist_alerts.query import create_gadm_dist_query
 
 router = APIRouter(prefix="/dist_alerts")
 
