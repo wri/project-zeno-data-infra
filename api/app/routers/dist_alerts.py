@@ -161,10 +161,9 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
 
 
 @router.post(
-    "/v0/land_change/dist_alerts/analytics",
+    "/analytics",
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
-    tags=["Beta LandChange"],
     status_code=202,
 )
 def create(
@@ -357,10 +356,9 @@ async def do_analytics(file_path):
 
 
 @router.get(
-    "/v0/land_change/dist_alerts/analytics/{resource_id}",
+    "/{resource_id}",
     response_class=ORJSONResponse,
     response_model=DistAlertsAnalyticsResponse,
-    tags=["Beta LandChange"],
     status_code=200,
 )
 async def get_analytics_result(

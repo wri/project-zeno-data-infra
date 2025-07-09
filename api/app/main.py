@@ -18,7 +18,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(dist_alerts.router)
+app.include_router(
+    dist_alerts.router,
+    prefix="/v0/land_change/dist_alerts",
+    tags=["β Land Change"]
+)
 
 
 @app.get("/")
