@@ -1,11 +1,11 @@
-terraform {
-    required_providers {
-        aws = {
-            source  = "hashicorp/aws"
-            version = "<6.0.0"
-        }
-    }
-}
+# terraform {
+#     required_providers {
+#         aws = {
+#             source  = "hashicorp/aws"
+#             version = "<6.0.0"
+#         }
+#     }
+# }
 
 provider "aws" {
     region = "us-east-1" # Replace with your desired region
@@ -17,11 +17,21 @@ module "ecs" {
 
   cluster_name = "analytics"
   create_task_exec_iam_role = true
+  default_capacity_provider_strategy = {
+    FARGATE = {
+      weight = 50
+      base   = 20
+    }
+    FARGATE_SPOT = {
+      weight = 50
+    }
+  }
 
   services = {
     analytics = {
       cpu    = 1024
       memory = 4096
+      assign_public_ip = true
 
       # Container definition(s)
       container_definitions = {
@@ -29,7 +39,7 @@ module "ecs" {
           cpu       = 1024
           memory    = 2048
           essential = true
-          port_mappings = [
+          portMappings = [
             {
                 name          = "api"
                 containerPort = 8000
@@ -37,7 +47,9 @@ module "ecs" {
                 protocol      = "tcp"
             }
           ]
-          image     = "084375562450.dkr.ecr.us-east-1.amazonaws.com/analytics-api:latest"
+          image     = "public.ecr.aws/b7u8b0a6/analytics:latest"
+          command   = ["uvicorn", "dynamic.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          readonlyRootFilesystem = false
         }
       }
 
@@ -50,7 +62,7 @@ module "ecs" {
       }
     
       enable_cloudwatch_logging = true
-      subnet_ids = ["subnet-0f1544432f2a769d2", "subnet-06be7fcbfc68758ff", "subnet-04591b309ac62bf35"]
+      subnet_ids = ["subnet-0f1544432f2a769d2", "subnet-06be7fcbfc68758ff", "subnet-04591b309ac62bf35"] #["subnet-093dc828845e30d17", "subnet-06a71eea1358f008f", "subnet-061f3f293ed2f3f5e"]  #
       security_group_rules = {
         alb_ingress_8000 = {
           type                     = "ingress"
