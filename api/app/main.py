@@ -321,20 +321,25 @@ def create(
 
     # Store payload in /tmp directory
     payload_dir = PAYLOAD_STORE_DIR / resource_id
-    payload_file = payload_dir / "metadata.json"
+    metadata_data = payload_dir / "metadata.json"
+    analytics_data = payload_dir / "data.json"
 
     link = DataMartResourceLink(
         link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
     )
 
-    if payload_file.exists():
+    if metadata_data.exists() and analytics_data.exists():
         return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
-    else:
-        payload_dir.mkdir(parents=True, exist_ok=True)
-        payload_file.write_text(payload_json)
-        background_tasks.add_task(do_analytics, file_path=payload_file)
-        response.headers["Retry-After"] = '1'
+
+    if metadata_data.exists():
         return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
+
+
+    payload_dir.mkdir(parents=True, exist_ok=True)
+    metadata_data.write_text(payload_json)
+    background_tasks.add_task(do_analytics, file_path=payload_dir)
+    response.headers["Retry-After"] = '1'
+    return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
 
 
 class AnalysisStatus(str, Enum):
@@ -390,18 +395,21 @@ async def get_analytics_result(resource_id: str):
         )
 
     # Construct file path
-    file_path = PAYLOAD_STORE_DIR / resource_id / "metadata.json"
+    file_path = PAYLOAD_STORE_DIR / resource_id
+    analytics_metadata = file_path / "metadata.json"
+    analytics_data = file_path / "data.json"
 
-    # Check if file exists
-    if not file_path.exists():
+    # Check if resource exists
+    if not (analytics_metadata.exists() and analytics_data.exists()):
         raise HTTPException(
             status_code=404,
             detail="Requested resource not found. Either expired or never existed.",
         )
 
-    alerts_dict, metadata_content = await do_analytics(file_path)
+    # load resource from filesystem
+    alerts_dict = json.loads(analytics_data.read_text())
+    metadata_content = json.loads(analytics_metadata.read_text())
 
-    # Return using your custom response model
     return DistAlertsAnalyticsResponse(
         data={
             "result": alerts_dict,
@@ -413,7 +421,8 @@ async def get_analytics_result(resource_id: str):
 
 async def do_analytics(file_path):
     # Read and parse JSON file
-    json_content = file_path.read_text()
+    metadata = file_path / "metadata.json"
+    json_content = metadata.read_text()
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
     aoi = metadata_content["aois"][0]
     if aoi["type"] == "admin":
@@ -453,4 +462,8 @@ async def do_analytics(file_path):
     if metadata_content["end_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
     alerts_dict = alerts_df.to_dict(orient="list")
+
+    data = file_path / 'data.json'
+    data.write_text(json.dumps(alerts_dict))
+
     return alerts_dict, metadata_content
