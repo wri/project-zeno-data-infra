@@ -20,10 +20,9 @@ RUN curl -LsSf https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/u
 RUN useradd -m -s /bin/bash appuser
 RUN mkdir -p /app
 RUN chown appuser:appuser /app
-COPY --chown=appuser . /app
 
 USER appuser
-
+COPY --chown=appuser pyproject.toml uv.lock /app/
 WORKDIR /app
 
 # Create a virtual environment with uv inside the container
@@ -32,5 +31,10 @@ RUN uv venv ${VENV_DIR} --python ${PYTHON_VERSION} --seed --system-site-packages
 ## Verify GDAL and core Python package installation
 RUN . ${VENV_DIR}/bin/activate \
     && uv sync --locked --no-install-project --no-dev
-
 ENV PATH=${VENV_DIR}/bin:${USR_LOCAL_BIN}:${PATH}
+ENV VIRTUAL_ENV=/app/.venv
+
+COPY --chown=appuser . /app
+
+# Expose the port the FastAPI app will run on
+EXPOSE 8000

@@ -15,62 +15,50 @@ provider "aws" {
 module "ecs" {
   source = "terraform-aws-modules/ecs/aws"
 
-  cluster_name = "zeno-data-infra"
-
-  cluster_configuration = {
-    execute_command_configuration = {
-      logging = "OVERRIDE"
-      log_configuration = {
-        cloud_watch_log_group_name = "/aws/ecs/aws-ec2"
-      }
-    }
-  }
-
-  fargate_capacity_providers = {
-    FARGATE = {
-      default_capacity_provider_strategy = {
-        weight = 50
-      }
-    }
-    FARGATE_SPOT = {
-      default_capacity_provider_strategy = {
-        weight = 50
-      }
-    }
-  }
+  cluster_name = "analytics"
+  create_task_exec_iam_role = true
 
   services = {
-    zeno-analytics = {
+    analytics = {
       cpu    = 1024
       memory = 4096
 
       # Container definition(s)
       container_definitions = {
-        nginx = {
-          cpu       = 512
-          memory    = 1024
+        api = {
+          cpu       = 1024
+          memory    = 2048
           essential = true
-          image     = "public.ecr.aws/nginx/nginx"
+          port_mappings = [
+            {
+                name          = "api"
+                containerPort = 8000
+                hostPort      = 8000
+                protocol      = "tcp"
+            }
+          ]
+          image     = "084375562450.dkr.ecr.us-east-1.amazonaws.com/analytics-api:latest"
         }
       }
 
       load_balancer = {
         service = {
           target_group_arn = module.alb.target_groups["ex_ecs"].arn
-          container_name   = "zeno-analytics"
-          container_port   = 80
+          container_name   = "api"
+          container_port   = 8000
         }
       }
-
-      subnet_ids = ["subnet-00564600fc0109d5f", "subnet-0c9a24adf6985b148", "subnet-0e9ba580b832e58ab"]
+    
+      enable_cloudwatch_logging = true
+      subnet_ids = ["subnet-0f1544432f2a769d2", "subnet-06be7fcbfc68758ff", "subnet-04591b309ac62bf35"]
       security_group_rules = {
-        alb_ingress_3000 = {
+        alb_ingress_8000 = {
           type                     = "ingress"
-          from_port                = 80
-          to_port                  = 80
+          from_port                = 8000
+          to_port                  = 8000
           protocol                 = "tcp"
           description              = "Service port"
-          source_security_group_id = "sg-02f79d9422c79d174"
+          source_security_group_id = "sg-080c4a3dcb3b8052b"
         }
         egress_all = {
           type        = "egress"
@@ -84,7 +72,7 @@ module "ecs" {
   }
 
   tags = {
-    Environment = "Production"
+    Environment = "Staging"
     Project     = "Zeno"
   }
 }
@@ -93,12 +81,12 @@ module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
 
-  name = "zeno-analytics"
+  name = "analytics"
 
   load_balancer_type = "application"
 
-  vpc_id  = module.vpc.vpc_id
-  subnets = module.vpc.public_subnets
+  vpc_id  = "vpc-0233b677bf7586002"
+  subnets = ["subnet-0f1544432f2a769d2", "subnet-06be7fcbfc68758ff", "subnet-04591b309ac62bf35"]
 
   # For example only
   enable_deletion_protection = false
@@ -115,7 +103,7 @@ module "alb" {
   security_group_egress_rules = {
     all = {
       ip_protocol = "-1"
-      cidr_ipv4   = module.vpc.vpc_cidr_block
+      cidr_ipv4   = "10.0.0.0/16"
     }
   }
 
@@ -133,7 +121,7 @@ module "alb" {
   target_groups = {
     ex_ecs = {
       backend_protocol                  = "HTTP"
-      backend_port                      = 80
+      backend_port                      = 8000
       target_type                       = "ip"
       deregistration_delay              = 5
       load_balancing_cross_zone_enabled = true
