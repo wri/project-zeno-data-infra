@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, List, Annotated, Union, Optional, Literal, Dict
 from uuid import UUID
 
-from fastapi import APIRouter, Request, BackgroundTasks
+from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field, model_validator, field_validator
@@ -354,3 +354,61 @@ async def do_analytics(file_path):
     data.write_text(json.dumps(alerts_dict))
 
     return alerts_dict, metadata_content
+
+
+@router.get(
+    "/v0/land_change/dist_alerts/analytics/{resource_id}",
+    response_class=ORJSONResponse,
+    response_model=DistAlertsAnalyticsResponse,
+    tags=["Beta LandChange"],
+    status_code=200,
+)
+async def get_analytics_result(
+        resource_id: str,
+        response: FastAPIResponse,
+):
+    # Validate UUID format
+    try:
+        uuid.UUID(resource_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
+        )
+
+    # Construct file path
+    file_path = PAYLOAD_STORE_DIR / resource_id
+    analytics_metadata = file_path / "metadata.json"
+    analytics_data = file_path / "data.json"
+    metadata_content = None
+    alerts_dict = None
+
+    if analytics_metadata.exists() and analytics_data.exists():
+        # load resource from filesystem
+        alerts_dict = json.loads(analytics_data.read_text())
+        metadata_content = json.loads(analytics_metadata.read_text())
+
+        return DistAlertsAnalyticsResponse(
+            data={
+                "result": alerts_dict,
+                "metadata": metadata_content,
+                "status": AnalysisStatus.saved,
+            },
+            status="success",
+        )
+
+    if metadata_content:
+        response.headers["Retry-After"] = '1'
+        return DistAlertsAnalyticsResponse(
+            data={
+                "status": AnalysisStatus.pending,
+                "message": "Resource is still processing, follow Retry-After header.",
+                "result": alerts_dict,
+                "metadata": metadata_content,
+            },
+            status="success",
+        )
+
+    raise HTTPException(
+        status_code=404,
+        detail="Requested resource not found. Either expired or never existed.",
+    )
