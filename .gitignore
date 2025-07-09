@@ -1,6 +1,6 @@
-*.ipynb
 */__pycache__/*
 *.pyc
+*.ipynb
 
 .venv*
 
