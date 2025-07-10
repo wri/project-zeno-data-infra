@@ -32,12 +32,12 @@ class AdminAreaOfInterest(AreaOfInterest):
 
     def get_admin_level(self):
         admin_level = (
-                sum(
-                    1
-                    for field in (self.country, self.region, self.subregion)
-                    if field is not None
-                )
-                - 1
+            sum(
+                1
+                for field in (self.country, self.region, self.subregion)
+                if field is not None
+            )
+            - 1
         )
         return admin_level
 

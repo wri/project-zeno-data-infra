@@ -9,9 +9,14 @@ from fastapi.responses import ORJSONResponse
 from api.app.analysis.dist_alerts.analysis import do_analytics
 
 from api.app.routers.models.common.analysis import AnalysisStatus
-from api.app.routers.models.common.base import DataMartResourceLinkResponse, \
-    DataMartResourceLink
-from api.app.routers.models.land_change.dist_alerts import DistAlertsAnalyticsResponse, DistAlertsAnalyticsIn
+from api.app.routers.models.common.base import (
+    DataMartResourceLinkResponse,
+    DataMartResourceLink,
+)
+from api.app.routers.models.land_change.dist_alerts import (
+    DistAlertsAnalyticsResponse,
+    DistAlertsAnalyticsIn,
+)
 
 
 router = APIRouter(prefix="/dist_alerts")
