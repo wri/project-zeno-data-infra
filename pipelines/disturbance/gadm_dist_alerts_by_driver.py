@@ -87,28 +87,16 @@ def gadm_dist_alerts_by_driver(
 
     dist_alerts, country, region, subregion, dist_drivers = loader(dist_zarr_uri)
 
-    alert_dates = np.arange(731, 1590)
+    confidence, groupbys, expected_groups = _setup(
+        dist_alerts, country, region, subregion, dist_drivers, groups
+    )
 
     print("Starting reduce")
     alerts_count = xarray_reduce(
-        dist_alerts.confidence,
-        *(
-            country.band_data.rename("country"),
-            region.band_data.rename("region"),
-            subregion.band_data.rename("subregion"),
-            dist_drivers.band_data.rename("driver"),
-            dist_alerts.alert_date,
-            dist_alerts.confidence
-        ),
+        confidence,
+        *groupbys,
         func='count',
-        expected_groups=(
-            adm0_ids,
-            np.arange(86),
-            np.arange(854),
-            np.arange(5),
-            alert_dates,
-            [1, 2, 3]
-        ),
+        expected_groups=expected_groups,
         reindex=ReindexStrategy(
             blockwise=False, array_type=ReindexArrayType.SPARSE_COO
         ),
@@ -142,15 +130,17 @@ def _setup(
     country: xr.Dataset,
     region: xr.Dataset,
     subregion: xr.Dataset,
+    dist_drivers: xr.Dataset,
     expected_groups: Tuple,
 ) -> Tuple:
     groups = (
         (
-            np.arange(894),
-            np.arange(86),
-            np.arange(854),
-            np.arange(731, 1590),
-            [1, 2, 3],
+            np.arange(894),        # country ISO codes
+            np.arange(86),         # region codes
+            np.arange(854),        # subregion codes
+            np.arange(5),          # driver categories
+            np.arange(731, 1590),  # days
+            [1, 2, 3],             # confidence values
         )
         if expected_groups is None
         else expected_groups
@@ -162,6 +152,7 @@ def _setup(
             country.band_data.rename("country"),
             region.band_data.rename("region"),
             subregion.band_data.rename("subregion"),
+            dist_drivers.band_data.rename("driver"),
             dist_alerts.alert_date,
             dist_alerts.confidence,
         ),
