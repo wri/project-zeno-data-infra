@@ -104,19 +104,7 @@ def gadm_dist_alerts_by_driver(
     ).compute()
     print("Finished reduce")
 
-    sparse_data = alerts_count.data
-
-    dim_names = alerts_count.dims
-    indices = sparse_data.coords
-    values = sparse_data.data
-
-    coord_dict = {
-        dim: alerts_count.coords[dim].values[indices[i]]
-        for i, dim in enumerate(dim_names)
-    }
-    coord_dict["value"] = values
-
-    df = pd.DataFrame(coord_dict)
+    df = _create_data_frame(alerts_count)
 
     print("Starting saving to parquet")
     _save_results(df, dist_version, saver, results_uri)
