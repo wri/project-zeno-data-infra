@@ -142,6 +142,7 @@ async def do_analytics(file_path):
             intersection = None
 
         alerts_df = await zonal_statistics(geojson, aoi, intersection)
+
     if metadata_content["start_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
     if metadata_content["end_date"] is not None:
@@ -150,5 +151,3 @@ async def do_analytics(file_path):
 
     data = file_path / "data.json"
     data.write_text(json.dumps(alerts_dict))
-
-    return alerts_dict, metadata_content
