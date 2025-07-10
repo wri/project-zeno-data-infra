@@ -92,16 +92,7 @@ def gadm_dist_alerts_by_driver(
     )
 
     print("Starting reduce")
-    alerts_count = xarray_reduce(
-        confidence,
-        *groupbys,
-        func='count',
-        expected_groups=expected_groups,
-        reindex=ReindexStrategy(
-            blockwise=False, array_type=ReindexArrayType.SPARSE_COO
-        ),
-        fill_value=0
-    ).compute()
+    alerts_count = _compute(confidence, groupbys, expected_groups)
     print("Finished reduce")
 
     df = _create_data_frame(alerts_count)
