@@ -7,3 +7,6 @@
 .DS_Store
 
 **/.ipynb_checkpoints/
+.idea/
+.qlty/
+zeno_data_analytics.egg-info/

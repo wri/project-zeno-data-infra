@@ -6,14 +6,14 @@ from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 
-from api.app.analysis.dist_alerts.analysis import do_analytics
+from app.analysis.dist_alerts.analysis import do_analytics
 
-from api.app.models.common.analysis import AnalysisStatus
-from api.app.models.common.base import (
+from app.models.common.analysis import AnalysisStatus
+from app.models.common.base import (
     DataMartResourceLinkResponse,
     DataMartResourceLink,
 )
-from api.app.models.land_change.dist_alerts import (
+from app.models.land_change.dist_alerts import (
     DistAlertsAnalyticsResponse,
     DistAlertsAnalyticsIn,
 )

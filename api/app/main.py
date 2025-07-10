@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from dask.distributed import LocalCluster
 from fastapi import FastAPI
 
-from api.app.routers import land_change
+from .routers import land_change
 
 
 @asynccontextmanager
