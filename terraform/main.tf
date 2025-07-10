@@ -47,7 +47,7 @@ module "ecs" {
                 protocol      = "tcp"
             }
           ]
-          image     = "public.ecr.aws/b7u8b0a6/analytics:latest"
+          image     = var.api_image #"public.ecr.aws/b7u8b0a6/analytics:latest"
           command   = ["uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           readonlyRootFilesystem = false
         }
@@ -62,7 +62,7 @@ module "ecs" {
       }
     
       enable_cloudwatch_logging = true
-      subnet_ids = ["subnet-0f1544432f2a769d2", "subnet-06be7fcbfc68758ff", "subnet-04591b309ac62bf35"] #["subnet-093dc828845e30d17", "subnet-06a71eea1358f008f", "subnet-061f3f293ed2f3f5e"]  #
+      subnet_ids = var.subnet_ids
       security_group_rules = {
         alb_ingress_8000 = {
           type                     = "ingress"
@@ -98,7 +98,7 @@ module "alb" {
   load_balancer_type = "application"
 
   vpc_id  = "vpc-0233b677bf7586002"
-  subnets = ["subnet-0f1544432f2a769d2", "subnet-06be7fcbfc68758ff", "subnet-04591b309ac62bf35"]
+  subnets = var.subnet_ids
 
   # For example only
   enable_deletion_protection = false
