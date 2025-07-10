@@ -37,11 +37,11 @@ packages = ["pipelines"]
 [tool.uv.workspace]
 members = [
     "project-zeno-data-infra",
+]
 
 [dependency-groups]
 development = [
     "pandera>=0.24.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",
-
 ]
