@@ -1,165 +1,23 @@
 import json
 import uuid
-from enum import Enum
-
-import duckdb
 from pathlib import Path
-from typing import Any, List, Annotated, Union, Optional, Literal, Dict
-from uuid import UUID
 
 from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
-from pydantic import BaseModel, Field, model_validator, field_validator
 
-from api.app.analysis.common.analysis import get_geojson
-from api.app.analysis.dist_alerts.analysis import zonal_statistics
+from api.app.analysis.dist_alerts.analysis import do_analytics
 
-from api.app.analysis.dist_alerts.query import create_gadm_dist_query
+from api.app.routers.models.common.analysis import AnalysisStatus
+from api.app.routers.models.common.base import DataMartResourceLinkResponse, \
+    DataMartResourceLink
+from api.app.routers.models.land_change.dist_alerts import DistAlertsAnalyticsResponse, DistAlertsAnalyticsIn
+
 
 router = APIRouter(prefix="/dist_alerts")
 
-ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
-DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 PAYLOAD_STORE_DIR = Path("/tmp/dist_alerts_analytics_payloads")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-class StrictBaseModel(BaseModel):
-    model_config = {
-        "extra": "forbid",
-        "validate_assignment": True,
-    }
-
-
-class Response(StrictBaseModel):
-    data: Any
-    status: str = "success"
-
-
-class DataMartResourceLink(StrictBaseModel):
-    link: str
-
-
-class DataMartResourceLinkResponse(Response):
-    data: DataMartResourceLink
-
-
-class AreaOfInterest(StrictBaseModel):
-    async def get_geostore_id(self) -> Optional[UUID]:
-        """Return the unique identifier for the area of interest."""
-        raise NotImplementedError("This method is not implemented.")
-
-
-class AdminAreaOfInterest(AreaOfInterest):
-    type: Literal["admin"] = "admin"
-    id: str = Field(
-        ...,
-        title="Dot-delimited identifier",
-        pattern=ADMIN_REGEX,
-        examples=["BRA.12.3", "IND", "IDN.12"],
-    )
-    provider: str = Field("gadm", title="Administrative Boundary Provider")
-    version: str = Field("4.1", title="Administrative Boundary Version")
-
-    async def get_geostore_id(self) -> Optional[UUID]:
-        # admin_level = self.get_admin_level()
-        geostore_id = None
-        return geostore_id
-
-    def get_admin_level(self):
-        admin_level = (
-            sum(
-                1
-                for field in (self.country, self.region, self.subregion)
-                if field is not None
-            )
-            - 1
-        )
-        return admin_level
-
-    @model_validator(mode="after")
-    def check_region_subregion(cls, values):
-        # id = values.get("id")
-        # parse id to get region and subregion (if they exist)
-        subregion = None
-        region = None
-        if subregion is not None and region is None:
-            raise ValueError("region must be specified if subregion is provided")
-        return values
-
-    @field_validator("provider", mode="before")
-    def set_provider_default(cls, v):
-        return v or "gadm"
-
-    @field_validator("version", mode="before")
-    def set_version_default(cls, v):
-        return v or "4.1"
-
-
-class KeyBiodiversityAreaOfInterest(AreaOfInterest):
-    type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
-    id: str = Field(
-        ..., title="Key Biodiversity Area site code", examples=["36", "18", "8111"]
-    )
-
-
-class ProtectedAreaOfInterest(AreaOfInterest):
-    type: Literal["protected_area"] = "protected_area"
-    id: str = Field(
-        ...,
-        title="WDPA protected area ID",
-        examples=["555625448", "148322", "555737674"],
-    )
-
-
-class IndigenousAreaOfInterest(AreaOfInterest):
-    type: Literal["indigenous_land"] = "indigenous_land"
-    id: str = Field(
-        ...,
-        title="Landmark Indigenous lands object ID",
-        examples=["1931", "1918", "43053"],
-    )
-
-
-class CustomAreaOfInterest(AreaOfInterest):
-    type: Literal["geojson"] = "geojson"
-    geojson: Dict[str, Any] = Field(
-        ...,
-        title="GeoJSON of one geometry",
-    )
-
-
-AoiUnion = Union[
-    AdminAreaOfInterest,
-    KeyBiodiversityAreaOfInterest,
-    ProtectedAreaOfInterest,
-    IndigenousAreaOfInterest,
-    CustomAreaOfInterest,
-]
-
-
-class DistAlertsAnalyticsIn(StrictBaseModel):
-    aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
-        ..., min_length=1, max_length=1, description="List of areas of interest."
-    )
-    start_date: str = Field(
-        ...,
-        title="Start Date",
-        description="Must be either year or YYYY-MM-DD date format.",
-        pattern=DATE_REGEX,
-        examples=["2020", "2020-01-01"],
-    )
-    end_date: str = Field(
-        ...,
-        title="End Date",
-        description="Must be either year or YYYY-MM-DD date format.",
-        pattern=DATE_REGEX,
-        examples=["2023", "2023-12-31"],
-    )
-    intersections: List[Literal["driver", "natural_lands"]] = Field(
-        ..., min_length=0, max_length=1, description="List of intersection types"
-    )
 
 
 @router.post(
@@ -199,93 +57,6 @@ def create(
     metadata_data.write_text(payload_json)
     background_tasks.add_task(do_analytics, file_path=payload_dir)
     return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
-
-
-class AnalysisStatus(str, Enum):
-    saved = "saved"
-    pending = "pending"
-    failed = "failed"
-
-
-class DistAlertsAnalytics(StrictBaseModel):
-    result: Optional[dict] = {  # column oriented for loading into a dataframe
-        "__dtypes__": {
-            "country": "str",
-            "region": "int",
-            "subregion": "int",
-            "alert_date": "int",
-            "confidence": "int",
-            "value": "int",
-        },
-        "country": ["BRA", "BRA", "BRA"],
-        "region": [1, 1, 1],
-        "subregion": [12, 12, 12],
-        "alert_date": [731, 733, 733],
-        "confidence": [2, 2, 3],
-        "value": [38, 5, 3],
-    }
-    metadata: Optional[dict] = None
-    message: Optional[str] = None
-    status: AnalysisStatus
-
-    model_config = {
-        "from_attributes": True,
-        "validate_by_name": True,
-    }
-
-
-class DistAlertsAnalyticsResponse(Response):
-    data: DistAlertsAnalytics
-
-
-async def do_analytics(file_path):
-    # Read and parse JSON file
-    metadata = file_path / "metadata.json"
-    json_content = metadata.read_text()
-    metadata_content = json.loads(json_content)  # Convert JSON to Python object
-    aoi = metadata_content["aois"][0]
-    if aoi["type"] == "admin":
-        # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = aoi["id"].split(".")
-        intersections = metadata_content["intersections"]
-
-        query = create_gadm_dist_query(gadm_id, intersections)
-
-        # Dumbly doing this per request since the STS token expires eventually otherwise
-        # According to this issue, duckdb should auto refresh the token in 1.3.0,
-        # but it doesn't seem to work for us and people are reporting the same on the issue
-        # https://github.com/duckdb/duckdb-aws/issues/26
-        # TODO do this on lifecycle start once autorefresh works
-        duckdb.query(
-            """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain
-            );
-        """
-        )
-
-        # Send query to DuckDB and convert to return format
-        alerts_df = duckdb.query(query).df()
-    else:
-        geojson = await get_geojson(aoi)
-
-        if metadata_content["intersections"]:
-            intersection = metadata_content["intersections"][0]
-        else:
-            intersection = None
-
-        alerts_df = await zonal_statistics(geojson, aoi, intersection)
-    if metadata_content["start_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
-    if metadata_content["end_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
-    alerts_dict = alerts_df.to_dict(orient="list")
-
-    data = file_path / "data.json"
-    data.write_text(json.dumps(alerts_dict))
-
-    return alerts_dict, metadata_content
 
 
 @router.get(

@@ -1,9 +1,13 @@
+import json
+
+import duckdb
 import numpy as np
 import pandas as pd
 import xarray as xr
 from flox.xarray import xarray_reduce
 
-from ..common.analysis import clip_xarr_to_geojson, JULIAN_DATE_2021
+from .query import create_gadm_dist_query
+from ..common.analysis import clip_xarr_to_geojson, JULIAN_DATE_2021, get_geojson
 
 NATURAL_LANDS_CLASSES = {
     2: "Forest",
@@ -98,3 +102,53 @@ async def zonal_statistics(geojson, aoi, intersection=None):
 
     alerts_df = alerts_df[alerts_df.value > 0]
     return alerts_df
+
+
+async def do_analytics(file_path):
+    # Read and parse JSON file
+    metadata = file_path / "metadata.json"
+    json_content = metadata.read_text()
+    metadata_content = json.loads(json_content)  # Convert JSON to Python object
+    aoi = metadata_content["aois"][0]
+    if aoi["type"] == "admin":
+        # GADM IDs are coming joined by '.', e.g. IDN.24.9
+        gadm_id = aoi["id"].split(".")
+        intersections = metadata_content["intersections"]
+
+        query = create_gadm_dist_query(gadm_id, intersections)
+
+        # Dumbly doing this per request since the STS token expires eventually otherwise
+        # According to this issue, duckdb should auto refresh the token in 1.3.0,
+        # but it doesn't seem to work for us and people are reporting the same on the issue
+        # https://github.com/duckdb/duckdb-aws/issues/26
+        # TODO do this on lifecycle start once autorefresh works
+        duckdb.query(
+            """
+            CREATE OR REPLACE SECRET secret (
+                TYPE s3,
+                PROVIDER credential_chain
+            );
+        """
+        )
+
+        # Send query to DuckDB and convert to return format
+        alerts_df = duckdb.query(query).df()
+    else:
+        geojson = await get_geojson(aoi)
+
+        if metadata_content["intersections"]:
+            intersection = metadata_content["intersections"][0]
+        else:
+            intersection = None
+
+        alerts_df = await zonal_statistics(geojson, aoi, intersection)
+    if metadata_content["start_date"] is not None:
+        alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
+    if metadata_content["end_date"] is not None:
+        alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+    alerts_dict = alerts_df.to_dict(orient="list")
+
+    data = file_path / "data.json"
+    data.write_text(json.dumps(alerts_dict))
+
+    return alerts_dict, metadata_content
