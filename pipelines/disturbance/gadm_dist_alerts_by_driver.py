@@ -85,23 +85,13 @@ def gadm_dist_alerts_by_driver(
 
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
-    dist_alerts, country, region, subregion, dist_drivers = loader(dist_zarr_uri)
-
-    confidence, groupbys, expected_groups = _setup(
-        dist_alerts, country, region, subregion, dist_drivers, groups
+    return pipe(
+        loader(dist_zarr_uri),
+        lambda d: _setup(*d, groups),
+        lambda s: _compute(*s),
+        _create_data_frame,
+        lambda df: _save_results(df, dist_version, saver, results_uri),
     )
-
-    print("Starting reduce")
-    alerts_count = _compute(confidence, groupbys, expected_groups)
-    print("Finished reduce")
-
-    df = _create_data_frame(alerts_count)
-
-    print("Starting saving to parquet")
-    _save_results(df, dist_version, saver, results_uri)
-    print("Finished saving to parquet")
-
-    return results_uri
 
 
 def _setup(
