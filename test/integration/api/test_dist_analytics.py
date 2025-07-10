@@ -9,11 +9,14 @@ from api.app.main import app
 
 client = TestClient(app)
 
+
 class TestDistAnalyticsWithNoPreviousResult:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = "/tmp/dist_alerts_analytics_payloads/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+        dir_path = (
+            "/tmp/dist_alerts_analytics_payloads/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+        )
 
         if os.path.exists(dir_path):
             for filename in os.listdir(dir_path):
@@ -31,18 +34,18 @@ class TestDistAnalyticsWithNoPreviousResult:
             },
         )
 
-
     def test_post_returns_pending_status(self):
         resource = self.test_request.json()
 
         assert resource["status"] == "pending"
 
-
     def test_post_returns_resource_link(self):
         resource = self.test_request.json()
 
-        assert resource["data"]["link"] == 'http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59'
-
+        assert (
+            resource["data"]["link"]
+            == "http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+        )
 
     def test_post_returns_202_accepted_response_code(self):
         response = self.test_request
@@ -77,18 +80,18 @@ class TestDistAnalyticsWithPreviousResult:
             },
         )
 
-
     def test_post_returns_pending_status(self):
         resource = self.test_request.json()
 
         assert resource["status"] == "saved"
 
-
     def test_post_returns_resource_link(self):
         resource = self.test_request.json()
 
-        assert resource["data"]["link"] == 'http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59'
-
+        assert (
+            resource["data"]["link"]
+            == "http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+        )
 
     def test_post_202_accepted_response_code(self):
         response = self.test_request

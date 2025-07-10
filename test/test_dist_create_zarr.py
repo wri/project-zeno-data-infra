@@ -65,19 +65,18 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     mock_open_dataset.return_value = mock_dataset
 
     version = "v20250102"
-    cog_uri = f"s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/cog/default.tif"
+    cog_uri = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/cog/default.tif"
 
     with patch.object(xr.Dataset, "to_zarr") as mock_to_zarr:
-
         result = create_zarr(version, overwrite=False)
 
-        expected_uri = f"s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+        expected_uri = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
 
         assert result == expected_uri
 
         mock_s3_exists.assert_called_once_with(
             "gfw-data-lake",
-            f"umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
+            "umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
         )
 
         mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
