@@ -8,12 +8,12 @@ from fastapi.responses import ORJSONResponse
 
 from api.app.analysis.dist_alerts.analysis import do_analytics
 
-from api.app.routers.models.common.analysis import AnalysisStatus
-from api.app.routers.models.common.base import (
+from api.app.models.common.analysis import AnalysisStatus
+from api.app.models.common.base import (
     DataMartResourceLinkResponse,
     DataMartResourceLink,
 )
-from api.app.routers.models.land_change.dist_alerts import (
+from api.app.models.land_change.dist_alerts import (
     DistAlertsAnalyticsResponse,
     DistAlertsAnalyticsIn,
 )

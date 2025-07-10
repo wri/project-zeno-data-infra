@@ -2,7 +2,7 @@ from typing import Optional, Literal, Dict, Any
 from uuid import UUID
 from pydantic import Field, model_validator, field_validator
 
-from api.app.routers.models.common.base import StrictBaseModel
+from api.app.models.common.base import StrictBaseModel
 
 
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"

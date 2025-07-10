@@ -1,15 +1,15 @@
 from typing import Optional, List, Annotated, Union, Literal
 from pydantic import Field
 
-from api.app.routers.models.common.analysis import AnalysisStatus, DATE_REGEX
-from api.app.routers.models.common.areas_of_interest import (
+from api.app.models.common.analysis import AnalysisStatus, DATE_REGEX
+from api.app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,
     CustomAreaOfInterest,
 )
-from api.app.routers.models.common.base import StrictBaseModel, Response
+from api.app.models.common.base import StrictBaseModel, Response
 
 
 AoiUnion = Union[
