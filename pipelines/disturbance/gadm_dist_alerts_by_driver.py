@@ -1,12 +1,12 @@
 from functools import reduce
 from typing import Callable, Optional, Tuple
 
-import numpy as np
-import xarray as xr
-import pandas as pd
 import logging
-from flox.xarray import xarray_reduce
+import numpy as np
+import pandas as pd
+import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
+from flox.xarray import xarray_reduce
 
 from .check_for_new_alerts import s3_object_exists
 from ..globals import DATA_LAKE_BUCKET, country_zarr_uri, region_zarr_uri, subregion_zarr_uri
@@ -129,9 +129,11 @@ def gadm_dist_alerts_by_driver(
     coord_dict["value"] = values
 
     df = pd.DataFrame(coord_dict)
-    print("Starting parquet")
-    df.to_parquet(results_uri, index=False)
-    print("Finished parquet")
+
+    print("Starting saving to parquet")
+    _save_results(df, dist_version, saver, results_uri)
+    print("Finished saving to parquet")
+
     return results_uri
 
 
