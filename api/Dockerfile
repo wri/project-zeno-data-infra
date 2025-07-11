@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 # Set GDAL version explicitly for pip
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
-RUN gdal-config --version  # Optional: check GDAL version
+RUN gdal-config --version # Optional: check GDAL version
 
 WORKDIR /app
 COPY requirements.txt .
