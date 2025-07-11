@@ -3,6 +3,7 @@ from pipelines.disturbance.gadm_dist_alerts_by_natural_lands import gadm_dist_al
 import pytest
 import numpy as np
 import xarray as xr
+from typing import Optional
 
 
 @pytest.fixture
@@ -20,7 +21,7 @@ def expected_groups_nl():
 
 @pytest.fixture
 def mock_loader_nl():
-    def _loader(dist_zarr_uri: str):
+    def _loader(dist_zarr_uri: str, contextual_uri: Optional[str]):
         # 1. dist_alerts dataset
         confidence_data = np.array([[[3, 2], [2, 3]]], dtype=np.int16)
         alert_date_data = np.array([[[750, 731], [731, 800]]], dtype=np.int16)
@@ -82,8 +83,8 @@ def mock_loader_nl():
 def test_gadm_dist_alerts_happy_path(mock_loader_nl, expected_groups_nl, spy_saver):
     """Test full workflow with in-memory dependencies"""
     result_uri = gadm_dist_alerts_by_natural_lands(
-        zarr_uri="s3://dummy_zarr_uri",
-        version="test_v1",
+        dist_zarr_uri="s3://dummy_zarr_uri",
+        dist_version="test_v1",
         loader=mock_loader_nl,
         groups=expected_groups_nl,
         saver=spy_saver,
@@ -127,8 +128,8 @@ def test_gadm_dist_alerts_result(mock_loader_nl, expected_groups_nl, spy_saver):
     )
 
     gadm_dist_alerts_by_natural_lands(
-        zarr_uri="s3://dummy_zarr_uri",
-        version="test_v1",
+        dist_zarr_uri="s3://dummy_zarr_uri",
+        dist_version="test_v1",
         loader=mock_loader_nl,
         groups=expected_groups_nl,
         saver=spy_saver,

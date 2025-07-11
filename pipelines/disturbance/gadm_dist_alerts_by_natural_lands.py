@@ -10,13 +10,15 @@ from flox.xarray import xarray_reduce
 from .check_for_new_alerts import s3_object_exists
 from ..globals import DATA_LAKE_BUCKET, country_zarr_uri, region_zarr_uri, subregion_zarr_uri
 
-LoaderType = Callable[[str], Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]]
+LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
 def _s3_loader(
     dist_zarr_uri: str,
-) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset]:
+    contextual_uri: Optional[str],
+) -> Tuple[xr.Dataset, ...]:
+    """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
     dist_alerts = xr.open_zarr(dist_zarr_uri)
 
@@ -27,17 +29,18 @@ def _s3_loader(
     subregion = xr.open_zarr(subregion_zarr_uri)
     subregion_aligned = xr.align(dist_alerts, subregion, join='left')[1]
 
-    natural_lands = xr.open_zarr(
-        f's3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr'
-    )
-    natural_lands_aligned = xr.align(dist_alerts, natural_lands, join='left')[1]
+    if contextual_uri is not None:
+        contextual_layer = xr.open_zarr(contextual_uri)
+        contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join='left')[1]
+    else:
+        contextual_layer_aligned = None
 
     return (
         dist_alerts,
         country_aligned,
         region_aligned,
         subregion_aligned,
-        natural_lands_aligned
+        contextual_layer_aligned
     )
 
 def _parquet_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
@@ -45,8 +48,8 @@ def _parquet_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
 
 
 def gadm_dist_alerts_by_natural_lands(
-    zarr_uri: str,
-    version: str,
+    dist_zarr_uri: str,
+    dist_version: str,
     loader: LoaderType = _s3_loader,
     groups: Optional[ExpectedGroupsType] = None,
     saver: SaverType = _parquet_saver,
@@ -55,53 +58,57 @@ def gadm_dist_alerts_by_natural_lands(
     """Run DIST alerts analysis by natural lands using Dask to create parquet, upload to S3 and return URI."""
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
-    results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_natural_lands.parquet"
+    contextual_uri = f's3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr'
+
+    expected_groups = (
+        (
+            np.arange(894),        # country ISO codes
+            np.arange(86),         # region codes
+            np.arange(854),        # subregion codes
+            np.arange(22),         # natural lands categories
+            np.arange(731, 1590),  # date range
+            [1, 2, 3],             # confidence values
+        )
+        if groups is None
+        else groups
+    )
+
+    contextual_column_name = 'natural_lands'
+
+    results_key = f"umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_natural_lands.parquet"
     results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
 
     if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, results_key):
         return results_uri
 
     return pipe(
-        loader(zarr_uri),
-        lambda d: _setup(*d, groups),
+        loader(dist_zarr_uri, contextual_uri),
+        lambda d: _setup(d, expected_groups, contextual_column_name),
         lambda s: _compute(*s),
         _create_data_frame,
-        lambda df: _save_results(df, version, saver, results_uri),
+        lambda df: _save_results(df, dist_version, saver, results_uri),
     )
 
 def _setup(
-    dist_alerts: xr.Dataset,
-    country: xr.Dataset,
-    region: xr.Dataset,
-    subregion: xr.Dataset,
-    dist_natural_lands: xr.Dataset,
-    expected_groups: Tuple,
+    datasets: Tuple[xr.Dataset, ...],
+    expected_groups: Optional[ExpectedGroupsType],
+    contextual_column_name: Optional[str]
 ) -> Tuple:
-    groups = (
-        (
-            np.arange(894),
-            np.arange(86),
-            np.arange(854),
-            np.arange(22), # natural lands categories
-            # we should get this from metadata which includes `content_date_range`
-            np.arange(731, 1590),
-            [1, 2, 3],
-        )
-        if expected_groups is None
-        else expected_groups
-    )
-    return (
+    """Setup the arguments for the xrarray reduce on dist alerts"""
+    dist_alerts, country, region, subregion, contextual_layer = datasets
+
+    mask = dist_alerts.confidence
+    groupbys: Tuple[xr.Dataset, ...] = (
+        country.band_data.rename("country"),
+        region.band_data.rename("region"),
+        subregion.band_data.rename("subregion"),
+        dist_alerts.alert_date,
         dist_alerts.confidence,
-        (
-            country.band_data.rename("country"),
-            region.band_data.rename("region"),
-            subregion.band_data.rename("subregion"),
-            dist_natural_lands.band_data.rename("natural_lands"),
-            dist_alerts.alert_date,
-            dist_alerts.confidence,
-        ),
-        groups,
     )
+    if contextual_layer is not None:
+        groupbys = groupbys[:2] + (contextual_layer.band_data.rename(contextual_column_name),) + groupbys[2:]
+
+    return (mask, groupbys, expected_groups)
 
 
 def _compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple):
