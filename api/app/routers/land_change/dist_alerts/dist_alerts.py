@@ -104,8 +104,10 @@ async def get_analytics_result(
             status="success",
         )
 
-    if metadata_content:
+    if analytics_metadata.exists():
+        metadata_content = json.loads(analytics_metadata.read_text())
         response.headers["Retry-After"] = "1"
+
         return DistAlertsAnalyticsResponse(
             data={
                 "status": AnalysisStatus.pending,
