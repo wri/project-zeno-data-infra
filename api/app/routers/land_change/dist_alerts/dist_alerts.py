@@ -74,7 +74,6 @@ async def get_analytics_result(
     resource_id: str,
     response: FastAPIResponse,
 ):
-    print("In the GET")
     # Validate UUID format
     try:
         uuid.UUID(resource_id)
