@@ -28,9 +28,10 @@ def gadm_dist_alerts_by_driver(zarr_uri: str, version: str, overwrite: bool) -> 
     subregion_from_clipped = xr.align(dist_alerts, subregion, join='left')[1].band_data
 
     # This is actually an already-clipped versions of drivers
-    dist_drivers_from_clipped = xr.open_zarr(
+    dist_drivers = xr.open_zarr(
         f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
-    ).band_data
+    )
+    dist_drivers_from_clipped = xr.align(dist_alerts, dist_drivers, join='left')[1].band_data
 
     adm0_ids = [
         0, 4, 8, 10, 12, 16, 20, 24, 28, 31, 32, 36, 40, 44, 48, 50, 51, 52, 56, 60,
