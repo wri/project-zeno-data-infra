@@ -3,12 +3,10 @@ import json
 import duckdb
 import numpy as np
 import pandas as pd
-import xarray as xr
 from flox.xarray import xarray_reduce
 
 from ..common.analysis import (
     JULIAN_DATE_2021,
-    clip_xarr_to_geojson,
     get_geojson,
     read_zarr_clipped_to_geojson,
 )
@@ -52,19 +50,17 @@ async def zonal_statistics(geojson, aoi, intersection=None):
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 1590), [1, 2, 3]]
     if intersection == "natural_lands":
-        natural_lands = clip_xarr_to_geojson(
-            xr.open_zarr(
-                "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
-                storage_options={"requester_pays": True},
-            ).band_data,
+        natural_lands = read_zarr_clipped_to_geojson(
+            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
-        )
+        ).band_data
         natural_lands.name = "natural_land_class"
 
         groupby_layers.append(natural_lands)
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
-        dist_drivers = clip_xarr_to_geojson(
+        dist_drivers = read_zarr_clipped_to_geojson(
+            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
         )
         dist_drivers.name = "ldacs_driver"
