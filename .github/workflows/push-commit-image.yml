@@ -1,0 +1,57 @@
+name: Build and Push Docker Image to AWS ECR
+
+on:
+  push:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+        # Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13.5"  # Adjust Python version as needed
+
+      # Install UV and dependencies
+      - name: Install UV and Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv venv venv --python 3.13.5 --seed --system-site-packages
+          . venv/bin/activate
+          uv sync --locked --no-install-project --no-dev
+
+      # Run pytest
+      - name: Run Tests
+        run: |
+          . venv/bin/activate
+          pytest --maxfail=1 --disable-warnings
+
+      # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Log in to AWS ECR
+      - name: Log in to AWS ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Build the Docker image
+      - name: Build Docker Image
+        run: |
+          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)  # Use the first 7 characters of the commit hash as the tag
+          docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
+
+      # Push the Docker image to ECR
+      - name: Push Docker Image to ECR
+        run: |
+          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
+
+    env:
+      AWS_REGION: us-east-1  # Replace with your AWS region
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}  # Store your AWS account ID in GitHub Secrets
+      REPOSITORY_NAME: fastapi-app  # Replace with your ECR repository name
+  
