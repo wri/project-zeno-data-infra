@@ -6,8 +6,13 @@ import pandas as pd
 import xarray as xr
 from flox.xarray import xarray_reduce
 
+from ..common.analysis import (
+    JULIAN_DATE_2021,
+    clip_xarr_to_geojson,
+    get_geojson,
+    read_zarr_clipped_to_geojson,
+)
 from .query import create_gadm_dist_query
-from ..common.analysis import clip_xarr_to_geojson, JULIAN_DATE_2021, get_geojson
 
 NATURAL_LANDS_CLASSES = {
     2: "Forest",
@@ -42,14 +47,15 @@ DIST_DRIVERS = {
 
 async def zonal_statistics(geojson, aoi, intersection=None):
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
-    dist_alerts = clip_xarr_to_geojson(xr.open_zarr(dist_obj_name), geojson)
+    dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 1590), [1, 2, 3]]
     if intersection == "natural_lands":
         natural_lands = clip_xarr_to_geojson(
             xr.open_zarr(
-                "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr"
+                "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
+                storage_options={"requester_pays": True},
             ).band_data,
             geojson,
         )
@@ -59,9 +65,6 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
         dist_drivers = clip_xarr_to_geojson(
-            xr.open_zarr(
-                "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
-            ).band_data,
             geojson,
         )
         dist_drivers.name = "ldacs_driver"
