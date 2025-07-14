@@ -53,7 +53,7 @@ def _s3_loader(
     dist_drivers = xr.open_zarr(
         f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
     )
-    dist_drivers_aligned = xr.align(dist_alerts, dist_drivers, join='left')[1]
+    dist_drivers_aligned = xr.align(dist_alerts, dist_drivers, join='left')[1].band_data
 
     return (
         dist_alerts,
@@ -121,7 +121,7 @@ def _setup(
             country.band_data.rename("country"),
             region.band_data.rename("region"),
             subregion.band_data.rename("subregion"),
-            dist_drivers.band_data.rename("driver"),
+            dist_drivers.driver,
             dist_alerts.alert_date,
             dist_alerts.confidence,
         ),
