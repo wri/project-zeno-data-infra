@@ -1,16 +1,11 @@
 import logging
-from functools import reduce
-from typing import Callable, Tuple, Optional
+from typing import Optional
 import numpy as np
-import pandas as pd
-import xarray as xr
-from flox import ReindexArrayType, ReindexStrategy
-from flox.xarray import xarray_reduce
 
 from .check_for_new_alerts import s3_object_exists
-from ..globals import DATA_LAKE_BUCKET, country_zarr_uri, region_zarr_uri, subregion_zarr_uri
+from ..globals import DATA_LAKE_BUCKET
 
-from .gadm_dist_alerts_by_natural_lands import LoaderType, ExpectedGroupsType, SaverType, _s3_loader, _parquet_saver, _setup, _compute, _create_data_frame, _save_results, pipe
+from .stages import LoaderType, ExpectedGroupsType, SaverType, _s3_loader, _parquet_saver, _setup, _compute, _create_data_frame, _save_results, pipe
 
 
 def gadm_dist_alerts(
