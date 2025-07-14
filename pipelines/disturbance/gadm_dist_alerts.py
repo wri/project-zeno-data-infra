@@ -25,11 +25,11 @@ def gadm_dist_alerts(
 
     expected_groups = (
         (
-            np.arange(894),  # country value range
-            np.arange(86),   # region value range
-            np.arange(854),  # subregion value range
-            np.arange(731, 1590),  # dates value range
-            [1, 2, 3],       # confidence value range
+            np.arange(894),  # country ISO codes
+            np.arange(86),   # region codes
+            np.arange(854),  # subregion codes
+            np.arange(731, 1590),  # dates values
+            [1, 2, 3],       # confidence values
         )
         if groups is None
         else groups

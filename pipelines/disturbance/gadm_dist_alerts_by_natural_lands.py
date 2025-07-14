@@ -26,7 +26,7 @@ def gadm_dist_alerts_by_natural_lands(
             np.arange(86),         # region codes
             np.arange(854),        # subregion codes
             np.arange(22),         # natural lands categories
-            np.arange(731, 1590),  # date range
+            np.arange(731, 1590),  # dates values
             [1, 2, 3],             # confidence values
         )
         if groups is None
