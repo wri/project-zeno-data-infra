@@ -2,22 +2,20 @@ import json
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Request, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 
-from app.analysis.dist_alerts.analysis import do_analytics
-
-from app.models.common.analysis import AnalysisStatus
-from app.models.common.base import (
-    DataMartResourceLinkResponse,
+from api.app.analysis.dist_alerts.analysis import do_analytics
+from api.app.models.common.analysis import AnalysisStatus
+from api.app.models.common.base import (
     DataMartResourceLink,
+    DataMartResourceLinkResponse,
 )
-from app.models.land_change.dist_alerts import (
-    DistAlertsAnalyticsResponse,
+from api.app.models.land_change.dist_alerts import (
     DistAlertsAnalyticsIn,
+    DistAlertsAnalyticsResponse,
 )
-
 
 router = APIRouter(prefix="/dist_alerts")
 
