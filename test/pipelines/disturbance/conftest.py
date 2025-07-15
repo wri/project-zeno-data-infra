@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 import numpy as np
 import xarray as xr
-
+from typing import Optional
 
 @pytest.fixture
 def expected_groups():
@@ -18,7 +18,7 @@ def expected_groups():
 
 @pytest.fixture
 def mock_loader():
-    def _loader(dist_zarr_uri: str):
+    def _loader(dist_zarr_uri: str, contextual_uri: Optional[str]):
         # 1. dist_alerts dataset
         confidence_data = np.array([[[3, 2], [2, 3]]], dtype=np.int16)
         alert_date_data = np.array([[[750, 731], [731, 800]]], dtype=np.int16)
@@ -64,7 +64,7 @@ def mock_loader():
             },
         )
 
-        return dist_alerts, country, region, subregion
+        return dist_alerts, country, region, subregion, None
 
     return _loader
 
