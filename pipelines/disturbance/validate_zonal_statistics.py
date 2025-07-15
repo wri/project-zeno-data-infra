@@ -1,11 +1,12 @@
 import pandas as pd
 import pandera.pandas as pa
 from pandera.typing.pandas import Series
+from typing import List
 
 class ZonalStatsSchema(pa.DataFrameModel):
     country: Series[int] = pa.Field(eq=76) # gadm id for Brazil
-    region: Series[int] = pa.Field(eq=20) # gadm id for AOI
-    subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
+    region: Series[int] = pa.Field(eq=20) # gadm id for adm1 AOI
+    #subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
     alert_date: Series[int] = pa.Field(ge=731, le=1640) # julian date between 2023-01-01 to latest version
     confidence: Series[int] = pa.Field(ge=2, le=3) # low confidence, high confidence
     value: Series[int]
@@ -17,15 +18,22 @@ class ZonalStatsSchema(pa.DataFrameModel):
         ordered = True
         unique_columns = ["country", "region", "subregion", "alert_date", "confidence"]
 
-    @classmethod
-    def calculate_alert_counts(cls, df: pd.DataFrame) -> dict:
+    @staticmethod
+    def calculate_alert_counts(df: pd.DataFrame) -> dict:
         """Calculate the number of alerts by confidence level."""
         alert_counts = df["confidence"].value_counts().to_dict()
         return {
             "low_confidence": alert_counts.get(2, 0),
             "high_confidence": alert_counts.get(3, 0),
         }
-
+    
+    @staticmethod
+    def spot_check_julian_dates(df: pd.DataFrame, julian_dates: List[int]) -> pd.DataFrame:
+        filtered_by_date_df = df[df["alert_date"].isin(julian_dates)]
+        filtered_by_date_df = filtered_by_date_df.sort_values(by="alert_date").reset_index(drop=True)
+        return filtered_by_date_df[["alert_date", "confidence", "value"]]
+        
+    
 def validates_zonal_statistics(zarr_uri: str, parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
     
@@ -43,5 +51,11 @@ def validates_zonal_statistics(zarr_uri: str, parquet_uri: str) -> bool:
     validation_alerts = ZonalStatsSchema.calculate_alert_counts(validation_df)
     zeno_alerts = ZonalStatsSchema.calculate_alert_counts(zeno_aoi_df)
     assert validation_alerts == zeno_alerts, f"Alert counts do not match: {validation_alerts} != {zeno_alerts}"
+
+    # spot check random dates
+    spot_check_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600]
+    validation_spot_check = ZonalStatsSchema.spot_check_julian_dates(validation_df, spot_check_dates)
+    zeno_spot_check = ZonalStatsSchema.spot_check_julian_dates(zeno_aoi_df, spot_check_dates)
+    assert validation_spot_check.equals(zeno_spot_check), "Spot check dataframes do not match"
     
     return True

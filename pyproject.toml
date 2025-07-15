@@ -15,6 +15,7 @@ dependencies = [
     "numbagg",
     "numpy",
     "pandas",
+    "pandera[pandas],
     "prefect",
     "rasterio==1.4.3",
     "rioxarray",
