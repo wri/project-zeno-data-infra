@@ -1,15 +1,14 @@
 import json
-import logging
-import os
 
-import httpx
+import duckdb
 import numpy as np
 import pandas as pd
 import xarray as xr
 from flox.xarray import xarray_reduce
-from shapely.geometry import shape
 
-JULIAN_DATE_2021 = 2459215
+from .query import create_gadm_dist_query
+from ..common.analysis import clip_xarr_to_geojson, JULIAN_DATE_2021, get_geojson
+
 NATURAL_LANDS_CLASSES = {
     2: "Forest",
     3: "Short vegetation",
@@ -39,52 +38,6 @@ DIST_DRIVERS = {
     4: "Potential conversion",
     5: "Unclassified",
 }
-
-
-async def send_request_to_data_api(url, params):
-    params["x-api-key"] = _get_api_key()
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        response = await client.get(url, params=params)
-    return response.json()
-
-
-async def get_geojson_from_data_api(aoi, send_request=send_request_to_data_api):
-    url, params = get_geojson_request_for_data_api(aoi)
-    response = await send_request(url, params)
-
-    if "data" not in response:
-        logging.error(
-            f"Unable to get GeoJSON from Data API for AOI {aoi}, Data API returned: \n{response}"
-        )
-        raise ValueError("Unable to get GeoJSON from Data API.")
-
-    geojson = json.loads(response["data"][0]["gfw_geojson"])
-    return geojson
-
-
-def get_geojson_request_for_data_api(aoi):
-    if aoi["type"] == "key_biodiversity_area":
-        url = "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
-        sql = f"select gfw_geojson from data where sitrecid = {aoi['id']}"
-    elif aoi["type"] == "protected_area":
-        url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-        sql = f"select gfw_geojson from data where wdpaid = {aoi['id']}"
-    elif aoi["type"] == "indigenous_land":
-        url = (
-            "https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query"
-        )
-        sql = f"select gfw_geojson from data where objectid = {aoi['id']}"
-    else:
-        raise ValueError(f"Unable to retrieve AOI type {aoi['type']} from Data API.")
-    return url, {"sql": sql}
-
-
-async def get_geojson(aoi, geojson_from_predfined_aoi=get_geojson_from_data_api):
-    if aoi["type"] == "geojson":
-        geojson = aoi["geojson"]
-    else:
-        geojson = await geojson_from_predfined_aoi(aoi)
-    return geojson
 
 
 async def zonal_statistics(geojson, aoi, intersection=None):
@@ -151,15 +104,50 @@ async def zonal_statistics(geojson, aoi, intersection=None):
     return alerts_df
 
 
-def clip_xarr_to_geojson(xarr, geojson):
-    geom = shape(geojson)
-    sliced = xarr.sel(
-        x=slice(geom.bounds[0], geom.bounds[2]),
-        y=slice(geom.bounds[3], geom.bounds[1]),
-    ).squeeze("band")
-    clipped = sliced.rio.clip([geojson])
-    return clipped
+async def do_analytics(file_path):
+    # Read and parse JSON file
+    metadata = file_path / "metadata.json"
+    json_content = metadata.read_text()
+    metadata_content = json.loads(json_content)  # Convert JSON to Python object
+    aoi = metadata_content["aois"][0]
+    if aoi["type"] == "admin":
+        # GADM IDs are coming joined by '.', e.g. IDN.24.9
+        gadm_id = aoi["id"].split(".")
+        intersections = metadata_content["intersections"]
 
+        query = create_gadm_dist_query(gadm_id, intersections)
 
-def _get_api_key():
-    return os.environ["API_KEY"]
+        # Dumbly doing this per request since the STS token expires eventually otherwise
+        # According to this issue, duckdb should auto refresh the token in 1.3.0,
+        # but it doesn't seem to work for us and people are reporting the same on the issue
+        # https://github.com/duckdb/duckdb-aws/issues/26
+        # TODO do this on lifecycle start once autorefresh works
+        duckdb.query(
+            """
+            CREATE OR REPLACE SECRET secret (
+                TYPE s3,
+                PROVIDER credential_chain
+            );
+        """
+        )
+
+        # Send query to DuckDB and convert to return format
+        alerts_df = duckdb.query(query).df()
+    else:
+        geojson = await get_geojson(aoi)
+
+        if metadata_content["intersections"]:
+            intersection = metadata_content["intersections"][0]
+        else:
+            intersection = None
+
+        alerts_df = await zonal_statistics(geojson, aoi, intersection)
+
+    if metadata_content["start_date"] is not None:
+        alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
+    if metadata_content["end_date"] is not None:
+        alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+    alerts_dict = alerts_df.to_dict(orient="list")
+
+    data = file_path / "data.json"
+    data.write_text(json.dumps(alerts_dict))

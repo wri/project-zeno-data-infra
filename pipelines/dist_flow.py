@@ -15,8 +15,6 @@ from pipelines.disturbance.gadm_dist_alerts_by_natural_lands import (
 )
 from pipelines.disturbance.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
 
-DATA_LAKE_BUCKET = "gfw-data-lake"
-
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
 
@@ -80,6 +78,7 @@ def main(overwrite=False) -> list[str]:
     result_uris = []
     try:
         dist_version = get_new_dist_version()
+        logger.info(f"Latest dist version: {dist_version}")
         dask_client, _ = create_cluster()
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
         gadm_dist_result = analyze_gadm_dist(dist_zarr_uri, dist_version, overwrite=overwrite)

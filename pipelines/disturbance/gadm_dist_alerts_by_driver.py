@@ -6,8 +6,7 @@ from flox.xarray import xarray_reduce
 from flox import ReindexArrayType, ReindexStrategy
 
 from .check_for_new_alerts import s3_object_exists
-
-DATA_LAKE_BUCKET = "gfw-data-lake"
+from ..globals import DATA_LAKE_BUCKET, country_zarr_uri, region_zarr_uri, subregion_zarr_uri
 
 def gadm_dist_alerts_by_driver(zarr_uri: str, version: str, overwrite: bool) -> str:
     """Run DIST alerts analysis by driver using Dask to create parquet, upload to S3 and return URI."""
@@ -21,17 +20,16 @@ def gadm_dist_alerts_by_driver(zarr_uri: str, version: str, overwrite: bool) -> 
 
     dist_alerts = xr.open_zarr(zarr_uri)
 
-    countries_from_clipped = xr.open_zarr(
-        "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm0_clipped_to_dist.zarr"
-    ).band_data
-    regions_from_clipped = xr.open_zarr(
-        "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm1_clipped_to_dist.zarr"
-    ).band_data
-    subregions_from_clipped = xr.open_zarr(
-        "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm2_clipped_to_dist.zarr"
-    ).band_data
+    country = xr.open_zarr(country_zarr_uri)
+    country_from_clipped = xr.align(dist_alerts, country, join='left')[1].band_data
+    region = xr.open_zarr(region_zarr_uri)
+    region_from_clipped = xr.align(dist_alerts, region, join='left')[1].band_data
+    subregion = xr.open_zarr(subregion_zarr_uri)
+    subregion_from_clipped = xr.align(dist_alerts, subregion, join='left')[1].band_data
+
+    # This is actually an already-clipped versions of drivers
     dist_drivers_from_clipped = xr.open_zarr(
-        "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
+        f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
     ).band_data
 
     adm0_ids = [
@@ -56,17 +54,17 @@ def gadm_dist_alerts_by_driver(zarr_uri: str, version: str, overwrite: bool) -> 
 
     alert_dates = np.arange(731, 1590)
 
-    countries_from_clipped.name = "countries"
-    regions_from_clipped.name = "regions"
-    subregions_from_clipped.name = "subregions"
+    country_from_clipped.name = "countries"
+    region_from_clipped.name = "regions"
+    subregion_from_clipped.name = "subregions"
     dist_drivers_from_clipped.name = "driver"
     print("Starting reduce")
     alerts_count = xarray_reduce(
         dist_alerts.confidence,
         *(
-            countries_from_clipped,
-            regions_from_clipped,
-            subregions_from_clipped,
+            country_from_clipped,
+            region_from_clipped,
+            subregion_from_clipped,
             dist_drivers_from_clipped,
             dist_alerts.alert_date,
             dist_alerts.confidence

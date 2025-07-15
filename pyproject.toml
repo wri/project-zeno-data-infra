@@ -23,6 +23,8 @@ dependencies = [
     "sparse",
     "xarray",
     "zarr",
+    "duckdb",
+    "shapely"
 ]
 
 [build-system]
@@ -31,6 +33,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["pipelines"]
+
+[tool.uv.workspace]
+members = [
+    "project-zeno-data-infra",
+]
 
 [dependency-groups]
 development = [

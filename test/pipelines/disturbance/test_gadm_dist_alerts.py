@@ -10,11 +10,12 @@ def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, spy_saver):
         loader=mock_loader,
         groups=expected_groups,
         saver=spy_saver,
+        overwrite=True,
     )
 
     assert (
         result_uri
-        == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_raw_test.parquet"
+        == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2.parquet"
     )
 
 
@@ -54,6 +55,7 @@ def test_gadm_dist_alerts_result(mock_loader, expected_groups, spy_saver):
         loader=mock_loader,
         groups=expected_groups,
         saver=spy_saver,
+        overwrite=True,
     )
 
     # Verify
