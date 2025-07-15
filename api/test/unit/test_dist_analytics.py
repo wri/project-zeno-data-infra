@@ -1,11 +1,11 @@
 import re
 
 import pytest
-
-from api.app.analysis.common.analysis import (
+from app.analysis.common.analysis import (
     get_geojson_from_data_api,
     get_geojson_request_for_data_api,
 )
+
 from api.app.analysis.dist_alerts.query import create_gadm_dist_query
 
 

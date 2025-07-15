@@ -4,9 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from app.main import app
 from fastapi.testclient import TestClient
-
-from api.app.main import app
 
 client = TestClient(app)
 
@@ -182,7 +181,6 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
 
     def test_returns_saved_status(self):
         resource = self.test_request.json()
-        # actual_df = pd.DataFrame(resource["data"]["result"])
         assert resource["data"]["status"] == "saved"
 
     def test_returns_results(self):
