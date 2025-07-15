@@ -23,7 +23,7 @@ NATURAL_LANDS_CLASSES = {
     12: "Cropland",
     13: "Built-up",
     14: "Non-natural tree cover",
-    15: "Non-natural hhort vegetation",
+    15: "Non-natural short vegetation",
     16: "Non-natural water",
     17: "Wetland non-natural tree cover",
     18: "Non-natural peat tree cover",
