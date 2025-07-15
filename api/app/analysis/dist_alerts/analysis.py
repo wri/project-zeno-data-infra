@@ -54,7 +54,7 @@ async def zonal_statistics(geojson, aoi, intersection=None):
             ).band_data,
             geojson,
         )
-        natural_lands.name = "natural_land_class"
+        natural_lands.name = "natural_lands_class"
 
         groupby_layers.append(natural_lands)
         expected_groups.append(np.arange(22))
@@ -93,7 +93,7 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         alerts_df[aoi["type"]] = aoi["id"]
 
     if intersection == "natural_lands":
-        alerts_df.natural_land_class = alerts_df.natural_land_class.apply(
+        alerts_df.natural_lands_class = alerts_df.natural_lands_class.apply(
             lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
         )
     elif intersection == "driver":
