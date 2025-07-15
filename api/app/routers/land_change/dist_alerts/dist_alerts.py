@@ -1,5 +1,7 @@
+import logging
 import json
 import uuid
+import traceback
 from pathlib import Path
 
 from app.analysis.dist_alerts.analysis import do_analytics
@@ -28,37 +30,52 @@ PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
     response_model=DataMartResourceLinkResponse,
     status_code=202,
 )
-def create(
+async def create(
     *, data: DistAlertsAnalyticsIn, request: Request, background_tasks: BackgroundTasks
 ):
-    # Convert model to JSON with sorted keys
-    payload_dict = data.model_dump()
+    try:
+        # Convert model to JSON with sorted keys
+        payload_dict = data.model_dump()
 
-    # Convert to JSON string with sorted keys
-    payload_json = json.dumps(payload_dict, sort_keys=True)
+        # Convert to JSON string with sorted keys
+        payload_json = json.dumps(payload_dict, sort_keys=True)
 
-    # Generate deterministic UUID from payload
-    resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
+        # Generate deterministic UUID from payload
+        resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
 
-    # Store payload in /tmp directory
-    payload_dir = PAYLOAD_STORE_DIR / resource_id
-    metadata_data = payload_dir / "metadata.json"
-    analytics_data = payload_dir / "data.json"
+        # Store payload in /tmp directory
+        payload_dir = PAYLOAD_STORE_DIR / resource_id
+        metadata_data = payload_dir / "metadata.json"
+        analytics_data = payload_dir / "data.json"
 
-    link = DataMartResourceLink(
-        link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
-    )
+        link = DataMartResourceLink(
+            link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
+        )
 
-    if metadata_data.exists() and analytics_data.exists():
-        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
+        if metadata_data.exists() and analytics_data.exists():
+            return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
 
-    if metadata_data.exists():
+        if metadata_data.exists():
+            return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
+
+        payload_dir.mkdir(parents=True, exist_ok=True)
+        metadata_data.write_text(payload_json)
+        background_tasks.add_task(do_analytics, file_path=payload_dir)
         return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
-
-    payload_dir.mkdir(parents=True, exist_ok=True)
-    metadata_data.write_text(payload_json)
-    background_tasks.add_task(do_analytics, file_path=payload_dir)
-    return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(
+            {
+                "event": "dist_alerts_analytics_request_failure",
+                "severity": "high",  # Helps with alerting
+                "analytics_in": await request.json(),
+                "resource_id": str(resource_id),
+                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_details": str(e),
+                "stack_trace": traceback.format_exc(),
+            }
+        )
 
 
 @router.get(
