@@ -29,7 +29,6 @@ def create_cluster():
         name="dist_alerts_zonal_stat_count",
         region="us-east-1",
         n_workers=10,
-        container="globalforestwatch/zeno:2",
         tags={"project": "dist_alerts_zonal_stat"},
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
@@ -71,8 +70,8 @@ def run_validation_suite():
     pass
 
 
-@flow(name="DIST alerts count")
-def main(overwrite=False) -> list[str]:
+@flow(log_prints=True)
+def dist_alerts_flow(overwrite=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
@@ -101,6 +100,9 @@ def main(overwrite=False) -> list[str]:
             dask_client.shutdown()
 
     return result_uris
+
+def main(overwrite=False):
+    dist_alerts_flow(overwrite=False)
 
 
 if __name__ == "__main__":

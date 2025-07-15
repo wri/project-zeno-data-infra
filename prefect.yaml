@@ -1,0 +1,20 @@
+push:
+- prefect_coiled.deployments.steps.build_package_sync_senv:
+    id: coiled_senv
+
+pull:
+- prefect.deployments.steps.set_working_directory:
+    directory: /scratch/batch
+
+deployments:
+- name: deploy1
+  build: null
+  entrypoint: pipelines.dist_flow:dist_alerts_flow
+  work_pool:
+    name: coiled
+    job_variables:
+      software: '{{ coiled_senv.name }}'
+      env:
+        AWS_REGION: "us-east-1"
+        AWS_ACCESS_KEY_ID: '{{ $AWS_ACCESS_KEY_ID }}'
+        AWS_SECRET_ACCESS_KEY: '{{ $AWS_SECRET_ACCESS_KEY }}'
