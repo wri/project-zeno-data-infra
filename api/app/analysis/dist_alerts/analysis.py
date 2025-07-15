@@ -1,8 +1,10 @@
 import json
+import os
 
 import duckdb
 import numpy as np
 import pandas as pd
+import s3fs
 from flox.xarray import xarray_reduce
 
 from ..common.analysis import (
@@ -114,7 +116,7 @@ async def do_analytics(file_path):
         gadm_id = aoi["id"].split(".")
         intersections = metadata_content["intersections"]
 
-        query = create_gadm_dist_query(gadm_id, intersections)
+        query, table = create_gadm_dist_query(gadm_id, intersections)
 
         # Dumbly doing this per request since the STS token expires eventually otherwise
         # According to this issue, duckdb should auto refresh the token in 1.3.0,
@@ -125,13 +127,21 @@ async def do_analytics(file_path):
             """
             CREATE OR REPLACE SECRET secret (
                 TYPE s3,
-                PROVIDER credential_chain
+                PROVIDER credential_chain,
+                CHAIN config
             );
         """
         )
 
-        # Send query to DuckDB and convert to return format
+        # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
+        # For now, we need to just download the file temporarily
+        fs = s3fs.S3FileSystem(requester_pays=True)
+        fs.get(
+            f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+            f"/tmp/{table}.parquet",
+        )
         alerts_df = duckdb.query(query).df()
+        os.remove(f"/tmp/{table}.parquet")
     else:
         geojson = await get_geojson(aoi)
 
