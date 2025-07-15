@@ -7,7 +7,7 @@ import xarray as xr
 from flox.xarray import xarray_reduce
 
 from .query import create_gadm_dist_query
-from ..common.analysis import clip_xarr_to_geojson, JULIAN_DATE_2021, get_geojson
+from ..common.analysis import clip_zarr_to_geojson, JULIAN_DATE_2021, get_geojson
 
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
@@ -43,12 +43,12 @@ DIST_DRIVERS = {
 
 async def zonal_statistics(geojson, aoi, intersection=None):
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
-    dist_alerts = clip_xarr_to_geojson(xr.open_zarr(dist_obj_name), geojson)
+    dist_alerts = clip_zarr_to_geojson(xr.open_zarr(dist_obj_name), geojson)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 1590), [1, 2, 3]]
     if intersection == "natural_lands":
-        natural_lands = clip_xarr_to_geojson(
+        natural_lands = clip_zarr_to_geojson(
             xr.open_zarr(
                 "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr"
             ).band_data,
@@ -59,7 +59,7 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         groupby_layers.append(natural_lands)
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
-        dist_drivers = clip_xarr_to_geojson(
+        dist_drivers = clip_zarr_to_geojson(
             xr.open_zarr(
                 "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
             ).band_data,
