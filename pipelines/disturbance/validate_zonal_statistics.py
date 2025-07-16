@@ -3,10 +3,36 @@ import pandera.pandas as pa
 from pandera.typing.pandas import Series
 from typing import List
 
-class ZonalStatsSchema(pa.DataFrameModel):
+
+isos = [
+    'AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE',
+    'BHS', 'BHR', 'BGD', 'BRB', 'BLR', 'BEL', 'BLZ', 'BEN', 'BMU', 'BTN', 'BOL', 'BES', 'BIH', 'BWA', 'BVT', 'BRA',
+    'IOT', 'BRN', 'BGR', 'BFA', 'BDI', 'CPV', 'KHM', 'CMR', 'CAN', 'CYM', 'CAF', 'TCD', 'CHL', 'CHN', 'CXR', 'CCK',
+    'COL', 'COM', 'COG', 'COD', 'COK', 'CRI', 'CIV', 'HRV', 'CUB', 'CUW', 'CYP', 'CZE', 'DNK', 'DJI', 'DMA', 'DOM',
+    'ECU', 'EGY', 'SLV', 'GNQ', 'ERI', 'EST', 'SWZ', 'ETH', 'FLK', 'FRO', 'FJI', 'FIN', 'FRA', 'GUF', 'PYF', 'ATF',
+    'GAB', 'GMB', 'GEO', 'DEU', 'GHA', 'GIB', 'GRC', 'GRL', 'GRD', 'GLP', 'GUM', 'GTM', 'GGY', 'GIN', 'GNB', 'GUY',
+    'HTI', 'HMD', 'VAT', 'HND', 'HKG', 'HUN', 'ISL', 'IND', 'IDN', 'IRN', 'IRQ', 'IRL', 'IMN', 'ISR', 'ITA', 'JAM',
+    'JPN', 'JEY', 'JOR', 'KAZ', 'KEN', 'KIR', 'PRK', 'KOR', 'KWT', 'KGZ', 'LAO', 'LVA', 'LBN', 'LSO', 'LBR', 'LBY',
+    'LIE', 'LTU', 'LUX', 'MAC', 'MDG', 'MWI', 'MYS', 'MDV', 'MLI', 'MLT', 'MHL', 'MTQ', 'MRT', 'MUS', 'MYT', 'MEX',
+    'FSM', 'MDA', 'MCO', 'MNG', 'MNE', 'MSR', 'MAR', 'MOZ', 'MMR', 'NAM', 'NRU', 'NPL', 'NLD', 'NCL', 'NZL', 'NIC',
+    'NER', 'NGA', 'NIU', 'NFK', 'MKD', 'MNP', 'NOR', 'OMN', 'PAK', 'PLW', 'PSE', 'PAN', 'PNG', 'PRY', 'PER', 'PHL',
+    'PCN', 'POL', 'PRT', 'PRI', 'QAT', 'REU', 'ROU', 'RUS', 'RWA', 'BLM', 'SHN', 'KNA', 'LCA', 'MAF', 'SPM', 'VCT',
+    'WSM', 'SMR', 'STP', 'SAU', 'SEN', 'SRB', 'SYC', 'SLE', 'SGP', 'SXM', 'SVK', 'SVN', 'SLB', 'SOM', 'ZAF', 'SGS',
+    'SSD', 'ESP', 'LKA', 'SDN', 'SUR', 'SJM', 'SWE', 'CHE', 'SYR', 'TWN', 'TJK', 'TZA', 'THA', 'TLS', 'TGO', 'TKL',
+    'TON', 'TTO', 'TUN', 'TUR', 'TKM', 'TCA', 'TUV', 'UGA', 'UKR', 'ARE', 'GBR', 'USA', 'UMI', 'URY', 'UZB', 'VUT',
+    'VEN', 'VNM', 'VGB', 'VIR', 'WLF', 'ESH', 'YEM', 'ZMB', 'ZWE'
+]
+
+sbtn_natural_lands_classes = [
+    "Forest", "Short vegetation", "Water", "Mangroves", "Bare", "Snow/Ice", "Wetland forest", "Peat forest",
+    "Wetland short vegetation", "Peat short vegetation",  "Cropland", "Built-up", "Tree cover", "Short vegetation",
+    "Water", "Wetland tree cover", "Peat tree cover", "Wetland short vegetation", "Peat short vegetation", "Bare"
+]
+
+class DistZonalStats(pa.DataFrameModel):
     country: Series[int] = pa.Field(eq=76) # gadm id for Brazil
     region: Series[int] = pa.Field(eq=20) # gadm id for adm1 AOI
-    #subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
+    subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
     alert_date: Series[int] = pa.Field(ge=731, le=1640) # julian date between 2023-01-01 to latest version
     confidence: Series[int] = pa.Field(ge=2, le=3) # low confidence, high confidence
     value: Series[int]
@@ -32,9 +58,15 @@ class ZonalStatsSchema(pa.DataFrameModel):
         filtered_by_date_df = df[df["alert_date"].isin(julian_dates)]
         filtered_by_date_df = filtered_by_date_df.sort_values(by="alert_date").reset_index(drop=True)
         return filtered_by_date_df[["alert_date", "confidence", "value"]]
-        
     
-def validates_zonal_statistics(zarr_uri: str, parquet_uri: str) -> bool:
+class NaturalLandsZonalStats(pa.DataFrameModel):
+    countries: Series[str] = pa.Field(isin=isos)
+    regions: Series[int] = pa.Field()
+    subregions: Series[int] = pa.Field()
+    natural_lands: Series[str] = pa.Field(isin=sbtn_natural_lands_classes)
+    area: Series[float] = pa.Field(ge=0)
+    
+def validates_zonal_statistics(parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
     
     # load local results
@@ -45,17 +77,17 @@ def validates_zonal_statistics(zarr_uri: str, parquet_uri: str) -> bool:
     zeno_aoi_df = zeno_df[(zeno_df["country"] == 76) & (zeno_df["region"] == 20)]
 
     # validate zonal stats schema
-    ZonalStatsSchema.validate(zeno_aoi_df)
+    DistZonalStats.validate(zeno_aoi_df)
 
     # validate alert counts
-    validation_alerts = ZonalStatsSchema.calculate_alert_counts(validation_df)
-    zeno_alerts = ZonalStatsSchema.calculate_alert_counts(zeno_aoi_df)
+    validation_alerts = DistZonalStats.calculate_alert_counts(validation_df)
+    zeno_alerts = DistZonalStats.calculate_alert_counts(zeno_aoi_df)
     assert validation_alerts == zeno_alerts, f"Alert counts do not match: {validation_alerts} != {zeno_alerts}"
 
     # spot check random dates
     spot_check_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600]
-    validation_spot_check = ZonalStatsSchema.spot_check_julian_dates(validation_df, spot_check_dates)
-    zeno_spot_check = ZonalStatsSchema.spot_check_julian_dates(zeno_aoi_df, spot_check_dates)
+    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, spot_check_dates)
+    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, spot_check_dates)
     assert validation_spot_check.equals(zeno_spot_check), "Spot check dataframes do not match"
     
     return True
