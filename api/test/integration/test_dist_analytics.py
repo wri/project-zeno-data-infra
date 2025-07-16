@@ -14,12 +14,12 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+        delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
 
         self.test_request = client.post(
             "/v0/land_change/dist_alerts/analytics",
             json={
-                "aois": [{"type": "admin", "id": "IDN.24.9"}],
+                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
                 "start_date": "2024-08-15",
                 "end_date": "2024-08-16",
                 "intersections": [],
@@ -34,7 +34,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
     def test_post_returns_202_accepted_response_code(self):
@@ -46,14 +46,14 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
         write_metadata_file(dir_path)
 
         # now, the resource is already processing...make another post
         self.test_request = client.post(
             "/v0/land_change/dist_alerts/analytics",
             json={
-                "aois": [{"type": "admin", "id": "IDN.24.9"}],
+                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
                 "start_date": "2024-08-15",
                 "end_date": "2024-08-16",
                 "intersections": [],
@@ -68,7 +68,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -80,7 +80,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
@@ -88,7 +88,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         self.test_request = client.post(
             "/v0/land_change/dist_alerts/analytics",
             json={
-                "aois": [{"type": "admin", "id": "IDN.24.9"}],
+                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
                 "start_date": "2024-08-15",
                 "end_date": "2024-08-16",
                 "intersections": [],
@@ -103,7 +103,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -115,10 +115,10 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+        delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
 
         self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+            "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
     def test_returns_404_not_found_response_code(self):
@@ -130,11 +130,11 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+            "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
     def test_returns_pending_status(self):
@@ -161,7 +161,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -176,7 +176,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
 
         self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
+            "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
     def test_returns_saved_status(self):
@@ -207,12 +207,12 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
 
 
 def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("9c4b9bb5-0ecd-580d-85c9-d9a112a69b59")
+    delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
 
     resource = client.post(
         "/v0/land_change/dist_alerts/analytics",
         json={
-            "aois": [{"type": "admin", "id": "IDN.24.9"}],
+            "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
             "start_date": "2024-08-15",
             "end_date": "2024-08-16",
             "intersections": [],
@@ -244,12 +244,12 @@ def test_gadm_dist_analytics_no_intersection():
 
 
 def test_kba_dist_analytics_no_intersection():
-    delete_resource_files("ade7d58e-da53-507b-8186-e1b4e78c2ca1")
+    delete_resource_files("6d6095db-9d62-5914-af37-963e6a13c074")
 
     resource = client.post(
         "/v0/land_change/dist_alerts/analytics",
         json={
-            "aois": [{"type": "key_biodiversity_area", "id": "8111"}],
+            "aoi": {"type": "key_biodiversity_area", "ids": ["8111"]},
             "start_date": "2024-08-15",
             "end_date": "2024-08-16",
             "intersections": [],
@@ -281,9 +281,7 @@ def test_kba_dist_analytics_no_intersection():
 # yet.                                                           #
 ##################################################################
 def delete_resource_files(resource_id: str) -> Path:
-    dir_path = Path(
-        "/tmp/dist_alerts_analytics_payloads/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
-    )
+    dir_path = Path(f"/tmp/dist_alerts_analytics_payloads/{resource_id}")
 
     if os.path.exists(dir_path):
         for filename in os.listdir(dir_path):
@@ -299,14 +297,12 @@ def write_metadata_file(dir_path):
     metadata_file.write_text(
         json.dumps(
             {
-                "aois": [
-                    {
-                        "id": "IDN.24.9",
-                        "provider": "gadm",
-                        "type": "admin",
-                        "version": "4.1",
-                    }
-                ],
+                "aoi": {
+                    "ids": ["IDN.24.9"],
+                    "provider": "gadm",
+                    "type": "admin",
+                    "version": "4.1",
+                },
                 "end_date": "2024-08-16",
                 "intersections": [],
                 "start_date": "2024-08-15",

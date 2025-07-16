@@ -89,8 +89,8 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
-    if "id" in aoi:
-        alerts_df[aoi["type"]] = aoi["id"]
+    if "ids" in aoi:
+        alerts_df[aoi["type"]] = aoi["ids"][0]
 
     if intersection == "natural_lands":
         alerts_df.natural_land_class = alerts_df.natural_land_class.apply(
@@ -110,10 +110,10 @@ async def do_analytics(file_path):
     metadata = file_path / "metadata.json"
     json_content = metadata.read_text()
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
-    aoi = metadata_content["aois"][0]
+    aoi = metadata_content["aoi"]
     if aoi["type"] == "admin":
         # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = aoi["id"].split(".")
+        gadm_id = aoi["ids"][0].split(".")
         intersections = metadata_content["intersections"]
 
         query, table = create_gadm_dist_query(gadm_id, intersections)

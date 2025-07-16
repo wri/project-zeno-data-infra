@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from dask.distributed import LocalCluster
+from dask.distributed import Client, LocalCluster
 from fastapi import FastAPI
 
 from .routers import land_change
@@ -10,6 +10,7 @@ from .routers import land_change
 async def lifespan(app: FastAPI):
     # Load the dask cluster
     app.state.dask_cluster = LocalCluster(processes=False, asynchronous=True)
+    app.state.dask_client = Client(app.state.dask_cluster)
     yield
     # Release the resources
     close_call = app.state.dask_cluster.close()
