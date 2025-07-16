@@ -136,14 +136,14 @@ async def do_analytics(file_path):
             )
 
             # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-        # For now, we need to just download the file temporarily
-        fs = s3fs.S3FileSystem(requester_pays=True)
-        fs.get(
-            f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
-            f"/tmp/{table}.parquet",
-        )
+            # For now, we need to just download the file temporarily
+            fs = s3fs.S3FileSystem(requester_pays=True)
+            fs.get(
+                f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+                f"/tmp/{table}.parquet"
+            )
             alerts_df = duckdb.query(query).df()
-        os.remove(f"/tmp/{table}.parquet")
+            os.remove(f"/tmp/{table}.parquet")
         else:
             geojson = await get_geojson(aoi)
 
