@@ -105,6 +105,47 @@ async def zonal_statistics(geojson, aoi, intersection=None):
     return alerts_df
 
 
+async def get_precomputed_statistics(aoi, intersections):
+    if aoi["type"] != "admin" and (
+        intersections and intersections[0] not in ["natural_lands", "driver"]
+    ):
+        raise ValueError(
+            f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersections}"
+        )
+
+    # GADM IDs are coming joined by '.', e.g. IDN.24.9
+    gadm_id = aoi["id"].split(".")
+
+    query, table = create_gadm_dist_query(gadm_id, intersections)
+
+    # Dumbly doing this per request since the STS token expires eventually otherwise
+    # According to this issue, duckdb should auto refresh the token in 1.3.0,
+    # but it doesn't seem to work for us and people are reporting the same on the issue
+    # https://github.com/duckdb/duckdb-aws/issues/26
+    # TODO do this on lifecycle start once autorefresh works
+    duckdb.query(
+        """
+        CREATE OR REPLACE SECRET secret (
+            TYPE s3,
+            PROVIDER credential_chain,
+            CHAIN config
+        );
+    """
+    )
+
+    # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
+    # For now, we need to just download the file temporarily
+    fs = s3fs.S3FileSystem(requester_pays=True)
+    fs.get(
+        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+        f"/tmp/{table}.parquet",
+    )
+    alerts_df = duckdb.query(query).df()
+    os.remove(f"/tmp/{table}.parquet")
+
+    return alerts_df
+
+
 async def do_analytics(file_path):
     # Read and parse JSON file
     metadata = file_path / "metadata.json"
@@ -112,36 +153,9 @@ async def do_analytics(file_path):
     metadata_content = json.loads(json_content)  # Convert JSON to Python object
     aoi = metadata_content["aoi"]
     if aoi["type"] == "admin":
-        # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = aoi["ids"][0].split(".")
-        intersections = metadata_content["intersections"]
-
-        query, table = create_gadm_dist_query(gadm_id, intersections)
-
-        # Dumbly doing this per request since the STS token expires eventually otherwise
-        # According to this issue, duckdb should auto refresh the token in 1.3.0,
-        # but it doesn't seem to work for us and people are reporting the same on the issue
-        # https://github.com/duckdb/duckdb-aws/issues/26
-        # TODO do this on lifecycle start once autorefresh works
-        duckdb.query(
-            """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain,
-                CHAIN config
-            );
-        """
+        alerts_df = await get_precomputed_statistics(
+            {"type": "admin", "id": aoi["ids"][0]}, metadata_content["intersections"]
         )
-
-        # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-        # For now, we need to just download the file temporarily
-        fs = s3fs.S3FileSystem(requester_pays=True)
-        fs.get(
-            f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
-            f"/tmp/{table}.parquet",
-        )
-        alerts_df = duckdb.query(query).df()
-        os.remove(f"/tmp/{table}.parquet")
     else:
         geojson = await get_geojson(aoi)
 
