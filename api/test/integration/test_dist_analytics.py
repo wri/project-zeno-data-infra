@@ -206,6 +206,65 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         assert response.status_code == 200
 
 
+class TestDistAnalyticsPostWithMultipleAdminAOIs:
+    @pytest.fixture(autouse=True)
+    def setup_before_each(self):
+        """Runs before each test in this class"""
+        delete_resource_files("c5c64587-db91-56b0-aa00-6f67a0cb42fb")
+
+        self.test_request = client.post(
+            "/v0/land_change/dist_alerts/analytics",
+            json={
+                "aoi": {"type": "admin", "ids": ["IDN.24.9", "IDN.14.13", "BRA.1.1"]},
+                "start_date": "2024-08-15",
+                "end_date": "2024-08-16",
+                "intersections": [],
+            },
+        )
+
+    def test_post_returns_pending_status(self):
+        resource = self.test_request.json()
+        assert resource["status"] == "pending"
+
+    def test_post_returns_resource_link(self):
+        resource = self.test_request.json()
+        assert (
+            resource["data"]["link"]
+            == "http://testserver/v0/land_change/dist_alerts/analytics/c5c64587-db91-56b0-aa00-6f67a0cb42fb"
+        )
+
+    def test_post_returns_202_accepted_response_code(self):
+        response = self.test_request
+        assert response.status_code == 202
+
+    def test_resource_calculate_results(self):
+        resource_id = self.test_request.json()["data"]["link"].split("/")[-1]
+        data = retry_getting_resource(resource_id)
+
+        expected_df = pd.DataFrame(
+            {
+                "country": ["IDN", "IDN", "IDN", "IDN", "BRA", "BRA"],
+                "region": [24, 24, 14, 14, 1, 1],
+                "subregion": [9, 9, 13, 13, 1, 1],
+                "alert_date": [
+                    "2024-08-15",
+                    "2024-08-15",
+                    "2024-08-15",
+                    "2024-08-15",
+                    "2024-08-15",
+                    "2024-08-15",
+                ],
+                "confidence": ["high", "low", "high", "low", "high", "low"],
+                "value": [1490, 95, 1490, 95, 1490, 95],
+            }
+        )
+
+        actual_df = pd.DataFrame(data["result"])
+        print(actual_df)
+
+        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+
+
 def test_gadm_dist_analytics_no_intersection():
     delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
 
