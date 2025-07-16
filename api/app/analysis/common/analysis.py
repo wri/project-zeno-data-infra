@@ -3,7 +3,7 @@ import logging
 import os
 
 import httpx
-
+import xarray as xr
 from shapely.geometry import shape
 
 JULIAN_DATE_2021 = 2459215
@@ -63,6 +63,19 @@ def clip_xarr_to_geojson(xarr, geojson):
     ).squeeze("band")
     clipped = sliced.rio.clip([geojson])
     return clipped
+
+
+def read_zarr_clipped_to_geojson(uri, geojson):
+    zarr = read_zarr(uri)
+    clipped = clip_xarr_to_geojson(zarr, geojson)
+    return clipped
+
+
+def read_zarr(uri):
+    return xr.open_zarr(
+        uri,
+        storage_options={"requester_pays": True},
+    )
 
 
 def _get_api_key():
