@@ -2,24 +2,20 @@ from typing import List, Tuple
 
 
 def create_gadm_dist_query(
-    gadm_id: Tuple[str, int, int], intersections: List[str]
-) -> tuple[str, str]:
-    # Each intersection will be in a different parquet file
-    if not intersections:
-        table = "gadm_dist_alerts"
-    elif intersections[0] == "driver":
-        table = "gadm_dist_alerts_by_driver"
-        intersection_col = "ldacs_driver"
-    elif intersections[0] == "natural_lands":
-        table = "gadm_dist_alerts_by_natural_lands"
-        intersection_col = "natural_land_class"
-    else:
-        raise ValueError(f"No way to calculate intersection {intersections[0]}")
-
+    gadm_id: Tuple[str, int, int], table: str, intersections: List[str]
+) -> str:
     # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
     # TODO use final pipeline locations and schema for parquet files
     # TODO this should be done in a background task and written to file
     # Build up the DuckDB query based on GADM ID and intersection
+
+    intersection_col = None
+    if intersections:
+        if intersections[0] == "driver":
+            intersection_col = "ldacs_driver"
+        elif intersections[0] == "natural_lands":
+            intersection_col = "natural_land_class"
+
     from_clause = f"FROM '/tmp/{table}.parquet'"
     select_clause = "SELECT country"
     where_clause = f"WHERE country = '{gadm_id[0]}'"
@@ -50,4 +46,4 @@ def create_gadm_dist_query(
     select_clause += ", STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
-    return query, table
+    return query

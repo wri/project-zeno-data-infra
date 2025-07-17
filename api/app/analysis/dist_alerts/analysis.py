@@ -106,17 +106,14 @@ async def zonal_statistics(geojson, aoi, intersection=None):
 
 
 async def get_precomputed_statistics(aoi, intersections):
-    if aoi["type"] != "admin" and (
-        intersections and intersections[0] not in ["natural_lands", "driver"]
+    if aoi["type"] != "admin" or (
+        intersections and (intersections[0] not in ["natural_lands", "driver"])
     ):
         raise ValueError(
             f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersections}"
         )
 
-    # GADM IDs are coming joined by '.', e.g. IDN.24.9
-    gadm_id = aoi["id"].split(".")
-
-    query, table = create_gadm_dist_query(gadm_id, intersections)
+    table = get_precomputed_table(aoi["type"], intersections)
 
     # Dumbly doing this per request since the STS token expires eventually otherwise
     # According to this issue, duckdb should auto refresh the token in 1.3.0,
@@ -140,9 +137,38 @@ async def get_precomputed_statistics(aoi, intersections):
         f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
         f"/tmp/{table}.parquet",
     )
-    alerts_df = duckdb.query(query).df()
+
+    alerts_df = await get_precomputed_statistic_on_gadm_aoi(
+        aoi["ids"][0], table, intersections
+    )
     os.remove(f"/tmp/{table}.parquet")
 
+    return alerts_df
+
+
+def get_precomputed_table(aoi_type, intersections):
+    if aoi_type == "admin":
+        # Each intersection will be in a different parquet file
+        if not intersections:
+            table = "gadm_dist_alerts"
+        elif intersections[0] == "driver":
+            table = "gadm_dist_alerts_by_driver"
+        elif intersections[0] == "natural_lands":
+            table = "gadm_dist_alerts_by_natural_lands"
+        else:
+            raise ValueError(f"No way to calculate intersection {intersections[0]}")
+    else:
+        raise ValueError(f"No way to calculate aoi type {aoi_type}")
+
+    return table
+
+
+async def get_precomputed_statistic_on_gadm_aoi(id, table, intersections):
+    # GADM IDs are coming joined by '.', e.g. IDN.24.9
+    gadm_id = id.split(".")
+
+    query = create_gadm_dist_query(gadm_id, table, intersections)
+    alerts_df = duckdb.query(query).df()
     return alerts_df
 
 
@@ -154,7 +180,7 @@ async def do_analytics(file_path):
     aoi = metadata_content["aoi"]
     if aoi["type"] == "admin":
         alerts_df = await get_precomputed_statistics(
-            {"type": "admin", "id": aoi["ids"][0]}, metadata_content["intersections"]
+            aoi, metadata_content["intersections"]
         )
     else:
         geojson = await get_geojson(aoi)
