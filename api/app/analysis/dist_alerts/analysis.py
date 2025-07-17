@@ -46,7 +46,7 @@ DIST_DRIVERS = {
 }
 
 
-async def zonal_statistics(geojson, aoi, intersection=None):
+async def zonal_statistics(geojson, aoi, intersection=None, dask_client=None):
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
@@ -71,12 +71,14 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         groupby_layers.append(dist_drivers)
         expected_groups.append(np.arange(5))
 
-    alerts_count = xarray_reduce(
-        dist_alerts.alert_date,
-        *tuple(groupby_layers),
-        func="count",
-        expected_groups=tuple(expected_groups),
-    ).compute()
+    alerts_count = await dask_client.compute(
+        xarray_reduce(
+            dist_alerts.alert_date,
+            *tuple(groupby_layers),
+            func="count",
+            expected_groups=tuple(expected_groups),
+        )
+    )
     alerts_count.name = "value"
 
     alerts_df = (
@@ -195,7 +197,7 @@ async def do_analytics(file_path, dask_client):
         else:
             intersection = None
 
-        alerts_df = await zonal_statistics(geojson, aoi, intersection)
+        alerts_df = await zonal_statistics(geojson, aoi, intersection, dask_client)
 
     if metadata_content["start_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]

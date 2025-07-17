@@ -309,22 +309,27 @@ async def test_gadm_dist_analytics_no_intersection():
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
 
-def test_kba_dist_analytics_no_intersection():
+@pytest.mark.asyncio
+async def test_kba_dist_analytics_no_intersection():
     delete_resource_files("6d6095db-9d62-5914-af37-963e6a13c074")
 
-    resource = client.post(
-        "/v0/land_change/dist_alerts/analytics",
-        json={
-            "aoi": {"type": "key_biodiversity_area", "ids": ["8111"]},
-            "start_date": "2024-08-15",
-            "end_date": "2024-08-16",
-            "intersections": [],
-        },
-    ).json()
+    async with LifespanManager(app):
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            resource = await client.post(
+                "/v0/land_change/dist_alerts/analytics",
+                json={
+                    "aoi": {"type": "key_biodiversity_area", "ids": ["8111"]},
+                    "start_date": "2024-08-15",
+                    "end_date": "2024-08-16",
+                    "intersections": [],
+                },
+            )
 
-    resource_id = resource["data"]["link"].split("/")[-1]
+            resource_id = resource.json()["data"]["link"].split("/")[-1]
 
-    data = retry_getting_resource(resource_id)
+            data = await retry_getting_resource(resource_id, client)
 
     expected_df = pd.DataFrame(
         {
