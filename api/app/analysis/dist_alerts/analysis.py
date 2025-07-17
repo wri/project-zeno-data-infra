@@ -140,7 +140,7 @@ async def do_analytics(file_path):
             fs = s3fs.S3FileSystem(requester_pays=True)
             fs.get(
                 f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
-                f"/tmp/{table}.parquet"
+                f"/tmp/{table}.parquet",
             )
             alerts_df = duckdb.query(query).df()
             os.remove(f"/tmp/{table}.parquet")

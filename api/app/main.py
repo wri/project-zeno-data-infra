@@ -1,6 +1,5 @@
 import logging
 import os
-import traceback
 from contextlib import asynccontextmanager
 
 from dask.distributed import LocalCluster
@@ -10,7 +9,6 @@ from fastapi.exception_handlers import (
     request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .routers import land_change
 
@@ -25,7 +23,9 @@ def setup_logging():
         level=log_level, format=log_format, handlers=[logging.StreamHandler()]
     )
 
-    if os.getenv("LOG_FORMAT", "JSON").upper() == "JSON":  # set LOG_FORMAT to "TEXT" for default logging
+    if (
+        os.getenv("LOG_FORMAT", "JSON").upper() == "JSON"
+    ):  # set LOG_FORMAT to "TEXT" for default logging
         from pythonjsonlogger.json import JsonFormatter
 
         logging.getLogger("uvicorn").handlers.clear()
