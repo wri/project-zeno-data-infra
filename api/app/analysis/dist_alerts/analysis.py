@@ -1,5 +1,6 @@
 import json
 import os
+from functools import partial
 
 import duckdb
 import numpy as np
@@ -105,7 +106,7 @@ async def zonal_statistics(geojson, aoi, intersection=None):
     return alerts_df
 
 
-async def get_precomputed_statistics(aoi, intersections):
+async def get_precomputed_statistics(aoi, intersections, dask_client):
     if aoi["type"] != "admin" or (
         intersections and (intersections[0] not in ["natural_lands", "driver"])
     ):
@@ -138,9 +139,13 @@ async def get_precomputed_statistics(aoi, intersections):
         f"/tmp/{table}.parquet",
     )
 
-    alerts_df = await get_precomputed_statistic_on_gadm_aoi(
-        aoi["ids"][0], table, intersections
+    precompute_partial = partial(
+        get_precomputed_statistic_on_gadm_aoi, table=table, intersections=intersections
     )
+    futures = dask_client.map(precompute_partial, aoi["ids"])
+    results = await dask_client.gather(futures)
+    alerts_df = pd.concat(results)
+
     os.remove(f"/tmp/{table}.parquet")
 
     return alerts_df
@@ -172,7 +177,7 @@ async def get_precomputed_statistic_on_gadm_aoi(id, table, intersections):
     return alerts_df
 
 
-async def do_analytics(file_path):
+async def do_analytics(file_path, dask_client):
     # Read and parse JSON file
     metadata = file_path / "metadata.json"
     json_content = metadata.read_text()
@@ -180,7 +185,7 @@ async def do_analytics(file_path):
     aoi = metadata_content["aoi"]
     if aoi["type"] == "admin":
         alerts_df = await get_precomputed_statistics(
-            aoi, metadata_content["intersections"]
+            aoi, metadata_content["intersections"], dask_client
         )
     else:
         geojson = await get_geojson(aoi)

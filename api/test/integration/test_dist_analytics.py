@@ -5,7 +5,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from app.main import app
+from asgi_lifespan import LifespanManager
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
@@ -265,22 +267,27 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
 
-def test_gadm_dist_analytics_no_intersection():
+@pytest.mark.asyncio
+async def test_gadm_dist_analytics_no_intersection():
     delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
 
-    resource = client.post(
-        "/v0/land_change/dist_alerts/analytics",
-        json={
-            "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-            "start_date": "2024-08-15",
-            "end_date": "2024-08-16",
-            "intersections": [],
-        },
-    ).json()
+    async with LifespanManager(app):
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            resource = await client.post(
+                "/v0/land_change/dist_alerts/analytics",
+                json={
+                    "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
+                    "start_date": "2024-08-15",
+                    "end_date": "2024-08-16",
+                    "intersections": [],
+                },
+            )
 
-    resource_id = resource["data"]["link"].split("/")[-1]
+            resource_id = resource.json()["data"]["link"].split("/")[-1]
 
-    data = retry_getting_resource(resource_id)
+            data = await retry_getting_resource(resource_id, client)
 
     expected_df = pd.DataFrame(
         {
@@ -375,10 +382,9 @@ def write_data_file(dir_path, data):
     data_file.write_text(json.dumps(data))
 
 
-def retry_getting_resource(resource_id: str):
-    data = client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}").json()[
-        "data"
-    ]
+async def retry_getting_resource(resource_id: str, client):
+    resource = await client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}")
+    data = resource.json()["data"]
     status = data["status"]
     attempts = 1
     while status == "pending" and attempts < 10:

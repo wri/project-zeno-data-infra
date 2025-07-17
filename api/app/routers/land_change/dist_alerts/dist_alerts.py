@@ -57,7 +57,9 @@ def create(
 
     payload_dir.mkdir(parents=True, exist_ok=True)
     metadata_data.write_text(payload_json)
-    background_tasks.add_task(do_analytics, file_path=payload_dir)
+    background_tasks.add_task(
+        do_analytics, file_path=payload_dir, dask_client=request.app.state.dask_client
+    )
     return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
 
 
