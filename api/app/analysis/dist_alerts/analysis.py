@@ -1,4 +1,6 @@
 import json
+import logging
+import traceback
 import os
 
 import duckdb
@@ -106,57 +108,69 @@ async def zonal_statistics(geojson, aoi, intersection=None):
 
 
 async def do_analytics(file_path):
-    # Read and parse JSON file
-    metadata = file_path / "metadata.json"
-    json_content = metadata.read_text()
-    metadata_content = json.loads(json_content)  # Convert JSON to Python object
-    aoi = metadata_content["aois"][0]
-    if aoi["type"] == "admin":
-        # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = aoi["id"].split(".")
-        intersections = metadata_content["intersections"]
+    try:
+        # Read and parse JSON file
+        metadata = file_path / "metadata.json"
+        json_content = metadata.read_text()
+        metadata_content = json.loads(json_content)  # Convert JSON to Python object
+        aoi = metadata_content["aois"][0]
+        if aoi["type"] == "admin":
+            # GADM IDs are coming joined by '.', e.g. IDN.24.9
+            gadm_id = aoi["id"].split(".")
+            intersections = metadata_content["intersections"]
 
-        query, table = create_gadm_dist_query(gadm_id, intersections)
+            query, table = create_gadm_dist_query(gadm_id, intersections)
 
-        # Dumbly doing this per request since the STS token expires eventually otherwise
-        # According to this issue, duckdb should auto refresh the token in 1.3.0,
-        # but it doesn't seem to work for us and people are reporting the same on the issue
-        # https://github.com/duckdb/duckdb-aws/issues/26
-        # TODO do this on lifecycle start once autorefresh works
-        duckdb.query(
+            # Dumbly doing this per request since the STS token expires eventually otherwise
+            # According to this issue, duckdb should auto refresh the token in 1.3.0,
+            # but it doesn't seem to work for us and people are reporting the same on the issue
+            # https://github.com/duckdb/duckdb-aws/issues/26
+            # TODO do this on lifecycle start once autorefresh works
+            duckdb.query(
+                """
+                CREATE OR REPLACE SECRET secret (
+                    TYPE s3,
+                    PROVIDER credential_chain,
+                CHAIN config);
             """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain,
-                CHAIN config
-            );
-        """
-        )
+            )
 
-        # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-        # For now, we need to just download the file temporarily
-        fs = s3fs.S3FileSystem(requester_pays=True)
-        fs.get(
-            f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
-            f"/tmp/{table}.parquet",
-        )
-        alerts_df = duckdb.query(query).df()
-        os.remove(f"/tmp/{table}.parquet")
-    else:
-        geojson = await get_geojson(aoi)
-
-        if metadata_content["intersections"]:
-            intersection = metadata_content["intersections"][0]
+            # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
+            # For now, we need to just download the file temporarily
+            fs = s3fs.S3FileSystem(requester_pays=True)
+            fs.get(
+                f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+                f"/tmp/{table}.parquet",
+            )
+            alerts_df = duckdb.query(query).df()
+            os.remove(f"/tmp/{table}.parquet")
         else:
-            intersection = None
+            geojson = await get_geojson(aoi)
 
-        alerts_df = await zonal_statistics(geojson, aoi, intersection)
+            if metadata_content["intersections"]:
+                intersection = metadata_content["intersections"][0]
+            else:
+                intersection = None
 
-    if metadata_content["start_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
-    if metadata_content["end_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
-    alerts_dict = alerts_df.to_dict(orient="list")
+            alerts_df = await zonal_statistics(geojson, aoi, intersection)
 
-    data = file_path / "data.json"
-    data.write_text(json.dumps(alerts_dict))
+        if metadata_content["start_date"] is not None:
+            alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
+        if metadata_content["end_date"] is not None:
+            alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+        alerts_dict = alerts_df.to_dict(orient="list")
+
+        data = file_path / "data.json"
+        data.write_text(json.dumps(alerts_dict))
+    except Exception as e:
+        logging.error(
+            {
+                "event": "dist_alerts_analytics_processing_failure",
+                "severity": "high",  # Helps with alerting
+                "metadata": metadata_content,
+                "generated_query": query,
+                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_details": str(e),
+                "stack_trace": traceback.format_exc(),
+            }
+        )
