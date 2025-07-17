@@ -1,19 +1,50 @@
-import numpy as np
-import xarray as xr
-import pandas as pd
 import logging
-from flox.xarray import xarray_reduce
-from flox import ReindexArrayType, ReindexStrategy
+from typing import Optional
+import numpy as np
 
 from .check_for_new_alerts import s3_object_exists
-from ..globals import DATA_LAKE_BUCKET, country_zarr_uri, region_zarr_uri, subregion_zarr_uri
+from ..globals import DATA_LAKE_BUCKET
 
-def gadm_dist_alerts_by_grasslands(zarr_uri: str, version: str, overwrite: bool) -> str:
+from .stages import LoaderType, ExpectedGroupsType, SaverType, _s3_loader, _parquet_saver, _setup, _compute, _create_data_frame, _save_results, pipe
+
+def gadm_dist_alerts_by_driver(
+    dist_zarr_uri: str,
+    dist_version: str,
+    loader: LoaderType = _s3_loader,
+    groups: Optional[ExpectedGroupsType] = None,
+    saver: SaverType = _parquet_saver,
+    overwrite: bool = False
+):
     """Run DIST alerts analysis in grasslands using Dask to create parquet, upload to S3 and return URI."""
-
-    results_key = f"umd_glad_dist_alerts/{version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_driver.parquet"
-    results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
-
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
-    return "str"
+    contextual_uri = f"s3://{DATA_LAKE_BUCKET}/gfw_grasslands/v1/zarr/natural_grassland2kchunk.zarr"
+
+    expected_groups = (
+        (
+            np.arange(894),        # country ISO codes
+            np.arange(86),         # region codes
+            np.arange(854),        # subregion codes
+            np.arange(3),          # grasslands categories
+            np.arange(731, 1590),  # dates values
+            [1, 2, 3],             # confidence values
+        ) if groups is None
+        else groups
+    )
+
+    contextual_column_name = 'grasslands'
+
+    results_key = f"umd_glad_dist_alerts/{dist_version}/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2_grasslands.parquet"
+    results_uri = f"s3://{DATA_LAKE_BUCKET}/{results_key}"
+
+    if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, results_key):
+        return results_uri
+    
+
+    return pipe(
+        loader(dist_zarr_uri, contextual_uri),
+        lambda d: _setup(d, expected_groups, contextual_column_name),
+        lambda s: _compute(*s),
+        _create_data_frame,
+        lambda df: _save_results(df, dist_version, saver, results_uri),
+    )
