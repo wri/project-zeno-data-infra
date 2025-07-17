@@ -2,7 +2,7 @@ import pandas as pd
 import pandera.pandas as pa
 from pandera.typing.pandas import Series
 from typing import List
-
+from prefect.logging import get_run_logger
 
 isos = [
     'AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE',
@@ -69,25 +69,39 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
 def validates_zonal_statistics(parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
     
+    logger = get_run_logger()
+
     # load local results
     validation_df = pd.read_csv("../notebooks/validation_stats.csv")
+    logger.info("Loaded validation stats.")
 
     # load zeno stats for aoi
     zeno_df = pd.read_parquet(parquet_uri)
     zeno_aoi_df = zeno_df[(zeno_df["country"] == 76) & (zeno_df["region"] == 20)]
+    logger.info("Loaded Zeno stats for admin area.")
 
     # validate zonal stats schema
-    DistZonalStats.validate(zeno_aoi_df)
+    try:
+        DistZonalStats.validate(zeno_aoi_df)
+        logger.info("Zonal stats schema validation passed.")
+    except Exception as e:
+        logger.error(f"Schema validation failed: {e}")
+        return False
 
     # validate alert counts
     validation_alerts = DistZonalStats.calculate_alert_counts(validation_df)
     zeno_alerts = DistZonalStats.calculate_alert_counts(zeno_aoi_df)
-    assert validation_alerts == zeno_alerts, f"Alert counts do not match: {validation_alerts} != {zeno_alerts}"
+    if validation_alerts != zeno_alerts:
+        logger.error(f"Alert counts do not match: {validation_alerts} != {zeno_alerts}")
+        return False
+    logger.info("Alert counts validation passed.")
 
     # spot check random dates
-    spot_check_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600]
-    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, spot_check_dates)
-    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, spot_check_dates)
-    assert validation_spot_check.equals(zeno_spot_check), "Spot check dataframes do not match"
+    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, julian_dates)
+    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, julian_dates)
+    if not validation_spot_check.equals(zeno_spot_check):
+        logger.error("Spot check dataframes do not match.")
+        return False
+    logger.info("Spot check validation passed.")
     
     return True
