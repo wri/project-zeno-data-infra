@@ -1,25 +1,44 @@
+import pytest
+
+from unittest.mock import patch
+
 from pandera.pandas import DataFrameSchema, Column, Check
-from pipelines.disturbance.gadm_dist_alerts import gadm_dist_alerts
+from prefect.testing.utilities import prefect_test_harness
+
+from pipelines.disturbance.prefect_flows import dist_alerts_count
 
 
-def test_gadm_dist_alerts_happy_path(mock_loader, expected_groups, spy_saver):
+@pytest.mark.slow
+@pytest.mark.integration
+@patch("pipelines.disturbance.stages._save_parquet")
+@patch("pipelines.disturbance.stages._load_zarr")
+def test_gadm_dist_alerts_happy_path(
+    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds
+):
     """Test full workflow with in-memory dependencies"""
-    result_uri = gadm_dist_alerts(
-        dist_zarr_uri="s3://dummy_zarr_uri",
-        dist_version="test_v1",
-        loader=mock_loader,
-        groups=expected_groups,
-        saver=spy_saver,
-        overwrite=True,
-    )
+
+    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds]
+
+    with prefect_test_harness():
+        result_uri = dist_alerts_count(
+            dist_zarr_uri="s3://dummy_zarr_uri",
+            dist_version="test_v1",
+            # overwrite=True,
+        )
 
     assert (
         result_uri
-        == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/epsg-4326/zonal_stats/dist_alerts_by_adm2.parquet"
+        == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/zonal_stats/gadm/gadm_adm2_dist_alerts.parquet"
     )
 
 
-def test_gadm_dist_alerts_result(mock_loader, expected_groups, spy_saver):
+@pytest.mark.slow
+@pytest.mark.integration
+@patch("pipelines.disturbance.stages._save_parquet")
+@patch("pipelines.disturbance.stages._load_zarr")
+def test_gadm_dist_alerts_result(
+    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds
+):
     alert_schema = DataFrameSchema(
         name="GADM Dist Alerts",
         columns={
@@ -42,23 +61,17 @@ def test_gadm_dist_alerts_result(mock_loader, expected_groups, spy_saver):
                 df.groupby(["country", "region", "subregion", "alert_date"])[
                     "confidence"
                 ].transform("nunique")
-                == 2
+                == 1
             ),
             name="two_confidences_per_group",
-            error="Each location-date must have exactly 2 confidence levels",
+            error="Each location-date must have exactly 1 confidence levels",
         ),
     )
 
-    gadm_dist_alerts(
-        dist_zarr_uri="s3://dummy_zarr_uri",
-        dist_version="test_v1",
-        loader=mock_loader,
-        groups=expected_groups,
-        saver=spy_saver,
-        overwrite=True,
-    )
+    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds]
+    dist_alerts_count(dist_zarr_uri="s3://dummy_zarr_uri", dist_version="test_v1")
 
     # Verify
-    result = spy_saver.saved_data
+    result = mock_save_parquet.call_args[0][0]
     print(f"\nGADM dist alerts result:\n{result}")
     alert_schema.validate(result)
