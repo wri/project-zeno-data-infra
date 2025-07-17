@@ -1,9 +1,11 @@
 import json
 import os
+import time
 from pathlib import Path
 
 import pandas as pd
 import pytest
+import pytest_asyncio
 from app.main import app
 from asgi_lifespan import LifespanManager
 from fastapi.testclient import TestClient
@@ -209,39 +211,55 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
 
 
 class TestDistAnalyticsPostWithMultipleAdminAOIs:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest_asyncio.fixture(autouse=True)
+    async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("c5c64587-db91-56b0-aa00-6f67a0cb42fb")
+        delete_resource_files("ef700a48-b5ef-532f-8bb8-17f507a97ae7")
 
-        self.test_request = client.post(
-            "/v0/land_change/dist_alerts/analytics",
-            json={
-                "aoi": {"type": "admin", "ids": ["IDN.24.9", "IDN.14.13", "BRA.1.1"]},
-                "start_date": "2024-08-15",
-                "end_date": "2024-08-16",
-                "intersections": [],
-            },
-        )
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                request = await client.post(
+                    "/v0/land_change/dist_alerts/analytics",
+                    json={
+                        "aoi": {
+                            "type": "admin",
+                            "ids": ["IDN.24.9", "IDN.14.13", "BRA.1.1"],
+                        },
+                        "start_date": "2024-08-15",
+                        "end_date": "2024-08-16",
+                        "intersections": [],
+                    },
+                )
 
-    def test_post_returns_pending_status(self):
-        resource = self.test_request.json()
+                yield (request, client)
+
+    @pytest.mark.asyncio
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["status"] == "pending"
 
-    def test_post_returns_resource_link(self):
-        resource = self.test_request.json()
+    @pytest.mark.asyncio
+    async def test_post_returns_resource_link(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/c5c64587-db91-56b0-aa00-6f67a0cb42fb"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/ef700a48-b5ef-532f-8bb8-17f507a97ae7"
         )
 
-    def test_post_returns_202_accepted_response_code(self):
-        response = self.test_request
-        assert response.status_code == 202
+    @pytest.mark.asyncio
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        assert test_request.status_code == 202
 
-    def test_resource_calculate_results(self):
-        resource_id = self.test_request.json()["data"]["link"].split("/")[-1]
-        data = retry_getting_resource(resource_id)
+    @pytest.mark.asyncio
+    async def test_resource_calculate_results(self, setup):
+        test_request, client = setup
+        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        data = await retry_getting_resource(resource_id, client)
 
         expected_df = pd.DataFrame(
             {
@@ -393,10 +411,10 @@ async def retry_getting_resource(resource_id: str, client):
     status = data["status"]
     attempts = 1
     while status == "pending" and attempts < 10:
-        data = client.get(
-            f"/v0/land_change/dist_alerts/analytics/{resource_id}"
-        ).json()["data"]
+        resp = await client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}")
+        data = resp.json()["data"]
         status = data["status"]
+        time.sleep(1)
         attempts += 1
     if attempts >= 10:
         pytest.fail("Resource stuck on 'pending' status")
