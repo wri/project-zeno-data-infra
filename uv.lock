@@ -1841,6 +1841,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/4d/ec550fbb5fe09a7c0a93a3f9b2d87446f728c1ef052f786b195eb4620def/pandera-0.24.0-py3-none-any.whl", hash = "sha256:3b7de575b43a4aa03a1561802be4ee0c7471e49153684fe327f7bbea0724b02b", size = 267092, upload-time = "2025-05-15T14:08:45.77Z" },
 ]
 
+[package.optional-dependencies]
+pandas = [
+    { name = "numpy" },
+    { name = "pandas" },
+]
+
 [[package]]
 name = "paramiko"
 version = "3.5.1"
@@ -3453,6 +3459,7 @@ dependencies = [
     { name = "numbagg" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "pandera", extra = ["pandas"] },
     { name = "prefect" },
     { name = "prefect-coiled" },
     { name = "rasterio" },
@@ -3485,6 +3492,7 @@ requires-dist = [
     { name = "numbagg" },
     { name = "numpy" },
     { name = "pandas" },
+    { name = "pandera", extras = ["pandas"] },
     { name = "prefect" },
     { name = "prefect-coiled", specifier = ">=0.0.4" },
     { name = "rasterio", specifier = "==1.4.3" },

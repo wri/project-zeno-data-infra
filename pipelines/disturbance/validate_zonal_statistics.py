@@ -97,8 +97,9 @@ def validates_zonal_statistics(parquet_uri: str) -> bool:
     logger.info("Alert counts validation passed.")
 
     # spot check random dates
-    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, julian_dates)
-    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, julian_dates)
+    spot_check_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
+    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, spot_check_dates)
+    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, spot_check_dates)
     if not validation_spot_check.equals(zeno_spot_check):
         logger.error("Spot check dataframes do not match.")
         return False
