@@ -2,12 +2,10 @@ import json
 import os
 from pathlib import Path
 
-import pytest
-
 import pandas as pd
-from fastapi.testclient import TestClient
-
+import pytest
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -183,7 +181,6 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
 
     def test_returns_saved_status(self):
         resource = self.test_request.json()
-        actual_df = pd.DataFrame(resource["data"]["result"])
         assert resource["data"]["status"] == "saved"
 
     def test_returns_results(self):
@@ -278,11 +275,11 @@ def test_kba_dist_analytics_no_intersection():
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
 
-####################################################################
-## Utility functions for managing test data                       ##
-## Since we're just beginning, I don't want to move these out,    ##
-## yet.                                                           ##
-####################################################################
+##################################################################
+# Utility functions for managing test data                       #
+# Since we're just beginning, I don't want to move these out,    #
+# yet.                                                           #
+##################################################################
 def delete_resource_files(resource_id: str) -> Path:
     dir_path = Path(
         "/tmp/dist_alerts_analytics_payloads/9c4b9bb5-0ecd-580d-85c9-d9a112a69b59"
