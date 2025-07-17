@@ -11,6 +11,7 @@ from fastapi.exception_handlers import (
 )
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from .routers import land_change
 
 
@@ -27,10 +28,15 @@ def setup_logging():
     if os.getenv("LOG_FORMAT", "JSON").upper() == "JSON":  # set LOG_FORMAT to "TEXT" for default logging
         from pythonjsonlogger.json import JsonFormatter
 
+        logging.getLogger("uvicorn").handlers.clear()
+        logging.getLogger("uvicorn.access").handlers.clear()
+        logging.getLogger("uvicorn.error").handlers.clear()
+
         json_handler = logging.StreamHandler()
         formatter = JsonFormatter(fmt="%(asctime)s %(name)s %(levelname)s %(message)s")
         json_handler.setFormatter(formatter)
-        logging.getLogger().handlers = [json_handler]
+        logging.root.handlers = [json_handler]
+        logging.getLogger("uvicorn.access").handlers = [json_handler]
 
 
 # Initialize logging
@@ -49,19 +55,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-
-
-@app.exception_handler(StarletteHTTPException)
-async def custom_http_exception_handler(request, exc: StarletteHTTPException):
-    logging.error(
-        {
-            "event": "http_exception",
-            "severity": "high",
-            "errors": exc.detail,
-            "traceback": traceback.format_exc(),
-        }
-    )
-    return await http_exception_handler(request, exc)
 
 
 @app.exception_handler(RequestValidationError)
