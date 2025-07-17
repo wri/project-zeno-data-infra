@@ -3451,7 +3451,7 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-development = [
+dev = [
     { name = "pandera" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -3483,7 +3483,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-development = [
+dev = [
     { name = "pandera", specifier = ">=0.24.0" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
