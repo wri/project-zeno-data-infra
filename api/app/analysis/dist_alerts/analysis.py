@@ -2,6 +2,7 @@ import json
 import os
 from functools import partial
 
+import dask.dataframe as dd
 import duckdb
 import numpy as np
 import pandas as pd
@@ -46,7 +47,25 @@ DIST_DRIVERS = {
 }
 
 
-async def zonal_statistics(geojson, aoi, intersection=None, dask_client=None):
+async def zonal_statistics_on_aois(aois, dask_client, intersections=[]):
+    if intersections:
+        intersection = intersections[0]
+    else:
+        intersection = None
+
+    aois = [{"type": aois["type"], "id": id} for id in aois["ids"]]
+    precompute_partial = partial(zonal_statistics, intersection=intersection)
+    dd_df_futures = await dask_client.compute(
+        dd.concat(dask_client.map(precompute_partial, aois))
+    )
+    alerts_df = await dask_client.compute(dd_df_futures)
+
+    return alerts_df
+
+
+async def zonal_statistics(aoi, intersection=None):
+    geojson = await get_geojson(aoi)
+
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
@@ -71,29 +90,27 @@ async def zonal_statistics(geojson, aoi, intersection=None, dask_client=None):
         groupby_layers.append(dist_drivers)
         expected_groups.append(np.arange(5))
 
-    alerts_count = await dask_client.compute(
-        xarray_reduce(
-            dist_alerts.alert_date,
-            *tuple(groupby_layers),
-            func="count",
-            expected_groups=tuple(expected_groups),
-        )
+    alerts_count = xarray_reduce(
+        dist_alerts.alert_date,
+        *tuple(groupby_layers),
+        func="count",
+        expected_groups=tuple(expected_groups),
     )
     alerts_count.name = "value"
 
     alerts_df = (
-        alerts_count.to_dataframe()
+        alerts_count.to_dask_dataframe()
         .drop("band", axis=1)
         .drop("spatial_ref", axis=1)
-        .reset_index()
+        .reset_index(drop=True)
     )
     alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"})
-    alerts_df.alert_date = pd.to_datetime(
+    alerts_df.alert_date = dd.to_datetime(
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
-    if "ids" in aoi:
-        alerts_df[aoi["type"]] = aoi["ids"][0]
+    if "id" in aoi:
+        alerts_df[aoi["type"]] = aoi["id"]
 
     if intersection == "natural_lands":
         alerts_df.natural_land_class = alerts_df.natural_land_class.apply(
@@ -190,14 +207,9 @@ async def do_analytics(file_path, dask_client):
             aoi, metadata_content["intersections"], dask_client
         )
     else:
-        geojson = await get_geojson(aoi)
-
-        if metadata_content["intersections"]:
-            intersection = metadata_content["intersections"][0]
-        else:
-            intersection = None
-
-        alerts_df = await zonal_statistics(geojson, aoi, intersection, dask_client)
+        alerts_df = await zonal_statistics_on_aois(
+            aoi, dask_client, metadata_content.get("intersections", None)
+        )
 
     if metadata_content["start_date"] is not None:
         alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]

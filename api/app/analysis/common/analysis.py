@@ -51,9 +51,7 @@ async def get_geojson(aoi, geojson_from_predfined_aoi=get_geojson_from_data_api)
     if aoi["type"] == "feature_collection":
         geojson = aoi["feature_collection"]
     else:
-        geojson = await geojson_from_predfined_aoi(
-            {"type": aoi["type"], "id": aoi["ids"][0]}
-        )
+        geojson = await geojson_from_predfined_aoi(aoi)
     return geojson
 
 
