@@ -10,3 +10,5 @@
 .idea/
 .qlty/
 zeno_data_analytics.egg-info/
+
+.env

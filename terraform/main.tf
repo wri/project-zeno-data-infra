@@ -47,9 +47,13 @@ module "ecs" {
                 protocol      = "tcp"
             }
           ]
-          image     = var.api_image #"public.ecr.aws/b7u8b0a6/analytics:latest"
+          image     = var.api_image
           command   = ["uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           readonlyRootFilesystem = false
+          environment = [{
+            name = "PYTHONPATH"
+            value = "/app/api"
+          }]
         }
       }
 

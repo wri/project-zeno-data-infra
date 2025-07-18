@@ -1,34 +1,34 @@
 import re
 
 import pytest
-
 from app.analysis.common.analysis import (
     get_geojson_from_data_api,
     get_geojson_request_for_data_api,
 )
+
 from app.analysis.dist_alerts.query import create_gadm_dist_query
 
 
 def test_create_gadm_adm2_dist_query_no_intersection_select_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], [])
     expected_clause = "SELECT country, region, subregion, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_no_intersection_from_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], [])
-    expected_clause = "FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/gadm_dist_alerts.parquet'"
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], [])
+    expected_clause = "/tmp/gadm_dist_alerts.parquet'"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_no_intersection_where_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], [])
     expected_clause = "WHERE country = 'IDN' AND region = 24 AND subregion = 9"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_no_intersection_group_by_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], [])
     expected_clause = (
         "GROUP BY country, region, subregion, alert_date, alert_confidence"
     )
@@ -36,7 +36,7 @@ def test_create_gadm_adm2_dist_query_no_intersection_group_by_clause():
 
 
 def test_create_gadm_adm2_dist_query_no_intersection_order_by_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], [])
     expected_clause = (
         "ORDER BY country, region, subregion, alert_date, alert_confidence"
     )
@@ -44,121 +44,121 @@ def test_create_gadm_adm2_dist_query_no_intersection_order_by_clause():
 
 
 def test_create_gadm_adm1_dist_query_no_intersection_select_clause():
-    query = create_gadm_dist_query(["IDN", "24"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24"], [])
     expected_clause = "SELECT country, region, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
 def test_create_gadm_adm1_dist_query_no_intersection_from_clause():
-    query = create_gadm_dist_query(["IDN", "24"], [])
-    expected_clause = "FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/gadm_dist_alerts.parquet'"
+    query, _ = create_gadm_dist_query(["IDN", "24"], [])
+    expected_clause = "/tmp/gadm_dist_alerts.parquet'"
     assert expected_clause in query
 
 
 def test_create_gadm_adm1_dist_query_no_intersection_where_clause():
-    query = create_gadm_dist_query(["IDN", "24"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24"], [])
     expected_clause = "WHERE country = 'IDN' AND region = 24"
     assert expected_clause in query
 
 
 def test_create_gadm_adm1_dist_query_no_intersection_group_by_clause():
-    query = create_gadm_dist_query(["IDN", "24"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24"], [])
     expected_clause = "GROUP BY country, region, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_adm1_dist_query_no_intersection_order_by_clause():
-    query = create_gadm_dist_query(["IDN", "24"], [])
+    query, _ = create_gadm_dist_query(["IDN", "24"], [])
     expected_clause = "ORDER BY country, region, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_iso_dist_query_no_intersection_select_clause():
-    query = create_gadm_dist_query(["IDN"], [])
+    query, _ = create_gadm_dist_query(["IDN"], [])
     expected_clause = "SELECT country, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
 def test_create_gadm_iso_dist_query_no_intersection_from_clause():
-    query = create_gadm_dist_query(["IDN"], [])
-    expected_clause = "FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/gadm_dist_alerts.parquet'"
+    query, _ = create_gadm_dist_query(["IDN"], [])
+    expected_clause = "/tmp/gadm_dist_alerts.parquet'"
     assert expected_clause in query
 
 
 def test_create_gadm_iso_dist_query_no_intersection_where_clause():
-    query = create_gadm_dist_query(["IDN"], [])
+    query, _ = create_gadm_dist_query(["IDN"], [])
     expected_clause = "WHERE country = 'IDN'"
     assert expected_clause in query
 
 
 def test_create_gadm_iso_dist_query_no_intersection_group_by_clause():
-    query = create_gadm_dist_query(["IDN"], [])
+    query, _ = create_gadm_dist_query(["IDN"], [])
     expected_clause = "GROUP BY country, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_iso_dist_query_no_intersection_order_by_clause():
-    query = create_gadm_dist_query(["IDN"], [])
+    query, _ = create_gadm_dist_query(["IDN"], [])
     expected_clause = "ORDER BY country, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_select_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "SELECT country, region, subregion, natural_land_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
+    expected_clause = "SELECT country, region, subregion, natural_lands_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_from_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/gadm_dist_alerts_by_natural_lands.parquet'"
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
+    expected_clause = "/tmp/gadm_dist_alerts_by_natural_lands.parquet'"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_where_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
     expected_clause = "WHERE country = 'IDN' AND region = 24 AND subregion = 9"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_group_by_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "GROUP BY country, region, subregion, natural_land_class, alert_date, alert_confidence"
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
+    expected_clause = "GROUP BY country, region, subregion, natural_lands_class, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_order_by_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "ORDER BY country, region, subregion, natural_land_class, alert_date, alert_confidence"
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
+    expected_clause = "ORDER BY country, region, subregion, natural_lands_class, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_drivers_intersection_select_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
     expected_clause = "SELECT country, region, subregion, ldacs_driver, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_drivers_intersection_from_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
-    expected_clause = "FROM 's3://gfw-data-lake/umd_glad_dist_alerts/parquet/gadm_dist_alerts_by_driver.parquet'"
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
+    expected_clause = "/tmp/gadm_dist_alerts_by_driver.parquet'"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_drivers_intersection_where_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
     expected_clause = "WHERE country = 'IDN' AND region = 24 AND subregion = 9"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_drivers_intersection_group_by_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
     expected_clause = "GROUP BY country, region, subregion, ldacs_driver, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_drivers_intersection_order_by_clause():
-    query = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
+    query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["driver"])
     expected_clause = "ORDER BY country, region, subregion, ldacs_driver, alert_date, alert_confidence"
     assert expected_clause in query
 

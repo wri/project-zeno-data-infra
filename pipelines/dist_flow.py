@@ -57,13 +57,13 @@ def analyze_gadm_dist(dist_zarr_uri, version, overwrite: bool):
 @task
 def analyze_gadm_dist_by_natural_lands(dist_zarr_uri, version, overwrite: bool):
 
-    return gadm_dist_alerts_by_natural_lands(dist_zarr_uri, version, overwrite)
+    return gadm_dist_alerts_by_natural_lands(dist_zarr_uri, version, overwrite=overwrite)
 
 
 @task
 def analyze_gadm_dist_by_driver(dist_zarr_uri, version, overwrite: bool):
 
-    return gadm_dist_alerts_by_driver(dist_zarr_uri, version, overwrite)
+    return gadm_dist_alerts_by_driver(dist_zarr_uri, version, overwrite=overwrite)
 
 
 @task

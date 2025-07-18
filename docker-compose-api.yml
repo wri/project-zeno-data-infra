@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  fastapi-app:
+    #image: zeno-data-analytics
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"  # Maps port 8000 on the host to port 8000 in the container
+    command: uvicorn api.app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - PYTHON_VERSION=3.13  
+      - PYTHONPATH=/app/api
+    volumes:
+      - $HOME/.aws:/home/appuser/.aws:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
