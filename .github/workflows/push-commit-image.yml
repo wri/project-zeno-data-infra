@@ -12,7 +12,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install sudo for compiler steps, node for uv step
+      - name: Install sudo, node for later actions, only needed if running locally
+        if: ${{ env.ACT }}
         shell: bash
         run: |
           apt-get update
@@ -30,13 +31,14 @@ jobs:
         with:
           compiler: gcc-latest
 
-      - name: Install uv and enable caching
-        uses: astral-sh/setup-uv@v6.4.1
+      - name: Install uv, create a VENV, and enable caching
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-          activate-environment: 'true'
+          activate-environment: true
+          prune-cache: false
 
-      - name: Install Dependencies
+      - name: Install project dependencies
         shell: bash
         env:
           CC: ${{ steps.install_clang.outputs.cc }}
@@ -45,27 +47,31 @@ jobs:
           cd $GITHUB_WORKSPACE
           uv sync --locked --no-install-project --dev -p 3.13.5
 
-      - name: Run Tests
+      - name: Run tests
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE
           pytest test --maxfail=1 --disable-warnings
 
-      - name: Log in to AWS ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+##      - name: Log in to AWS ECR
+##        id: login-ecr
+##        uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build Docker Image
-        run: |
-          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)  # Use the first 7 characters of the commit hash as the tag
-          docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
-          echo Image tag: $IMAGE_TAG
+#      - name: Set up Docker, only need if running locally
+#        if: ${{ env.ACT }}
+#        uses: docker/setup-docker-action@v4
 
-    #      # Push the Docker image to ECR
-    #      - name: Push Docker Image to ECR
-    #        run: |
-    #          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
-    #          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
+#      - name: Build Docker Image
+#        run: |
+#          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)  # Use the first 7 characters of the commit hash as the tag
+#          docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
+#          echo Image tag: $IMAGE_TAG
+
+#      # Push the Docker image to ECR
+#      - name: Push Docker Image to ECR
+#        run: |
+#          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
+#          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
 
     env:
       AWS_REGION: us-east-1  # Replace with your AWS region
