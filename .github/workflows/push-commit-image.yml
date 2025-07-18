@@ -58,6 +58,10 @@ jobs:
           cd $GITHUB_WORKSPACE
           pytest test --maxfail=1 --disable-warnings
 
+      - name: Test step
+        if: success()
+        run: echo "Test success!"
+
 ##      - name: Log in to AWS ECR
 ##        if: success()
 ##        id: login-ecr
@@ -78,6 +82,7 @@ jobs:
 #        run: |
 #          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
 #          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
+
 
     env:
       AWS_REGION: us-east-1  # Replace with your AWS region
