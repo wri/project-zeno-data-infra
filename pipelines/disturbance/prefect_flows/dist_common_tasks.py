@@ -2,18 +2,13 @@ from typing import Optional, Tuple
 import xarray as xr
 import pandas as pd
 
-from prefect import flow, task
+from prefect import task
 
 from pipelines.disturbance import stages
-from ...globals import DATA_LAKE_BUCKET
 
 
 @task
-def load_data(dist_zarr_uri: str, contextual_path: Optional[str] = None):
-    contextual_uri = None
-    if contextual_path is not None:
-        contextual_uri = f"s3://{DATA_LAKE_BUCKET}/{contextual_path}"
-
+def load_data(dist_zarr_uri: str, contextual_uri: Optional[str] = None):
     return stages.load_data(dist_zarr_uri, contextual_uri)
 
 
@@ -37,5 +32,5 @@ def postprocess_result(result: xr.Dataset):
 
 
 @task
-def save_result(result_df: pd.DataFrame, dist_version: str, result_filename: str):
-    return stages.save_results(result_df, dist_version, result_filename)
+def save_result(result_df: pd.DataFrame, result_uri: str) -> str:
+    return stages.save_results(result_df, result_uri)

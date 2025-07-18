@@ -4,11 +4,10 @@ import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
 
-from ..globals import (
+from pipelines.globals import (
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
-    DATA_LAKE_BUCKET,
 )
 
 
@@ -107,19 +106,18 @@ def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
 
 
 def save_results(
-    alerts_count_df: pd.DataFrame, dist_version: str, result_filename: str
+    df: pd.DataFrame, results_uri: str
 ) -> str:
     print("Starting parquet")
 
-    results_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
-
-    _save_parquet(alerts_count_df, results_uri)
+    _save_parquet(df, results_uri)
     print("Finished parquet")
     return results_uri
 
 
-def _save_parquet(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
-    alerts_count_df.to_parquet(results_uri, index=False)
+# _load_zarr and _save_parquet are the functions being mocked by the unit tests.
+def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
+    df.to_parquet(results_uri, index=False)
 
 
 def _load_zarr(zarr_uri):

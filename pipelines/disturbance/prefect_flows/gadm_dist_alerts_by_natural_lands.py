@@ -3,15 +3,15 @@ import numpy as np
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from ...globals import DATA_LAKE_BUCKET
-from pipelines.disturbance.check_for_new_alerts import s3_object_exists
+from pipelines.globals import DATA_LAKE_BUCKET
+from pipelines.utils import s3_uri_exists
 
 @flow(name="DIST alerts count by natural lands")
 def dist_alerts_by_natural_lands_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_filename = "dist_alerts_by_natural_lands"
-    result_key = f"umd_glad_dist_alerts/{dist_version}/tabular/parquet/gadm_{result_filename}.parquet"
-    if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, result_key):
-        return f"s3://{DATA_LAKE_BUCKET}/{result_key}"
+    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
+    if not overwrite and s3_uri_exists(result_uri):
+        return result_uri
 
     expected_groups = (
         np.arange(894),  # country ISO codes
@@ -24,7 +24,7 @@ def dist_alerts_by_natural_lands_count(dist_zarr_uri: str, dist_version: str, ov
     contextual_uri = f"s3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
     datasets = dist_common_tasks.load_data.with_options(
         name="dist-alerts-by-natural-lands-load-data"
-    )(dist_zarr_uri, contextual_path=contextual_uri)
+    )(dist_zarr_uri, contextual_uri=contextual_uri)
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-by-natural-lands-compute"
     )(datasets, expected_groups, contextual_name="natural_lands")
@@ -37,6 +37,6 @@ def dist_alerts_by_natural_lands_count(dist_zarr_uri: str, dist_version: str, ov
     )(result_dataset)
     result_uri = dist_common_tasks.save_result.with_options(
         name="dist-alerts-by-natural-lands-save-result"
-    )(result_df, dist_version, result_filename)
+    )(result_df, result_uri)
 
     return result_uri

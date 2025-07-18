@@ -4,14 +4,14 @@ from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
 from pipelines.globals import DATA_LAKE_BUCKET
-from pipelines.disturbance.check_for_new_alerts import s3_object_exists
+from pipelines.utils import s3_uri_exists
 
 @flow(name="DIST alerts count")
 def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_filename = "dist_alerts"
-    result_key = f"umd_glad_dist_alerts/{dist_version}/tabular/parquet/gadm_{result_filename}.parquet"
-    if not overwrite and s3_object_exists(DATA_LAKE_BUCKET, result_key):
-        return f"s3://{DATA_LAKE_BUCKET}/{result_key}"
+    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
+    if not overwrite and s3_uri_exists(result_uri):
+        return result_uri
 
     expected_groups = (
         np.arange(894),  # country ISO codes
@@ -33,8 +33,8 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-postprocess-result"
     )(result_dataset)
-    result_uri = dist_common_tasks.save_result.with_options(
+    dist_common_tasks.save_result.with_options(
         name="dist-alerts-save-result"
-    )(result_df, dist_version, result_filename)
+    )(result_df, result_uri)
 
     return result_uri
