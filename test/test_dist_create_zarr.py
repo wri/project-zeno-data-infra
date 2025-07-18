@@ -57,7 +57,7 @@ def test_decode_alert_data():
     assert list(result.y.values) == [0, 1]
 
 
-@patch("pipelines.disturbance.create_zarr.s3_object_exists")
+@patch("pipelines.disturbance.create_zarr.s3_uri_exists")
 @patch("pipelines.disturbance.create_zarr.xr.open_dataset")
 def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     """Test creating a new zarr file when it doesn't exist."""
@@ -75,8 +75,7 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
         assert result == expected_uri
 
         mock_s3_exists.assert_called_once_with(
-            "gfw-data-lake",
-            "umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
+            "s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
         )
 
         mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
