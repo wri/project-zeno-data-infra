@@ -74,12 +74,12 @@ def setup_compute(
     return (mask, groupbys, expected_groups)
 
 
-def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple):
+def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str):
     print("Starting reduce")
     alerts_count = xarray_reduce(
         reduce_mask,
         *reduce_groupbys,
-        func="count",
+        func=funcname,
         expected_groups=expected_groups,
         reindex=ReindexStrategy(
             blockwise=False, array_type=ReindexArrayType.SPARSE_COO

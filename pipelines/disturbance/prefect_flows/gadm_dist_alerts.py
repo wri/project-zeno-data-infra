@@ -29,7 +29,7 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
 
     result_dataset = dist_common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-compute-zonal-stats"
-    )(*compute_input)
+    )(*compute_input, funcname="count")
     result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-postprocess-result"
     )(result_dataset)

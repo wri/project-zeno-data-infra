@@ -22,8 +22,10 @@ def setup_compute(
 
 
 @task
-def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple, expected_groups: Tuple):
-    return stages.compute(dataset, groupbys, expected_groups)
+def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple, expected_groups: Tuple, funcname: str):
+    '''Do the reduction with the specified groupbys. funcname is the name of the
+    reduction function'''
+    return stages.compute(dataset, groupbys, expected_groups, funcname)
 
 
 @task
