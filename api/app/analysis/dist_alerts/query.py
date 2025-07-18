@@ -12,7 +12,7 @@ def create_gadm_dist_query(
         intersection_col = "ldacs_driver"
     elif intersections[0] == "natural_lands":
         table = "gadm_dist_alerts_by_natural_lands"
-        intersection_col = "natural_land_class"
+        intersection_col = "natural_lands_class"
     else:
         raise ValueError(f"No way to calculate intersection {intersections[0]}")
 

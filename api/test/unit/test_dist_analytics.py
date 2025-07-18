@@ -6,7 +6,7 @@ from app.analysis.common.analysis import (
     get_geojson_request_for_data_api,
 )
 
-from api.app.analysis.dist_alerts.query import create_gadm_dist_query
+from app.analysis.dist_alerts.query import create_gadm_dist_query
 
 
 def test_create_gadm_adm2_dist_query_no_intersection_select_clause():
@@ -105,7 +105,7 @@ def test_create_gadm_iso_dist_query_no_intersection_order_by_clause():
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_select_clause():
     query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "SELECT country, region, subregion, natural_land_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+    expected_clause = "SELECT country, region, subregion, natural_lands_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
     assert expected_clause in query
 
 
@@ -123,13 +123,13 @@ def test_create_gadm_adm2_dist_query_natural_lands_intersection_where_clause():
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_group_by_clause():
     query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "GROUP BY country, region, subregion, natural_land_class, alert_date, alert_confidence"
+    expected_clause = "GROUP BY country, region, subregion, natural_lands_class, alert_date, alert_confidence"
     assert expected_clause in query
 
 
 def test_create_gadm_adm2_dist_query_natural_lands_intersection_order_by_clause():
     query, _ = create_gadm_dist_query(["IDN", "24", "9"], ["natural_lands"])
-    expected_clause = "ORDER BY country, region, subregion, natural_land_class, alert_date, alert_confidence"
+    expected_clause = "ORDER BY country, region, subregion, natural_lands_class, alert_date, alert_confidence"
     assert expected_clause in query
 
 
