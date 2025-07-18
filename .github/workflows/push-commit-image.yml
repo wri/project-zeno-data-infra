@@ -6,50 +6,66 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest-arm
-#    container: "ghcr.io/osgeo/gdal:ubuntu-small-3.9.3"
-    container: "globalforestwatch/zeno:2"
+    container: "ghcr.io/osgeo/gdal:ubuntu-full-3.10.3"
     steps:
-        # Set up Python environment
-#      - name: Set up Python
-#        uses: actions/setup-python@v4
-#        with:
-#          python-version: "3.13.5"  # Adjust Python version as needed
       # Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Install UV and dependencies
-      - name: Install UV and Dependencies
+      - name: Install sudo for compiler steps, node for uv step
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          pip install uv
-          . /app/.venv/bin/activate
-          cd $GITHUB_WORKSPACE
-          uv sync --locked --no-install-project --dev
+          apt-get update
+          apt-get install sudo nodejs -y
 
-      # Run pytest
-      - name: Run Tests
+      - name: Install CLANG for building rasterio deps
+        id: install_clang
+        uses: rlalik/setup-cpp-compiler@master
+        with:
+          compiler: clang-latest
+
+      - name: Install GCC for building rasterio deps
+        id: install_gcc
+        uses: rlalik/setup-cpp-compiler@master
+        with:
+          compiler: gcc-latest
+
+      - name: Install uv and enable caching
+        uses: astral-sh/setup-uv@v6.4.1
+        with:
+          enable-cache: true
+          activate-environment: 'true'
+
+      - name: Install Dependencies
+        shell: bash
+        env:
+          CC: ${{ steps.install_clang.outputs.cc }}
+          GCC: ${{ steps.install_gcc.outputs.cc }}
         run: |
-          . /app/.venv/bin/activate
+          cd $GITHUB_WORKSPACE
+          uv sync --locked --no-install-project --dev -p 3.13.5
+
+      - name: Run Tests
+        shell: bash
+        run: |
           cd $GITHUB_WORKSPACE
           pytest test --maxfail=1 --disable-warnings
 
-      # Log in to AWS ECR
       - name: Log in to AWS ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # Build the Docker image
       - name: Build Docker Image
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)  # Use the first 7 characters of the commit hash as the tag
           docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
+          echo Image tag: $IMAGE_TAG
 
-      # Push the Docker image to ECR
-      - name: Push Docker Image to ECR
-        run: |
-          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
+    #      # Push the Docker image to ECR
+    #      - name: Push Docker Image to ECR
+    #        run: |
+    #          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
+    #          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
 
     env:
       AWS_REGION: us-east-1  # Replace with your AWS region
