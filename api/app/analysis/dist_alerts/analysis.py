@@ -1,4 +1,6 @@
 import json
+import logging
+import traceback
 import os
 
 import duckdb
@@ -15,27 +17,28 @@ from ..common.analysis import (
 from .query import create_gadm_dist_query
 
 NATURAL_LANDS_CLASSES = {
-    2: "Forest",
-    3: "Short vegetation",
-    4: "Water",
+    2: "Natural forests",
+    3: "Natural short vegetation",
+    4: "Natural water",
     5: "Mangroves",
     6: "Bare",
-    7: "Snow/Ice",
-    8: "Wetland forest",
-    9: "Peat forest",
-    10: "Wetland short vegetation",
-    11: "Peat short vegetation",
+    7: "Snow",
+    8: "Wetland natural forests",
+    9: "Natural peat forests",
+    10: "Wetland natural short vegetation",
+    11: "Natural peat short vegetation",
     12: "Cropland",
     13: "Built-up",
-    14: "Tree cover",
-    15: "Short vegetation",
-    16: "Water",
-    17: "Wetland tree cover",
-    18: "Peat tree cover",
-    19: "Wetland short vegetation",
-    20: "Peat short vegetation",
-    21: "Bare",
+    14: "Non-natural tree cover",
+    15: "Non-natural short vegetation",
+    16: "Non-natural water",
+    17: "Wetland non-natural tree cover",
+    18: "Non-natural peat tree cover",
+    19: "Wetland non-natural short vegetation",
+    20: "Non-natural peat short vegetation",
+    21: "Non-natural bare",
 }
+
 DIST_DRIVERS = {
     1: "Wildfire",
     2: "Flooding",
@@ -56,7 +59,7 @@ async def zonal_statistics(geojson, aoi, intersection=None):
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
         ).band_data
-        natural_lands.name = "natural_land_class"
+        natural_lands.name = "natural_lands_class"
 
         groupby_layers.append(natural_lands)
         expected_groups.append(np.arange(22))
@@ -93,7 +96,10 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         alerts_df[aoi["type"]] = aoi["id"]
 
     if intersection == "natural_lands":
-        alerts_df.natural_land_class = alerts_df.natural_land_class.apply(
+        alerts_df["natural_lands_category"] = alerts_df.natural_lands_class.apply(
+            lambda x: "natural" if 1 < x < 12 else "non-natural"
+        )
+        alerts_df["natural_lands_class"] = alerts_df.natural_lands_class.apply(
             lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
         )
     elif intersection == "driver":
@@ -106,57 +112,69 @@ async def zonal_statistics(geojson, aoi, intersection=None):
 
 
 async def do_analytics(file_path):
-    # Read and parse JSON file
-    metadata = file_path / "metadata.json"
-    json_content = metadata.read_text()
-    metadata_content = json.loads(json_content)  # Convert JSON to Python object
-    aoi = metadata_content["aois"][0]
-    if aoi["type"] == "admin":
-        # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = aoi["id"].split(".")
-        intersections = metadata_content["intersections"]
+    try:
+        # Read and parse JSON file
+        metadata = file_path / "metadata.json"
+        json_content = metadata.read_text()
+        metadata_content = json.loads(json_content)  # Convert JSON to Python object
+        aoi = metadata_content["aois"][0]
+        if aoi["type"] == "admin":
+            # GADM IDs are coming joined by '.', e.g. IDN.24.9
+            gadm_id = aoi["id"].split(".")
+            intersections = metadata_content["intersections"]
 
-        query, table = create_gadm_dist_query(gadm_id, intersections)
+            query, table = create_gadm_dist_query(gadm_id, intersections)
 
-        # Dumbly doing this per request since the STS token expires eventually otherwise
-        # According to this issue, duckdb should auto refresh the token in 1.3.0,
-        # but it doesn't seem to work for us and people are reporting the same on the issue
-        # https://github.com/duckdb/duckdb-aws/issues/26
-        # TODO do this on lifecycle start once autorefresh works
-        duckdb.query(
+            # Dumbly doing this per request since the STS token expires eventually otherwise
+            # According to this issue, duckdb should auto refresh the token in 1.3.0,
+            # but it doesn't seem to work for us and people are reporting the same on the issue
+            # https://github.com/duckdb/duckdb-aws/issues/26
+            # TODO do this on lifecycle start once autorefresh works
+            duckdb.query(
+                """
+                CREATE OR REPLACE SECRET secret (
+                    TYPE s3,
+                    PROVIDER credential_chain,
+                CHAIN config);
             """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain,
-                CHAIN config
-            );
-        """
-        )
+            )
 
-        # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-        # For now, we need to just download the file temporarily
-        fs = s3fs.S3FileSystem(requester_pays=True)
-        fs.get(
-            f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
-            f"/tmp/{table}.parquet",
-        )
-        alerts_df = duckdb.query(query).df()
-        os.remove(f"/tmp/{table}.parquet")
-    else:
-        geojson = await get_geojson(aoi)
-
-        if metadata_content["intersections"]:
-            intersection = metadata_content["intersections"][0]
+            # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
+            # For now, we need to just download the file temporarily
+            fs = s3fs.S3FileSystem(requester_pays=True)
+            fs.get(
+                f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+                f"/tmp/{table}.parquet",
+            )
+            alerts_df = duckdb.query(query).df()
+            os.remove(f"/tmp/{table}.parquet")
         else:
-            intersection = None
+            geojson = await get_geojson(aoi)
 
-        alerts_df = await zonal_statistics(geojson, aoi, intersection)
+            if metadata_content["intersections"]:
+                intersection = metadata_content["intersections"][0]
+            else:
+                intersection = None
 
-    if metadata_content["start_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
-    if metadata_content["end_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
-    alerts_dict = alerts_df.to_dict(orient="list")
+            alerts_df = await zonal_statistics(geojson, aoi, intersection)
 
-    data = file_path / "data.json"
-    data.write_text(json.dumps(alerts_dict))
+        if metadata_content["start_date"] is not None:
+            alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
+        if metadata_content["end_date"] is not None:
+            alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+        alerts_dict = alerts_df.to_dict(orient="list")
+
+        data = file_path / "data.json"
+        data.write_text(json.dumps(alerts_dict))
+    except Exception as e:
+        logging.error(
+            {
+                "event": "dist_alerts_analytics_processing_failure",
+                "severity": "high",  # Helps with alerting
+                "metadata": metadata_content,
+                "generated_query": query,
+                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_details": str(e),
+                "stack_trace": traceback.format_exc(),
+            }
+        )

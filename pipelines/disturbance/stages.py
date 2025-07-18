@@ -1,34 +1,41 @@
-from functools import reduce
 from typing import Callable, Tuple, Optional
 import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
 
-from ..globals import country_zarr_uri, region_zarr_uri, subregion_zarr_uri
+from pipelines.globals import (
+    country_zarr_uri,
+    region_zarr_uri,
+    subregion_zarr_uri,
+)
+
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
-def _s3_loader(
+
+def load_data(
     dist_zarr_uri: str,
-    contextual_uri: Optional[str],
+    contextual_uri: Optional[str] = None,
 ) -> Tuple[xr.Dataset, ...]:
     """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
-    dist_alerts = xr.open_zarr(dist_zarr_uri)
+    dist_alerts = _load_zarr(dist_zarr_uri)
 
-    country = xr.open_zarr(country_zarr_uri)
-    country_aligned = xr.align(dist_alerts, country, join='left')[1]
-    region = xr.open_zarr(region_zarr_uri)
-    region_aligned = xr.align(dist_alerts, region, join='left')[1]
-    subregion = xr.open_zarr(subregion_zarr_uri)
-    subregion_aligned = xr.align(dist_alerts, subregion, join='left')[1]
+    country = _load_zarr(country_zarr_uri)
+    country_aligned = xr.align(dist_alerts, country, join="left")[1]
+    region = _load_zarr(region_zarr_uri)
+    region_aligned = xr.align(dist_alerts, region, join="left")[1]
+    subregion = _load_zarr(subregion_zarr_uri)
+    subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1]
 
     if contextual_uri is not None:
-        contextual_layer = xr.open_zarr(contextual_uri)
-        contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join='left')[1]
+        contextual_layer = _load_zarr(contextual_uri)
+        contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join="left")[
+            1
+        ]
     else:
         contextual_layer_aligned = None
 
@@ -37,16 +44,14 @@ def _s3_loader(
         country_aligned,
         region_aligned,
         subregion_aligned,
-        contextual_layer_aligned
+        contextual_layer_aligned,
     )
 
-def _parquet_saver(alerts_count_df: pd.DataFrame, results_uri: str) -> None:
-    alerts_count_df.to_parquet(results_uri, index=False)
 
-def _setup(
+def setup_compute(
     datasets: Tuple[xr.Dataset, ...],
     expected_groups: Optional[ExpectedGroupsType],
-    contextual_column_name: Optional[str]
+    contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xrarray reduce on dist alerts"""
     dist_alerts, country, region, subregion, contextual_layer = datasets
@@ -60,12 +65,16 @@ def _setup(
         dist_alerts.confidence,
     )
     if contextual_layer is not None:
-        groupbys = groupbys[:2] + (contextual_layer.band_data.rename(contextual_column_name),) + groupbys[2:]
+        groupbys = (
+            groupbys[:2]
+            + (contextual_layer.band_data.rename(contextual_column_name),)
+            + groupbys[2:]
+        )
 
     return (mask, groupbys, expected_groups)
 
 
-def _compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple):
+def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple):
     print("Starting reduce")
     alerts_count = xarray_reduce(
         reduce_mask,
@@ -80,7 +89,8 @@ def _compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups:
     print("Finished reduce")
     return alerts_count
 
-def _create_data_frame(alerts_count: xr.Dataset) -> pd.DataFrame:
+
+def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
     sparse_data = alerts_count.data
     dim_names = alerts_count.dims
     indices = sparse_data.coords
@@ -94,14 +104,21 @@ def _create_data_frame(alerts_count: xr.Dataset) -> pd.DataFrame:
 
     return pd.DataFrame(coord_dict)
 
-def _save_results(
-    alerts_count_df: pd.DataFrame, dist_version: str, saver: Callable, results_uri: str
+
+def save_results(
+    df: pd.DataFrame, results_uri: str
 ) -> str:
     print("Starting parquet")
-    saver(alerts_count_df, results_uri)
+
+    _save_parquet(df, results_uri)
     print("Finished parquet")
     return results_uri
 
 
-def pipe(value, *functions):
-    return reduce(lambda v, f: f(v), functions, value)
+# _load_zarr and _save_parquet are the functions being mocked by the unit tests.
+def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
+    df.to_parquet(results_uri, index=False)
+
+
+def _load_zarr(zarr_uri):
+    return xr.open_zarr(zarr_uri)

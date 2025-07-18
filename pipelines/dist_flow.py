@@ -9,11 +9,7 @@ from pipelines.disturbance.create_zarr import (
 )
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
-from pipelines.disturbance.gadm_dist_alerts import gadm_dist_alerts
-from pipelines.disturbance.gadm_dist_alerts_by_natural_lands import (
-    gadm_dist_alerts_by_natural_lands,
-)
-from pipelines.disturbance.gadm_dist_alerts_by_driver import gadm_dist_alerts_by_driver
+from pipelines.disturbance import prefect_flows
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -48,29 +44,11 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 
 @task
-def analyze_gadm_dist(dist_zarr_uri, version, overwrite: bool):
-
-    return gadm_dist_alerts(dist_zarr_uri, version, overwrite=overwrite)
-
-
-@task
-def analyze_gadm_dist_by_natural_lands(dist_zarr_uri, version, overwrite: bool):
-
-    return gadm_dist_alerts_by_natural_lands(dist_zarr_uri, version, overwrite=overwrite)
-
-
-@task
-def analyze_gadm_dist_by_driver(dist_zarr_uri, version, overwrite: bool):
-
-    return gadm_dist_alerts_by_driver(dist_zarr_uri, version, overwrite=overwrite)
-
-
-@task
 def run_validation_suite():
     pass
 
 
-@flow(log_prints=True)
+@flow(name="dist_alerts_flow", log_prints=True)
 def dist_alerts_flow(overwrite=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -80,18 +58,20 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         logger.info(f"Latest dist version: {dist_version}")
         dask_client, _ = create_cluster()
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = analyze_gadm_dist(dist_zarr_uri, dist_version, overwrite=overwrite)
+        gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version)
         result_uris.append(gadm_dist_result)
 
-        gadm_dist_by_natural_lands_result = analyze_gadm_dist_by_natural_lands(
-            dist_zarr_uri, dist_version, overwrite
+        gadm_dist_by_natural_lands_result = (
+            prefect_flows.dist_alerts_by_natural_lands_count(
+                dist_zarr_uri, dist_version
+            )
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
-        gadm_dist_by_driver_result = analyze_gadm_dist_by_driver(
-            dist_zarr_uri, dist_version, overwrite
+        gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_count(
+            dist_zarr_uri, dist_version
         )
-        result_uris.append(gadm_dist_by_driver_result)
+        result_uris.append(gadm_dist_by_drivers_result)
     except Exception:
         logger.error("DIST alerts analysis failed.")
         raise

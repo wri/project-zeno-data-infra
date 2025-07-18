@@ -1,8 +1,8 @@
-import pandas as pd
 import pytest
 import numpy as np
 import xarray as xr
-from typing import Optional
+import dask.array as da
+
 
 @pytest.fixture
 def expected_groups():
@@ -17,62 +17,90 @@ def expected_groups():
 
 
 @pytest.fixture
-def mock_loader():
-    def _loader(dist_zarr_uri: str, contextual_uri: Optional[str]):
-        # 1. dist_alerts dataset
-        confidence_data = np.array([[[3, 2], [2, 3]]], dtype=np.int16)
-        alert_date_data = np.array([[[750, 731], [731, 800]]], dtype=np.int16)
-        dist_alerts = xr.Dataset(
-            data_vars={
-                "confidence": (("band", "y", "x"), confidence_data),
-                "alert_date": (("band", "y", "x"), alert_date_data),
-            },
-            coords={
-                "band": ("band", [1], {}),
-                "y": ("y", [60.0, 59.99975], {}),
-                "x": ("x", [-180.0, -179.99975], {}),
-                "spatial_ref": ((), 0, {}),
-            },
-            attrs={},
-        )
+def dist_ds():
+    confidence_data = da.array([[[3, 2], [2, 3]]], dtype=np.int16)
+    alert_date_data = da.array([[[750, 731], [731, 800]]], dtype=np.int16)
+    dist_alerts = xr.Dataset(
+        data_vars={
+            "confidence": (("band", "y", "x"), confidence_data),
+            "alert_date": (("band", "y", "x"), alert_date_data),
+        },
+        coords={
+            "band": ("band", [1], {}),
+            "y": ("y", [60.0, 59.99975], {}),
+            "x": ("x", [-180.0, -179.99975], {}),
+            "spatial_ref": ((), 0, {}),
+        },
+        attrs={},
+    )
 
-        # 2. GADM datasets
-        country = xr.Dataset(
-            data_vars={
-                "band_data": (
-                    ("band", "y", "x"),
-                    np.array([[[12, 12], [12, 12]]], dtype=np.uint16),
-                )
-            },
-        )
-
-        region = xr.Dataset(
-            data_vars={
-                "band_data": (
-                    ("band", "y", "x"),
-                    np.array([[[7, 7], [7, 7]]], dtype=np.uint16),
-                )
-            },
-        )
-
-        subregion = xr.Dataset(
-            data_vars={
-                "band_data": (
-                    ("band", "y", "x"),
-                    np.array([[[124, 124], [124, 125]]], dtype=np.uint16),
-                )
-            },
-        )
-
-        return dist_alerts, country, region, subregion, None
-
-    return _loader
+    return dist_alerts
 
 
 @pytest.fixture
-def spy_saver():
-    def _saver(df: pd.DataFrame, uri: str):
-        """Capture the DataFrame passed in to be later used in assertions"""
-        _saver.saved_data = df
+def country_ds():
+    country = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[12, 12], [12, 12]]], dtype=np.uint16),
+            )
+        }
+    )
 
-    return _saver
+    return country
+
+
+@pytest.fixture
+def region_ds():
+    region = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[7, 7], [7, 7]]], dtype=np.uint16),
+            )
+        }
+    )
+    return region
+
+
+@pytest.fixture
+def subregion_ds():
+    subregion = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[124, 124], [124, 125]]], dtype=np.uint16),
+            )
+        }
+    )
+
+    return subregion
+
+
+@pytest.fixture
+def natural_lands_ds():
+    natural_lands = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[2, 2], [2, 2]]], dtype=np.uint8),
+            )
+        },
+    )
+
+    return natural_lands
+
+
+@pytest.fixture
+def dist_drivers_ds():
+    drivers = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[2, 2], [2, 2]]], dtype=np.uint8),
+            )
+        },
+    )
+
+    return drivers
