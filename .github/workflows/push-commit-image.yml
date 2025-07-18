@@ -6,32 +6,35 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-24.04-arm
-    container: "ghcr.io/osgeo/gdal:ubuntu-full-3.10.3"
+    container: "ghcr.io/osgeo/gdal:ubuntu-small-3.10.3"
     steps:
       # Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install sudo, node for later actions, only needed if running locally
-        if: ${{ env.ACT }}
+      - name: Install sudo, node for later actions
+        if: success()
         shell: bash
         run: |
           apt-get update
           apt-get install sudo nodejs -y
 
       - name: Install CLANG for building rasterio deps
+        if: success()
         id: install_clang
         uses: rlalik/setup-cpp-compiler@master
         with:
           compiler: clang-latest
 
       - name: Install GCC for building rasterio deps
+        if: success()
         id: install_gcc
         uses: rlalik/setup-cpp-compiler@master
         with:
           compiler: gcc-latest
 
       - name: Install uv, create a VENV, and enable caching
+        if: success()
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
@@ -39,6 +42,7 @@ jobs:
           prune-cache: false
 
       - name: Install project dependencies
+        if: success()
         shell: bash
         env:
           CC: ${{ steps.install_clang.outputs.cc }}
@@ -48,16 +52,18 @@ jobs:
           uv sync --locked --no-install-project --dev -p 3.13.5
 
       - name: Run tests
+        if: success()
         shell: bash
         run: |
           cd $GITHUB_WORKSPACE
           pytest test --maxfail=1 --disable-warnings
 
 ##      - name: Log in to AWS ECR
+##        if: success()
 ##        id: login-ecr
 ##        uses: aws-actions/amazon-ecr-login@v1
 
-#      - name: Set up Docker, only need if running locally
+#      - name: Set up Docker, only needed if running locally
 #        if: ${{ env.ACT }}
 #        uses: docker/setup-docker-action@v4
 
