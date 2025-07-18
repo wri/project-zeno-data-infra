@@ -263,19 +263,18 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "country": ["IDN", "IDN", "IDN", "IDN", "BRA", "BRA"],
-                "region": [24, 24, 14, 14, 1, 1],
-                "subregion": [9, 9, 13, 13, 1, 1],
+                "country": ["IDN", "IDN", "IDN", "IDN", "BRA"],
+                "region": [24, 24, 14, 14, 1],
+                "subregion": [9, 9, 13, 13, 1],
                 "alert_date": [
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
-                    "2024-08-15",
                 ],
-                "confidence": ["high", "low", "high", "low", "high", "low"],
-                "value": [1490, 95, 1490, 95, 1490, 95],
+                "confidence": ["high", "low", "high", "low", "high"],
+                "value": [1490, 95, 1414, 126, 2091],
             }
         )
 
