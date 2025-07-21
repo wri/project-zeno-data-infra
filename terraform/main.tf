@@ -29,15 +29,15 @@ module "ecs" {
 
   services = {
     analytics = {
-      cpu    = 1024
-      memory = 4096
+      cpu    = 8192
+      memory = 32768
       assign_public_ip = true
 
       # Container definition(s)
       container_definitions = {
         api = {
-          cpu       = 1024
-          memory    = 2048
+          cpu       = 8192
+          memory    = 32768
           essential = true
           portMappings = [
             {
