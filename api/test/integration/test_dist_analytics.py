@@ -15,34 +15,43 @@ client = TestClient(app)
 
 
 class TestDistAnalyticsPostWithNoPreviousRequest:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest_asyncio.fixture(autouse=True)
+    async def test_request(self):
         """Runs before each test in this class"""
         delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
 
-        self.test_request = client.post(
-            "/v0/land_change/dist_alerts/analytics",
-            json={
-                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                "start_date": "2024-08-15",
-                "end_date": "2024-08-16",
-                "intersections": [],
-            },
-        )
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                test_request = await client.post(
+                    "/v0/land_change/dist_alerts/analytics",
+                    json={
+                        "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
+                        "start_date": "2024-08-15",
+                        "end_date": "2024-08-16",
+                        "intersections": [],
+                    },
+                )
 
-    def test_post_returns_pending_status(self):
-        resource = self.test_request.json()
+                yield test_request
+
+    @pytest.mark.asyncio
+    async def test_post_returns_pending_status(self, test_request):
+        resource = test_request.json()
         assert resource["status"] == "pending"
 
-    def test_post_returns_resource_link(self):
-        resource = self.test_request.json()
+    @pytest.mark.asyncio
+    async def test_post_returns_resource_link(self, test_request):
+        resource = test_request.json()
         assert (
             resource["data"]["link"]
             == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
         )
 
-    def test_post_returns_202_accepted_response_code(self):
-        response = self.test_request
+    @pytest.mark.asyncio
+    async def test_post_returns_202_accepted_response_code(self, test_request):
+        response = test_request
         assert response.status_code == 202
 
 
@@ -283,103 +292,104 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
         pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
-    class TestDistAnalyticsPostWithMultipleKBAAOIs:
-        @pytest_asyncio.fixture(autouse=True)
-        async def setup(self):
-            """Runs before each test in this class"""
-            delete_resource_files("afbd08aa-5629-5cdd-aef7-d9b1bc3e1324")
 
-            async with LifespanManager(app):
-                async with AsyncClient(
-                    transport=ASGITransport(app), base_url="http://testserver"
-                ) as client:
-                    request = await client.post(
-                        "/v0/land_change/dist_alerts/analytics",
-                        json={
-                            "aoi": {
-                                "type": "key_biodiversity_area",
-                                "ids": ["18392", "46942", "18407"],
-                            },
-                            "start_date": "2025-02-01",
-                            "end_date": "2025-04-30",
-                            "intersections": [],
+class TestDistAnalyticsPostWithMultipleKBAAOIs:
+    @pytest_asyncio.fixture(autouse=True)
+    async def setup(self):
+        """Runs before each test in this class"""
+        delete_resource_files("b089f8dc-51da-58af-aee2-9eea285c0f84")
+
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                request = await client.post(
+                    "/v0/land_change/dist_alerts/analytics",
+                    json={
+                        "aoi": {
+                            "type": "key_biodiversity_area",
+                            "ids": ["18392", "46942", "18407"],
                         },
-                    )
+                        "start_date": "2025-02-01",
+                        "end_date": "2025-04-30",
+                        "intersections": [],
+                    },
+                )
 
-                    yield (request, client)
+                yield (request, client)
 
-        @pytest.mark.asyncio
-        async def test_post_returns_pending_status(self, setup):
-            test_request, _ = setup
-            resource = test_request.json()
-            assert resource["status"] == "pending"
+    @pytest.mark.asyncio
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert resource["status"] == "pending"
 
-        @pytest.mark.asyncio
-        async def test_post_returns_resource_link(self, setup):
-            test_request, _ = setup
-            resource = test_request.json()
-            assert (
-                resource["data"]["link"]
-                == "http://testserver/v0/land_change/dist_alerts/analytics/afbd08aa-5629-5cdd-aef7-d9b1bc3e1324"
-            )
+    @pytest.mark.asyncio
+    async def test_post_returns_resource_link(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert (
+            resource["data"]["link"]
+            == "http://testserver/v0/land_change/dist_alerts/analytics/b089f8dc-51da-58af-aee2-9eea285c0f84"
+        )
 
-        @pytest.mark.asyncio
-        async def test_post_returns_202_accepted_response_code(self, setup):
-            test_request, _ = setup
-            assert test_request.status_code == 202
+    @pytest.mark.asyncio
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        assert test_request.status_code == 202
 
-        @pytest.mark.asyncio
-        async def test_resource_calculate_results(self, setup):
-            test_request, client = setup
-            resource_id = test_request.json()["data"]["link"].split("/")[-1]
-            data = await retry_getting_resource(resource_id, client)
+    @pytest.mark.asyncio
+    async def test_resource_calculate_results(self, setup):
+        test_request, client = setup
+        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        data = await retry_getting_resource(resource_id, client)
 
-            expected_df = pd.DataFrame(
-                {
-                    "alert_date": [
-                        "2025-02-03",
-                        "2025-02-03",
-                        "2025-02-11",
-                        "2025-02-18",
-                        "2025-03-30",
-                        "2025-02-23",
-                        "2025-02-23",
-                        "2025-02-23",
-                        "2025-03-05",
-                        "2025-03-05",
-                    ],
-                    "confidence": [
-                        "low",
-                        "high",
-                        "high",
-                        "high",
-                        "low",
-                        "low",
-                        "low",
-                        "high",
-                        "low",
-                        "high",
-                    ],
-                    "value": [2, 1, 2, 2, 1, 1, 4, 7, 5, 1],
-                    "key_biodiversity_area": [
-                        "18392",
-                        "18392",
-                        "18392",
-                        "18392",
-                        "18392",
-                        "46942",
-                        "18407",
-                        "18407",
-                        "18407",
-                        "18407",
-                    ],
-                }
-            )
+        expected_df = pd.DataFrame(
+            {
+                "alert_date": [
+                    "2025-02-03",
+                    "2025-02-03",
+                    "2025-02-11",
+                    "2025-02-18",
+                    "2025-03-30",
+                    "2025-02-23",
+                    "2025-02-23",
+                    "2025-02-23",
+                    "2025-03-05",
+                    "2025-03-05",
+                ],
+                "confidence": [
+                    "low",
+                    "high",
+                    "high",
+                    "high",
+                    "low",
+                    "low",
+                    "low",
+                    "high",
+                    "low",
+                    "high",
+                ],
+                "value": [2, 1, 2, 2, 1, 1, 4, 7, 5, 1],
+                "key_biodiversity_area": [
+                    "18392",
+                    "18392",
+                    "18392",
+                    "18392",
+                    "18392",
+                    "46942",
+                    "18407",
+                    "18407",
+                    "18407",
+                    "18407",
+                ],
+            }
+        )
 
-            actual_df = pd.DataFrame(data["result"])
-            print(actual_df)
+        actual_df = pd.DataFrame(data["result"])
+        print(actual_df)
 
-            pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
 
 @pytest.mark.asyncio
