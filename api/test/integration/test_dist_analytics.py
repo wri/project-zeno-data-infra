@@ -428,7 +428,6 @@ async def test_gadm_dist_analytics_no_intersection():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    print(actual_df)
 
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 

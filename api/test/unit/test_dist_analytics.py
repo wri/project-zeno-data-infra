@@ -6,8 +6,7 @@ from app.analysis.common.analysis import (
     get_geojson_request_for_data_api,
     get_sql_in_list,
 )
-
-from api.app.analysis.dist_alerts.query import create_gadm_dist_query
+from app.analysis.dist_alerts.query import create_gadm_dist_query
 
 
 class TestGadmQueryAdm2NoIntersections:

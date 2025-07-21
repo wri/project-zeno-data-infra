@@ -2070,6 +2070,19 @@ wheels = [
 ]
 
 [[package]]
+name = "prefect-coiled"
+version = "0.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "coiled" },
+    { name = "prefect" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/10/d2/b63d0e7686e91eaa34982cacff8965231414b9db733c4f6d3e722fcfc22d/prefect_coiled-0.0.4.tar.gz", hash = "sha256:92c784d858f032da4da548287105070ecffc4719507efeca74f9d40902bb0535", size = 10624, upload-time = "2025-01-10T17:38:28.119Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3d/86/7c0893eeeb188df8b88f2b15ca41971c730557105b46f2faf29efc89ac13/prefect_coiled-0.0.4-py3-none-any.whl", hash = "sha256:6289961287397dc178c4e04e72df0cc23296e2d4977cfb4b7d67f560b5ac8841", size = 9052, upload-time = "2025-01-10T17:38:18.878Z" },
+]
+
+[[package]]
 name = "prometheus-client"
 version = "0.22.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3427,7 +3440,7 @@ wheels = [
 [[package]]
 name = "zeno-data-analytics"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "boto3" },
     { name = "coiled" },
@@ -3441,6 +3454,7 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "prefect" },
+    { name = "prefect-coiled" },
     { name = "rasterio" },
     { name = "rioxarray" },
     { name = "s3fs" },
@@ -3472,6 +3486,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "prefect" },
+    { name = "prefect-coiled", specifier = ">=0.0.4" },
     { name = "rasterio", specifier = "==1.4.3" },
     { name = "rioxarray" },
     { name = "s3fs" },

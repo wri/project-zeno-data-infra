@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import traceback
 from functools import partial
 
 import dask.dataframe as dd
@@ -17,27 +19,28 @@ from ..common.analysis import (
 from .query import create_gadm_dist_query
 
 NATURAL_LANDS_CLASSES = {
-    2: "Forest",
-    3: "Short vegetation",
-    4: "Water",
+    2: "Natural forests",
+    3: "Natural short vegetation",
+    4: "Natural water",
     5: "Mangroves",
     6: "Bare",
-    7: "Snow/Ice",
-    8: "Wetland forest",
-    9: "Peat forest",
-    10: "Wetland short vegetation",
-    11: "Peat short vegetation",
+    7: "Snow",
+    8: "Wetland natural forests",
+    9: "Natural peat forests",
+    10: "Wetland natural short vegetation",
+    11: "Natural peat short vegetation",
     12: "Cropland",
     13: "Built-up",
-    14: "Tree cover",
-    15: "Short vegetation",
-    16: "Water",
-    17: "Wetland tree cover",
-    18: "Peat tree cover",
-    19: "Wetland short vegetation",
-    20: "Peat short vegetation",
-    21: "Bare",
+    14: "Non-natural tree cover",
+    15: "Non-natural short vegetation",
+    16: "Non-natural water",
+    17: "Wetland non-natural tree cover",
+    18: "Non-natural peat tree cover",
+    19: "Wetland non-natural short vegetation",
+    20: "Non-natural peat short vegetation",
+    21: "Non-natural bare",
 }
+
 DIST_DRIVERS = {
     1: "Wildfire",
     2: "Flooding",
@@ -80,7 +83,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
         ).band_data
-        natural_lands.name = "natural_land_class"
+        natural_lands.name = "natural_lands_class"
 
         groupby_layers.append(natural_lands)
         expected_groups.append(np.arange(22))
@@ -117,7 +120,10 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         alerts_df[aoi["type"]] = aoi["id"]
 
     if intersection == "natural_lands":
-        alerts_df.natural_land_class = alerts_df.natural_land_class.apply(
+        alerts_df["natural_lands_category"] = alerts_df.natural_lands_class.apply(
+            lambda x: "natural" if 1 < x < 12 else "non-natural"
+        )
+        alerts_df["natural_lands_class"] = alerts_df.natural_lands_class.apply(
             lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
         )
     elif intersection == "driver":
@@ -201,25 +207,42 @@ async def get_precomputed_statistic_on_gadm_aoi(id, table, intersections):
 
 
 async def do_analytics(file_path, dask_client):
-    # Read and parse JSON file
-    metadata = file_path / "metadata.json"
-    json_content = metadata.read_text()
-    metadata_content = json.loads(json_content)  # Convert JSON to Python object
-    aoi = metadata_content["aoi"]
-    if aoi["type"] == "admin":
-        alerts_df = await get_precomputed_statistics(
-            aoi, metadata_content["intersections"], dask_client
-        )
-    else:
-        alerts_df = await zonal_statistics_on_aois(
-            aoi, dask_client, metadata_content.get("intersections", None)
-        )
+    try:
+        # Read and parse JSON file
+        metadata = file_path / "metadata.json"
+        json_content = metadata.read_text()
+        metadata_content = json.loads(json_content)  # Convert JSON to Python object
+        aoi = metadata_content["aoi"]
+        if aoi["type"] == "admin":
+            alerts_df = await get_precomputed_statistics(
+                aoi, metadata_content["intersections"], dask_client
+            )
+        else:
+            alerts_df = await zonal_statistics_on_aois(
+                aoi, dask_client, metadata_content.get("intersections", None)
+            )
 
-    if metadata_content["start_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
-    if metadata_content["end_date"] is not None:
-        alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
-    alerts_dict = alerts_df.to_dict(orient="list")
+            if metadata_content["start_date"] is not None:
+                alerts_df = alerts_df[
+                    alerts_df.alert_date >= metadata_content["start_date"]
+                ]
+            if metadata_content["end_date"] is not None:
+                alerts_df = alerts_df[
+                    alerts_df.alert_date <= metadata_content["end_date"]
+                ]
+            alerts_dict = alerts_df.to_dict(orient="list")
 
-    data = file_path / "data.json"
-    data.write_text(json.dumps(alerts_dict))
+            data = file_path / "data.json"
+            data.write_text(json.dumps(alerts_dict))
+    except Exception as e:
+        logging.error(
+            {
+                "event": "dist_alerts_analytics_processing_failure",
+                "severity": "high",  # Helps with alerting
+                "metadata": metadata_content,
+                # "generated_query": query,
+                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_details": str(e),
+                "stack_trace": traceback.format_exc(),
+            }
+        )

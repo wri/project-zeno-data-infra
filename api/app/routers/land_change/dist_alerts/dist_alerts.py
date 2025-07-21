@@ -1,4 +1,6 @@
 import json
+import logging
+import traceback
 import uuid
 from pathlib import Path
 
@@ -28,39 +30,65 @@ PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
     response_model=DataMartResourceLinkResponse,
     status_code=202,
 )
-def create(
+async def create(
     *, data: DistAlertsAnalyticsIn, request: Request, background_tasks: BackgroundTasks
 ):
-    # Convert model to JSON with sorted keys
-    payload_dict = data.model_dump()
+    try:
+        # Convert model to JSON with sorted keys
+        payload_dict = data.model_dump()
 
-    # Convert to JSON string with sorted keys
-    payload_json = json.dumps(payload_dict, sort_keys=True)
+        # Convert to JSON string with sorted keys
+        payload_json = json.dumps(payload_dict, sort_keys=True)
 
-    # Generate deterministic UUID from payload
-    resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
+        # Generate deterministic UUID from payload
+        resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
 
-    # Store payload in /tmp directory
-    payload_dir = PAYLOAD_STORE_DIR / resource_id
-    metadata_data = payload_dir / "metadata.json"
-    analytics_data = payload_dir / "data.json"
+        logging.info(
+            {
+                "event": "dist_alerts_analytics_request",
+                "analytics_in": payload_dict,
+                "resource_id": resource_id,
+            }
+        )
 
-    link = DataMartResourceLink(
-        link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
-    )
+        # Store payload in /tmp directory
+        payload_dir = PAYLOAD_STORE_DIR / resource_id
+        metadata_data = payload_dir / "metadata.json"
+        analytics_data = payload_dir / "data.json"
 
-    if metadata_data.exists() and analytics_data.exists():
-        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
+        link = DataMartResourceLink(
+            link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
+        )
 
-    if metadata_data.exists():
+        if metadata_data.exists() and analytics_data.exists():
+            return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
+
+        if metadata_data.exists():
+            return DataMartResourceLinkResponse(
+                data=link, status=AnalysisStatus.pending
+            )
+
+        payload_dir.mkdir(parents=True, exist_ok=True)
+        metadata_data.write_text(payload_json)
+        background_tasks.add_task(
+            do_analytics,
+            file_path=payload_dir,
+            dask_client=request.app.state.dask_client,
+        )
         return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
-
-    payload_dir.mkdir(parents=True, exist_ok=True)
-    metadata_data.write_text(payload_json)
-    background_tasks.add_task(
-        do_analytics, file_path=payload_dir, dask_client=request.app.state.dask_client
-    )
-    return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
+    except Exception as e:
+        logging.error(
+            {
+                "event": "dist_alerts_analytics_request_failure",
+                "severity": "high",  # Helps with alerting
+                "analytics_in": await request.json(),
+                "resource_id": resource_id,
+                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_details": str(e),
+                "traceback": traceback.format_exc(),
+            }
+        )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get(
@@ -81,41 +109,57 @@ async def get_analytics_result(
             status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
         )
 
-    # Construct file path
-    file_path = PAYLOAD_STORE_DIR / resource_id
-    analytics_metadata = file_path / "metadata.json"
-    analytics_data = file_path / "data.json"
-    metadata_content = None
-    alerts_dict = None
+    try:
+        # Construct file path
+        file_path = PAYLOAD_STORE_DIR / resource_id
+        analytics_metadata = file_path / "metadata.json"
+        analytics_data = file_path / "data.json"
+        metadata_content = None
+        alerts_dict = None
 
-    if analytics_metadata.exists() and analytics_data.exists():
-        # load resource from filesystem
-        alerts_dict = json.loads(analytics_data.read_text())
-        metadata_content = json.loads(analytics_metadata.read_text())
+        if analytics_metadata.exists() and analytics_data.exists():
+            # load resource from filesystem
+            alerts_dict = json.loads(analytics_data.read_text())
+            metadata_content = json.loads(analytics_metadata.read_text())
 
-        return DistAlertsAnalyticsResponse(
-            data={
-                "result": alerts_dict,
-                "metadata": metadata_content,
-                "status": AnalysisStatus.saved,
-            },
-            status="success",
+            return DistAlertsAnalyticsResponse(
+                data={
+                    "result": alerts_dict,
+                    "metadata": metadata_content,
+                    "status": AnalysisStatus.saved,
+                },
+                status="success",
+            )
+
+        if analytics_metadata.exists():
+            metadata_content = json.loads(analytics_metadata.read_text())
+            response.headers["Retry-After"] = "1"
+
+            return DistAlertsAnalyticsResponse(
+                data={
+                    "status": AnalysisStatus.pending,
+                    "message": "Resource is still processing, follow Retry-After header.",
+                    "result": alerts_dict,
+                    "metadata": metadata_content,
+                },
+                status="success",
+            )
+
+    except Exception as e:
+        logging.error(
+            {
+                "event": "dist_alerts_analytics_resource_request_failure",
+                "severity": "high",  # Helps with alerting
+                "resource_id": resource_id,
+                "resource_metadata": metadata_content,
+                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_details": str(e),
+                "traceback": traceback.format_exc(),
+            }
         )
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-    if analytics_metadata.exists():
-        metadata_content = json.loads(analytics_metadata.read_text())
-        response.headers["Retry-After"] = "1"
-
-        return DistAlertsAnalyticsResponse(
-            data={
-                "status": AnalysisStatus.pending,
-                "message": "Resource is still processing, follow Retry-After header.",
-                "result": alerts_dict,
-                "metadata": metadata_content,
-            },
-            status="success",
-        )
-
+    # Should've found the resource by now. So, assume it doesn't exist
     raise HTTPException(
         status_code=404,
         detail="Requested resource not found. Either expired or never existed.",
