@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from typing import Iterable
 
 import httpx
 import xarray as xr
@@ -26,22 +27,25 @@ async def get_geojson_from_data_api(aoi, send_request=send_request_to_data_api):
         )
         raise ValueError("Unable to get GeoJSON from Data API.")
 
-    geojson = json.loads(response["data"][0]["gfw_geojson"])
-    return geojson
+    geojsons = [json.loads(data["gfw_geojson"]) for data in response["data"]]
+    return geojsons
 
 
 def get_geojson_request_for_data_api(aoi):
+    value_list = get_sql_in_list(aoi["ids"])
     if aoi["type"] == "key_biodiversity_area":
         url = "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
-        sql = f"select gfw_geojson from data where sitrecid = {aoi['id']}"
+        sql = f"select gfw_geojson from data where sitrecid in {value_list} order by sitrecid"
     elif aoi["type"] == "protected_area":
         url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-        sql = f"select gfw_geojson from data where wdpaid = {aoi['id']}"
+        sql = (
+            f"select gfw_geojson from data where wdpaid in {value_list} order by wdpaid"
+        )
     elif aoi["type"] == "indigenous_land":
         url = (
             "https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query"
         )
-        sql = f"select gfw_geojson from data where objectid = {aoi['id']}"
+        sql = f"select gfw_geojson from data where objectid in {value_list} order by objectid"
     else:
         raise ValueError(f"Unable to retrieve AOI type {aoi['type']} from Data API.")
     return url, {"sql": sql}
@@ -80,3 +84,9 @@ def read_zarr(uri):
 
 def _get_api_key():
     return os.environ["API_KEY"]
+
+
+def get_sql_in_list(iter: Iterable) -> str:
+    quoted = [f"'{item}'" for item in iter]
+    joined = f"({', '.join(quoted)})"
+    return joined

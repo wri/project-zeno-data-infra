@@ -9,11 +9,11 @@ from .routers import land_change
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the dask cluster
-    app.state.dask_cluster = LocalCluster(processes=False, asynchronous=True)
+    app.state.dask_cluster = LocalCluster(processes=True, asynchronous=True)
     app.state.dask_client = Client(app.state.dask_cluster)
     yield
     # Release the resources
-    close_call = app.state.dask_cluster.close()
+    close_call = app.state.dask_client.shutdown()
     if close_call is not None:
         await close_call
 

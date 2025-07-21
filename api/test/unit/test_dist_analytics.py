@@ -4,6 +4,7 @@ import pytest
 from app.analysis.common.analysis import (
     get_geojson_from_data_api,
     get_geojson_request_for_data_api,
+    get_sql_in_list,
 )
 
 from api.app.analysis.dist_alerts.query import create_gadm_dist_query
@@ -172,11 +173,11 @@ async def test_get_geojson_from_data_api():
             "status": "success",
         }
 
-    aoi = {"type": "protected_area", "id": "555625448"}
+    aoi = {"type": "protected_area", "ids": ["555625448"]}
     geojson = await get_geojson_from_data_api(
         aoi, send_request=send_request_to_data_api_test
     )
-    assert geojson["type"] == "MultiPolygon"
+    assert geojson[0]["type"] == "MultiPolygon"
 
 
 @pytest.mark.asyncio
@@ -184,7 +185,7 @@ async def test_get_geojson_from_data_api_failed():
     async def send_request_to_data_api_test_failed(url, params):
         return {"detail": "you suck", "status": "failed"}
 
-    aoi = {"type": "protected_area", "id": "555625448"}
+    aoi = {"type": "protected_area", "ids": ["555625448"]}
     try:
         await get_geojson_from_data_api(
             aoi, send_request=send_request_to_data_api_test_failed
@@ -194,33 +195,39 @@ async def test_get_geojson_from_data_api_failed():
 
 
 def test_get_geojson_request_for_data_api_protected_areas():
-    aoi = {"type": "protected_area", "id": "555625448"}
+    aoi = {"type": "protected_area", "ids": ["555625448"]}
     url, params = get_geojson_request_for_data_api(aoi)
     assert (
         url
         == "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
     )
-    assert params == {"sql": "select gfw_geojson from data where wdpaid = 555625448"}
+    assert params == {
+        "sql": "select gfw_geojson from data where wdpaid in ('555625448') order by wdpaid"
+    }
 
 
 def test_get_geojson_request_for_data_api_indigenous_lands():
-    aoi = {"type": "indigenous_land", "id": "8111"}
+    aoi = {"type": "indigenous_land", "ids": ["8111"]}
     url, params = get_geojson_request_for_data_api(aoi)
     assert (
         url
         == "https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query"
     )
-    assert params == {"sql": "select gfw_geojson from data where objectid = 8111"}
+    assert params == {
+        "sql": "select gfw_geojson from data where objectid in ('8111') order by objectid"
+    }
 
 
 def test_get_geojson_request_for_data_api_kba():
-    aoi = {"type": "key_biodiversity_area", "id": "1241"}
+    aoi = {"type": "key_biodiversity_area", "ids": ["1241"]}
     url, params = get_geojson_request_for_data_api(aoi)
     assert (
         url
         == "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
     )
-    assert params == {"sql": "select gfw_geojson from data where sitrecid = 1241"}
+    assert params == {
+        "sql": "select gfw_geojson from data where sitrecid in ('1241') order by sitrecid"
+    }
 
 
 def test_get_geojson_request_for_data_api_notreal():
@@ -232,3 +239,7 @@ def test_get_geojson_request_for_data_api_notreal():
 
     # Optional: Verify exception message
     assert "Unable to retrieve AOI type notreal from Data API." in str(exc_info.value)
+
+
+def test_sql_in_list():
+    assert get_sql_in_list(["1", "2", "3"]) == "('1', '2', '3')"

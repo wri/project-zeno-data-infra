@@ -354,9 +354,9 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "2025-03-30",
                     "2025-02-23",
                     "2025-02-23",
+                    "2025-03-05",
+                    "2025-03-05",
                     "2025-02-23",
-                    "2025-03-05",
-                    "2025-03-05",
                 ],
                 "confidence": [
                     "low",
@@ -365,27 +365,26 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "high",
                     "low",
                     "low",
-                    "low",
                     "high",
                     "low",
                     "high",
+                    "low",
                 ],
-                "value": [2, 1, 2, 2, 1, 1, 4, 7, 5, 1],
+                "value": [2, 1, 2, 2, 1, 4, 7, 5, 1, 1],
                 "key_biodiversity_area": [
                     "18392",
                     "18392",
                     "18392",
                     "18392",
                     "18392",
+                    "18407",
+                    "18407",
+                    "18407",
+                    "18407",
                     "46942",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
                 ],
             }
         )
-
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
 
