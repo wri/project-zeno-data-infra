@@ -55,10 +55,9 @@ async def zonal_statistics_on_aois(aois, dask_client, intersections=[]):
 
     aois = [{"type": aois["type"], "id": id} for id in aois["ids"]]
     precompute_partial = partial(zonal_statistics, intersection=intersection)
-    dd_df_futures = await dask_client.compute(
-        dd.concat(dask_client.map(precompute_partial, aois))
-    )
-    alerts_df = await dask_client.compute(dd_df_futures)
+    dd_df_futures = await dask_client.gather(dask_client.map(precompute_partial, aois))
+    dfs = await dask_client.gather(dd_df_futures)
+    alerts_df = await dask_client.compute(dd.concat(dfs))
 
     return alerts_df
 
