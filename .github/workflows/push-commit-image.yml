@@ -71,6 +71,10 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1  # ${{ secrets.AWS_REGION }}
 
+      - name: Set up Docker
+        if: success()
+        uses: docker/setup-docker-action@v4
+
       - name: Login to Amazon ECR Private
         if: success()
         id: login-ecr
@@ -85,10 +89,6 @@ jobs:
 #      - name: Test step
 #        run: |
 #          echo $AWS_SESSION_TOKEN
-
-#      - name: Set up Docker, only needed if running locally
-#        if: ${{ env.ACT }}
-#        uses: docker/setup-docker-action@v4
 
 #      - name: Build Docker Image
 #        run: |
