@@ -8,11 +8,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     container: "ghcr.io/osgeo/gdal:ubuntu-small-3.10.3"
     steps:
-      # Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install sudo, node for later actions
+      - name: Install packages needed for later actions
         if: success()
         shell: bash
         run: |
@@ -55,6 +54,10 @@ jobs:
 #      - name: Run tests
 #        if: success()
 #        shell: bash
+#        env:
+#          AWS_REGION: us-east-1
+#          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Store AWS credentials in GitHub Secrets
+#          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 #        run: |
 #          cd $GITHUB_WORKSPACE
 #          pytest test --maxfail=1 --disable-warnings
@@ -71,39 +74,27 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1  # ${{ secrets.AWS_REGION }}
 
-#      - name: Set up Docker
-#        if: success()
-#        uses: docker/setup-docker-action@v4
-
       - name: Login to Amazon ECR Private
         if: success()
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-#        env:
-#          AWS_DEFAULT_REGION:
-#          AWS_REGION:
-#          AWS_ACCESS_KEY_ID:
-#          AWS_SECRET_ACCESS_KEY:
-#          AWS_SESSION_TOKEN:
 
-#      - name: Test step
-#        run: |
-#          echo $AWS_SESSION_TOKEN
+      - name: Build Docker Image
+        if: success()
+        env:
+          AWS_REGION: us-east-1
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          REPOSITORY_NAME: zeno-fastapi-app
+        run: |
+          IMAGE_TAG=test_image_1
+          docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
 
-#      - name: Build Docker Image
-#        run: |
-#          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)  # Use the first 7 characters of the commit hash as the tag
-#          docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
-#          echo Image tag: $IMAGE_TAG
-
-#      # Push the Docker image to ECR
-#      - name: Push Docker Image to ECR
-#        run: |
-#          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
-#          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
-
-#env:
-#  AWS_REGION: us-east-1  # Replace with your AWS region
-#  REPOSITORY_NAME: zeno-fastapi-app  # Replace with your ECR repository name
-#      AWS_ACCOUNT_ID: ${{ secrets.AWS_KEY_PRODUCTION }}  # Store your AWS account ID in GitHub Secrets
-#      AWS_ACCOUNT_ID: ${{ secrets.AWS_SECRET_PRODUCTION }}  # Store your AWS account ID in GitHub Secrets
+      - name: Push Docker Image to ECR
+        if: success()
+        env:
+          AWS_REGION: us-east-1
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          REPOSITORY_NAME: zeno-fastapi-app
+        run: |
+          IMAGE_TAG=test_image_1
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
