@@ -47,6 +47,7 @@ jobs:
         env:
           CC: ${{ steps.install_clang.outputs.cc }}
           GCC: ${{ steps.install_gcc.outputs.cc }}
+          MAKEFLAGS: "-j$(nproc)"
         run: |
           cd $GITHUB_WORKSPACE
           uv sync --locked --no-install-project --dev -p 3.13.5
@@ -58,14 +59,32 @@ jobs:
           cd $GITHUB_WORKSPACE
           pytest test --maxfail=1 --disable-warnings
 
-      - name: Test step
+      - name: Configure AWS credentials
         if: success()
-        run: echo "Test success!"
+        uses: aws-actions/configure-aws-credentials@v4
+        env:
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Store AWS credentials in GitHub Secrets
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1  # ${{ secrets.AWS_REGION }}
 
-##      - name: Log in to AWS ECR
-##        if: success()
-##        id: login-ecr
-##        uses: aws-actions/amazon-ecr-login@v1
+      - name: Login to Amazon ECR Private
+        if: success()
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+#        env:
+#          AWS_DEFAULT_REGION:
+#          AWS_REGION:
+#          AWS_ACCESS_KEY_ID:
+#          AWS_SECRET_ACCESS_KEY:
+#          AWS_SESSION_TOKEN:
+
+#      - name: Test step
+#        run: |
+#          echo $AWS_SESSION_TOKEN
 
 #      - name: Set up Docker, only needed if running locally
 #        if: ${{ env.ACT }}
@@ -83,9 +102,8 @@ jobs:
 #          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
 #          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
 
-
-    env:
-      AWS_REGION: us-east-1  # Replace with your AWS region
-      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}  # Store your AWS account ID in GitHub Secrets
-      REPOSITORY_NAME: fastapi-app  # Replace with your ECR repository name
-  
+#env:
+#  AWS_REGION: us-east-1  # Replace with your AWS region
+#  REPOSITORY_NAME: zeno-fastapi-app  # Replace with your ECR repository name
+#      AWS_ACCOUNT_ID: ${{ secrets.AWS_KEY_PRODUCTION }}  # Store your AWS account ID in GitHub Secrets
+#      AWS_ACCOUNT_ID: ${{ secrets.AWS_SECRET_PRODUCTION }}  # Store your AWS account ID in GitHub Secrets
