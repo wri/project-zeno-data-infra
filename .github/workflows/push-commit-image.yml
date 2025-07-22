@@ -17,7 +17,7 @@ jobs:
         shell: bash
         run: |
           apt-get update
-          apt-get install sudo nodejs iptables -y
+          apt-get install sudo nodejs iptables docker -y
 
 #      - name: Install CLANG for building rasterio deps
 #        if: success()
@@ -71,9 +71,9 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1  # ${{ secrets.AWS_REGION }}
 
-      - name: Set up Docker
-        if: success()
-        uses: docker/setup-docker-action@v4
+#      - name: Set up Docker
+#        if: success()
+#        uses: docker/setup-docker-action@v4
 
       - name: Login to Amazon ECR Private
         if: success()
