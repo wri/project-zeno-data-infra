@@ -2,55 +2,60 @@ name: Deploy Terraform to Environment
 
 on:
   push:
-    tags:
-      - prerelease
-      - release  # Trigger on both "prerelease" and "release" tags
+#    tags:
+#      - prerelease
+#      - release  # Trigger on both "prerelease" and "release" tags
 
 jobs:
   terraform-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
       # Set up Terraform
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.8.0
 
+        # Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        with:
+          ref: github-actions
+          token: ${{ env.GITHUB_TOKEN }}
+
       # Determine Environment and Docker Image Tag Based on Git Tag
       - name: Set Environment and Docker Image Tag
         id: set-env
         run: |
-          TAG="${GITHUB_REF##*/}"
+          TAG="refs/heads/github-actions"
           COMMIT_SHA=$(git rev-parse HEAD)  # Get the SHA of the last commit
-          if [[ "$TAG" == "prerelease" ]]; then
-            echo "environment=staging" >> $GITHUB_ENV
-          elif [[ "$TAG" == "release" ]]; then
-            echo "environment=production" >> $GITHUB_ENV
-          else
-            echo "Unknown tag. Exiting."
-            exit 1
-          fi
-          echo "docker_image_tag=$COMMIT_SHA" >> $GITHUB_ENV
+          echo "environment=production" >> foo
+          echo "docker_image_tag=$COMMIT_SHA" >> foo
 
       # Initialize Terraform
       - name: Terraform Init
-        run: terraform init
+        run: |
+          cd terraform
+          terraform init
 
       # Plan Terraform Deployment
       - name: Terraform Plan
-        run: terraform plan -var="environment=${{ env.environment }}" -var="docker_image_tag=${{ env.docker_image_tag }}"
+        env:
+          AWS_REGION: us-east-1  # Replace with your AWS region
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Store AWS credentials in GitHub Secrets
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          cd terraform
+          terraform plan -var="api_key=${{ env.API_KEY }}"
 
-      # Apply Terraform Deployment
-      - name: Terraform Apply
-        run: terraform apply -auto-approve -var="environment=${{ env.environment }}" -var="docker_image_tag=${{ env.docker_image_tag }}"
+#      # Plan Terraform Deployment
+#      - name: Terraform Plan
+#        run: terraform plan -var="environment=${{ env.environment }}" -var="docker_image_tag=${{ env.docker_image_tag }}"
 
-    env:
-      AWS_REGION: us-east-1  # Replace with your AWS region
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Store AWS credentials in GitHub Secrets
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  
+#      # Apply Terraform Deployment
+#      - name: Terraform Apply
+#        run: terraform apply -auto-approve -var="environment=${{ env.environment }}" -var="docker_image_tag=${{ env.docker_image_tag }}"
