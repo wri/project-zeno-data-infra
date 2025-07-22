@@ -74,7 +74,7 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1  # ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR Private
+      - name: Login to Amazon ECR
         if: success()
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
@@ -84,7 +84,7 @@ jobs:
         env:
           AWS_REGION: us-east-1
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          REPOSITORY_NAME: zeno-fastapi-app
+          REPOSITORY_NAME: analytics-api
         run: |
           IMAGE_TAG=test_image_1
           docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG .
@@ -94,7 +94,7 @@ jobs:
         env:
           AWS_REGION: us-east-1
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-          REPOSITORY_NAME: zeno-fastapi-app
+          REPOSITORY_NAME: analytics-api
         run: |
           IMAGE_TAG=test_image_1
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$REPOSITORY_NAME:$IMAGE_TAG
