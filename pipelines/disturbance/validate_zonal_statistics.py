@@ -1,8 +1,15 @@
 import pandas as pd
+import geopandas as gpd
 import pandera.pandas as pa
 from pandera.typing.pandas import Series
 from typing import List
 from prefect.logging import get_run_logger
+import rasterio as rio
+from rasterio.windows import from_bounds
+from rasterio.features import geometry_mask
+import numpy as np
+
+from ..pipelines.disturbance.check_for_new_alerts import get_latest_version
 
 isos = [
     'AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE',
@@ -65,6 +72,79 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
     subregions: Series[int] = pa.Field()
     natural_lands: Series[str] = pa.Field(isin=sbtn_natural_lands_classes)
     area: Series[float] = pa.Field(ge=0)
+
+def generate_validation_statistics(version: str) -> pd.DataFrame:
+    """Generate zonal statistics for the admin area AOI."""
+    gdf = gpd.read_file("../../test/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
+    aoi = gdf.iloc[0]
+    aoi_tile = "00N_040W" # This AOI fits within a tile, but we should build VRTs so we can use any (resonably sized) AOI
+    
+    # read dist alerts for AOI
+    bounds = aoi.geometry.bounds
+    with rio.open(f"s3://gfw-data-lake/umd_glad_dist_alerts/{version}/raster/epsg-4326/10/40000/currentweek/gdal-geotiff/{aoi_tile}.tif") as src:
+        window = from_bounds(
+            bounds[0],
+            bounds[1],
+            bounds[2],
+            bounds[3],
+            src.transform
+        )
+        dist_alerts = src.read(1, window=window)
+        win_affine = src.window_transform(window)
+
+    # set no_data from -1 to 0
+    dist_alerts = np.where(dist_alerts == -1, 0, dist_alerts)
+
+    # Extract confidence level (first digit)
+    dist_confidence_levels = dist_alerts // 10000
+    dist_high_conf = np.where(dist_confidence_levels == 3, 1, 0)
+    dist_low_conf = np.where(dist_confidence_levels == 2, 1, 0)
+
+    # Extract Julian date (remaining digits)
+    dist_julian_date = dist_alerts % 10000 
+
+    # mask dist alerts by aoi geometry
+    aoi_mask = geometry_mask([aoi.geometry], invert=True, transform=win_affine, out_shape=dist_alerts.shape)
+
+    # confidence level maskings 
+    dist_high_conf_aoi = aoi_mask * dist_high_conf
+    dist_low_conf_aoi = aoi_mask * dist_low_conf
+    dist_julian_date_aoi = aoi_mask * dist_julian_date
+
+    # create a dataframe of analysis results
+    high_conf_flat = dist_high_conf_aoi.flatten()
+    low_conf_flat = dist_low_conf_aoi.flatten()
+    julian_date_flat = dist_julian_date_aoi.flatten()
+    df = pd.DataFrame({
+        "alert_date": julian_date_flat,
+        "high_conf": high_conf_flat,
+        "low_conf": low_conf_flat
+    })
+    high_conf_results = df.groupby("alert_date")["high_conf"].sum().reset_index()
+    low_conf_results = df.groupby("alert_date")["low_conf"].sum().reset_index()
+
+    # set confidence levels and GADM IDs
+    high_conf_results["confidence"] = 3
+    high_conf_results["country"] = 76
+    high_conf_results["region"] = 20
+    high_conf_results["subregion"] = 150
+    low_conf_results["confidence"] = 2
+    low_conf_results["country"] = 76
+    low_conf_results["region"] = 20
+    low_conf_results["subregion"] = 150
+
+    # rename high_conf to value
+    high_conf_results.rename(columns={"high_conf": "value"}, inplace=True)
+    low_conf_results.rename(columns={"low_conf": "value"}, inplace=True)
+
+    # reorder columns to country, region, subregion, alert_date, confidence, value
+    high_conf_results = high_conf_results[["country", "region", "subregion", "alert_date", "confidence", "value"]]
+    low_conf_results = low_conf_results[["country", "region", "subregion", "alert_date", "confidence", "value"]]
+
+    # concatenate confidence dfs into one validation df
+    results = pd.concat([high_conf_results, low_conf_results], ignore_index=True)
+
+    return pd.DataFrame(results)
     
 def validates_zonal_statistics(parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
@@ -72,8 +152,9 @@ def validates_zonal_statistics(parquet_uri: str) -> bool:
     logger = get_run_logger()
 
     # load local results
-    validation_df = pd.read_csv("../notebooks/validation_stats.csv")
-    logger.info("Loaded validation stats.")
+    version = get_latest_version()
+    validation_df = generate_validation_statistics(version)
+    logger.info(f"Generating validation stats for version {version}.")
 
     # load zeno stats for aoi
     zeno_df = pd.read_parquet(parquet_uri)
@@ -97,9 +178,9 @@ def validates_zonal_statistics(parquet_uri: str) -> bool:
     logger.info("Alert counts validation passed.")
 
     # spot check random dates
-    spot_check_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
-    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, spot_check_dates)
-    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, spot_check_dates)
+    validation_dates = np.random.choice(range(800, 1500), size=10, replace=False).tolist()
+    validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, validation_dates)
+    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, validation_dates)
     if not validation_spot_check.equals(zeno_spot_check):
         logger.error("Spot check dataframes do not match.")
         return False
