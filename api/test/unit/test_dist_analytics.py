@@ -230,7 +230,7 @@ def test_get_geojson_request_for_data_api_kba():
 
 
 def test_get_geojson_request_for_data_api_notreal():
-    aoi = {"type": "notreal", "id": "1241"}
+    aoi = {"type": "notreal", "ids": ["1241"]}
 
     # Verify ValueError is raised
     with pytest.raises(ValueError) as exc_info:

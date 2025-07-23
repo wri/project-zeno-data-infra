@@ -222,18 +222,16 @@ async def do_analytics(file_path, dask_client):
                 aoi, dask_client, metadata_content.get("intersections", None)
             )
 
-            if metadata_content["start_date"] is not None:
-                alerts_df = alerts_df[
-                    alerts_df.alert_date >= metadata_content["start_date"]
-                ]
-            if metadata_content["end_date"] is not None:
-                alerts_df = alerts_df[
-                    alerts_df.alert_date <= metadata_content["end_date"]
-                ]
-            alerts_dict = alerts_df.to_dict(orient="list")
+        if metadata_content["start_date"] is not None:
+            alerts_df = alerts_df[
+                alerts_df.alert_date >= metadata_content["start_date"]
+            ]
+        if metadata_content["end_date"] is not None:
+            alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+        alerts_dict = alerts_df.to_dict(orient="list")
 
-            data = file_path / "data.json"
-            data.write_text(json.dumps(alerts_dict))
+        data = file_path / "data.json"
+        data.write_text(json.dumps(alerts_dict))
     except Exception as e:
         logging.error(
             {
