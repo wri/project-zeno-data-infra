@@ -10,8 +10,8 @@ from pipelines.disturbance.prefect_flows import dist_alerts_count
 
 @pytest.mark.slow
 @pytest.mark.integration
-@patch("pipelines.disturbance.stages._save_parquet")
-@patch("pipelines.disturbance.stages._load_zarr")
+@patch("pipelines.prefect_flows.common_stages._save_parquet")
+@patch("pipelines.prefect_flows.common_stages._load_zarr")
 def test_gadm_dist_alerts_happy_path(
     mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds
 ):
@@ -34,8 +34,8 @@ def test_gadm_dist_alerts_happy_path(
 
 @pytest.mark.slow
 @pytest.mark.integration
-@patch("pipelines.disturbance.stages._save_parquet")
-@patch("pipelines.disturbance.stages._load_zarr")
+@patch("pipelines.prefect_flows.common_stages._save_parquet")
+@patch("pipelines.prefect_flows.common_stages._load_zarr")
 def test_gadm_dist_alerts_result(
     mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds
 ):

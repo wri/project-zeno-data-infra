@@ -2,9 +2,7 @@ from typing import Optional, Tuple
 import xarray as xr
 
 from prefect import task
-
-from pipelines.disturbance import stages
-
+from pipelines.natural_lands import stages
 
 @task
 def setup_compute(

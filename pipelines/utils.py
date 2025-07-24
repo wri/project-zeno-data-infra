@@ -20,4 +20,3 @@ def s3_uri_exists(s3_uri):
             return False
         else:
             raise
-        
