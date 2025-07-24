@@ -2,12 +2,10 @@ from typing import Union, List, Annotated, Literal
 from pydantic import Field
 
 from app.models.common.base import StrictBaseModel
-
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
-
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -16,6 +14,7 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 
+AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 
 class TreeCoverLossAnalyticsIn(StrictBaseModel):
     aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
@@ -35,7 +34,7 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2024"],
     )
-    canopy_cover: int = Field(
+    canopy_cover: AllowedCanopyCover = Field(
         ...,
         title="Canopy Cover",
     )
