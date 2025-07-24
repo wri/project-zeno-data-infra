@@ -1,7 +1,9 @@
-from typing import Union, List, Annotated, Literal
+from typing import Union, List, Annotated, Literal, Optional
+
+from models.common.analysis import AnalysisStatus
 from pydantic import Field, field_validator, model_validator
 
-from app.models.common.base import StrictBaseModel
+from app.models.common.base import StrictBaseModel, Response
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
@@ -61,3 +63,34 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
         if end < start:
             raise ValueError('end_year must be greater than or equal to start_year')
         return self
+
+
+class TreeCoverLossAnalytics(StrictBaseModel):
+    result: Optional[dict] = {  # column oriented for loading into a dataframe
+        "__dtypes__": {
+            "country": "str",
+            "region": "int",
+            "subregion": "int",
+            "tree_cover_loss__year": "int",
+            "tree_cover_loss__ha": "float",
+            "gross_emissions_co2e_all_gases__mg": "float",
+        },
+        "country": ["BRA", "BRA", "BRA"],
+        "region": [1, 1, 1],
+        "subregion": [12, 12, 12],
+        "tree_cover_loss__year": [2022, 2023, 2024],
+        "tree_cover_loss__ha": [4045.406160862687, 4050.4061608627, 4045.406160862687],
+        "gross_emissions_co2e_all_gases__mg": [3490821.6510292348, 114344.24741739516, 114347.2474174],
+    }
+    metadata: Optional[dict] = None
+    message: Optional[str] = None
+    status: AnalysisStatus
+
+    model_config = {
+        "from_attributes": True,
+        "validate_by_name": True,
+    }
+
+
+class TreeCoverLossAnalyticsResponse(Response):
+    data: TreeCoverLossAnalytics
