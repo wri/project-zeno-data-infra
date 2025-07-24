@@ -27,7 +27,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
             canopy_cover=30,
             intersections=["natural_lands"],
         )
-        response = client.post(
+        client.post(
             "/v0/land_change/tree_cover_loss/analytics",
             json={
                 "aois": [{"type": "admin", "id": "IDN.24.9"}],
