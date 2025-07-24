@@ -1,8 +1,10 @@
 import json
 import logging
-import traceback
 import os
+import traceback
+from functools import partial
 
+import dask.dataframe as dd
 import duckdb
 import numpy as np
 import pandas as pd
@@ -48,7 +50,24 @@ DIST_DRIVERS = {
 }
 
 
-async def zonal_statistics(geojson, aoi, intersection=None):
+async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
+    geojsons = await get_geojson(aois)
+    aois = sorted(
+        [{"type": aois["type"], "id": id} for id in aois["ids"]],
+        key=lambda aoi: aoi["id"],
+    )
+
+    precompute_partial = partial(zonal_statistics, intersection=intersection)
+    dd_df_futures = await dask_client.gather(
+        dask_client.map(precompute_partial, aois, geojsons)
+    )
+    dfs = await dask_client.gather(dd_df_futures)
+    alerts_df = await dask_client.compute(dd.concat(dfs))
+
+    return alerts_df
+
+
+async def zonal_statistics(aoi, geojson, intersection=None):
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
@@ -78,17 +97,17 @@ async def zonal_statistics(geojson, aoi, intersection=None):
         *tuple(groupby_layers),
         func="count",
         expected_groups=tuple(expected_groups),
-    ).compute()
+    )
     alerts_count.name = "value"
 
     alerts_df = (
-        alerts_count.to_dataframe()
+        alerts_count.to_dask_dataframe()
         .drop("band", axis=1)
         .drop("spatial_ref", axis=1)
-        .reset_index()
+        .reset_index(drop=True)
     )
     alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"})
-    alerts_df.alert_date = pd.to_datetime(
+    alerts_df.alert_date = dd.to_datetime(
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
@@ -111,55 +130,99 @@ async def zonal_statistics(geojson, aoi, intersection=None):
     return alerts_df
 
 
-async def do_analytics(file_path):
+async def get_precomputed_statistics(aoi, intersection, dask_client):
+    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver"]:
+        raise ValueError(
+            f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
+        )
+
+    table = get_precomputed_table(aoi["type"], intersection)
+
+    # Dumbly doing this per request since the STS token expires eventually otherwise
+    # According to this issue, duckdb should auto refresh the token in 1.3.0,
+    # but it doesn't seem to work for us and people are reporting the same on the issue
+    # https://github.com/duckdb/duckdb-aws/issues/26
+    # TODO do this on lifecycle start once autorefresh works
+    duckdb.query(
+        """
+        CREATE OR REPLACE SECRET secret (
+            TYPE s3,
+            PROVIDER credential_chain,
+            CHAIN config
+        );
+    """
+    )
+
+    # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
+    # For now, we need to just download the file temporarily
+    fs = s3fs.S3FileSystem(requester_pays=True)
+    fs.get(
+        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+        f"/tmp/{table}.parquet",
+    )
+
+    precompute_partial = partial(
+        get_precomputed_statistic_on_gadm_aoi, table=table, intersection=intersection
+    )
+    futures = dask_client.map(precompute_partial, aoi["ids"])
+    results = await dask_client.gather(futures)
+    alerts_df = pd.concat(results)
+
+    os.remove(f"/tmp/{table}.parquet")
+
+    return alerts_df
+
+
+def get_precomputed_table(aoi_type, intersection):
+    if aoi_type == "admin":
+        # Each intersection will be in a different parquet file
+        if intersection is None:
+            table = "gadm_dist_alerts"
+        elif intersection == "driver":
+            table = "gadm_dist_alerts_by_driver"
+        elif intersection == "natural_lands":
+            table = "gadm_dist_alerts_by_natural_lands"
+        else:
+            raise ValueError(f"No way to calculate intersection {intersection}")
+    else:
+        raise ValueError(f"No way to calculate aoi type {aoi_type}")
+
+    return table
+
+
+async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
+    # GADM IDs are coming joined by '.', e.g. IDN.24.9
+    gadm_id = id.split(".")
+
+    query = create_gadm_dist_query(gadm_id, table, intersection)
+    alerts_df = duckdb.query(query).df()
+    return alerts_df
+
+
+async def do_analytics(file_path, dask_client):
     try:
         # Read and parse JSON file
         metadata = file_path / "metadata.json"
         json_content = metadata.read_text()
         metadata_content = json.loads(json_content)  # Convert JSON to Python object
-        aoi = metadata_content["aois"][0]
-        if aoi["type"] == "admin":
-            # GADM IDs are coming joined by '.', e.g. IDN.24.9
-            gadm_id = aoi["id"].split(".")
-            intersections = metadata_content["intersections"]
+        aoi = metadata_content["aoi"]
 
-            query, table = create_gadm_dist_query(gadm_id, intersections)
-
-            # Dumbly doing this per request since the STS token expires eventually otherwise
-            # According to this issue, duckdb should auto refresh the token in 1.3.0,
-            # but it doesn't seem to work for us and people are reporting the same on the issue
-            # https://github.com/duckdb/duckdb-aws/issues/26
-            # TODO do this on lifecycle start once autorefresh works
-            duckdb.query(
-                """
-                CREATE OR REPLACE SECRET secret (
-                    TYPE s3,
-                    PROVIDER credential_chain,
-                CHAIN config);
-            """
-            )
-
-            # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-            # For now, we need to just download the file temporarily
-            fs = s3fs.S3FileSystem(requester_pays=True)
-            fs.get(
-                f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
-                f"/tmp/{table}.parquet",
-            )
-            alerts_df = duckdb.query(query).df()
-            os.remove(f"/tmp/{table}.parquet")
+        # for now we only support one intersection, as enforced by the route
+        intersections = metadata_content["intersections"]
+        if intersections:
+            intersection = intersections[0]
         else:
-            geojson = await get_geojson(aoi)
+            intersection = None
 
-            if metadata_content["intersections"]:
-                intersection = metadata_content["intersections"][0]
-            else:
-                intersection = None
-
-            alerts_df = await zonal_statistics(geojson, aoi, intersection)
+        if aoi["type"] == "admin":
+            alerts_df = await get_precomputed_statistics(aoi, intersection, dask_client)
+        else:
+            alerts_df = await zonal_statistics_on_aois(aoi, dask_client, intersection)
 
         if metadata_content["start_date"] is not None:
-            alerts_df = alerts_df[alerts_df.alert_date >= metadata_content["start_date"]]
+            alerts_df = alerts_df[
+                alerts_df.alert_date >= metadata_content["start_date"]
+            ]
         if metadata_content["end_date"] is not None:
             alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
         alerts_dict = alerts_df.to_dict(orient="list")
@@ -172,7 +235,6 @@ async def do_analytics(file_path):
                 "event": "dist_alerts_analytics_processing_failure",
                 "severity": "high",  # Helps with alerting
                 "metadata": metadata_content,
-                "generated_query": query,
                 "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
                 "error_details": str(e),
                 "stack_trace": traceback.format_exc(),

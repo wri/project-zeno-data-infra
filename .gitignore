@@ -1,11 +1,11 @@
 */__pycache__/*
 *.pyc
-*.ipynb
 
 .venv*
 
 .DS_Store
 
+**/*.ipynb
 **/.ipynb_checkpoints/
 .idea/
 .qlty/
