@@ -235,7 +235,6 @@ async def do_analytics(file_path, dask_client):
                 "event": "dist_alerts_analytics_processing_failure",
                 "severity": "high",  # Helps with alerting
                 "metadata": metadata_content,
-                # "generated_query": query,
                 "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
                 "error_details": str(e),
                 "stack_trace": traceback.format_exc(),
