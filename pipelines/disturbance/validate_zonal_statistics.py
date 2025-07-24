@@ -9,7 +9,7 @@ from rasterio.windows import from_bounds
 from rasterio.features import geometry_mask
 import numpy as np
 
-from ..pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
 isos = [
     'AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE',
@@ -52,8 +52,8 @@ class DistZonalStats(pa.DataFrameModel):
         unique_columns = ["country", "region", "subregion", "alert_date", "confidence"]
 
     @staticmethod
-    def calculate_alert_counts(df: pd.DataFrame) -> dict:
-        """Calculate the number of alerts by confidence level."""
+    def calculate_alert_counts_by_date(df: pd.DataFrame) -> dict:
+        """Calculate the number of dates with alerts by confidence level."""
         alert_counts = df["confidence"].value_counts().to_dict()
         return {
             "low_confidence": alert_counts.get(2, 0),
@@ -81,7 +81,7 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     
     # read dist alerts for AOI
     bounds = aoi.geometry.bounds
-    with rio.open(f"s3://gfw-data-lake/umd_glad_dist_alerts/{version}/raster/epsg-4326/10/40000/currentweek/gdal-geotiff/{aoi_tile}.tif") as src:
+    with rio.open(f"s3://gfw-data-lake/umd_glad_dist_alerts/{version}/raster/epsg-4326/10/40000/default/gdal-geotiff/{aoi_tile}.tif") as src:
         window = from_bounds(
             bounds[0],
             bounds[1],
@@ -92,9 +92,6 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
         dist_alerts = src.read(1, window=window)
         win_affine = src.window_transform(window)
 
-    # set no_data from -1 to 0
-    dist_alerts = np.where(dist_alerts == -1, 0, dist_alerts)
-
     # Extract confidence level (first digit)
     dist_confidence_levels = dist_alerts // 10000
     dist_high_conf = np.where(dist_confidence_levels == 3, 1, 0)
@@ -103,10 +100,11 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     # Extract Julian date (remaining digits)
     dist_julian_date = dist_alerts % 10000 
 
-    # mask dist alerts by aoi geometry
+    # create geometry_mask to mask dist alerts by aoi geometry
     aoi_mask = geometry_mask([aoi.geometry], invert=True, transform=win_affine, out_shape=dist_alerts.shape)
 
     # confidence level maskings 
+    # anything outside the AOI becomes zero
     dist_high_conf_aoi = aoi_mask * dist_high_conf
     dist_low_conf_aoi = aoi_mask * dist_low_conf
     dist_julian_date_aoi = aoi_mask * dist_julian_date
@@ -144,6 +142,12 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     # concatenate confidence dfs into one validation df
     results = pd.concat([high_conf_results, low_conf_results], ignore_index=True)
 
+    # drop rows where alert_date is zero
+    results = results[results["alert_date"] != 0]
+
+    # drop rows where alerts are zero
+    results = results[results["value"] != 0]
+
     return pd.DataFrame(results)
     
 def validates_zonal_statistics(parquet_uri: str) -> bool:
@@ -153,11 +157,12 @@ def validates_zonal_statistics(parquet_uri: str) -> bool:
 
     # load local results
     version = get_latest_version()
-    validation_df = generate_validation_statistics(version)
     logger.info(f"Generating validation stats for version {version}.")
+    validation_df = generate_validation_statistics(version)
+    validation_df.to_csv(f"../../test/validation_statistics/dist_{version}_validation.csv", index=False)
 
     # load zeno stats for aoi
-    zeno_df = pd.read_parquet(parquet_uri)
+    zeno_df = pd.read_parquet(parquet_uri) # assumes parquet refers to latest version
     zeno_aoi_df = zeno_df[(zeno_df["country"] == 76) & (zeno_df["region"] == 20)]
     logger.info("Loaded Zeno stats for admin area.")
 
@@ -170,15 +175,16 @@ def validates_zonal_statistics(parquet_uri: str) -> bool:
         return False
 
     # validate alert counts
-    validation_alerts = DistZonalStats.calculate_alert_counts(validation_df)
-    zeno_alerts = DistZonalStats.calculate_alert_counts(zeno_aoi_df)
+    validation_alerts = DistZonalStats.calculate_alert_counts_by_date(validation_df)
+    zeno_alerts = DistZonalStats.calculate_alert_counts_by_date(zeno_aoi_df)
     if validation_alerts != zeno_alerts:
         logger.error(f"Alert counts do not match: {validation_alerts} != {zeno_alerts}")
         return False
     logger.info("Alert counts validation passed.")
 
     # spot check random dates
-    validation_dates = np.random.choice(range(800, 1500), size=10, replace=False).tolist()
+    validation_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500] # example julian dates
+    #validation_dates = np.random.choice(range(800, 1500), size=10, replace=False).tolist() # if we want to use random dates
     validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, validation_dates)
     zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, validation_dates)
     if not validation_spot_check.equals(zeno_spot_check):
