@@ -1,8 +1,8 @@
-from typing import List, Tuple
+from typing import Optional, Tuple
 
 
 def create_gadm_dist_query(
-    gadm_id: Tuple[str, int, int], table: str, intersections: List[str]
+    gadm_id: Tuple[str, int, int], table: str, intersection: Optional[str] = None
 ) -> str:
     # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
     # TODO use final pipeline locations and schema for parquet files
@@ -10,10 +10,10 @@ def create_gadm_dist_query(
     # Build up the DuckDB query based on GADM ID and intersection
 
     intersection_col = None
-    if intersections:
-        if intersections[0] == "driver":
+    if intersection is not None:
+        if intersection == "driver":
             intersection_col = "ldacs_driver"
-        elif intersections[0] == "natural_lands":
+        elif intersection == "natural_lands":
             intersection_col = "natural_land_class"
 
     from_clause = f"FROM '/tmp/{table}.parquet'"
@@ -34,7 +34,7 @@ def create_gadm_dist_query(
         by_clause += ", subregion"
 
     # Includes an intersection, so group by the appropriate column
-    if intersections:
+    if intersection:
         select_clause += f", {intersection_col}"
         by_clause += f", {intersection_col}"
 

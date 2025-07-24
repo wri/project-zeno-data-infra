@@ -2,8 +2,8 @@ import re
 
 import pytest
 from app.analysis.common.analysis import (
-    get_geojson_from_data_api,
     get_geojson_request_for_data_api,
+    get_geojsons_from_data_api,
     get_sql_in_list,
 )
 from app.analysis.dist_alerts.query import create_gadm_dist_query
@@ -13,7 +13,7 @@ class TestGadmQueryAdm2NoIntersections:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        self.query = create_gadm_dist_query(["IDN", "24", "9"], "gadm_dist_alerts", [])
+        self.query = create_gadm_dist_query(["IDN", "24", "9"], "gadm_dist_alerts")
 
     def test_create_gadm_adm2_dist_query_no_intersection_select_clause(self):
         expected_clause = "SELECT country, region, subregion, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
@@ -44,7 +44,7 @@ class TestGadmQueryAdm1NoIntersections:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        self.query = create_gadm_dist_query(["IDN", "24"], "gadm_dist_alerts", [])
+        self.query = create_gadm_dist_query(["IDN", "24"], "gadm_dist_alerts")
 
     def test_create_gadm_adm1_dist_query_no_intersection_select_clause(self):
         expected_clause = "SELECT country, region, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
@@ -71,7 +71,7 @@ class TestGadmQueryIsoNoIntersections:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        self.query = create_gadm_dist_query(["IDN"], "gadm_dist_alerts", [])
+        self.query = create_gadm_dist_query(["IDN"], "gadm_dist_alerts")
 
     def test_create_gadm_iso_dist_query_no_intersection_select_clause(self):
         expected_clause = "SELECT country, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
@@ -99,7 +99,7 @@ class TestGadmQueryAdm2NaturalLandsIntersections:
     def setup_before_each(self):
         """Runs before each test in this class"""
         self.query = create_gadm_dist_query(
-            ["IDN", "24", "9"], "gadm_dist_alerts_by_natural_lands", ["natural_lands"]
+            ["IDN", "24", "9"], "gadm_dist_alerts_by_natural_lands", "natural_lands"
         )
 
     def test_create_gadm_adm2_dist_query_natural_lands_intersection_select_clause(self):
@@ -132,7 +132,7 @@ class TestGadmQueryAdm2DriverIntersections:
     def setup_before_each(self):
         """Runs before each test in this class"""
         self.query = create_gadm_dist_query(
-            ["IDN", "24", "9"], "gadm_dist_alerts_by_driver", ["driver"]
+            ["IDN", "24", "9"], "gadm_dist_alerts_by_driver", "driver"
         )
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_select_clause(self):
@@ -161,7 +161,7 @@ def strip_extra_whitespace(string: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_get_geojson_from_data_api():
+async def test_get_geojsons_from_data_api():
     async def send_request_to_data_api_test(url, params):
         return {
             "data": [
@@ -173,20 +173,20 @@ async def test_get_geojson_from_data_api():
         }
 
     aoi = {"type": "protected_area", "ids": ["555625448"]}
-    geojson = await get_geojson_from_data_api(
+    geojson = await get_geojsons_from_data_api(
         aoi, send_request=send_request_to_data_api_test
     )
     assert geojson[0]["type"] == "MultiPolygon"
 
 
 @pytest.mark.asyncio
-async def test_get_geojson_from_data_api_failed():
+async def test_get_geojsons_from_data_api_failed():
     async def send_request_to_data_api_test_failed(url, params):
         return {"detail": "you suck", "status": "failed"}
 
     aoi = {"type": "protected_area", "ids": ["555625448"]}
     try:
-        await get_geojson_from_data_api(
+        await get_geojsons_from_data_api(
             aoi, send_request=send_request_to_data_api_test_failed
         )
     except ValueError:

@@ -17,7 +17,7 @@ async def send_request_to_data_api(url, params):
     return response.json()
 
 
-async def get_geojson_from_data_api(aoi, send_request=send_request_to_data_api):
+async def get_geojsons_from_data_api(aoi, send_request=send_request_to_data_api):
     url, params = get_geojson_request_for_data_api(aoi)
     response = await send_request(url, params)
 
@@ -51,11 +51,11 @@ def get_geojson_request_for_data_api(aoi):
     return url, {"sql": sql}
 
 
-async def get_geojson(aoi, geojson_from_predfined_aoi=get_geojson_from_data_api):
+async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_api):
     if aoi["type"] == "feature_collection":
         geojson = aoi["feature_collection"]
     else:
-        geojson = await geojson_from_predfined_aoi(aoi)
+        geojson = await geojsons_from_predefined_aoi(aoi)
     return geojson
 
 

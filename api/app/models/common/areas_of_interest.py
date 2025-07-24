@@ -69,7 +69,7 @@ class KeyBiodiversityAreaOfInterest(AreaOfInterest):
 
 class ProtectedAreaOfInterest(AreaOfInterest):
     type: Literal["protected_area"] = "protected_area"
-    id: List[str] = Field(
+    ids: List[str] = Field(
         ...,
         title="WDPA protected area IDs",
         examples=[["555625448"], ["148322", "555737674"]],
@@ -78,7 +78,7 @@ class ProtectedAreaOfInterest(AreaOfInterest):
 
 class IndigenousAreaOfInterest(AreaOfInterest):
     type: Literal["indigenous_land"] = "indigenous_land"
-    id: List[str] = Field(
+    ids: List[str] = Field(
         ...,
         title="Landmark Indigenous lands object ID",
         examples=[["1931"], ["1918", "43053"]],

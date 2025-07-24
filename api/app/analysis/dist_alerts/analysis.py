@@ -50,12 +50,7 @@ DIST_DRIVERS = {
 }
 
 
-async def zonal_statistics_on_aois(aois, dask_client, intersections=[]):
-    if intersections:
-        intersection = intersections[0]
-    else:
-        intersection = None
-
+async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     geojsons = await get_geojson(aois)
     aois = sorted(
         [{"type": aois["type"], "id": id} for id in aois["ids"]],
@@ -135,15 +130,13 @@ async def zonal_statistics(aoi, geojson, intersection=None):
     return alerts_df
 
 
-async def get_precomputed_statistics(aoi, intersections, dask_client):
-    if aoi["type"] != "admin" or (
-        intersections and (intersections[0] not in ["natural_lands", "driver"])
-    ):
+async def get_precomputed_statistics(aoi, intersection, dask_client):
+    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver"]:
         raise ValueError(
-            f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersections}"
+            f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
         )
 
-    table = get_precomputed_table(aoi["type"], intersections)
+    table = get_precomputed_table(aoi["type"], intersection)
 
     # Dumbly doing this per request since the STS token expires eventually otherwise
     # According to this issue, duckdb should auto refresh the token in 1.3.0,
@@ -169,7 +162,7 @@ async def get_precomputed_statistics(aoi, intersections, dask_client):
     )
 
     precompute_partial = partial(
-        get_precomputed_statistic_on_gadm_aoi, table=table, intersections=intersections
+        get_precomputed_statistic_on_gadm_aoi, table=table, intersection=intersection
     )
     futures = dask_client.map(precompute_partial, aoi["ids"])
     results = await dask_client.gather(futures)
@@ -180,28 +173,28 @@ async def get_precomputed_statistics(aoi, intersections, dask_client):
     return alerts_df
 
 
-def get_precomputed_table(aoi_type, intersections):
+def get_precomputed_table(aoi_type, intersection):
     if aoi_type == "admin":
         # Each intersection will be in a different parquet file
-        if not intersections:
+        if intersection is None:
             table = "gadm_dist_alerts"
-        elif intersections[0] == "driver":
+        elif intersection == "driver":
             table = "gadm_dist_alerts_by_driver"
-        elif intersections[0] == "natural_lands":
+        elif intersection == "natural_lands":
             table = "gadm_dist_alerts_by_natural_lands"
         else:
-            raise ValueError(f"No way to calculate intersection {intersections[0]}")
+            raise ValueError(f"No way to calculate intersection {intersection}")
     else:
         raise ValueError(f"No way to calculate aoi type {aoi_type}")
 
     return table
 
 
-async def get_precomputed_statistic_on_gadm_aoi(id, table, intersections):
+async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
     # GADM IDs are coming joined by '.', e.g. IDN.24.9
     gadm_id = id.split(".")
 
-    query = create_gadm_dist_query(gadm_id, table, intersections)
+    query = create_gadm_dist_query(gadm_id, table, intersection)
     alerts_df = duckdb.query(query).df()
     return alerts_df
 
@@ -213,14 +206,18 @@ async def do_analytics(file_path, dask_client):
         json_content = metadata.read_text()
         metadata_content = json.loads(json_content)  # Convert JSON to Python object
         aoi = metadata_content["aoi"]
-        if aoi["type"] == "admin":
-            alerts_df = await get_precomputed_statistics(
-                aoi, metadata_content["intersections"], dask_client
-            )
+
+        # for now we only support one intersection, as enforced by the route
+        intersections = metadata_content["intersections"]
+        if intersections:
+            intersection = intersections[0]
         else:
-            alerts_df = await zonal_statistics_on_aois(
-                aoi, dask_client, metadata_content.get("intersections", None)
-            )
+            intersection = None
+
+        if aoi["type"] == "admin":
+            alerts_df = await get_precomputed_statistics(aoi, intersection, dask_client)
+        else:
+            alerts_df = await zonal_statistics_on_aois(aoi, dask_client, intersection)
 
         if metadata_content["start_date"] is not None:
             alerts_df = alerts_df[
