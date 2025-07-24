@@ -1,5 +1,5 @@
 from typing import Union, List, Annotated, Literal
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.models.common.base import StrictBaseModel
 from app.models.common.areas_of_interest import (
@@ -42,10 +42,19 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
         ..., min_length=0, max_length=1, description="List of intersection types"
     )
 
-    # Validator to ensure year is >= 2001
+
     @field_validator('start_year', 'end_year')
     def year_must_be_at_least_2001(cls, v: str) -> str:
         year_int = int(v)
         if year_int < 2001:
             raise ValueError('Year must be at least 2001')
         return v
+
+
+    @model_validator(mode='after')
+    def validate_year_range(self) -> 'TreeCoverLossAnalyticsIn':
+        start = int(self.start_year)
+        end = int(self.end_year)
+        if end < start:
+            raise ValueError('end_year must be greater than or equal to start_year')
+        return self
