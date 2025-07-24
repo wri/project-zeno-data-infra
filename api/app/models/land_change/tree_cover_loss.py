@@ -5,19 +5,13 @@ from app.models.common.base import StrictBaseModel
 
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
-    KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
-    IndigenousAreaOfInterest,
-    CustomAreaOfInterest,
 )
 
 
 AoiUnion = Union[
     AdminAreaOfInterest,
-    KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
-    IndigenousAreaOfInterest,
-    CustomAreaOfInterest,
 ]
 
 DATE_REGEX = r"^\d{4}$"
