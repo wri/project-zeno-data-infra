@@ -25,7 +25,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
             start_year="2023",
             end_year="2024",
             canopy_cover=30,
-            intersections=[],
+            intersections=["natural_lands"],
         )
         response = client.post(
             "/v0/land_change/tree_cover_loss/analytics",
@@ -34,7 +34,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
                 "start_year": "2023",
                 "end_year": "2024",
                 "canopy_cover": 30,
-                "intersections": [],
+                "intersections": ["natural_lands"],
             },
         )
 
