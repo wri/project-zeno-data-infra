@@ -13,8 +13,8 @@ AoiUnion = Union[
 ]
 
 DATE_REGEX = r"^\d{4}$"
-
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
+AllowedIntersections = List[Literal["driver", "natural_lands"]]
 
 class TreeCoverLossAnalyticsIn(StrictBaseModel):
     aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
@@ -38,8 +38,11 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
         ...,
         title="Canopy Cover",
     )
-    intersections: List[Literal["driver", "natural_lands"]] = Field(
-        ..., min_length=0, max_length=1, description="List of intersection types"
+    intersections: AllowedIntersections = Field(
+        ...,
+        min_length=0,
+        max_length=1,
+        description="List of intersection types"
     )
 
 
