@@ -5,6 +5,7 @@ from prefect import flow
 from pipelines.disturbance.prefect_flows import dist_common_tasks
 from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
+from pipelines.prefect_flows import common_tasks
 
 @flow(name="DIST alerts count by drivers")
 def dist_alerts_by_drivers_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
@@ -22,20 +23,20 @@ def dist_alerts_by_drivers_count(dist_zarr_uri: str, dist_version: str, overwrit
         [1, 2, 3],  # confidence values
     )
     contextual_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
-    datasets = dist_common_tasks.load_data.with_options(
+    datasets = common_tasks.load_data.with_options(
         name="dist-alerts-by-natural-lands-load-data"
     )(dist_zarr_uri, contextual_uri=contextual_uri)
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-by-drivers-compute"
     )(datasets, expected_groups, contextual_name="driver")
 
-    result_dataset = dist_common_tasks.compute_zonal_stat.with_options(
+    result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-by-drivers-compute-zonal-stats"
     )(*compute_input, funcname="count")
-    result_df = dist_common_tasks.postprocess_result.with_options(
+    result_df = common_tasks.postprocess_result.with_options(
         name="dist-alerts-by-drivers-postprocess-result"
     )(result_dataset)
-    dist_common_tasks.save_result.with_options(
+    common_tasks.save_result.with_options(
         name="dist-alerts-by-drivers-save-result"
     )(result_df, result_uri)
 

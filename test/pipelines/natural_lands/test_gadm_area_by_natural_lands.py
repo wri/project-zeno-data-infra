@@ -4,13 +4,13 @@ from unittest.mock import patch
 from pandera.pandas import DataFrameSchema, Column, Check, dtypes
 from prefect.testing.utilities import prefect_test_harness
 
-from pipelines.natural_lands.nl_flow import gadm_natural_lands_area
+from pipelines.natural_lands.prefect_flows.nl_flow import gadm_natural_lands_area
 
 
 @pytest.mark.integration
 @pytest.mark.slow
-@patch("pipelines.disturbance.stages._save_parquet")
-@patch("pipelines.disturbance.stages._load_zarr")
+@patch("pipelines.prefect_flows.common_stages._save_parquet")
+@patch("pipelines.prefect_flows.common_stages._load_zarr")
 def test_gadm_area_by_natural_lands_result(
     mock_load_zarr,
     mock_save_parquet,
@@ -64,7 +64,7 @@ def test_gadm_area_by_natural_lands_result(
 
     assert (
         result_uri
-        == "s3://gfw-data-lake/sbtn_natural_lands/zarr/area_by_natural_lands_all_adm2_raw.parquet"
+        == "s3://gfw-data-lake/sbtn_natural_lands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
     )
 
     # Verify

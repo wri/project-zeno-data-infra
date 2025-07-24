@@ -10,7 +10,7 @@ from pipelines.disturbance.create_zarr import (
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
 from pipelines.disturbance import prefect_flows
-from pipelines.natural_lands import nl_flow
+from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -59,7 +59,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         logger.info(f"Latest dist version: {dist_version}")
         dask_client, _ = create_cluster()
 
-        nl_result = nl_flow.gadm_natural_lands_area(overwrite=overwrite)
+        nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
         result_uris.append(nl_result)
 
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
