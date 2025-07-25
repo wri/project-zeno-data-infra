@@ -6,7 +6,8 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from app.models.land_change.tree_cover_loss import (
     TreeCoverLossAnalyticsIn,
-    TreeCoverLossAnalyticsResponse, TreeCoverLossAnalytics,
+    TreeCoverLossAnalyticsResponse,
+    TreeCoverLossAnalytics,
 )
 from app.models.common.base import DataMartResourceLinkResponse, DataMartResourceLink
 from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
@@ -33,7 +34,9 @@ def create(
         service = TreeCoverLossService(background_tasks)
         service.do(data)
 
-        link_url = request.url_for("get_tcl_analytics_result", resource_id=data.thumbprint())
+        link_url = request.url_for(
+            "get_tcl_analytics_result", resource_id=data.thumbprint()
+        )
         link = DataMartResourceLink(link=str(link_url))
 
         return DataMartResourceLinkResponse(data=link, status=service.get_status())

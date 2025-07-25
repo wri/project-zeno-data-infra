@@ -20,7 +20,7 @@ class AdminAreaOfInterest(AreaOfInterest):
     ids: List[AdminStr] = Field(
         ...,
         title="Dot-delimited identifier",
-        examples=[["BRA.12.3"],["BRA.12.3", "IND", "IDN.12"]],
+        examples=[["BRA.12.3"], ["BRA.12.3", "IND", "IDN.12"]],
     )
     provider: str = Field("gadm", title="Administrative Boundary Provider")
     version: str = Field("4.1", title="Administrative Boundary Version")

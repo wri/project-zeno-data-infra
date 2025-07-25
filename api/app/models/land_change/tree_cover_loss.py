@@ -117,7 +117,11 @@ class TreeCoverLossAnalyticsResponse(Response):
                             "region": [1, 1, 1],
                             "subregion": [12, 12, 12],
                             "tree_cover_loss__year": [2022, 2023, 2024],
-                            "tree_cover_loss__ha": [4045.406160862687, 4050.4061608627, 4045.406160862687],
+                            "tree_cover_loss__ha": [
+                                4045.406160862687,
+                                4050.4061608627,
+                                4045.406160862687,
+                            ],
                             "gross_emissions_co2e_all_gases__mg": [
                                 3490821.6510292348,
                                 114344.24741739516,

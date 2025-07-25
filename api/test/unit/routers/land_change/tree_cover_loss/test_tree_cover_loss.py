@@ -21,7 +21,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
         self, tree_cover_loss_service: TreeCoverLossService
     ):
         tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(
-            aoi= {
+            aoi={
                 "type": "admin",
                 "ids": ["IDN.24.9"],
             },
