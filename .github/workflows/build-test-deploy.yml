@@ -80,4 +80,4 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
         run: |
           cd terraform
-          terraform apply -auto-approve -var="api_key=${{ env.API_KEY }}" -var="api_image=${{ env.SHORT_SHA }}" tf.plan
+          terraform apply -auto-approve tf.plan
