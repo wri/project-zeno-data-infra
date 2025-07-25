@@ -2,7 +2,7 @@ name: Build Docker image, test, push to AWS ECR, then deploy
 
 on:
   push:
-    branches: [ github-actions ]  # TODO: Change to main
+    branches: [ main ]
 
 jobs:
   everything:
@@ -73,8 +73,8 @@ jobs:
           terraform init
           terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=${{ env.SHORT_SHA }}"
 
-#      - name: Terraform Apply
-#        if: success()
-#        env:
-#          API_KEY: ${{ secrets.API_KEY }}
-#        run: terraform apply -auto-approve -var="api_key=${{ env.API_KEY }}" -var="api_image=${{ env.SHORT_SHA }}"
+      - name: Terraform Apply
+        if: success()
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: terraform apply -auto-approve -var="api_key=${{ env.API_KEY }}" -var="api_image=${{ env.SHORT_SHA }}"
