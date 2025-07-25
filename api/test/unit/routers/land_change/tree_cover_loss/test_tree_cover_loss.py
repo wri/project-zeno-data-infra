@@ -21,7 +21,10 @@ class TestTreeCoverLossPostUseCaseInitiation:
         self, tree_cover_loss_service: TreeCoverLossService
     ):
         tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(
-            aois=[{"type": "admin", "id": "IDN.24.9"}],
+            aoi= {
+            "type": "admin",
+            "ids": ["IDN.24.9"],
+            },
             start_year="2023",
             end_year="2024",
             canopy_cover=30,
@@ -30,7 +33,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
         client.post(
             "/v0/land_change/tree_cover_loss/analytics",
             json={
-                "aois": [{"type": "admin", "id": "IDN.24.9"}],
+                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
                 "start_year": "2023",
                 "end_year": "2024",
                 "canopy_cover": 30,
