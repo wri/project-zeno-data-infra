@@ -51,6 +51,7 @@ jobs:
           image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
+            cd api
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
 
       - name: Push Docker Image to ECR
