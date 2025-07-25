@@ -21,8 +21,10 @@ AllowedIntersections = List[Literal["driver", "natural_lands"]]
 
 
 class TreeCoverLossAnalyticsIn(StrictBaseModel):
-    aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
-        ..., min_length=1, max_length=1, description="List of areas of interest."
+    aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
+        ...,
+        title="AOI",
+        description="AOI to calculate in.",
     )
     start_year: str = Field(
         ...,
