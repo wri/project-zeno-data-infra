@@ -2,7 +2,7 @@ name: Build Docker image, test, push to AWS ECR, then deploy
 
 on:
   push:
-    branches: [ github-actions ]
+    branches: [ main ]
 
 jobs:
   everything:
