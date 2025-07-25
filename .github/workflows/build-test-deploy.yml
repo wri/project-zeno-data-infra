@@ -2,7 +2,7 @@ name: Build Docker image, test, push to AWS ECR, then deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ github-actions ]
 
 jobs:
   everything:
@@ -52,7 +52,7 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd api
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            API_KEY=${{ secrets.API_KEY }} AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
 
       - name: Push Docker Image to ECR
         if: success()
