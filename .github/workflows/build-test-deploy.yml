@@ -14,7 +14,8 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - name: Install packages needed for later actions
+      - name: Install packages needed for later actions (local)
+        if: ${{ env.ACT }}
         run: |
           apt-get update
           apt-get install sudo nodejs iptables docker.io -y
