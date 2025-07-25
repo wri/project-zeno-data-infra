@@ -33,9 +33,8 @@ def create(
         service = TreeCoverLossService(background_tasks)
         service.do(data)
 
-        link = DataMartResourceLink(
-            link=f"{str(request.base_url).rstrip('/')}/v0/land_change/tree_cover_loss/analytics/{data.thumbprint()}"
-        )
+        link_url = request.url_for("get_tcl_analytics_result", resource_id=data.thumbprint())
+        link = DataMartResourceLink(link=str(link_url))
 
         return DataMartResourceLinkResponse(data=link, status=service.get_status())
     except Exception as e:
@@ -57,7 +56,7 @@ def create(
     response_model=TreeCoverLossAnalyticsResponse,
     status_code=200,
 )
-async def get_analytics_result(
+async def get_tcl_analytics_result(
     resource_id: str,
     response: FastAPIResponse,
 ):
