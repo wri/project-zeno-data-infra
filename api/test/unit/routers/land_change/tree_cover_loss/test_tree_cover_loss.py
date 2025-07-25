@@ -22,8 +22,8 @@ class TestTreeCoverLossPostUseCaseInitiation:
     ):
         tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(
             aoi= {
-            "type": "admin",
-            "ids": ["IDN.24.9"],
+                "type": "admin",
+                "ids": ["IDN.24.9"],
             },
             start_year="2023",
             end_year="2024",
