@@ -11,6 +11,7 @@ dependencies = [
     "fastparquet",
     "flox",
     "fsspec",
+    "geopandas",
     "numba>=0.61.2",
     "numbagg",
     "numpy",
