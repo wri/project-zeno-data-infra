@@ -49,7 +49,7 @@ class DistZonalStats(pa.DataFrameModel):
         strict = True
         name = "ZonalStatsSchema"
         ordered = True
-        unique_columns = ["country", "region", "subregion", "alert_date", "confidence"]
+        unique = ["country", "region", "subregion", "alert_date", "confidence"]
 
     @staticmethod
     def calculate_alert_counts_by_date(df: pd.DataFrame) -> dict:
@@ -75,7 +75,7 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
 
 def generate_validation_statistics(version: str) -> pd.DataFrame:
     """Generate zonal statistics for the admin area AOI."""
-    gdf = gpd.read_file("../../test/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
+    gdf = gpd.read_file("test/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
     aoi = gdf.iloc[0]
     aoi_tile = "00N_040W" # This AOI fits within a tile, but we should build VRTs so we can use any (resonably sized) AOI
     
@@ -125,11 +125,11 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     high_conf_results["confidence"] = 3
     high_conf_results["country"] = 76
     high_conf_results["region"] = 20
-    high_conf_results["subregion"] = 150
+    high_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
     low_conf_results["confidence"] = 2
     low_conf_results["country"] = 76
     low_conf_results["region"] = 20
-    low_conf_results["subregion"] = 150
+    low_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
 
     # rename high_conf to value
     high_conf_results.rename(columns={"high_conf": "value"}, inplace=True)
@@ -156,10 +156,10 @@ def validates_zonal_statistics(parquet_uri: str) -> bool:
     logger = get_run_logger()
 
     # load local results
-    version = get_latest_version()
+    version = get_latest_version("umd_glad_dist_alerts")
     logger.info(f"Generating validation stats for version {version}.")
     validation_df = generate_validation_statistics(version)
-    validation_df.to_csv(f"../../test/validation_statistics/dist_{version}_validation.csv", index=False)
+    #validation_df.to_csv(f"test/validation_statistics/dist_{version}_validation.csv", index=False)
 
     # load zeno stats for aoi
     zeno_df = pd.read_parquet(parquet_uri) # assumes parquet refers to latest version
