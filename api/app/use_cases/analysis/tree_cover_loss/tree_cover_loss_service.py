@@ -3,7 +3,7 @@ from app.models.common.analysis import AnalysisStatus
 
 
 class TreeCoverLossService:
-    def __init__(self, utils):
+    def __init__(self, utils=None):
         pass
 
     def do(self, tree_cover_loss_analytics: TreeCoverLossAnalyticsIn):
