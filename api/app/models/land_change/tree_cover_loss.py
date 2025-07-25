@@ -17,7 +17,8 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedIntersections = List[Literal["driver", "natural_lands"]]
+AllowedForestFilter = Literal["primary_forest", "intact_forest"]
+AllowedIntersections = List[Literal["driver"]]
 
 
 class TreeCoverLossAnalyticsIn(StrictBaseModel):
@@ -43,6 +44,10 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
     canopy_cover: AllowedCanopyCover = Field(
         ...,
         title="Canopy Cover",
+    )
+    forest_filter: AllowedForestFilter | None = Field(
+        default=None,
+        title="Forest Filter",
     )
     intersections: AllowedIntersections = Field(
         ..., min_length=0, max_length=1, description="List of intersection types"
@@ -123,10 +128,10 @@ class TreeCoverLossAnalyticsResponse(Response):
                             "aoi": {
                                 "type": "admin",
                                 "ids": ["BRA.1.12"],
-                                "start_year": "2022",
-                                "end_year": "2024",
-                                "canopy_cover": "30",
-                            }
+                            },
+                            "start_year": "2022",
+                            "end_year": "2024",
+                            "canopy_cover": "30",
                         },
                         "message": "",
                         "status": "saved",

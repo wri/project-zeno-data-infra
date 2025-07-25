@@ -28,7 +28,8 @@ class TestTreeCoverLossPostUseCaseInitiation:
             start_year="2023",
             end_year="2024",
             canopy_cover=30,
-            intersections=["natural_lands"],
+            forest_filter="primary_forest",
+            intersections=["driver"],
         )
         client.post(
             "/v0/land_change/tree_cover_loss/analytics",
@@ -37,7 +38,8 @@ class TestTreeCoverLossPostUseCaseInitiation:
                 "start_year": "2023",
                 "end_year": "2024",
                 "canopy_cover": 30,
-                "intersections": ["natural_lands"],
+                "forest_filter": "primary_forest",
+                "intersections": ["driver"],
             },
         )
 
