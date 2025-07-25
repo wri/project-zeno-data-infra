@@ -1,11 +1,12 @@
-from typing import Optional, Literal, Dict, Any
+from typing import Annotated, Any, Dict, List, Literal, Optional
 from uuid import UUID
-from pydantic import Field, model_validator, field_validator
+
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from .base import StrictBaseModel
 
-
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
+AdminStr = Annotated[str, StringConstraints(pattern=ADMIN_REGEX)]
 
 
 class AreaOfInterest(StrictBaseModel):
@@ -16,10 +17,9 @@ class AreaOfInterest(StrictBaseModel):
 
 class AdminAreaOfInterest(AreaOfInterest):
     type: Literal["admin"] = "admin"
-    id: str = Field(
+    ids: List[AdminStr] = Field(
         ...,
         title="Dot-delimited identifier",
-        pattern=ADMIN_REGEX,
         examples=["BRA.12.3", "IND", "IDN.12"],
     )
     provider: str = Field("gadm", title="Administrative Boundary Provider")
@@ -62,32 +62,32 @@ class AdminAreaOfInterest(AreaOfInterest):
 
 class KeyBiodiversityAreaOfInterest(AreaOfInterest):
     type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
-    id: str = Field(
-        ..., title="Key Biodiversity Area site code", examples=["36", "18", "8111"]
+    ids: List[str] = Field(
+        ..., title="Key Biodiversity Area site codes", examples=[["36"], ["18", "8111"]]
     )
 
 
 class ProtectedAreaOfInterest(AreaOfInterest):
     type: Literal["protected_area"] = "protected_area"
-    id: str = Field(
+    ids: List[str] = Field(
         ...,
-        title="WDPA protected area ID",
-        examples=["555625448", "148322", "555737674"],
+        title="WDPA protected area IDs",
+        examples=[["555625448"], ["148322", "555737674"]],
     )
 
 
 class IndigenousAreaOfInterest(AreaOfInterest):
     type: Literal["indigenous_land"] = "indigenous_land"
-    id: str = Field(
+    ids: List[str] = Field(
         ...,
         title="Landmark Indigenous lands object ID",
-        examples=["1931", "1918", "43053"],
+        examples=[["1931"], ["1918", "43053"]],
     )
 
 
 class CustomAreaOfInterest(AreaOfInterest):
-    type: Literal["geojson"] = "geojson"
-    geojson: Dict[str, Any] = Field(
+    type: Literal["feature_collection"] = "feature_collection"
+    feature_collection: Dict[str, Any] = Field(
         ...,
-        title="GeoJSON of one geometry",
+        title="Feature collection of one or more features",
     )

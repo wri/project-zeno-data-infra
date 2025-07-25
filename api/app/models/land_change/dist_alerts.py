@@ -1,16 +1,16 @@
-from typing import Optional, List, Annotated, Union, Literal
+from typing import Annotated, List, Literal, Optional, Union
+
 from pydantic import Field
 
-from ..common.analysis import AnalysisStatus, DATE_REGEX
+from ..common.analysis import DATE_REGEX, AnalysisStatus
 from ..common.areas_of_interest import (
     AdminAreaOfInterest,
+    CustomAreaOfInterest,
+    IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
-    IndigenousAreaOfInterest,
-    CustomAreaOfInterest,
 )
-from ..common.base import StrictBaseModel, Response
-
+from ..common.base import Response, StrictBaseModel
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -22,8 +22,10 @@ AoiUnion = Union[
 
 
 class DistAlertsAnalyticsIn(StrictBaseModel):
-    aois: List[Annotated[AoiUnion, Field(discriminator="type")]] = Field(
-        ..., min_length=1, max_length=1, description="List of areas of interest."
+    aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
+        ...,
+        title="AOI",
+        description="AOI to calculate in.",
     )
     start_date: str = Field(
         ...,
