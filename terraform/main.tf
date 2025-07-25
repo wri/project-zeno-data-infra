@@ -7,6 +7,15 @@
 #     }
 # }
 
+terraform {
+  backend "s3" {
+    bucket         = "tf-state-zeno-rest-api"
+    key            = "terraform/state/production/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+  }
+}
+
 provider "aws" {
     region = "us-east-1" # Replace with your desired region
 }
@@ -50,10 +59,16 @@ module "ecs" {
           image     = var.api_image
           command   = ["uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           readonlyRootFilesystem = false
-          environment = [{
-            name = "PYTHONPATH"
-            value = "/app/api"
-          }]
+          environment = [
+            {
+              name = "PYTHONPATH"
+              value = "/app/api"
+            },
+            {
+              name = "API_KEY"
+              value = var.api_key
+            }
+          ]
         }
       }
 
