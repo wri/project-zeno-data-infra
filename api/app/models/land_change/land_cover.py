@@ -41,7 +41,7 @@ class LandCoverChangeAnalyticsIn(StrictBaseModel):
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
 
-class TreeCoverLossAnalytics(StrictBaseModel):
+class LandCoverChangeAnalytics(StrictBaseModel):
     result: Optional[dict] = None
     metadata: Optional[dict] = None
     message: Optional[str] = None
