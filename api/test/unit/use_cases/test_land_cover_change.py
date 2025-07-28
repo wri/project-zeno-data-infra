@@ -9,7 +9,7 @@ from api.app.use_cases.analysis.land_cover.land_cover_change import (
 
 class TestLandCoverChangeMockData:
     @pytest.mark.asyncio
-    async def test_mock_results_gadm(self):
+    async def test_mock_results_multiple_aoi(self):
         land_cover_change_service = LandCoverChangeService(mock=True)
         land_cover_change_in = LandCoverChangeAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.1.12", "IDN.24.8"]}
@@ -51,3 +51,56 @@ class TestLandCoverChangeMockData:
         pd.testing.assert_frame_equal(
             expected_results_df, mock_results_df, check_like=True
         )
+
+    @pytest.mark.asyncio
+    async def test_mock_results_single_aoi(self):
+        land_cover_change_service = LandCoverChangeService(mock=True)
+        land_cover_change_in = LandCoverChangeAnalyticsIn(
+            aoi={"type": "admin", "ids": ["USA.1.1"]}
+        )
+
+        mock_results = await land_cover_change_service.get_results(land_cover_change_in)
+        mock_results_df = pd.DataFrame(mock_results)
+        expected_results_df = pd.DataFrame(
+            {
+                "id": ["USA.1.1"] * 9,
+                "land_cover_class_start": [
+                    "Bare and sparse vegetation",
+                    "Short vegetation",
+                    "Tree cover",
+                    "Wetland-short vegetation",
+                    "Water",
+                    "Snow/ice",
+                    "Cropland",
+                    "Built-up",
+                    "Cultivated grasslands",
+                ],
+                "land_cover_class_end": [
+                    "Cultivated grasslands",
+                    "Built-up",
+                    "Cropland",
+                    "Snow/ice",
+                    "Water",
+                    "Wetland-short vegetation",
+                    "Tree cover",
+                    "Short vegetation",
+                    "Bare and sparse vegetation",
+                ],
+                "area_ha": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+            }
+        )
+        pd.testing.assert_frame_equal(
+            expected_results_df, mock_results_df, check_like=True
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_results_raises_when_mock_false(self):
+        land_cover_change_service = LandCoverChangeService(mock=False)
+        land_cover_change_in = LandCoverChangeAnalyticsIn(
+            aoi={"type": "admin", "ids": ["BRA.1.12"]}
+        )
+        with pytest.raises(
+            ValueError,
+            match="Mocking is enabled, but no real data processing is available currently.",
+        ):
+            await land_cover_change_service.get_results(land_cover_change_in)
