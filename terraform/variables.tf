@@ -15,3 +15,7 @@ variable "api_image" {
   description = "API image URI"
   type        = string
 }
+
+variable "api_key" {
+  type        = string
+}

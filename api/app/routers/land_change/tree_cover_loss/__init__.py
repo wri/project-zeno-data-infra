@@ -37,6 +37,7 @@ create.__doc__ = """
 
     -----
 
+<<<<<<< HEAD
     ## Natural Lands (SBTN)
     | Dataset Key Aspects | Detailed Description |
     |---------------------|----------------------|
@@ -54,6 +55,8 @@ create.__doc__ = """
 
     -----
 
+=======
+>>>>>>> main
     **Key Features:**
     - 🆔 Deterministic UUID generation using SHA-1 hashing (UUIDv5)
     - 💾 Automatic payload storage in temporary storage

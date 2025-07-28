@@ -1,18 +1,19 @@
 import logging
 import traceback
 import uuid
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
-from fastapi import Response as FastAPIResponse
-from fastapi.responses import ORJSONResponse
+
+from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
 from app.models.land_change.tree_cover_loss import (
+    TreeCoverLossAnalytics,
     TreeCoverLossAnalyticsIn,
-    TreeCoverLossAnalyticsResponse, TreeCoverLossAnalytics,
+    TreeCoverLossAnalyticsResponse,
 )
-from app.models.common.base import DataMartResourceLinkResponse, DataMartResourceLink
 from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
     TreeCoverLossService,
 )
-
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import Response as FastAPIResponse
+from fastapi.responses import ORJSONResponse
 
 router = APIRouter(prefix="/tree_cover_loss")
 
@@ -33,7 +34,9 @@ def create(
         service = TreeCoverLossService(background_tasks)
         service.do(data)
 
-        link_url = request.url_for("get_tcl_analytics_result", resource_id=data.thumbprint())
+        link_url = request.url_for(
+            "get_tcl_analytics_result", resource_id=data.thumbprint()
+        )
         link = DataMartResourceLink(link=str(link_url))
 
         return DataMartResourceLinkResponse(data=link, status=service.get_status())

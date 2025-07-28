@@ -1,14 +1,14 @@
-import pytest
 from unittest.mock import patch
 
+import pytest
 from app.main import app
-from fastapi.testclient import TestClient
-from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
-    TreeCoverLossService,
-)
 from app.routers.land_change.tree_cover_loss.tree_cover_loss import (
     TreeCoverLossAnalyticsIn,
 )
+from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
+    TreeCoverLossService,
+)
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 
@@ -21,14 +21,15 @@ class TestTreeCoverLossPostUseCaseInitiation:
         self, tree_cover_loss_service: TreeCoverLossService
     ):
         tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(
-            aoi= {
+            aoi={
                 "type": "admin",
                 "ids": ["IDN.24.9"],
             },
             start_year="2023",
             end_year="2024",
             canopy_cover=30,
-            intersections=["natural_lands"],
+            forest_filter="primary_forest",
+            intersections=["driver"],
         )
         client.post(
             "/v0/land_change/tree_cover_loss/analytics",
@@ -37,7 +38,8 @@ class TestTreeCoverLossPostUseCaseInitiation:
                 "start_year": "2023",
                 "end_year": "2024",
                 "canopy_cover": 30,
-                "intersections": ["natural_lands"],
+                "forest_filter": "primary_forest",
+                "intersections": ["driver"],
             },
         )
 

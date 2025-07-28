@@ -1,14 +1,14 @@
 import json
 import uuid
-from typing import Union, List, Annotated, Literal, Optional
-from pydantic import Field, field_validator, model_validator
+from typing import Annotated, List, Literal, Optional, Union
+
 from app.models.common.analysis import AnalysisStatus
-from app.models.common.base import StrictBaseModel, Response
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
-
+from app.models.common.base import Response, StrictBaseModel
+from pydantic import Field, field_validator, model_validator
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -17,7 +17,8 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedIntersections = List[Literal["driver", "natural_lands"]]
+AllowedForestFilter = Literal["primary_forest", "intact_forest"]
+AllowedIntersections = List[Literal["driver"]]
 
 
 class TreeCoverLossAnalyticsIn(StrictBaseModel):
@@ -44,22 +45,22 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
         ...,
         title="Canopy Cover",
     )
+    forest_filter: AllowedForestFilter | None = Field(
+        default=None,
+        title="Forest Filter",
+    )
     intersections: AllowedIntersections = Field(
         ..., min_length=0, max_length=1, description="List of intersection types"
     )
 
-    def thumbprint(self) -> uuid:
+    def thumbprint(self) -> uuid.UUID:
         """
         Generate a deterministic UUID thumbprint based on the model's JSON representation.
 
         Returns:
             uuid: UUID5 string derived from sorted JSON representation
         """
-        # Convert model to dictionary with default settings
-        payload_dict = self.model_dump(
-            include=["aois", "start_year", "end_year", "canopy_cover", "intersections"]
-        )
-
+        payload_dict = self.model_dump()
         payload_json = json.dumps(payload_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
@@ -112,7 +113,11 @@ class TreeCoverLossAnalyticsResponse(Response):
                             "region": [1, 1, 1],
                             "subregion": [12, 12, 12],
                             "tree_cover_loss__year": [2022, 2023, 2024],
-                            "tree_cover_loss__ha": [4045.406160862687, 4050.4061608627, 4045.406160862687],
+                            "tree_cover_loss__ha": [
+                                4045.406160862687,
+                                4050.4061608627,
+                                4045.406160862687,
+                            ],
                             "gross_emissions_co2e_all_gases__mg": [
                                 3490821.6510292348,
                                 114344.24741739516,
@@ -123,10 +128,10 @@ class TreeCoverLossAnalyticsResponse(Response):
                             "aoi": {
                                 "type": "admin",
                                 "ids": ["BRA.1.12"],
-                                "start_year": "2022",
-                                "end_year": "2024",
-                                "canopy_cover": "30",
-                            }
+                            },
+                            "start_year": "2022",
+                            "end_year": "2024",
+                            "canopy_cover": "30",
                         },
                         "message": "",
                         "status": "saved",
