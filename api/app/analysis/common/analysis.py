@@ -71,6 +71,7 @@ def clip_zarr_to_geojson(xarr, geojson):
 
 def read_zarr_clipped_to_geojson(uri, geojson):
     zarr = read_zarr(uri)
+    zarr.rio.write_crs("EPSG:4326", inplace=True)
     clipped = clip_zarr_to_geojson(zarr, geojson)
     return clipped
 
