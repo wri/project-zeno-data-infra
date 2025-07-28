@@ -60,11 +60,7 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
         Returns:
             uuid: UUID5 string derived from sorted JSON representation
         """
-        # Convert model to dictionary with default settings
-        payload_dict = self.model_dump(
-            include=["aois", "start_year", "end_year", "canopy_cover", "intersections"]
-        )
-
+        payload_dict = self.model_dump()
         payload_json = json.dumps(payload_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
