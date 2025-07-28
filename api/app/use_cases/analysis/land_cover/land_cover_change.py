@@ -4,7 +4,17 @@ from app.models.common.analysis import AnalysisStatus
 
 from api.app.models.land_change.land_cover import LandCoverChangeAnalyticsIn
 
-LAND_COVER_CLASSES = ["Forest", "Croplands", "Cultivated Grasslands"]
+LAND_COVER_CLASSES = [
+    "Bare and sparse vegetation",
+    "Short vegetation",
+    "Tree cover",
+    "Wetland-short vegetation",
+    "Water",
+    "Snow/ice",
+    "Cropland",
+    "Built-up",
+    "Cultivated grasslands",
+]
 
 
 class LandCoverChangeService:
@@ -34,8 +44,8 @@ class LandCoverChangeService:
 
         for aoi_id in land_cover_change_analytics.aoi.ids:
             aoi_ids += [aoi_id] * len(LAND_COVER_CLASSES)
-            land_cover_start += ["Forest", "Croplands", "Cultivated Grasslands"]
-            land_cover_end += reversed(["Forest", "Croplands", "Cultivated Grasslands"])
+            land_cover_start += LAND_COVER_CLASSES
+            land_cover_end += reversed(LAND_COVER_CLASSES)
             area += range(1, len(LAND_COVER_CLASSES) + 1)
 
         return {
