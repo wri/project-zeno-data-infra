@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 from .dist_alerts import dist_alerts
+from .grasslands import grasslands
 
 router = APIRouter(prefix="/v0/land_change", tags=["β Land Change"])
 router.include_router(dist_alerts.router)
+router.include_router(grasslands.router)
