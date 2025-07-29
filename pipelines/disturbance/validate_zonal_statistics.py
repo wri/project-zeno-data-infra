@@ -3,6 +3,7 @@ import geopandas as gpd
 import pandera.pandas as pa
 from pandera.typing.pandas import Series
 from typing import List
+from prefect import task
 from prefect.logging import get_run_logger
 import rasterio as rio
 from rasterio.windows import from_bounds
@@ -149,8 +150,9 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     results = results[results["value"] != 0]
 
     return pd.DataFrame(results)
-    
-def validates_zonal_statistics(parquet_uri: str) -> bool:
+
+@task    
+def validate(parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
     
     logger = get_run_logger()
