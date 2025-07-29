@@ -2,7 +2,9 @@ from typing import List
 
 from app.models.common.analysis import AnalysisStatus
 
-from api.app.models.land_change.land_cover import LandCoverChangeAnalyticsIn
+from api.app.models.land_change.land_cover import (
+    LandCoverChangeAnalyticsIn,
+)
 
 LAND_COVER_CLASSES = [
     "Bare and sparse vegetation",
@@ -18,15 +20,16 @@ LAND_COVER_CLASSES = [
 
 
 class LandCoverChangeService:
-    def __init__(self, utils=None):
-        pass
+    def __init__(self, background_tasks):
+        self.background_tasks = background_tasks
 
     def do(self, land_cover_change_analytics: LandCoverChangeAnalyticsIn):
+        self.background_tasks.add_task(self.compute, land_cover_change_analytics)
+
+    def retrieve(self, resource_id: str):
         pass
 
-    async def get_results(
-        self, land_cover_change_analytics: LandCoverChangeAnalyticsIn
-    ):
+    async def compute(self, land_cover_change_analytics: LandCoverChangeAnalyticsIn):
         aoi_ids: List[str] = []
         land_cover_start: List[str] = []
         land_cover_end: List[str] = []
