@@ -18,23 +18,13 @@ LAND_COVER_CLASSES = [
 
 
 class LandCoverChangeService:
-    def __init__(self, mock=True, utils=None):
-        self.mock = mock
+    def __init__(self, utils=None):
+        pass
 
     def do(self, land_cover_change_analytics: LandCoverChangeAnalyticsIn):
         pass
 
     async def get_results(
-        self, land_cover_change_analytics: LandCoverChangeAnalyticsIn
-    ):
-        if self.mock:
-            return self._get_mock_results(land_cover_change_analytics)
-        else:
-            raise ValueError(
-                "Mocking is enabled, but no real data processing is available currently."
-            )
-
-    def _get_mock_results(
         self, land_cover_change_analytics: LandCoverChangeAnalyticsIn
     ):
         aoi_ids: List[str] = []
