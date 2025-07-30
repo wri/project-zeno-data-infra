@@ -4,7 +4,6 @@ import uuid
 
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
 from app.models.land_change.land_cover import (
-    LandCoverChangeAnalytics,
     LandCoverChangeAnalyticsIn,
     LandCoverChangeAnalyticsResponse,
 )
@@ -14,6 +13,8 @@ from app.use_cases.analysis.land_cover.land_cover_change import (
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
+
+from api.app.models.common.analysis import AnalysisStatus
 
 router = APIRouter(prefix="/land_cover_change")
 
@@ -74,15 +75,13 @@ async def get_analytics_result(
 
     try:
         service = LandCoverChangeService(background_tasks)
-        response.headers["Retry-After"] = "1"
+        resource = await service.get_resource(resource_id)
+
+        if resource.status == AnalysisStatus.pending:
+            response.headers["Retry-After"] = "1"
 
         return LandCoverChangeAnalyticsResponse(
-            data=LandCoverChangeAnalytics(
-                status=service.get_status(),
-                message="Resource is still processing, follow Retry-After header.",
-                result=None,
-                metadata=None,
-            ),
+            data=resource,
             status="success",
         )
     except Exception as e:
