@@ -1,13 +1,15 @@
-from typing import Optional, Tuple
+from typing import Tuple
 
 
-def create_gadm_grasslands_query(gadm_id: Tuple[str, int, int], table: str) -> str:
+def create_gadm_grasslands_query(
+    gadm_id: Tuple[str, int, int], parquet_file: str
+) -> str:
     # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
     # TODO use final pipeline locations and schema for parquet files
     # TODO this should be done in a background task and written to file
     # Build up the DuckDB query based on GADM ID and intersection
 
-    from_clause = f"FROM '/tmp/{table}.parquet'"
+    from_clause = f"FROM '{parquet_file}'"
     select_clause = "SELECT year, country"
     where_clause = f"WHERE country = '{gadm_id[0]}'"
     by_clause = "BY year, country"
