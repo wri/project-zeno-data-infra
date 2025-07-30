@@ -1,12 +1,11 @@
-name: Build image, test, push to CR, deploy on push to main
+name: Build Docker image, test, push to AWS ECR, then deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  build_and_test:
+  everything:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: us-east-1
@@ -60,17 +59,8 @@ jobs:
         run: |
           docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
 
-  deploy:
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    env:
-      AWS_REGION: us-east-1
-      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      REPOSITORY_NAME: analytics-api
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
       - name: Set up Terraform
+        if: success()
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.8.0
