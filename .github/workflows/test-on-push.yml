@@ -1,12 +1,12 @@
-name: Build image, test, push to CR, deploy on push to main
+name: Build, test on push to feature branch
 
 on:
   push:
-    branches:
+    branches-exclude:
       - main
 
 jobs:
-  build_and_test:
+  just_test_stuff:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: us-east-1
@@ -54,41 +54,3 @@ jobs:
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd api
             API_KEY=${{ secrets.API_KEY }} AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
-
-      - name: Push Docker Image to ECR
-        if: success()
-        run: |
-          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-
-  deploy:
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    env:
-      AWS_REGION: us-east-1
-      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      REPOSITORY_NAME: analytics-api
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.8.0
-
-      - name: Terraform Plan
-        if: success()
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-        run: |
-          IMAGE_PATH=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-          cd terraform
-          terraform init
-          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" --out=tf.plan
-
-      - name: Terraform Apply
-        if: success()
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-        run: |
-          cd terraform
-          terraform apply -auto-approve tf.plan
