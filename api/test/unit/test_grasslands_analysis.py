@@ -1,9 +1,16 @@
+import asyncio
+import numpy as np
 import pandas as pd
 import pytest
+import rioxarray  # noqa: F401
+import xarray as xr
 from unittest.mock import patch
 
 
-from app.analysis.grasslands.analysis import get_precomputed_statistic_on_gadm_aoi
+from app.analysis.grasslands.analysis import (
+    get_precomputed_statistic_on_gadm_aoi,
+    zonal_statistics,
+)
 
 
 class TestGrasslandsPreComputedAnalysis:
@@ -103,3 +110,96 @@ class TestGrasslandsPreComputedAnalysis:
         expected_df["aoi_type"] = "admin"
 
         pd.testing.assert_frame_equal(expected_df, result_df, check_like=True)
+
+
+class TestGrasslandsOTFAnalysis:
+    @pytest.fixture
+    def grasslands_datacube(self):
+        years = np.arange(2000, 2023)
+        y_vals = np.linspace(48.0, 47.99775, 10)
+        x_vals = np.linspace(105.0, 105.00225, 10)
+
+        values = np.tile(np.arange(4, dtype=np.uint8), 10 * 10 * len(years) // 4)
+        data = values.reshape((len(years), 10, 10))
+
+        band_data = xr.DataArray(
+            data,
+            coords={"year": years, "y": y_vals, "x": x_vals},
+            dims=["year", "y", "x"],
+            name="band_data",
+        )
+
+        return xr.Dataset({"band_data": band_data})
+
+    @pytest.fixture
+    def pixel_area(self):
+        # Define the base column (along y) — 10 values
+        column_vals = np.array(
+            [
+                518.6011,
+                518.6036,
+                518.606,
+                518.6085,
+                518.611,
+                518.61346,
+                518.61597,
+                518.61847,
+                518.6209,
+                518.6234,
+            ],
+            dtype=np.float32,
+        )
+
+        y_vals = np.linspace(48.0, 47.99775, 10)  # latitude
+        x_vals = np.linspace(105.0, 105.00225, 10)  # longitude
+
+        areas_2d = np.tile(column_vals[:, np.newaxis], (1, 10))
+        areas_3d = areas_2d[np.newaxis, :, :]  # shape: (1, 10, 10)
+        pixel_area = xr.DataArray(
+            areas_3d,
+            coords={"band": [1], "y": y_vals, "x": x_vals},
+            dims=["band", "y", "x"],
+            name="band_data",
+        )
+
+        ds = xr.Dataset({"band_data": pixel_area})
+        return ds
+
+    @pytest.mark.asyncio
+    @patch("app.analysis.common.analysis.read_zarr")
+    async def test_grasslands_otf_analysis(
+        self, mock_read_zarr, grasslands_datacube, pixel_area
+    ):
+        mock_read_zarr.side_effect = [grasslands_datacube, pixel_area]
+
+        geojson = {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [105.00050, 47.99875],
+                    [105.00175, 47.99875],
+                    [105.00175, 47.99775],
+                    [105.00050, 47.99775],
+                    [105.00050, 47.99875],
+                ]
+            ],
+        }
+        aoi = {"type": "feature_collection", "feature_collection": geojson}
+
+        result_df = await zonal_statistics(aoi, geojson)
+
+        loop = asyncio.get_event_loop()
+        computed_df = await loop.run_in_executor(None, result_df.compute)
+
+        years = np.arange(2000, 2023)
+        expected_df = pd.DataFrame(
+            {
+                "year": years,
+                "grassland_area": np.array(([2074.46875] * len(years))).astype(
+                    np.float32
+                ),
+                "aoi_type": ["feature_collection"] * len(years),
+            }
+        )
+
+        pd.testing.assert_frame_equal(expected_df, computed_df, check_like=True)
