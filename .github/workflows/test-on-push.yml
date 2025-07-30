@@ -2,8 +2,8 @@ name: Build, test on push to feature branch
 
 on:
   push:
-    branches:
-      - '!main'
+    branches-exclude:
+      - main
 
 jobs:
   just_test_stuff:
