@@ -1,8 +1,6 @@
-import json
-import uuid
 from typing import Annotated, List, Literal, Optional, Union
 
-from app.models.common.analysis import AnalysisStatus
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
@@ -21,7 +19,7 @@ AllowedForestFilter = Literal["primary_forest", "intact_forest"]
 AllowedIntersections = List[Literal["driver"]]
 
 
-class TreeCoverLossAnalyticsIn(StrictBaseModel):
+class TreeCoverLossAnalyticsIn(AnalyticsIn):
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
@@ -52,17 +50,6 @@ class TreeCoverLossAnalyticsIn(StrictBaseModel):
     intersections: AllowedIntersections = Field(
         ..., min_length=0, max_length=1, description="List of intersection types"
     )
-
-    def thumbprint(self) -> uuid.UUID:
-        """
-        Generate a deterministic UUID thumbprint based on the model's JSON representation.
-
-        Returns:
-            uuid: UUID5 string derived from sorted JSON representation
-        """
-        payload_dict = self.model_dump()
-        payload_json = json.dumps(payload_dict, sort_keys=True)
-        return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
     @field_validator("start_year", "end_year")
     def year_must_be_at_least_2001(cls, v: str) -> str:

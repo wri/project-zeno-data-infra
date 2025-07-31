@@ -1,8 +1,6 @@
-import json
-import uuid
 from typing import Annotated, List, Optional, Union
 
-from app.models.common.analysis import AnalysisStatus
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     IndigenousAreaOfInterest,
@@ -20,25 +18,12 @@ AoiUnion = Union[
 ]
 
 
-class LandCoverChangeAnalyticsIn(StrictBaseModel):
+class LandCoverChangeAnalyticsIn(AnalyticsIn):
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
         description="AOI to calculate in.",
     )
-
-    def thumbprint(self) -> uuid.UUID:
-        """
-        Generate a deterministic UUID thumbprint based on the model's JSON representation.
-
-        Returns:
-            uuid: UUID5 string derived from sorted JSON representation
-        """
-        # Convert model to dictionary with default settings
-        payload_dict = self.model_dump(include=["aoi"])
-
-        payload_json = json.dumps(payload_dict, sort_keys=True)
-        return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
 
 class LandCoverChangeResult(StrictBaseModel):
