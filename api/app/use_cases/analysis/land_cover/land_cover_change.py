@@ -6,8 +6,7 @@ from app.models.land_change.land_cover import (
     LandCoverChangeAnalyticsIn,
     LandCoverChangeResult,
 )
-
-from api.app.use_cases.analysis.land_cover.file_resource import (
+from app.use_cases.analysis.land_cover.file_resource import (
     load_resource,
     write_resource,
 )

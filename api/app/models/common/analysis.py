@@ -2,7 +2,7 @@ import json
 import uuid
 from enum import Enum
 
-from api.app.models.common.base import StrictBaseModel
+from app.models.common.base import StrictBaseModel
 
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
