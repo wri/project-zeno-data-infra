@@ -35,25 +35,26 @@ class LandCoverChangeService:
         write_resource=write_resource,
         load_resource=load_resource,
     ):
-        resource = load_resource(land_cover_change_analytics.thumbprint())
+        resource = await load_resource(land_cover_change_analytics.thumbprint())
         if resource.metadata is None:
-            write_resource(
+            await write_resource(
+                land_cover_change_analytics.thumbprint(),
                 LandCoverChangeAnalytics(
                     metadata=land_cover_change_analytics, status=AnalysisStatus.pending
-                )
+                ),
             )
 
-        if resource.result is not None:
+        if resource.result is None:
             resource = await self.compute(land_cover_change_analytics)
-            write_resource(resource)
+            await write_resource(land_cover_change_analytics.thumbprint(), resource)
 
-    def get(
+    async def get(
         self, resource_id: str, load_resource=load_resource
     ) -> LandCoverChangeAnalytics:
         """
         Retrieve the analytics result for a given resource ID.
         """
-        return load_resource(resource_id)
+        return await load_resource(resource_id)
 
     async def compute(
         self, land_cover_change_analytics: LandCoverChangeAnalyticsIn

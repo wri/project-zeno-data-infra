@@ -20,7 +20,9 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
     async def test_request(self):
         """Runs before each test in this class"""
-        delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+        delete_resource_files(
+            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+        )
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -61,7 +63,9 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+        dir_path = delete_resource_files(
+            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+        )
         write_metadata_file(dir_path)
 
         # now, the resource is already processing...make another post
@@ -95,7 +99,9 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+        dir_path = delete_resource_files(
+            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+        )
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
@@ -130,7 +136,9 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+        delete_resource_files(
+            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+        )
 
         self.test_request = client.get(
             "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
@@ -145,7 +153,9 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+        dir_path = delete_resource_files(
+            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+        )
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
@@ -176,7 +186,9 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+        dir_path = delete_resource_files(
+            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+        )
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -225,7 +237,9 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("ef700a48-b5ef-532f-8bb8-17f507a97ae7")
+        delete_resource_files(
+            "dist_alerts_analytics_payloads", "ef700a48-b5ef-532f-8bb8-17f507a97ae7"
+        )
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -299,7 +313,9 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("b089f8dc-51da-58af-aee2-9eea285c0f84")
+        delete_resource_files(
+            "dist_alerts_analytics_payloads", "b089f8dc-51da-58af-aee2-9eea285c0f84"
+        )
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -395,7 +411,9 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("71f40812-2157-5ce2-b654-377e833e5f73")
+    delete_resource_files(
+        "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+    )
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -436,7 +454,9 @@ async def test_gadm_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_kba_dist_analytics_no_intersection():
-    delete_resource_files("6d6095db-9d62-5914-af37-963e6a13c074")
+    delete_resource_files(
+        "dist_alerts_analytics_payloads", "6d6095db-9d62-5914-af37-963e6a13c074"
+    )
 
     async with LifespanManager(app):
         async with AsyncClient(

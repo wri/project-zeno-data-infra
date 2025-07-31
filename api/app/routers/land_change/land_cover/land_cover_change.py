@@ -26,7 +26,7 @@ router = APIRouter(prefix="/land_cover_change")
     response_model=DataMartResourceLinkResponse,
     status_code=202,
 )
-def create(
+async def create(
     *,
     data: LandCoverChangeAnalyticsIn,
     request: Request,
@@ -37,9 +37,11 @@ def create(
         background_tasks.add_task(service.do, data)
 
         resource_id = data.thumbprint()
-        resource = load_resource(resource_id)
+        resource = await load_resource(resource_id)
 
-        link_url = request.url_for("get_analytics_result", resource_id=resource_id)
+        link_url = request.url_for(
+            "get_land_cover_change_analytics_result", resource_id=resource_id
+        )
         link = DataMartResourceLink(link=str(link_url))
 
         return DataMartResourceLinkResponse(data=link, status=resource.status)
@@ -62,7 +64,7 @@ def create(
     response_model=LandCoverChangeAnalyticsResponse,
     status_code=200,
 )
-async def get_analytics_result(
+async def get_land_cover_change_analytics_result(
     resource_id: str,
     response: FastAPIResponse,
     background_tasks: BackgroundTasks,
@@ -82,10 +84,7 @@ async def get_analytics_result(
         if resource.status == AnalysisStatus.pending:
             response.headers["Retry-After"] = "1"
 
-        return LandCoverChangeAnalyticsResponse(
-            data=resource,
-            status="success",
-        )
+        return LandCoverChangeAnalyticsResponse(data=resource)
     except Exception as e:
         logging.error(
             {

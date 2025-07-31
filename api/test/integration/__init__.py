@@ -11,8 +11,8 @@ import pytest
 # Since we're just beginning, I don't want to move these out,    #
 # yet.                                                           #
 ##################################################################
-def delete_resource_files(resource_id: str) -> Path:
-    dir_path = Path(f"/tmp/dist_alerts_analytics_payloads/{resource_id}")
+def delete_resource_files(use_case_path: str, resource_id: str) -> Path:
+    dir_path = Path(f"/tmp/{use_case_path}/{resource_id}")
 
     if os.path.exists(dir_path):
         for filename in os.listdir(dir_path):
@@ -47,13 +47,13 @@ def write_data_file(dir_path, data):
     data_file.write_text(json.dumps(data))
 
 
-async def retry_getting_resource(resource_id: str, client):
-    resource = await client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}")
+async def retry_getting_resource(router: str, resource_id: str, client):
+    resource = await client.get(f"/v0/land_change/{router}/analytics/{resource_id}")
     data = resource.json()["data"]
     status = data["status"]
     attempts = 1
     while status == "pending" and attempts < 10:
-        resp = await client.get(f"/v0/land_change/dist_alerts/analytics/{resource_id}")
+        resp = await client.get(f"/v0/land_change/{router}/analytics/{resource_id}")
         data = resp.json()["data"]
         status = data["status"]
         time.sleep(1)
