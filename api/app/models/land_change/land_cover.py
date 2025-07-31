@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Annotated, Optional, Union
+from typing import Annotated, List, Optional, Union
 
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
@@ -41,9 +41,16 @@ class LandCoverChangeAnalyticsIn(StrictBaseModel):
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
 
+class LandCoverChangeResult(StrictBaseModel):
+    id: List[str]
+    land_cover_class_start: List[str]
+    land_cover_class_end: List[str]
+    area_ha: List[float]
+
+
 class LandCoverChangeAnalytics(StrictBaseModel):
-    result: Optional[dict] = None
-    metadata: Optional[dict] = None
+    result: Optional[LandCoverChangeResult] = None
+    metadata: Optional[LandCoverChangeAnalyticsIn] = None
     message: Optional[str] = None
     status: AnalysisStatus
 

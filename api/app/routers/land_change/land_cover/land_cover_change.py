@@ -15,6 +15,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 
 from api.app.models.common.analysis import AnalysisStatus
+from api.app.use_cases.analysis.land_cover.file_resource import load_resource
 
 router = APIRouter(prefix="/land_cover_change")
 
@@ -32,15 +33,16 @@ def create(
     background_tasks: BackgroundTasks,
 ):
     try:
-        service = LandCoverChangeService(background_tasks)
-        service.do(data)
+        service = LandCoverChangeService()
+        background_tasks.add_task(service.do, data)
 
-        link_url = request.url_for(
-            "get_analytics_result", resource_id=data.thumbprint()
-        )
+        resource_id = data.thumbprint()
+        resource = load_resource(resource_id)
+
+        link_url = request.url_for("get_analytics_result", resource_id=resource_id)
         link = DataMartResourceLink(link=str(link_url))
 
-        return DataMartResourceLinkResponse(data=link, status=service.get_status())
+        return DataMartResourceLinkResponse(data=link, status=resource.status)
     except Exception as e:
         logging.error(
             {
@@ -74,8 +76,8 @@ async def get_analytics_result(
         )
 
     try:
-        service = LandCoverChangeService(background_tasks)
-        resource = await service.get_resource(resource_id)
+        service = LandCoverChangeService()
+        resource = await service.get(resource_id)
 
         if resource.status == AnalysisStatus.pending:
             response.headers["Retry-After"] = "1"

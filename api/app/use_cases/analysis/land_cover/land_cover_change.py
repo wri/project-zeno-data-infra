@@ -1,12 +1,15 @@
-import json
-from pathlib import Path
 from typing import List
 
 from app.models.common.analysis import AnalysisStatus
-
-from api.app.models.land_change.land_cover import (
+from app.models.land_change.land_cover import (
     LandCoverChangeAnalytics,
     LandCoverChangeAnalyticsIn,
+    LandCoverChangeResult,
+)
+
+from api.app.use_cases.analysis.land_cover.file_resource import (
+    load_resource,
+    write_resource,
 )
 
 LAND_COVER_CLASSES = [
@@ -22,57 +25,39 @@ LAND_COVER_CLASSES = [
 ]
 
 
-PAYLOAD_STORE_DIR = Path("/tmp/land_cover_change_analytics_payloads")
-PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
-
-
 class LandCoverChangeService:
-    def __init__(self, background_tasks):
-        self.background_tasks = background_tasks
+    def __init__(self):
+        pass
 
-    def do(self, land_cover_change_analytics: LandCoverChangeAnalyticsIn):
-        payload_dict = land_cover_change_analytics.model_dump()
-        payload_json = json.dumps(payload_dict, sort_keys=True)
-
-        payload_dir = PAYLOAD_STORE_DIR / land_cover_change_analytics.thumbprint()
-        metadata_data = payload_dir / "metadata.json"
-
-        payload_dir.mkdir(parents=True, exist_ok=True)
-        metadata_data.write_text(payload_json)
-
-        self.background_tasks.add_task(self.compute, land_cover_change_analytics)
-
-    async def get_resource(self, resource_id: str):
-        # Construct file path
-        file_path = PAYLOAD_STORE_DIR / resource_id
-        analytics_metadata = file_path / "metadata.json"
-        analytics_data = file_path / "data.json"
-        metadata_content = None
-        alerts_dict = None
-
-        if analytics_metadata.exists() and analytics_data.exists():
-            # load resource from filesystem
-            alerts_dict = json.loads(analytics_data.read_text())
-            metadata_content = json.loads(analytics_metadata.read_text())
-
-            return LandCoverChangeAnalytics(
-                result=alerts_dict,
-                metadata=metadata_content,
-                status=AnalysisStatus.saved,
+    async def do(
+        self,
+        land_cover_change_analytics: LandCoverChangeAnalyticsIn,
+        write_resource=write_resource,
+        load_resource=load_resource,
+    ):
+        resource = load_resource(land_cover_change_analytics.thumbprint())
+        if resource.metadata is None:
+            write_resource(
+                LandCoverChangeAnalytics(
+                    metadata=land_cover_change_analytics, status=AnalysisStatus.pending
+                )
             )
 
-        if analytics_metadata.exists():
-            metadata_content = json.loads(analytics_metadata.read_text())
+        if resource.result is not None:
+            resource = await self.compute(land_cover_change_analytics)
+            write_resource(resource)
 
-            return LandCoverChangeAnalytics(
-                result=None,
-                metadata=metadata_content,
-                status=AnalysisStatus.pending,
-            )
+    def get(
+        self, resource_id: str, load_resource=load_resource
+    ) -> LandCoverChangeAnalytics:
+        """
+        Retrieve the analytics result for a given resource ID.
+        """
+        return load_resource(resource_id)
 
-        raise ValueError("Resource not found")
-
-    async def compute(self, land_cover_change_analytics: LandCoverChangeAnalyticsIn):
+    async def compute(
+        self, land_cover_change_analytics: LandCoverChangeAnalyticsIn
+    ) -> LandCoverChangeAnalytics:
         aoi_ids: List[str] = []
         land_cover_start: List[str] = []
         land_cover_end: List[str] = []
@@ -84,15 +69,15 @@ class LandCoverChangeService:
             land_cover_end += reversed(LAND_COVER_CLASSES)
             area += range(1, len(LAND_COVER_CLASSES) + 1)
 
-        results = {
-            "id": aoi_ids,
-            "land_cover_class_start": land_cover_start,
-            "land_cover_class_end": land_cover_end,
-            "area_ha": area,
-        }
+        results = LandCoverChangeResult(
+            id=aoi_ids,
+            land_cover_class_start=land_cover_start,
+            land_cover_class_end=land_cover_end,
+            area_ha=area,
+        )
 
-        data = PAYLOAD_STORE_DIR / "data.json"
-        data.write_text(json.dumps(results))
-
-    def get_status(self):
-        return AnalysisStatus.saved
+        return LandCoverChangeAnalytics(
+            result=results,
+            metadata=land_cover_change_analytics,
+            status=AnalysisStatus.saved,
+        )

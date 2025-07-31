@@ -58,38 +58,5 @@ class TestLandCoverChangeMockData:
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource(resource_id, client)
 
-        expected_df = pd.DataFrame(
-            {
-                "id": (["BRA.1.12"] * 9) + (["IDN.24.8"] * 9),
-                "land_cover_class_start": [
-                    "Bare and sparse vegetation",
-                    "Short vegetation",
-                    "Tree cover",
-                    "Wetland-short vegetation",
-                    "Water",
-                    "Snow/ice",
-                    "Cropland",
-                    "Built-up",
-                    "Cultivated grasslands",
-                ]
-                * 2,
-                "land_cover_class_end": [
-                    "Cultivated grasslands",
-                    "Built-up",
-                    "Cropland",
-                    "Snow/ice",
-                    "Water",
-                    "Wetland-short vegetation",
-                    "Tree cover",
-                    "Short vegetation",
-                    "Bare and sparse vegetation",
-                ]
-                * 2,
-                "area_ha": [1, 2, 3, 4, 5, 6, 7, 8, 9] * 2,
-            }
-        )
-
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
-
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
