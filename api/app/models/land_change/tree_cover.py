@@ -8,7 +8,7 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from pydantic import Field, field_validator
+from pydantic import Field
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -35,21 +35,11 @@ class TreeCoverAnalyticsIn(StrictBaseModel):
         default=None,
         title="Forest Filter",
     )
-    intersections: AllowedIntersections = Field(
-        ..., min_length=0, max_length=1, description="List of intersection types"
-    )
 
     def thumbprint(self) -> uuid.UUID:
         payload_dict = self.model_dump()
         payload_json = json.dumps(payload_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
-
-    @field_validator("start_year", "end_year")
-    def year_must_be_at_least_2001(cls, v: str) -> str:
-        year_int = int(v)
-        if year_int < 2001:
-            raise ValueError("Year must be at least 2001")
-        return v
 
 
 class TreeCoverAnalytics(StrictBaseModel):
