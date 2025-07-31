@@ -93,9 +93,9 @@ async def get_precomputed_statistic_on_gadm_aoi(id, parquet_file):
     grasslands_df["aoi_type"] = "admin"
 
     columns_to_drop = ["country"]
-    if len(gadm_id) == 2:
+    if len(gadm_id) > 1:
         columns_to_drop += ["region"]
-    if len(gadm_id) == 3:
+    if len(gadm_id) > 2:
         columns_to_drop += ["subregion"]
 
     grasslands_df = grasslands_df.drop(columns=columns_to_drop, axis=1)
