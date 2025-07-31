@@ -284,7 +284,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
     async def test_resource_calculate_results(self, setup):
         test_request, client = setup
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
-        data = await retry_getting_resource(resource_id, client)
+        data = await retry_getting_resource("dist_alerts", resource_id, client)
 
         expected_df = pd.DataFrame(
             {
@@ -360,7 +360,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
     async def test_resource_calculate_results(self, setup):
         test_request, client = setup
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
-        data = await retry_getting_resource(resource_id, client)
+        data = await retry_getting_resource("dist_alerts", resource_id, client)
 
         expected_df = pd.DataFrame(
             {
@@ -431,7 +431,7 @@ async def test_gadm_dist_analytics_no_intersection():
 
             resource_id = resource.json()["data"]["link"].split("/")[-1]
 
-            data = await retry_getting_resource(resource_id, client)
+            data = await retry_getting_resource("dist_alerts", resource_id, client)
 
     expected_df = pd.DataFrame(
         {
@@ -474,7 +474,7 @@ async def test_kba_dist_analytics_no_intersection():
 
             resource_id = resource.json()["data"]["link"].split("/")[-1]
 
-            data = await retry_getting_resource(resource_id, client)
+            data = await retry_getting_resource("dist_alerts", resource_id, client)
 
     expected_df = pd.DataFrame(
         {
