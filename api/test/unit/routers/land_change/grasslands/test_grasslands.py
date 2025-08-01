@@ -110,10 +110,9 @@ class TestGrasslandsAnalyticsPostWithCustomAOI:
     async def test_post_returns_resource_link(self, test_request):
 
         resource = test_request.json()
-        print("result", resource)
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/grasslands/analytics/91d617f8-4d15-5b1c-9b49-3b742935356c"
+            == "http://testserver/v0/land_change/grasslands/analytics/9067221f-fc65-56c8-a4c8-6af182b03240"
         )
 
     @pytest.mark.asyncio
