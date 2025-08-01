@@ -31,6 +31,7 @@ def create_cluster():
         worker_vm_types=["r7g.2xlarge"],
         compute_purchase_option="spot_with_fallback",
         no_client_timeout="5 seconds",
+        container="globalforestwatch/zeno:2",
     )
     cluster.adapt(minimum=10, maximum=50)
 
@@ -59,11 +60,11 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         logger.info(f"Latest dist version: {dist_version}")
         dask_client, _ = create_cluster()
 
-        nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
-        result_uris.append(nl_result)
+        # nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
+        # result_uris.append(nl_result)
 
-        dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version)
+        dist_zarr_uri = create_zarr(dist_version, overwrite=False)
+        gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version, overwrite=overwrite)
         result_uris.append(gadm_dist_result)
 
         gadm_dist_by_natural_lands_result = (
@@ -87,8 +88,8 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
     return result_uris
 
 def main(overwrite=False):
-    dist_alerts_flow(overwrite=False)
+    dist_alerts_flow(overwrite=overwrite)
 
 
 if __name__ == "__main__":
-    main(overwrite=False)
+    main(overwrite=True)
