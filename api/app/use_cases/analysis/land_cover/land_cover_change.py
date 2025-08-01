@@ -1,14 +1,14 @@
 from typing import List
 
+from app.infrastructure.persistence.file_resource import (
+    load_resource,
+    write_resource,
+)
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover import (
     LandCoverChangeAnalytics,
     LandCoverChangeAnalyticsIn,
     LandCoverChangeResult,
-)
-from app.use_cases.analysis.land_cover.file_resource import (
-    load_resource,
-    write_resource,
 )
 
 LAND_COVER_CLASSES = [
