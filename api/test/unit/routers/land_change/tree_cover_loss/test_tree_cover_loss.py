@@ -1,14 +1,14 @@
-import pytest
 from unittest.mock import patch
 
+import pytest
 from app.main import app
-from fastapi.testclient import TestClient
-from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
-    TreeCoverLossService,
-)
 from app.routers.land_change.tree_cover_loss.tree_cover_loss import (
     TreeCoverLossAnalyticsIn,
 )
+from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
+    TreeCoverLossService,
+)
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

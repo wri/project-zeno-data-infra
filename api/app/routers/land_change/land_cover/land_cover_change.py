@@ -2,20 +2,21 @@ import logging
 import traceback
 import uuid
 
+from app.infrastructure.persistence.file_resource import load_resource
+from app.models.common.analysis import AnalysisStatus
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
-from app.models.land_change.tree_cover_loss import (
-    TreeCoverLossAnalytics,
-    TreeCoverLossAnalyticsIn,
-    TreeCoverLossAnalyticsResponse,
+from app.models.land_change.land_cover import (
+    LandCoverChangeAnalyticsIn,
+    LandCoverChangeAnalyticsResponse,
 )
-from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
-    TreeCoverLossService,
+from app.use_cases.analysis.land_cover.land_cover_change import (
+    LandCoverChangeService,
 )
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 
-router = APIRouter(prefix="/tree_cover_loss")
+router = APIRouter(prefix="/land_cover_change")
 
 
 @router.post(
@@ -24,28 +25,31 @@ router = APIRouter(prefix="/tree_cover_loss")
     response_model=DataMartResourceLinkResponse,
     status_code=202,
 )
-def create(
+async def create(
     *,
-    data: TreeCoverLossAnalyticsIn,
+    data: LandCoverChangeAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
 ):
     try:
-        service = TreeCoverLossService(background_tasks)
-        service.do(data)
+        service = LandCoverChangeService()
+        background_tasks.add_task(service.do, data)
+
+        resource_id = data.thumbprint()
+        resource = await load_resource(resource_id)
 
         link_url = request.url_for(
-            "get_tcl_analytics_result", resource_id=data.thumbprint()
+            "get_land_cover_change_analytics_result", resource_id=resource_id
         )
         link = DataMartResourceLink(link=str(link_url))
 
-        return DataMartResourceLinkResponse(data=link, status=service.get_status())
+        return DataMartResourceLinkResponse(data=link, status=resource.status)
     except Exception as e:
         logging.error(
             {
-                "event": "tree_cover_loss_analytics_processing_failure",
-                "severity": "high",  # Helps with alerting
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "event": "land_cover_change_analytics_processing_failure",
+                "severity": "high",
+                "error_type": e.__class__.__name__,
                 "error_details": str(e),
                 "stack_trace": traceback.format_exc(),
             }
@@ -56,12 +60,13 @@ def create(
 @router.get(
     "/analytics/{resource_id}",
     response_class=ORJSONResponse,
-    response_model=TreeCoverLossAnalyticsResponse,
+    response_model=LandCoverChangeAnalyticsResponse,
     status_code=200,
 )
-async def get_tcl_analytics_result(
+async def get_land_cover_change_analytics_result(
     resource_id: str,
     response: FastAPIResponse,
+    background_tasks: BackgroundTasks,
 ):
     # Validate UUID format
     try:
@@ -72,26 +77,21 @@ async def get_tcl_analytics_result(
         )
 
     try:
-        service = TreeCoverLossService()
-        response.headers["Retry-After"] = "1"
+        service = LandCoverChangeService()
+        resource = await service.get(resource_id)
 
-        return TreeCoverLossAnalyticsResponse(
-            data=TreeCoverLossAnalytics(
-                status=service.get_status(),
-                message="Resource is still processing, follow Retry-After header.",
-                result=None,
-                metadata=None,
-            ),
-            status="success",
-        )
+        if resource.status == AnalysisStatus.pending:
+            response.headers["Retry-After"] = "1"
+
+        return LandCoverChangeAnalyticsResponse(data=resource)
     except Exception as e:
         logging.error(
             {
-                "event": "tree_cover_loss_analytics_resource_request_failure",
-                "severity": "high",  # Helps with alerting
+                "event": "land_cover_change_analytics_resource_request_failure",
+                "severity": "high",
                 "resource_id": resource_id,
                 "resource_metadata": None,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
+                "error_type": e.__class__.__name__,
                 "error_details": str(e),
                 "traceback": traceback.format_exc(),
             }
