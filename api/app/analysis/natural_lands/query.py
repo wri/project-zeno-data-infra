@@ -2,11 +2,7 @@ from typing import Tuple
 
 
 def create_gadm_natural_lands_query(gadm_id: Tuple[str, int, int], table: str) -> str:
-    # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
-    # TODO use final pipeline locations and schema for parquet files
-    # TODO this should be done in a background task and written to file
     # Build up the DuckDB query based on GADM ID and intersection
-
 
     from_clause = f"FROM '/tmp/{table}.parquet'"
     select_clause = "SELECT country"

@@ -11,10 +11,6 @@ import pandas as pd
 import s3fs
 from flox.xarray import xarray_reduce
 
-from dask.distributed import Client, LocalCluster
-from pathlib import Path
-import asyncio
-
 from ..common.analysis import (
     get_geojson,
     read_zarr_clipped_to_geojson,
@@ -75,7 +71,7 @@ async def zonal_statistics(aoi, geojson):
     counts = xarray_reduce(
         pixel_area,
         *tuple(groupby_layers),
-        func="count",
+        func="sum",
         expected_groups=tuple(expected_groups),
     )
     # counts.name = "natural_lands_area"
@@ -120,8 +116,10 @@ async def get_precomputed_statistics(aoi, dask_client):
     """
     )
 
+    # Should eventually rename to this, but currently parquet file is "gadm_adm2".
     # table = "gadm_natural_lands_areas"
     table = "gadm_adm2"
+
     # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
     # For now, we need to just download the file temporarily
     fs = s3fs.S3FileSystem(requester_pays=True)
