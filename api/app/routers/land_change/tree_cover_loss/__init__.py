@@ -16,9 +16,9 @@ create.__doc__ = """
     | **Update Frequency** | Annual |
     | **Content Date** | 2001-2024 |
     | **Keywords**<br/>A list of keyword tags related to this dataset so that the LLM better identify contexts where it is relevant. | tree cover loss, deforestation |
-    
+
     -----
-    
+
     # Available Intersection Datasets
     ## Drivers (LDACS)
     | Dataset Key Aspects | Detailed Description |
