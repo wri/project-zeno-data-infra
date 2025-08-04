@@ -21,36 +21,22 @@ class TreeCoverService:
         """
 
         if tree_cover_analytics.aoi.type == "admin":
-            # Separate ids by their number of parts
-            iso_ids = []
-            iso_adm1_ids = []
-            iso_adm1_adm2_ids = []
-
-            for id_str in tree_cover_analytics.aoi.ids:
-                parts = id_str.split(".")
-                if len(parts) == 1:
-                    iso_ids.append(parts[0])
-                elif len(parts) == 2:
-                    iso_adm1_ids.append((parts[0], int(parts[1])))
-                elif len(parts) == 3:
-                    iso_adm1_adm2_ids.append((parts[0], int(parts[1]), int(parts[2])))
-
             iso_query = self.build_query_for_admin_level(
-                iso_ids,
+                tree_cover_analytics.aoi.ids,
                 0,
                 tree_cover_analytics.canopy_cover,
                 tree_cover_analytics.forest_filter,
             )
 
             adm1_query = self.build_query_for_admin_level(
-                iso_adm1_ids,
+                tree_cover_analytics.aoi.ids,
                 1,
                 tree_cover_analytics.canopy_cover,
                 tree_cover_analytics.forest_filter,
             )
 
             adm2_query = self.build_query_for_admin_level(
-                iso_adm1_adm2_ids,
+                tree_cover_analytics.aoi.ids,
                 2,
                 tree_cover_analytics.canopy_cover,
                 tree_cover_analytics.forest_filter,
@@ -61,6 +47,16 @@ class TreeCoverService:
     def build_query_for_admin_level(
         self, ids, admin_level, canopy_cover, forest_filter=None
     ):
+        admin_level_ids = []
+        for id_str in ids:
+            parts = id_str.split(".")
+            if len(parts) == 1 and admin_level == 0:
+                admin_level_ids.append(parts[0])
+            elif len(parts) == 2 and admin_level == 1:
+                admin_level_ids.append((parts[0], int(parts[1])))
+            elif len(parts) == 3 and admin_level == 2:
+                admin_level_ids.append((parts[0], int(parts[1]), int(parts[2])))
+
         if admin_level == 0:
             admin_select_fields = "iso"
             admin_filter_fields = "iso"
@@ -72,7 +68,7 @@ class TreeCoverService:
             admin_filter_fields = "(iso, adm1, adm2)"
 
         select_str = f"SELECT {admin_select_fields}, SUM(umd_tree_cover_extent_2000__ha) AS umd_tree_cover_extent_2000__ha FROM data"
-        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND {admin_filter_fields} in {tuple(ids)}"
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND {admin_filter_fields} in {tuple(admin_level_ids)}"
         if forest_filter is not None:
             if forest_filter == "primary_forest":
                 forest_filter_field = "is__umd_regional_primary_forest_2001"
