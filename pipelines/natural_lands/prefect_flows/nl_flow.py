@@ -16,9 +16,9 @@ def gadm_natural_lands_area(
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
     base_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
-    contextual_uri = "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+    contextual_uri = "s3://gfw-data-lake/sbtn_natural_lands/v1.1/raster/epsg-4326/zarr/sbtn_natural_lands_all_classes.zarr"
     contextual_column_name = "natural_lands"
-    result_uri = f's3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/tabular/zonal_stats/gadm/gadm_adm2.parquet'
+    result_uri = f's3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/v1.1/tabular/statistics/area_by_admin.parquet'
     funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):

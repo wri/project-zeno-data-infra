@@ -84,7 +84,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
 
         validate_result = run_validation_suite(gadm_dist_result)
 
-     except Exception:
+    except Exception:
         logger.error("DIST alerts analysis failed.")
         raise
     finally:

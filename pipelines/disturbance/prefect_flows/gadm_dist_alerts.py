@@ -9,8 +9,7 @@ from pipelines.prefect_flows import common_tasks
 
 @flow(name="DIST alerts count")
 def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
-    result_filename = "dist_alerts"
-    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
+    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/statistics/admin.parquet"
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 

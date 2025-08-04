@@ -36,6 +36,8 @@ async def zonal_statistics_on_aois(aois, dask_client):
 
 async def zonal_statistics(aoi, geojson):
     grasslands_obj_name = (
+        # Preferred pathname once things have settled.
+        # "s3://gfw-data-lake/gfw_grasslands/v1/raster/epsg-4326/zarr/natural_grasslands_2kchunk.zarr"
         "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_2kchunk.zarr"
     )
     pixel_area_obj_name = (
@@ -164,6 +166,8 @@ def _download_parquet(
     fs = s3fs.S3FileSystem(requester_pays=True)
     local_parquet_file = f"/tmp/{table}.parquet"
     fs.get(
+        # Preferred path name once things have settled.
+        # f"s3://gfw-data-lake/gfw_grasslands/v1/tabular/statistics/{table}.parquet", local_parquet_file
         f"s3://gfw-data-lake/gfw_grasslands/v1/zarr/{table}.parquet", local_parquet_file
     )
 

@@ -65,7 +65,7 @@ def test_gadm_area_by_natural_lands_result(
 
     assert (
         result_uri
-        == "s3://gfw-data-lake/sbtn_natural_lands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
+        == "s3://gfw-data-lake/sbtn_natural_lands/v1.1/tabular/statistics/area_by_admin.parquet"
     )
 
     # Verify

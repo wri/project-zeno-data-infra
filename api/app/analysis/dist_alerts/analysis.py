@@ -3,6 +3,7 @@ import logging
 import os
 import traceback
 from functools import partial
+import httpx
 
 import dask.dataframe as dd
 import duckdb
@@ -50,6 +51,17 @@ DIST_DRIVERS = {
 }
 
 
+def get_latest_version(dataset):
+    url = f"https://data-api.globalforestwatch.org/dataset/{dataset}/latest"
+    resp = httpx.get(url, follow_redirects=True)
+    resp.raise_for_status()
+    data = resp.json()
+    if data["status"] != "success":
+        raise ValueError(f"No latest version set for dataset {dataset}")
+
+    return data["data"]["version"]
+
+
 async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     geojsons = await get_geojson(aois)
     aois = sorted(
@@ -68,6 +80,10 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
 
 
 async def zonal_statistics(aoi, geojson, intersection=None):
+    # Use latest version when the pipeline-generated dist zarr has been QCed.
+    # latest_version = get_latest_version("umd_glad_dist_alerts")
+    # dist_obj_name = f"s3://gfw-data-lake/umd_glad_dist_alerts/{latest_version}/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
@@ -75,7 +91,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
     expected_groups = [np.arange(731, 1590), [1, 2, 3]]
     if intersection == "natural_lands":
         natural_lands = read_zarr_clipped_to_geojson(
-            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
+            "s3://gfw-data-lake/sbtn_natural_lands/v1.1/raster/epsg-4326/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
         ).band_data
         natural_lands.name = "natural_lands_class"
@@ -84,7 +100,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
         dist_drivers = read_zarr_clipped_to_geojson(
-            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
+            "s3://gfw-data-lake/sbtn_natural_lands/v1.1/raster/epsg-4326/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
         )
         dist_drivers.name = "ldacs_driver"
@@ -156,7 +172,11 @@ async def get_precomputed_statistics(aoi, intersection, dask_client):
     # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
     # For now, we need to just download the file temporarily
     fs = s3fs.S3FileSystem(requester_pays=True)
+
+    # Use latest version when the pipeline-generated dist parquets have been QCed.
+    # latest_version = get_latest_version("umd_glad_dist_alerts")
     fs.get(
+        # f"s3://gfw-data-lake/umd_glad_dist_alerts/{latest_version}/tabular/statistics/{table}.parquet"
         f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
         f"/tmp/{table}.parquet",
     )

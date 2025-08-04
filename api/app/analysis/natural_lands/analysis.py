@@ -59,7 +59,7 @@ async def zonal_statistics_on_aois(aois, dask_client):
 
 
 async def zonal_statistics(aoi, geojson):
-    natural_lands_obj_name = "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+    natural_lands_obj_name = "s3://gfw-data-lake/sbtn_natural_lands/v1.1/raster/epsg-4326/zarr/sbtn_natural_lands_all_classes.zarr/"
     pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
     natural_lands = read_zarr_clipped_to_geojson(natural_lands_obj_name, geojson).band_data
     natural_lands.name = "natural_lands_class"
@@ -116,15 +116,13 @@ async def get_precomputed_statistics(aoi, dask_client):
     """
     )
 
-    # Should eventually rename to this, but currently parquet file is "gadm_adm2".
-    # table = "gadm_natural_lands_areas"
-    table = "gadm_adm2"
+    table = "area_by_admin"
 
     # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
     # For now, we need to just download the file temporarily
     fs = s3fs.S3FileSystem(requester_pays=True)
     fs.get(
-        f"s3://gfw-data-lake/sbtn_natural_lands/tabular/zonal_stats/gadm/{table}.parquet",
+        f"s3://gfw-data-lake/sbtn_natural_lands/v1.1/tabular/statistics/{table}.parquet",
         f"/tmp/{table}.parquet",
     )
 
