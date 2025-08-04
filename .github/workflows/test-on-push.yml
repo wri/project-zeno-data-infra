@@ -2,7 +2,7 @@ name: Build, test on push to feature branch
 
 on:
   push:
-    branches-exclude:
+    branches-ignore:
       - main
 
 jobs:
