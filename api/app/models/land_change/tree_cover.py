@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
@@ -15,10 +15,8 @@ AoiUnion = Union[
     ProtectedAreaOfInterest,
 ]
 
-DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 AllowedForestFilter = Literal["primary_forest", "intact_forest"]
-AllowedIntersections = List[Literal["driver"]]
 
 
 class TreeCoverAnalyticsIn(StrictBaseModel):

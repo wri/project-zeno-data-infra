@@ -2,6 +2,7 @@ import logging
 import traceback
 import uuid
 
+from app.models.common.analysis import AnalysisStatus
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
 from app.models.land_change.tree_cover import (
     TreeCoverAnalytics,
@@ -31,15 +32,15 @@ def create(
     background_tasks: BackgroundTasks,
 ):
     try:
-        service = TreeCoverService(background_tasks)
-        service.do(data)
+        service = TreeCoverService()
+        background_tasks.add_task(service.do, data)
 
         link_url = request.url_for(
             "get_tree_cover_analytics_result", resource_id=data.thumbprint()
         )
         link = DataMartResourceLink(link=str(link_url))
 
-        return DataMartResourceLinkResponse(data=link, status=service.get_status())
+        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
     except Exception as e:
         logging.error(
             {
@@ -72,12 +73,11 @@ async def get_tree_cover_analytics_result(
         )
 
     try:
-        service = TreeCoverService()
         response.headers["Retry-After"] = "1"
 
         return TreeCoverAnalyticsResponse(
             data=TreeCoverAnalytics(
-                status=service.get_status(),
+                status=AnalysisStatus.pending,
                 message="Resource is still processing, follow Retry-After header.",
                 result=None,
                 metadata=None,
