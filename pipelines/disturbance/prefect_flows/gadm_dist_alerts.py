@@ -32,12 +32,11 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-compute-zonal-stats"
     )(*compute_input, funcname="count")
-    result_df = common_tasks.postprocess_result.with_options(
+    result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-postprocess-result"
     )(result_dataset)
     common_tasks.save_result.with_options(
         name="dist-alerts-save-result"
     )(result_df, result_uri)
-    validate_result = validate_zonal_statistics.validate(result_uri)
 
     return result_uri

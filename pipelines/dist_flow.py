@@ -8,6 +8,7 @@ from pipelines.disturbance.create_zarr import (
     create_zarr as create_zarr_func,
 )
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.disturbance import validate_zonal_statistics
 
 from pipelines.disturbance import prefect_flows
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
@@ -26,7 +27,6 @@ def create_cluster():
         name="dist_alerts_zonal_stat_count",
         region="us-east-1",
         n_workers=10,
-        # container="globalforestwatch/zeno:2",
         tags={"project": "dist_alerts_zonal_stat"},
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
@@ -47,8 +47,8 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 
 @task
-def run_validation_suite():
-    pass
+def run_validation_suite(gadm_dist_result):
+    validate_zonal_statistics.validate(gadm_dist_result)
 
 
 @flow(name="dist_alerts_flow", log_prints=True)
@@ -65,7 +65,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         result_uris.append(nl_result)
 
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version, overwrite=overwrite)
+        gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version, overwrite=True)
         result_uris.append(gadm_dist_result)
 
         gadm_dist_by_natural_lands_result = (
@@ -79,7 +79,10 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
             dist_zarr_uri, dist_version
         )
         result_uris.append(gadm_dist_by_drivers_result)
-    except Exception:
+
+        validate_result = run_validation_suite(gadm_dist_result)
+
+     except Exception:
         logger.error("DIST alerts analysis failed.")
         raise
     finally:

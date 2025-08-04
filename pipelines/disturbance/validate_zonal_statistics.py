@@ -50,12 +50,12 @@ class DistZonalStats(pa.DataFrameModel):
         strict = True
         name = "ZonalStatsSchema"
         ordered = True
-        unique = ["country", "region", "subregion", "alert_date", "confidence"]
+        unique = ["country", "region", "subregion", "alert_date", "alert_confidence"]
 
     @staticmethod
     def calculate_alert_counts_by_date(df: pd.DataFrame) -> dict:
         """Calculate the number of dates with alerts by confidence level."""
-        alert_counts = df["confidence"].value_counts().to_dict()
+        alert_counts = df["alert_confidence"].value_counts().to_dict()
         return {
             "low_confidence": alert_counts.get(2, 0),
             "high_confidence": alert_counts.get(3, 0),
@@ -65,7 +65,7 @@ class DistZonalStats(pa.DataFrameModel):
     def spot_check_julian_dates(df: pd.DataFrame, julian_dates: List[int]) -> pd.DataFrame:
         filtered_by_date_df = df[df["alert_date"].isin(julian_dates)]
         filtered_by_date_df = filtered_by_date_df.sort_values(by="alert_date").reset_index(drop=True)
-        return filtered_by_date_df[["alert_date", "confidence", "value"]]
+        return filtered_by_date_df[["alert_date", "alert_confidence", "value"]]
     
 class NaturalLandsZonalStats(pa.DataFrameModel):
     countries: Series[str] = pa.Field(isin=isos)
@@ -123,11 +123,11 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     low_conf_results = df.groupby("alert_date")["low_conf"].sum().reset_index()
 
     # set confidence levels and GADM IDs
-    high_conf_results["confidence"] = 3
+    high_conf_results["confidence"] = "high"
     high_conf_results["country"] = 76
     high_conf_results["region"] = 20
     high_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
-    low_conf_results["confidence"] = 2
+    low_conf_results["confidence"] = "low"
     low_conf_results["country"] = 76
     low_conf_results["region"] = 20
     low_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
