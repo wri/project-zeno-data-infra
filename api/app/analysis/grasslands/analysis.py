@@ -118,11 +118,11 @@ async def do_analytics(file_path, dask_client):
 
         if metadata_content["start_year"] is not None:
             grasslands_df = grasslands_df[
-                grasslands_df.year >= metadata_content["start_year"]
+                grasslands_df.year >= int(metadata_content["start_year"])
             ]
         if metadata_content["end_year"] is not None:
             grasslands_df = grasslands_df[
-                grasslands_df.year <= metadata_content["end_year"]
+                grasslands_df.year <= int(metadata_content["end_year"])
             ]
         grasslands_dict = grasslands_df.to_dict(orient="list")
 
