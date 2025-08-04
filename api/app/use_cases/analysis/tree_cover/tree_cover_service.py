@@ -64,6 +64,19 @@ class TreeCoverService:
                         where_str += f" AND {forest_filter_field} = true"
                     group_by = "GROUP BY iso, adm1"
                     return f"{select_str} {where_str} {group_by}"
+                elif admin_level == 2:
+                    select_str = "SELECT iso, adm1, adm2, SUM(umd_tree_cover_extent_2000__ha) AS umd_tree_cover_extent_2000__ha FROM data"
+                    where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND (iso, adm1, adm2) in {tuple(ids)}"
+                    if forest_filter is not None:
+                        if forest_filter == "primary_forest":
+                            forest_filter_field = "is__umd_regional_primary_forest_2001"
+                        elif forest_filter == "intact_forest":
+                            forest_filter_field = (
+                                "is__ifl_intact_forest_landscapes_2000"
+                            )
+                        where_str += f" AND {forest_filter_field} = true"
+                    group_by = "GROUP BY iso, adm1, adm2"
+                    return f"{select_str} {where_str} {group_by}"
 
             iso_query = build_query_for_admin_level(
                 iso_ids,
@@ -78,7 +91,15 @@ class TreeCoverService:
                 tree_cover_analytics.canopy_cover,
                 tree_cover_analytics.forest_filter,
             )
-            return (iso_query, adm1_query)
+
+            adm2_query = build_query_for_admin_level(
+                iso_adm1_adm2_ids,
+                2,
+                tree_cover_analytics.canopy_cover,
+                tree_cover_analytics.forest_filter,
+            )
+
+            return (iso_query, adm1_query, adm2_query)
 
             # if iso_ids:
             #     iso_list = ", ".join([f"'{iso}'" for iso in iso_ids])
