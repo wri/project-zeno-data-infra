@@ -60,10 +60,10 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         logger.info(f"Latest dist version: {dist_version}")
         dask_client, _ = create_cluster()
 
-        # nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
-        # result_uris.append(nl_result)
+        nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
+        result_uris.append(nl_result)
 
-        dist_zarr_uri = create_zarr(dist_version, overwrite=False)
+        dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
         gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version, overwrite=overwrite)
         result_uris.append(gadm_dist_result)
 
@@ -92,4 +92,4 @@ def main(overwrite=False):
 
 
 if __name__ == "__main__":
-    main(overwrite=True)
+    main(overwrite=False)
