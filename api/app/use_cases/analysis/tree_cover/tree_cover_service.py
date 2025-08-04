@@ -62,35 +62,23 @@ class TreeCoverService:
         self, ids, admin_level, canopy_cover, forest_filter=None
     ):
         if admin_level == 0:
-            select_str = "SELECT iso, SUM(umd_tree_cover_extent_2000__ha) AS umd_tree_cover_extent_2000__ha FROM data"
-            where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND iso in {tuple(ids)}"
-            if forest_filter is not None:
-                if forest_filter == "primary_forest":
-                    forest_filter_field = "is__umd_regional_primary_forest_2001"
-                elif forest_filter == "intact_forest":
-                    forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
-                where_str += f" AND {forest_filter_field} = true"
-            group_by = "GROUP BY iso"
-            return f"{select_str} {where_str} {group_by}"
+            admin_select_fields = "iso"
+            admin_filter_fields = "iso"
         elif admin_level == 1:
-            select_str = "SELECT iso, adm1, SUM(umd_tree_cover_extent_2000__ha) AS umd_tree_cover_extent_2000__ha FROM data"
-            where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND (iso, adm1) in {tuple(ids)}"
-            if forest_filter is not None:
-                if forest_filter == "primary_forest":
-                    forest_filter_field = "is__umd_regional_primary_forest_2001"
-                elif forest_filter == "intact_forest":
-                    forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
-                where_str += f" AND {forest_filter_field} = true"
-            group_by = "GROUP BY iso, adm1"
-            return f"{select_str} {where_str} {group_by}"
+            admin_select_fields = "iso, adm1"
+            admin_filter_fields = "(iso, adm1)"
         elif admin_level == 2:
-            select_str = "SELECT iso, adm1, adm2, SUM(umd_tree_cover_extent_2000__ha) AS umd_tree_cover_extent_2000__ha FROM data"
-            where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND (iso, adm1, adm2) in {tuple(ids)}"
-            if forest_filter is not None:
-                if forest_filter == "primary_forest":
-                    forest_filter_field = "is__umd_regional_primary_forest_2001"
-                elif forest_filter == "intact_forest":
-                    forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
-                where_str += f" AND {forest_filter_field} = true"
-            group_by = "GROUP BY iso, adm1, adm2"
-            return f"{select_str} {where_str} {group_by}"
+            admin_select_fields = "iso, adm1, adm2"
+            admin_filter_fields = "(iso, adm1, adm2)"
+
+        select_str = f"SELECT {admin_select_fields}, SUM(umd_tree_cover_extent_2000__ha) AS umd_tree_cover_extent_2000__ha FROM data"
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {canopy_cover} AND {admin_filter_fields} in {tuple(ids)}"
+        if forest_filter is not None:
+            if forest_filter == "primary_forest":
+                forest_filter_field = "is__umd_regional_primary_forest_2001"
+            elif forest_filter == "intact_forest":
+                forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
+            where_str += f" AND {forest_filter_field} = true"
+        group_by = f"GROUP BY {admin_select_fields}"
+        query = f"{select_str} {where_str} {group_by}"
+        return query
