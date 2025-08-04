@@ -57,20 +57,7 @@ class GrasslandsAnalyticsIn(StrictBaseModel):
         return self
 
 class GrasslandsAnalytics(StrictBaseModel):
-    result: Optional[dict] = {  # column oriented for loading into a dataframe
-        "__dtypes__": {
-            "country": "str",
-            "region": "int",
-            "subregion": "int",
-            "year": "int",
-            "grassland_area": "float",
-        },
-        "country": ["BRA", "BRA", "BRA"],
-        "region": [1, 1, 1],
-        "subregion": [12, 12, 12],
-        "year": [2000, 2001, 2002],
-        "grassland_area": [384.9, 483.1, 1858.3],
-    }
+    result: Optional[dict] = None
     metadata: Optional[dict] = None
     message: Optional[str] = None
     status: AnalysisStatus
@@ -83,3 +70,34 @@ class GrasslandsAnalytics(StrictBaseModel):
 
 class GrasslandsAnalyticsResponse(Response):
     data: GrasslandsAnalytics
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "data": {
+                        "result": {  # column oriented for loading into a dataframe
+                            "__dtypes__": {
+                                "country": "str",
+                                "region": "int",
+                                "subregion": "int",
+                                "year": "int",
+                                "grassland_area": "float",
+                            },
+                            "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
+                            "aoi_type": ["admin", "admin", "admin"],
+                            "year": [2000, 2001, 2002],
+                            "grassland_area": [384.9, 483.1, 1858.3],
+                        },
+                       "metadata": {
+                            "aoi": {
+                                "type": "admin",
+                                "ids": ["BRA.1.12"],
+                            },
+                        },
+                        "message": "",
+                        "status": "saved",
+                    }
+                }
+            ]
+        }
+    }
