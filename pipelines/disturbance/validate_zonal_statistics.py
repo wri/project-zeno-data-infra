@@ -76,7 +76,7 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
 
 def generate_validation_statistics(version: str) -> pd.DataFrame:
     """Generate zonal statistics for the admin area AOI."""
-    gdf = gpd.read_file("test/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
+    gdf = gpd.read_file("pipelines/test/fixtures/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
     aoi = gdf.iloc[0]
     aoi_tile = "00N_040W" # This AOI fits within a tile, but we should build VRTs so we can use any (resonably sized) AOI
     
