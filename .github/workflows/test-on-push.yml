@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  just_test_stuff:
+  build_and_push_image:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: us-east-1
@@ -15,7 +15,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - name: Install packages needed for later actions (local)
+      - name: Install packages needed for ACT
         if: ${{ env.ACT }}
         run: |
           apt-get update
@@ -44,6 +44,28 @@ jobs:
         if: success()
         run: |
           docker build -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }} .
+
+      - name: Push Docker Image to ECR (Replace with step to build + cache)
+        if: success()
+        run: |
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+
+
+  just_test_api:
+    needs: build_and_push_image
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      REPOSITORY_NAME: analytics-api
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Run tests
         if: success()
