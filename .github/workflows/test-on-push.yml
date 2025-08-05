@@ -67,6 +67,11 @@ jobs:
       - name: Set short SHA
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
+      - name: Login to Amazon ECR
+        if: success()
+        uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+
       - name: Run tests
         if: success()
         uses: addnab/docker-run-action@v3
@@ -92,6 +97,11 @@ jobs:
 
       - name: Set short SHA
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Login to Amazon ECR
+        if: success()
+        uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
 
       - name: Run tests
         if: success()
