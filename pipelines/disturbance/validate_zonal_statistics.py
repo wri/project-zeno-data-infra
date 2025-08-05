@@ -9,6 +9,8 @@ import rasterio as rio
 from rasterio.windows import from_bounds
 from rasterio.features import geometry_mask
 import numpy as np
+from dateutil.relativedelta import relativedelta
+from datetime import date
 
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
@@ -31,42 +33,77 @@ isos = [
     'VEN', 'VNM', 'VGB', 'VIR', 'WLF', 'ESH', 'YEM', 'ZMB', 'ZWE'
 ]
 
+numeric_to_alpha3 = {
+    4: 'AFG', 248: 'ALA', 8: 'ALB', 12: 'DZA', 16: 'ASM', 20: 'AND', 24: 'AGO', 660: 'AIA',
+    10: 'ATA', 28: 'ATG', 32: 'ARG', 51: 'ARM', 533: 'ABW', 36: 'AUS', 40: 'AUT', 31: 'AZE',
+    44: 'BHS', 48: 'BHR', 50: 'BGD', 52: 'BRB', 112: 'BLR', 56: 'BEL', 84: 'BLZ', 204: 'BEN',
+    60: 'BMU', 64: 'BTN', 68: 'BOL', 535: 'BES', 70: 'BIH', 72: 'BWA', 74: 'BVT', 76: 'BRA',
+    86: 'IOT', 96: 'BRN', 100: 'BGR', 854: 'BFA', 108: 'BDI', 132: 'CPV', 116: 'KHM', 120: 'CMR',
+    124: 'CAN', 136: 'CYM', 140: 'CAF', 148: 'TCD', 152: 'CHL', 156: 'CHN', 162: 'CXR', 166: 'CCK',
+    170: 'COL', 174: 'COM', 178: 'COG', 180: 'COD', 184: 'COK', 188: 'CRI', 384: 'CIV', 191: 'HRV',
+    192: 'CUB', 531: 'CUW', 196: 'CYP', 203: 'CZE', 208: 'DNK', 262: 'DJI', 212: 'DMA', 214: 'DOM',
+    218: 'ECU', 818: 'EGY', 222: 'SLV', 226: 'GNQ', 232: 'ERI', 233: 'EST', 748: 'SWZ', 231: 'ETH',
+    238: 'FLK', 234: 'FRO', 242: 'FJI', 246: 'FIN', 250: 'FRA', 254: 'GUF', 258: 'PYF', 260: 'ATF',
+    266: 'GAB', 270: 'GMB', 268: 'GEO', 276: 'DEU', 288: 'GHA', 292: 'GIB', 300: 'GRC', 304: 'GRL',
+    308: 'GRD', 312: 'GLP', 316: 'GUM', 320: 'GTM', 831: 'GGY', 324: 'GIN', 624: 'GNB', 328: 'GUY',
+    332: 'HTI', 334: 'HMD', 336: 'VAT', 340: 'HND', 344: 'HKG', 348: 'HUN', 352: 'ISL', 356: 'IND',
+    360: 'IDN', 364: 'IRN', 368: 'IRQ', 372: 'IRL', 833: 'IMN', 376: 'ISR', 380: 'ITA', 388: 'JAM',
+    392: 'JPN', 832: 'JEY', 400: 'JOR', 398: 'KAZ', 404: 'KEN', 296: 'KIR', 408: 'PRK', 410: 'KOR',
+    414: 'KWT', 417: 'KGZ', 418: 'LAO', 428: 'LVA', 422: 'LBN', 426: 'LSO', 430: 'LBR', 434: 'LBY',
+    438: 'LIE', 440: 'LTU', 442: 'LUX', 446: 'MAC', 450: 'MDG', 454: 'MWI', 458: 'MYS', 462: 'MDV',
+    466: 'MLI', 470: 'MLT', 584: 'MHL', 474: 'MTQ', 478: 'MRT', 480: 'MUS', 175: 'MYT', 484: 'MEX',
+    583: 'FSM', 498: 'MDA', 492: 'MCO', 496: 'MNG', 499: 'MNE', 500: 'MSR', 504: 'MAR', 508: 'MOZ',
+    104: 'MMR', 516: 'NAM', 520: 'NRU', 524: 'NPL', 528: 'NLD', 540: 'NCL', 554: 'NZL', 558: 'NIC',
+    562: 'NER', 566: 'NGA', 570: 'NIU', 574: 'NFK', 807: 'MKD', 580: 'MNP', 578: 'NOR', 512: 'OMN',
+    586: 'PAK', 585: 'PLW', 275: 'PSE', 591: 'PAN', 598: 'PNG', 600: 'PRY', 604: 'PER', 608: 'PHL',
+    612: 'PCN', 616: 'POL', 620: 'PRT', 630: 'PRI', 634: 'QAT', 638: 'REU', 642: 'ROU', 643: 'RUS',
+    646: 'RWA', 652: 'BLM', 654: 'SHN', 659: 'KNA', 662: 'LCA', 663: 'MAF', 666: 'SPM', 670: 'VCT',
+    882: 'WSM', 674: 'SMR', 678: 'STP', 682: 'SAU', 686: 'SEN', 688: 'SRB', 690: 'SYC', 694: 'SLE',
+    702: 'SGP', 534: 'SXM', 703: 'SVK', 705: 'SVN', 90: 'SLB', 706: 'SOM', 710: 'ZAF', 239: 'SGS',
+    728: 'SSD', 724: 'ESP', 144: 'LKA', 729: 'SDN', 740: 'SUR', 744: 'SJM', 752: 'SWE', 756: 'CHE',
+    760: 'SYR', 158: 'TWN', 762: 'TJK', 834: 'TZA', 764: 'THA', 626: 'TLS', 768: 'TGO', 772: 'TKL',
+    776: 'TON', 780: 'TTO', 788: 'TUN', 792: 'TUR', 795: 'TKM', 796: 'TCA', 798: 'TUV', 800: 'UGA',
+    804: 'UKR', 784: 'ARE', 826: 'GBR', 840: 'USA', 581: 'UMI', 858: 'URY', 860: 'UZB', 548: 'VUT',
+    862: 'VEN', 704: 'VNM', 92: 'VGB', 850: 'VIR', 876: 'WLF', 732: 'ESH', 887: 'YEM', 894: 'ZMB',
+    716: 'ZWE'
+}
+
 sbtn_natural_lands_classes = [
     "Forest", "Short vegetation", "Water", "Mangroves", "Bare", "Snow/Ice", "Wetland forest", "Peat forest",
-    "Wetland short vegetation", "Peat short vegetation",  "Cropland", "Built-up", "Tree cover", "Short vegetation",
+    "Wetland short vegetation", "Peat short vegetation", "Cropland", "Built-up", "Tree cover", "Short vegetation",
     "Water", "Wetland tree cover", "Peat tree cover", "Wetland short vegetation", "Peat short vegetation", "Bare"
 ]
 
 class DistZonalStats(pa.DataFrameModel):
-    country: Series[int] = pa.Field(eq=76) # gadm id for Brazil
+    country: Series[str] = pa.Field(eq="BRA")
     region: Series[int] = pa.Field(eq=20) # gadm id for adm1 AOI
     subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
-    alert_date: Series[int] = pa.Field(ge=731, le=1640) # julian date between 2023-01-01 to latest version
-    confidence: Series[int] = pa.Field(ge=2, le=3) # low confidence, high confidence
-    value: Series[int]
-    
+    alert_date: Series[date] = pa.Field(ge=date.fromisoformat("2023-01-01"), le=date.fromisoformat("2025-06-28")) # julian date between 2023-01-01 to latest version
+    alert_confidence: Series[str] = pa.Field(isin=["low", "high"]) # low confidence, high confidence
+    count: Series[int]
+
     class Config:
         coerce = True
         strict = True
         name = "ZonalStatsSchema"
         ordered = True
-        unique = ["country", "region", "subregion", "alert_date", "confidence"]
+        unique = ["country", "region", "subregion", "alert_date", "alert_confidence"]
 
     @staticmethod
     def calculate_alert_counts_by_date(df: pd.DataFrame) -> dict:
         """Calculate the number of dates with alerts by confidence level."""
-        alert_counts = df["confidence"].value_counts().to_dict()
+        alert_counts = df["alert_confidence"].value_counts().to_dict()
         return {
-            "low_confidence": alert_counts.get(2, 0),
-            "high_confidence": alert_counts.get(3, 0),
+            "low_confidence": alert_counts.get("low", 0),
+            "high_confidence": alert_counts.get("high", 0),
         }
-    
+
     @staticmethod
-    def spot_check_julian_dates(df: pd.DataFrame, julian_dates: List[int]) -> pd.DataFrame:
+    def spot_check_julian_dates(df: pd.DataFrame, julian_dates: List[date]) -> pd.DataFrame:
         filtered_by_date_df = df[df["alert_date"].isin(julian_dates)]
         filtered_by_date_df = filtered_by_date_df.sort_values(by="alert_date").reset_index(drop=True)
-        return filtered_by_date_df[["alert_date", "confidence", "value"]]
-    
+        return filtered_by_date_df[["alert_date", "alert_confidence", "count"]]
+
 class NaturalLandsZonalStats(pa.DataFrameModel):
     countries: Series[str] = pa.Field(isin=isos)
     regions: Series[int] = pa.Field()
@@ -79,7 +116,7 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     gdf = gpd.read_file("test/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
     aoi = gdf.iloc[0]
     aoi_tile = "00N_040W" # This AOI fits within a tile, but we should build VRTs so we can use any (resonably sized) AOI
-    
+
     # read dist alerts for AOI
     bounds = aoi.geometry.bounds
     with rio.open(f"s3://gfw-data-lake/umd_glad_dist_alerts/{version}/raster/epsg-4326/10/40000/default/gdal-geotiff/{aoi_tile}.tif") as src:
@@ -99,12 +136,12 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     dist_low_conf = np.where(dist_confidence_levels == 2, 1, 0)
 
     # Extract Julian date (remaining digits)
-    dist_julian_date = dist_alerts % 10000 
+    dist_julian_date = dist_alerts % 10000
 
     # create geometry_mask to mask dist alerts by aoi geometry
     aoi_mask = geometry_mask([aoi.geometry], invert=True, transform=win_affine, out_shape=dist_alerts.shape)
 
-    # confidence level maskings 
+    # confidence level maskings
     # anything outside the AOI becomes zero
     dist_high_conf_aoi = aoi_mask * dist_high_conf
     dist_low_conf_aoi = aoi_mask * dist_low_conf
@@ -123,11 +160,11 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     low_conf_results = df.groupby("alert_date")["low_conf"].sum().reset_index()
 
     # set confidence levels and GADM IDs
-    high_conf_results["confidence"] = 3
+    high_conf_results["confidence"] = "high"
     high_conf_results["country"] = 76
     high_conf_results["region"] = 20
     high_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
-    low_conf_results["confidence"] = 2
+    low_conf_results["confidence"] = "low"
     low_conf_results["country"] = 76
     low_conf_results["region"] = 20
     low_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
@@ -149,12 +186,16 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     # drop rows where alerts are zero
     results = results[results["value"] != 0]
 
+    results.rename(columns={"value": "count", "confidence": "alert_confidence"}, inplace=True)
+    results['alert_date'] = results.sort_values(by='alert_date').alert_date.apply(lambda x: date(2020, 12, 31) + relativedelta(days=x))
+    results["country"] = results["country"].apply(lambda x: numeric_to_alpha3.get(x, None))
+
     return pd.DataFrame(results)
 
-@task    
+@task
 def validate(parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
-    
+
     logger = get_run_logger()
 
     # load local results
@@ -165,7 +206,7 @@ def validate(parquet_uri: str) -> bool:
 
     # load zeno stats for aoi
     zeno_df = pd.read_parquet(parquet_uri) # assumes parquet refers to latest version
-    zeno_aoi_df = zeno_df[(zeno_df["country"] == 76) & (zeno_df["region"] == 20)]
+    zeno_aoi_df = zeno_df[(zeno_df["country"] == "BRA") & (zeno_df["region"] == 20)]
     logger.info("Loaded Zeno stats for admin area.")
 
     # validate zonal stats schema
@@ -185,7 +226,7 @@ def validate(parquet_uri: str) -> bool:
     logger.info("Alert counts validation passed.")
 
     # spot check random dates
-    validation_dates = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500] # example julian dates
+    validation_dates = [date.fromisoformat(dstr) for dstr in ["2023-03-11", "2023-06-19", "2023-09-27", "2024-01-05", "2024-04-14", "2024-07-23", "2024-10-31", "2025-02-08"]] # example julian dates (800, 900, ..., 1500)
     #validation_dates = np.random.choice(range(800, 1500), size=10, replace=False).tolist() # if we want to use random dates
     validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, validation_dates)
     zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, validation_dates)
@@ -193,5 +234,5 @@ def validate(parquet_uri: str) -> bool:
         logger.error("Spot check dataframes do not match.")
         return False
     logger.info("Spot check validation passed.")
-    
+
     return True

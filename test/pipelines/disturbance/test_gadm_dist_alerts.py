@@ -1,4 +1,5 @@
 import pytest
+import datetime
 
 from unittest.mock import patch
 
@@ -42,24 +43,24 @@ def test_gadm_dist_alerts_result(
     alert_schema = DataFrameSchema(
         name="GADM Dist Alerts",
         columns={
-            "country": Column(int, Check.ge(0)),
+            "country": Column(str, Check.ne("")),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
             "alert_date": Column(
-                int,
+                datetime.date,
                 checks=[
-                    Check.greater_than_or_equal_to(731),
-                    Check.less_than_or_equal_to(800),
+                    Check.greater_than_or_equal_to(datetime.date.fromisoformat("2023-01-01")),
+                    Check.less_than_or_equal_to(datetime.date.fromisoformat("2023-03-11")),
                 ],
             ),
-            "confidence": Column(int, Check.isin([2, 3])),
-            "value": Column(int, Check.isin([0, 1, 2])),
+            "alert_confidence": Column(str, Check.isin(["low", "high"])),
+            "count": Column(int, Check.isin([0, 1, 2])),
         },
-        unique=["country", "region", "subregion", "alert_date", "confidence"],
+        unique=["country", "region", "subregion", "alert_date", "alert_confidence"],
         checks=Check(
             lambda df: (
                 df.groupby(["country", "region", "subregion", "alert_date"])[
-                    "confidence"
+                    "alert_confidence"
                 ].transform("nunique")
                 == 1
             ),
@@ -73,5 +74,4 @@ def test_gadm_dist_alerts_result(
 
     # Verify
     result = mock_save_parquet.call_args[0][0]
-    print(f"\nGADM dist alerts result:\n{result}")
     alert_schema.validate(result)
