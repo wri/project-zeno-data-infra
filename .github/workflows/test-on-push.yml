@@ -19,7 +19,7 @@ jobs:
         if: ${{ env.ACT }}
         run: |
           apt-get update
-          apt-get install sudo nodejs iptables docker.io -y
+          apt-get install sudo nodejs iptables docker.io awscli -y
 
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -78,11 +78,14 @@ jobs:
           docker login --username AWS \
           --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
+      - name: Pull image manually to ensure auth works
+        run: |
+          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+
       - name: Run tests
         uses: addnab/docker-run-action@v3
         with:
           image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-          registry: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd api
@@ -118,11 +121,14 @@ jobs:
           docker login --username AWS \
           --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
+      - name: Pull image manually to ensure auth works
+        run: |
+          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+
       - name: Run tests
         uses: addnab/docker-run-action@v3
         with:
           image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-          registry: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd pipelines
