@@ -151,16 +151,19 @@ jobs:
           rm -rf /tmp/aws/
 
       - name: Login to container registry
+        if: success()
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS \
           --password-stdin ${{ env.CONTAINER_REGISTRY }}
 
       - name: Explicitly pull image
+        if: success()
         run: |
           docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
 
       - name: Re-configure AWS credentials for GFW Data Lake
+        if: success()
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ env.AWS_GFW_ACCESS_KEY_ID }}
@@ -168,10 +171,11 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Run tests
+        if: success()
         uses: addnab/docker-run-action@v3
         with:
           image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            pytest test --disable-warnings
+            AWS_ACCESSKEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
