@@ -66,7 +66,6 @@ jobs:
 #    runs-on: ubuntu-latest
 #    env:
 #      AWS_REGION: ${{ secrets.AWS_REGION }}
-#      API_KEY: ${{ secrets.API_KEY }}
 #      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
 #      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
 #      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -121,7 +120,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      API_KEY: ${{ secrets.API_KEY }}
       AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
       AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
       AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -162,6 +160,13 @@ jobs:
         run: |
           docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
 
+      - name: Re-configure AWS credentials for GFW Data Lake
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_GFW_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_GFW_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Run tests
         uses: addnab/docker-run-action@v3
         with:
@@ -169,4 +174,4 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            AWS_ACCESSKEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            pytest test --disable-warnings
