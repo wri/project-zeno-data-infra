@@ -3,7 +3,6 @@ import numpy as np
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.disturbance import validate_zonal_statistics
 from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
@@ -32,7 +31,7 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-compute-zonal-stats"
     )(*compute_input, funcname="count")
-    result_df = common_tasks.postprocess_result.with_options(
+    result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-postprocess-result"
     )(result_dataset)
     common_tasks.save_result.with_options(

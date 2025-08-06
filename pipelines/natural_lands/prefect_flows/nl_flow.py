@@ -5,7 +5,6 @@ from prefect import flow
 
 from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
-from pipelines.disturbance.prefect_flows import dist_common_tasks
 from pipelines.natural_lands.prefect_flows import nl_tasks
 from pipelines.prefect_flows import common_tasks
 
@@ -43,7 +42,7 @@ def gadm_natural_lands_area(
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="area-by-natural-lands-compute-zonal-stats"
     )(*compute_input, funcname=funcname)
-    result_df = common_tasks.postprocess_result.with_options(
+    result_df = nl_tasks.postprocess_result.with_options(
         name="area-by-natural-lands-postprocess-result"
     )(result_dataset)
     result_uri = common_tasks.save_result.with_options(

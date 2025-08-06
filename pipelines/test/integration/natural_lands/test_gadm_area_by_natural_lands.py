@@ -21,12 +21,13 @@ def test_gadm_area_by_natural_lands_result(
     natural_lands_ds,
 ):
     alert_schema = DataFrameSchema(
-        name="GADM Dist Alerts",
+        name="GADM Natural lands",
         columns={
-            "country": Column(int, Check.ge(0)),
+            "country": Column(str, Check.ne('')),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
-            "natural_lands": Column(int, Check.ge(0)),
+            "natural_lands_category": Column(str, Check.ne("")),
+            "natural_lands_class": Column(str, Check.ne("")),
             "value": Column(dtypes.Float32, Check.in_range(0.0, 2300.0)),
         },
         unique=[
@@ -38,7 +39,7 @@ def test_gadm_area_by_natural_lands_result(
         checks=Check(
             lambda df: (
                 df.groupby(
-                    ["country", "region", "subregion", "natural_lands"]
+                    ["country", "region", "subregion", "natural_lands_category"]
                 )["value"].transform("nunique")
                 == 1
             ),
