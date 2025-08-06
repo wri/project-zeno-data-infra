@@ -27,11 +27,6 @@ def create_zarr(version, overwrite=False) -> str:
         {"x": 10000, "y": 10000}
     )
 
-    alert_date = (dataset % 10000).astype(np.uint16)
-    alert_conf = (dataset // 10000).astype(np.uint8)
-    alert_conf.name = "confidence"
-    alert_date.name = "alert_date"
-
     decoded_alert_data = decode_alert_data(dataset)
     decoded_alert_data.to_zarr(zarr_uri, mode="w")
 
