@@ -35,73 +35,65 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Manually login to ECR
+      - name: Build Docker Image
+        if: success()
+        run: |
+          docker build -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:$SHORT_SHA .
+
+      - name: Manually login to ECR because aws-actions/amazon-ecr-login@v2 didn't work
         if: success()
         run: |
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
           docker login --username AWS \
           --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
-#      - name: Login to Amazon ECR
-#        if: success()
-#        uses: aws-actions/amazon-ecr-login@v2
-#        id: login-ecr
-
-      - name: Build Docker Image
-        if: success()
-        run: |
-          docker build -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }} .
-
       - name: Push Docker Image to ECR (Replace with step to build + cache)
         if: success()
         run: |
-          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
 
-      - name: Debug pulling from ECR 1
+  just_test_api:
+    needs: build_and_push_image
+    runs-on: ubuntu-latest
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+      AWS_REGION: us-east-1
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      REPOSITORY_NAME: analytics-api
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        if: success()
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Manually login to ECR because aws-actions/amazon-ecr-login@v2 didn't work
         if: success()
         run: |
-          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS \
+          --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
-#  just_test_api:
-#    needs: build_and_push_image
-#    runs-on: ubuntu-latest
-#    env:
-#      API_KEY: ${{ secrets.API_KEY }}
-#      AWS_REGION: us-east-1
-#      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-#      REPOSITORY_NAME: analytics-api
-#      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#    steps:
-#      - name: Checkout Code
-#        uses: actions/checkout@v4
-#
-#      - name: Set short SHA
-#        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-#
-#      - name: Configure AWS credentials
-#        if: success()
-#        uses: aws-actions/configure-aws-credentials@v4
-#        with:
-#          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-#          aws-region: ${{ env.AWS_REGION }}
-#
-#      - name: Login to Amazon ECR
-#        if: success()
-#        uses: aws-actions/amazon-ecr-login@v2
-#        id: login-ecr
-#
-#      - name: Run tests
-#        if: success()
-#        uses: addnab/docker-run-action@v3
-#        with:
-#          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-#          registry: ${{ steps.login-ecr.outputs.registry }}
-#          run: |
-#            uv sync --locked --no-install-project --dev -p 3.13.5
-#            cd api
-#            API_KEY=${{ env.API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+      - name: Run tests
+        if: success()
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:$.SHORT_SHA
+          registry: ${{ steps.login-ecr.outputs.registry }}
+          run: |
+            uv sync --locked --no-install-project --dev -p 3.13.5
+            cd api
+            API_KEY=${{ env.API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
 
   just_test_pipelines:
     needs: build_and_push_image
@@ -123,34 +115,33 @@ jobs:
       - name: Debug pulling from ECR 2
         if: success()
         run: |
-          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
 
-#      - name: Configure AWS credentials
-#        uses: aws-actions/configure-aws-credentials@v4
-#        with:
-#          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-#          aws-region: ${{ env.AWS_REGION }}
-#
-#      - name: Debug pulling from ECR 3
-#        run: |
-#          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-#
-#      - name: Login to Amazon ECR
-#        uses: aws-actions/amazon-ecr-login@v2
-#        id: login-ecr
-#
-#      - name: Debug pulling from ECR 4
-#        run: |
-#          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-#      - name: Run tests
-#        if: success()
-#        uses: addnab/docker-run-action@v3
-#        with:
-#          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-#          registry: ${{ steps.login-ecr.outputs.registry }}
-#          run: |
-#            uv sync --locked --no-install-project --dev -p 3.13.5
-#            cd pipelines
-#            API_KEY=${{ env.API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+      - name: Debug pulling from ECR 3
+        run: |
+          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
+
+      - name: Manually login to ECR because aws-actions/amazon-ecr-login@v2 didn't work
+        if: success()
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS \
+          --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+      - name: Run tests
+        if: success()
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
+          registry: ${{ steps.login-ecr.outputs.registry }}
+          run: |
+            uv sync --locked --no-install-project --dev -p 3.13.5
+            cd pipelines
+            API_KEY=${{ env.API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
