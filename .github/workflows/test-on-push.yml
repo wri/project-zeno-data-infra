@@ -88,7 +88,7 @@ jobs:
         if: success()
         uses: addnab/docker-run-action@v3
         with:
-          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:$.SHORT_SHA
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
           registry: ${{ steps.login-ecr.outputs.registry }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
@@ -131,7 +131,7 @@ jobs:
         if: success()
         uses: addnab/docker-run-action@v3
         with:
-          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
           registry: ${{ steps.login-ecr.outputs.registry }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
