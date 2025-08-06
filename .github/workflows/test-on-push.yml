@@ -112,21 +112,12 @@ jobs:
       - name: Set short SHA
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Debug pulling from ECR 2
-        if: success()
-        run: |
-          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Debug pulling from ECR 3
-        run: |
-          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:$SHORT_SHA
 
       - name: Manually login to ECR because aws-actions/amazon-ecr-login@v2 didn't work
         if: success()
