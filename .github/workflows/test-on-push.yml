@@ -35,10 +35,17 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Manually login to ECR
         if: success()
-        uses: aws-actions/amazon-ecr-login@v2
-        id: login-ecr
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS \
+          --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+#      - name: Login to Amazon ECR
+#        if: success()
+#        uses: aws-actions/amazon-ecr-login@v2
+#        id: login-ecr
 
       - name: Build Docker Image
         if: success()
@@ -118,24 +125,24 @@ jobs:
         run: |
           docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Debug pulling from ECR 3
-        run: |
-          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-        id: login-ecr
-
-      - name: Debug pulling from ECR 4
-        run: |
-          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+#      - name: Configure AWS credentials
+#        uses: aws-actions/configure-aws-credentials@v4
+#        with:
+#          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+#          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+#          aws-region: ${{ env.AWS_REGION }}
+#
+#      - name: Debug pulling from ECR 3
+#        run: |
+#          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
+#
+#      - name: Login to Amazon ECR
+#        uses: aws-actions/amazon-ecr-login@v2
+#        id: login-ecr
+#
+#      - name: Debug pulling from ECR 4
+#        run: |
+#          docker pull ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.REPOSITORY_NAME }}:${{ env.SHORT_SHA }}
 
 #      - name: Run tests
 #        if: success()
