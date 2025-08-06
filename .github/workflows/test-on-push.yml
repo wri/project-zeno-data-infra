@@ -113,6 +113,7 @@ jobs:
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
+        if: success()
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
@@ -122,9 +123,9 @@ jobs:
       - name: Manually login to ECR because aws-actions/amazon-ecr-login@v2 didn't work
         if: success()
         run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS \
-          --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Run tests
         if: success()
@@ -135,4 +136,4 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd pipelines
-            API_KEY=${{ env.API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            API_KEY=$API_KEY AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY pytest test --disable-warnings
