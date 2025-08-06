@@ -2,6 +2,7 @@ import numpy as np
 
 from prefect import flow
 
+from pipelines.disturbance import validate_zonal_statistics
 from pipelines.disturbance.prefect_flows import dist_common_tasks
 from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
@@ -37,7 +38,6 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     common_tasks.save_result.with_options(
         name="dist-alerts-save-result"
     )(result_df, result_uri)
-    # FIXME: Temporarily disabling due to trouble loading JSON file
-    # validate_result = validate_zonal_statistics.validate(result_uri)
+    validate_result = validate_zonal_statistics.validate(result_uri)
 
     return result_uri

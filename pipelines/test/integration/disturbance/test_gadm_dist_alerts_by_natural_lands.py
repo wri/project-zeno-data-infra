@@ -35,7 +35,6 @@ def test_gadm_dist_alerts_happy_path(
         result_uri = dist_alerts_by_natural_lands_count(
             dist_zarr_uri="s3://dummy_zarr_uri",
             dist_version="test_v1",
-            overwrite=True,
         )
 
     assert (
@@ -106,7 +105,6 @@ def test_gadm_dist_alerts_result(
         dist_alerts_by_natural_lands_count(
             dist_zarr_uri="s3://dummy_zarr_uri",
             dist_version="test_v1",
-            overwrite=True,
         )
 
     # Verify
