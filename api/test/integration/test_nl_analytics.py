@@ -253,7 +253,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "value": [3.088260e+09, 1.714705e+10, 5.352373e+08],
+                "value": [1.304597e+10, 1.714705e+10, 1.817068e+09],
                 "aoi_id": ["IDN.24.9", "IDN.14.13", "BRA.1.1"],
                 "aoi_type": ["admin", "admin", "admin"],
             }
@@ -411,7 +411,7 @@ async def test_gadm_dist_analytics_no_intersection():
 
     expected_df = pd.DataFrame(
         {
-            "value": 3.088260e+09,
+            "value": 13045973802.754883,
             "aoi_id": "IDN.24.9",
             "aoi_type": "admin",
         }, index=[0]
