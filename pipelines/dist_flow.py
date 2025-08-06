@@ -63,18 +63,20 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         result_uris.append(nl_result)
 
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = prefect_flows.dist_alerts_count(dist_zarr_uri, dist_version)
+        gadm_dist_result = prefect_flows.dist_alerts_count(
+            dist_zarr_uri, dist_version, overwrite=overwrite
+        )
         result_uris.append(gadm_dist_result)
 
         gadm_dist_by_natural_lands_result = (
             prefect_flows.dist_alerts_by_natural_lands_count(
-                dist_zarr_uri, dist_version
+                dist_zarr_uri, dist_version, overwrite=overwrite
             )
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
         gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_count(
-            dist_zarr_uri, dist_version
+            dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_by_drivers_result)
     except Exception:
@@ -86,8 +88,9 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
 
     return result_uris
 
+
 def main(overwrite=False):
-    dist_alerts_flow(overwrite=False)
+    dist_alerts_flow(overwrite=overwrite)
 
 
 if __name__ == "__main__":
