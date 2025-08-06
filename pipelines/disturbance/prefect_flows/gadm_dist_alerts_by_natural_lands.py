@@ -33,7 +33,7 @@ def dist_alerts_by_natural_lands_count(dist_zarr_uri: str, dist_version: str, ov
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-by-natural-lands-compute-zonal-stats"
     )(*compute_input, funcname="count")
-    result_df = common_tasks.postprocess_result.with_options(
+    result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-by-natural-lands-postprocess-result"
     )(result_dataset)
     result_uri = common_tasks.save_result.with_options(
