@@ -76,8 +76,8 @@ class TreeCoverLossAnalyzer(Analyzer):
             admin_select_fields = "iso, adm1, adm2"
             admin_filter_fields = "(iso, adm1, adm2)"
 
-        select_str = f'SELECT {admin_select_fields}, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "gfw_gross_emissions_co2e_all_gases__Mg") FROM data'
-        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {tuple(admin_level_ids)}"
+        select_str = f'SELECT {admin_select_fields}, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "gfw_gross_emissions_co2e_all_gases__Mg" FROM data'
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {self._list_to_tuple_str(admin_level_ids)}"
         if tree_cover_loss_analytics_in.forest_filter is not None:
             if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
                 forest_filter_field = "is__umd_regional_primary_forest_2001"
@@ -121,3 +121,12 @@ class TreeCoverLossAnalyzer(Analyzer):
         # Drop the original 'iso', 'adm1', and 'adm2' columns if they exist
         results = results.drop(columns=join_cols)
         return results
+
+    @staticmethod
+    def _list_to_tuple_str(lst):
+        if not lst:
+            return "()"
+        elif len(lst) == 1:
+            return f"('{lst[0]}')"
+        else:
+            return str(tuple(lst))
