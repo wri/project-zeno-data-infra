@@ -176,11 +176,11 @@ class TestGrasslandsOTFAnalysis:
             "type": "Polygon",
             "coordinates": [
                 [
-                    [105.00050, 47.99875],
-                    [105.00175, 47.99875],
-                    [105.00175, 47.99775],
-                    [105.00050, 47.99775],
-                    [105.00050, 47.99875],
+                    [105.0006, 47.9987],
+                    [105.0016, 47.9987],
+                    [105.0016, 47.9978],
+                    [105.0006, 47.9978],
+                    [105.0006, 47.9987],
                 ]
             ],
         }
@@ -195,7 +195,7 @@ class TestGrasslandsOTFAnalysis:
         expected_df = pd.DataFrame(
             {
                 "year": years,
-                "grassland_area": np.array(([2074.46875] * len(years))).astype(
+                "grassland_area": np.array(([1555.85522] * len(years))).astype(
                     np.float32
                 ),
                 "aoi_type": ["feature_collection"] * len(years),
