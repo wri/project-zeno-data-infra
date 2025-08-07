@@ -18,7 +18,7 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
         np.arange(894),  # country ISO codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
-        np.arange(731, 1590),  # dates values
+        np.arange(731, 2000),  # dates values
         [1, 2, 3],  # confidence values
     )
     datasets = common_tasks.load_data.with_options(name="dist-alerts-load_data")(
