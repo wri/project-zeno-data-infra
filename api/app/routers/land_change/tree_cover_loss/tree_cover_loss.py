@@ -31,15 +31,10 @@ def create(
     background_tasks: BackgroundTasks,
 ):
     try:
-        service = TreeCoverLossService(background_tasks)
-        service.do(data)
-
-        link_url = request.url_for(
-            "get_tcl_analytics_result", resource_id=data.thumbprint()
-        )
-        link = DataMartResourceLink(link=str(link_url))
-
-        return DataMartResourceLinkResponse(data=link, status=service.get_status())
+        service = TreeCoverLossService()
+        service.set_resource_from(data)
+        background_tasks.add_task(service.do)
+        return _datamart_resource_link_response(request, service)
     except Exception as e:
         logging.error(
             {
@@ -51,6 +46,14 @@ def create(
             }
         )
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+def _datamart_resource_link_response(request, service) -> DataMartResourceLinkResponse:
+    link_url = request.url_for(
+        "get_tcl_analytics_result", resource_id=service.resource_thumbprint()
+    )
+    link = DataMartResourceLink(link=str(link_url))
+    return DataMartResourceLinkResponse(data=link, status=service.get_status())
 
 
 @router.get(
