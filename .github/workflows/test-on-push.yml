@@ -61,59 +61,62 @@ jobs:
         run: |
           docker push ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
 
-#  test_api:
-#    needs: build_and_push_image
-#    runs-on: ubuntu-latest
-#    env:
-#      AWS_REGION: ${{ secrets.AWS_REGION }}
-#      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
-#      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
-#      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-#      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-#      TEST_SUITE: api
-#    steps:
-#      - name: Checkout Code
-#        uses: actions/checkout@v4
-#
-#      - name: Set short SHA
-#        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-#
-#      - name: Configure AWS credentials
-#        uses: aws-actions/configure-aws-credentials@v4
-#        with:
-#          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-#          aws-region: ${{ env.AWS_REGION }}
-#
-#      - name: Install AWS CLI if running under ACT
-#        if: ${{ env.ACT }}
-#        run: |
-#          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
-#          unzip -q /tmp/awscliv2.zip -d /tmp
-#          rm /tmp/awscliv2.zip
-#          /tmp/aws/install --update
-#          rm -rf /tmp/aws/
-#
-#      - name: Login to container registry
-#        run: |
-#          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-#          docker login --username AWS \
-#          --password-stdin ${{ env.CONTAINER_REGISTRY }}
-#
-#      - name: Explicitly pull image
-#        run: |
-#          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-#
-#      - name: Run tests
-#        uses: addnab/docker-run-action@v3
-#        with:
-#          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-#          run: |
-#            uv sync --locked --no-install-project --dev -p 3.13.5
-#            cd ${{ env.TEST_SUITE }}
-#            AWS_ACCESSKEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+  test_api:
+    needs: build_and_push_image
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
+      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      GFW_API_KEY: ${{ secrets.API_KEY }}
+      TEST_SUITE: api
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install AWS CLI if running under ACT
+        if: ${{ env.ACT }}
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp
+          rm /tmp/awscliv2.zip
+          /tmp/aws/install --update
+          rm -rf /tmp/aws/
+
+      - name: Login to container registry
+        if: success()
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
+
+      - name: Explicitly pull image
+        if: success()
+        run: |
+          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
+
+      - name: Run tests
+        if: success()
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
+          run: |
+            uv sync --locked --no-install-project --dev -p 3.13.5
+            cd ${{ env.TEST_SUITE }}
+            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
 
   test_pipelines:
     needs: build_and_push_image
@@ -154,21 +157,12 @@ jobs:
         if: success()
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS \
-          --password-stdin ${{ env.CONTAINER_REGISTRY }}
+          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
 
       - name: Explicitly pull image
         if: success()
         run: |
           docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-
-      - name: Re-configure AWS credentials for GFW Data Lake
-        if: success()
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_GFW_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_GFW_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
 
       - name: Run tests
         if: success()
@@ -178,4 +172,4 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
