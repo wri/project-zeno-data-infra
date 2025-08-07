@@ -1,9 +1,8 @@
 import pandas as pd
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
-
-from api.app.models.common.analysis import AnalysisStatus
 
 
 class TreeCoverLossAnalyzer(Analyzer):
