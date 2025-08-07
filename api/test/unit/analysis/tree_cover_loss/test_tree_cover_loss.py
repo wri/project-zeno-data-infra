@@ -6,19 +6,34 @@ from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
 class DummyAnalysisRepository:
-    def store_analysis(self, resource_id, analysis):
+    async def store_analysis(self, resource_id, analysis):
         self.analysis = analysis
 
 
 class DummyComputeEngine:
-    def send_query(self, dataset, version, query):
+    async def send_query(self, dataset, version, query):
         self.dataset = dataset
         self.version = version
         self.query = query
 
+        return [
+            {
+                "iso": "BRA",
+                "year": 2000,
+                "umd_tree_cover_loss__year": 10,
+                "gfw_gross_emissions_co2e_all_gases__Mg": 100,
+            },
+            {
+                "iso": "BRA",
+                "year": 2024,
+                "umd_tree_cover_loss__year": 100,
+                "gfw_gross_emissions_co2e_all_gases__Mg": 1000,
+            },
+        ]
+
 
 @pytest.mark.asyncio
-async def test_tree_cover_loss_analysis():
+async def test_tree_cover_loss_analysis_one_iso():
     analysis_repo = DummyAnalysisRepository()
     compute_engine = DummyComputeEngine()
 
@@ -26,7 +41,7 @@ async def test_tree_cover_loss_analysis():
         analysis_repository=analysis_repo, compute_engine=compute_engine
     )
     metadata = TreeCoverLossAnalyticsIn(
-        aoi={"type": "admin", "ids": ["BRA.12.1"]},
+        aoi={"type": "admin", "ids": ["BRA"]},
         start_year="2020",
         end_year="2023",
         canopy_cover=30,

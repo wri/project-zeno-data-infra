@@ -51,7 +51,18 @@ class TreeCoverLossAnalyzer(Analyzer):
             admin_level
         )
         if not admin_level_ids:
-            return pd.DataFrame()
+            cols = ["iso"]
+            if admin_level >= 1:
+                cols.append("adm1")
+            if admin_level >= 2:
+                cols.append("adm2")
+
+            cols += [
+                "umd_tree_cover_loss__ha",
+                "gfw_gross_emissions_co2e_all_gases__Mg",
+                "umd_tree_cover_loss__year",
+            ]
+            return pd.DataFrame(columns=cols)
 
         if admin_level == 0:
             admin_select_fields = "iso"
@@ -64,7 +75,7 @@ class TreeCoverLossAnalyzer(Analyzer):
             admin_filter_fields = "(iso, adm1, adm2)"
 
         select_str = f'SELECT {admin_select_fields}, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "gfw_gross_emissions_co2e_all_gases__Mg") FROM data'
-        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.aoi.canopy_cover} AND {admin_filter_fields} in {tuple(admin_level_ids)}"
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {tuple(admin_level_ids)}"
         if tree_cover_loss_analytics_in.forest_filter is not None:
             if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
                 forest_filter_field = "is__umd_regional_primary_forest_2001"
@@ -87,7 +98,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         # Question for Gary - does this need an interface too? The params here would be different
         # if we were actually using dask or something I think
         results = await self.compute_engine.send_query(dataset, version, query)
-        df = pd.DataFrame(results.json()["data"], orient="records")
+        df = pd.DataFrame(results)
         return df
 
     def _merge_back_gadm_ids(
@@ -100,7 +111,10 @@ class TreeCoverLossAnalyzer(Analyzer):
         elif admin_level >= 2:
             join_cols.append("adm2")
 
-        results["id"] = results[join_cols].astype(str).agg(".".join, axis=1)
+        if results.empty:
+            results["id"] = None
+        else:
+            results["id"] = results[join_cols].astype(str).agg(".".join, axis=1)
 
         # Drop the original 'iso', 'adm1', and 'adm2' columns if they exist
         results = results.drop(columns=join_cols)
