@@ -178,4 +178,4 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            AWS_ACCESSKEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
