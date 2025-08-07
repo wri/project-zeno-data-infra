@@ -26,7 +26,7 @@ class TreeCoverLossAnalyzer(Analyzer):
                 1, tree_cover_loss_analytics_in
             )
             adm2_results = await self._get_results_for_admin_level(
-                1, tree_cover_loss_analytics_in
+                2, tree_cover_loss_analytics_in
             )
 
             iso_results_id_merged = self._merge_back_gadm_ids(0, iso_results)
@@ -111,7 +111,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         join_cols = ["iso"]
         if admin_level >= 1:
             join_cols.append("adm1")
-        elif admin_level >= 2:
+        if admin_level >= 2:
             join_cols.append("adm2")
 
         if results.empty:
