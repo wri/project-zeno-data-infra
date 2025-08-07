@@ -24,7 +24,6 @@ def test_gadm_dist_alerts_happy_path(
         result_uri = dist_alerts_count(
             dist_zarr_uri="s3://dummy_zarr_uri",
             dist_version="test_v1",
-            # overwrite=True,
         )
 
     assert (
@@ -70,7 +69,10 @@ def test_gadm_dist_alerts_result(
     )
 
     mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds]
-    dist_alerts_count(dist_zarr_uri="s3://dummy_zarr_uri", dist_version="test_v1")
+    dist_alerts_count(
+        dist_zarr_uri="s3://dummy_zarr_uri",
+        dist_version="test_v1",
+    )
 
     # Verify
     result = mock_save_parquet.call_args[0][0]
