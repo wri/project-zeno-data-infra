@@ -77,7 +77,7 @@ class TreeCoverLossAnalyzer(Analyzer):
             admin_filter_fields = "(iso, adm1, adm2)"
 
         select_str = f'SELECT {admin_select_fields}, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "gfw_gross_emissions_co2e_all_gases__Mg" FROM data'
-        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {self._list_to_tuple_str(admin_level_ids)}"
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {self._list_to_tuple_str(admin_level_ids)} AND umd_tree_cover_loss__year >= {tree_cover_loss_analytics_in.start_year} AND umd_tree_cover_loss__year <= {tree_cover_loss_analytics_in.end_year}"
         if tree_cover_loss_analytics_in.forest_filter is not None:
             if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
                 forest_filter_field = "is__umd_regional_primary_forest_2001"
