@@ -63,8 +63,8 @@ async def test_tree_cover_loss_analysis_one_iso():
     assert compute_engine.query == (
         "SELECT iso, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, "
         'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS '
-        '"gfw_gross_emissions_co2e_all_gases__Mg") FROM data WHERE '
-        "umd_tree_cover_density_2000__threshold = 30 AND iso in ('BRA',) AND "
+        '"gfw_gross_emissions_co2e_all_gases__Mg" FROM data WHERE '
+        "umd_tree_cover_density_2000__threshold = 30 AND iso in ('BRA') AND "
         "is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, "
         "umd_tree_cover_loss__year"
     )
