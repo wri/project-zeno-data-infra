@@ -3,12 +3,14 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
-from app.infrastructure.external_services.compute_service import ComputeService
 
 
 class TreeCoverLossAnalyzer(Analyzer):
     def __init__(
-        self, analysis_repository=None, compute_engine: ComputeService = None, dataset_repository=None
+        self,
+        analysis_repository=None,
+        compute_engine=None,
+        dataset_repository=None,
     ):
         self.analysis_repository = analysis_repository  # TreeCoverLossRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
@@ -74,7 +76,7 @@ class TreeCoverLossAnalyzer(Analyzer):
             admin_select_fields = "iso, adm1, adm2"
             admin_filter_fields = "(iso, adm1, adm2)"
 
-        select_str = f'SELECT {admin_select_fields}, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "gfw_gross_emissions_co2e_all_gases__Mg") FROM data'
+        select_str = f'SELECT {admin_select_fields}, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "gfw_gross_emissions_co2e_all_gases__Mg") FROM data'
         where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {tuple(admin_level_ids)}"
         if tree_cover_loss_analytics_in.forest_filter is not None:
             if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
@@ -95,7 +97,9 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         version = "v20250515"
 
-        results = await self.compute_engine.compute({"dataset": dataset, "version": version, "query": query})
+        results = await self.compute_engine.compute(
+            {"dataset": dataset, "version": version, "query": query}
+        )
         df = pd.DataFrame(results)
         return df
 

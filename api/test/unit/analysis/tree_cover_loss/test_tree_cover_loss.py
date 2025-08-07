@@ -1,9 +1,9 @@
 import pytest
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.models.analysis import Analysis
+from app.infrastructure.external_services.compute_service import ComputeService
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
-from app.infrastructure.external_services.compute_service import ComputeService
 
 
 class DummyAnalysisRepository:
@@ -61,11 +61,10 @@ async def test_tree_cover_loss_analysis_one_iso():
     assert compute_engine.dataset == "gadm__tcl__iso_change"
     assert compute_engine.version == "v20250515"
     assert compute_engine.query == (
-        'SELECT iso, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, '
+        "SELECT iso, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, "
         'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS '
         '"gfw_gross_emissions_co2e_all_gases__Mg") FROM data WHERE '
         "umd_tree_cover_density_2000__threshold = 30 AND iso in ('BRA',) AND "
-        'is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, '
-        'umd_tree_cover_loss__year'
+        "is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, "
+        "umd_tree_cover_loss__year"
     )
-
