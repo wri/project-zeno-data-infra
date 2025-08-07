@@ -211,5 +211,4 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
         run: |
           cd terraform
-          echo "Done"
-#          terraform apply -auto-approve tf.plan
+          terraform apply -auto-approve tf.plan
