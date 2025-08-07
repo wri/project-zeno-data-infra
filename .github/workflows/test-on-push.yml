@@ -18,7 +18,7 @@ jobs:
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     steps:
-      - name: Install needed dpackages if running under ACT
+      - name: Install needed packages if running under ACT
         if: ${{ env.ACT }}
         run: |
           apt-get update
