@@ -3,11 +3,12 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
+from app.infrastructure.external_services.compute_service import ComputeService
 
 
 class TreeCoverLossAnalyzer(Analyzer):
     def __init__(
-        self, analysis_repository=None, compute_engine=None, dataset_repository=None
+        self, analysis_repository=None, compute_engine: ComputeService = None, dataset_repository=None
     ):
         self.analysis_repository = analysis_repository  # TreeCoverLossRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
@@ -94,9 +95,7 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         version = "v20250515"
 
-        # Question for Gary - does this need an interface too? The params here would be different
-        # if we were actually using dask or something I think
-        results = await self.compute_engine.send_query(dataset, version, query)
+        results = await self.compute_engine.compute({"dataset": dataset, "version": version, "query": query})
         df = pd.DataFrame(results)
         return df
 
