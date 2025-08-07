@@ -1,22 +1,31 @@
 import logging
 import traceback
 import uuid
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import Response as FastAPIResponse
+from fastapi.responses import ORJSONResponse
 
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
+from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import (
     TreeCoverLossAnalytics,
     TreeCoverLossAnalyticsIn,
     TreeCoverLossAnalyticsResponse,
 )
-from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
-    TreeCoverLossService,
-)
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
-from fastapi import Response as FastAPIResponse
-from fastapi.responses import ORJSONResponse
+from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import TreeCoverLossService
+from app.domain.models.analysis import Analysis
+from app.domain.repositories.analysis_repository import AnalysisRepository
+
 
 router = APIRouter(prefix="/tree_cover_loss")
 
+def get_analysis_repository() -> AnalysisRepository:
+    class FakeAnalysisRepository(AnalysisRepository):
+        async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
+            return Analysis(status=AnalysisStatus.pending, metadata=None, result=None)
+        async def store_analysis(self, resource_id: uuid.UUID, analytics: Analysis):
+            pass
+    return FakeAnalysisRepository()
 
 @router.post(
     "/analytics",
@@ -24,15 +33,16 @@ router = APIRouter(prefix="/tree_cover_loss")
     response_model=DataMartResourceLinkResponse,
     status_code=202,
 )
-def create(
+async def create(
     *,
     data: TreeCoverLossAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository)
 ):
     try:
-        service = TreeCoverLossService()
-        service.set_resource_from(data)
+        service = TreeCoverLossService(analysis_repository=analysis_repository)
+        await service.set_resource_from(data)
         background_tasks.add_task(service.do)
         return _datamart_resource_link_response(request, service)
     except Exception as e:
