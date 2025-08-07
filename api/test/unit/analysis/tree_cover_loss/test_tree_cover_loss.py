@@ -52,7 +52,7 @@ async def test_tree_cover_loss_analysis_one_iso():
         end_year="2023",
         canopy_cover=30,
         forest_filter="intact_forest",
-        intersections=["driver"],  # Replace with actual enum
+        intersections=[],
     ).model_dump()
 
     analysis = Analysis(None, metadata, AnalysisStatus.saved)
@@ -64,7 +64,7 @@ async def test_tree_cover_loss_analysis_one_iso():
         "SELECT iso, umd_tree_cover_loss__year, SUM(umd_tree_cover_loss__ha) AS umd_tree_cover_loss__ha, "
         'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS '
         '"gfw_gross_emissions_co2e_all_gases__Mg" FROM data WHERE '
-        "umd_tree_cover_density_2000__threshold = 30 AND iso in ('BRA') AND "
+        "umd_tree_cover_density_2000__threshold = 30 AND iso in ('BRA') AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
         "is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, "
         "umd_tree_cover_loss__year"
     )
