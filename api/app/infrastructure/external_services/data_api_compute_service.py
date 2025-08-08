@@ -1,26 +1,29 @@
 import logging
 import os
 import requests
+import traceback
 
 from app.infrastructure.external_services.compute_service import ComputeService
 
 
 class DataApiComputeService(ComputeService):
     def __init__(self, api_key):
-        self.headers = {
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-        }
+        self.api_key = api_key
 
     async def compute(self, payload: dict):
         logging.info(
             {
-                "event": "data_api_compute_request",
+                "event": "data_api_compute_service_request",
+                "api_key": self.api_key,
                 "payload": payload,
             }
         )
 
         url = f"https://data-api.globalforestwatch.org/dataset/{payload["dataset"]}/{payload["version"]}/query/json"
+        self.headers = {
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+        }
         params = { "sql": payload["query"] }
 
         try:
@@ -35,6 +38,7 @@ class DataApiComputeService(ComputeService):
                 {
                     "event": "data_api_compute_service_failure",
                     "severity": "high",
+                    "api_key": self.api_key,
                     "metadata": payload,
                     "error_type": e.__class__.__name__,
                     "error_details": str(e),
