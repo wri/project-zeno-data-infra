@@ -9,7 +9,7 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.models.analysis import Analysis
 
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
-from models.common.analysis import AnalysisStatus
+from app.models.common.analysis import AnalysisStatus
 
 
 class TestTreeCoverLossServiceCollaborators:

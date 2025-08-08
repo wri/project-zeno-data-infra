@@ -53,6 +53,14 @@ async def create(
     analyzer: TreeCoverLossAnalyzer = Depends(get_analyzer),
 ):
     try:
+        logging.info(
+            {
+                "event": "tree_cover_loss_analytics_request",
+                "analytics_in": data.model_dump(),
+                "resource_id": data.thumbprint(),
+            }
+        )
+
         service = TreeCoverLossService(
             analysis_repository=analysis_repository,
             analyzer=analyzer,
