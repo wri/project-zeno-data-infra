@@ -1,4 +1,6 @@
+import logging
 from uuid import UUID
+import traceback
 
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn, TreeCoverLossAnalytics
@@ -18,15 +20,31 @@ class TreeCoverLossService:
         self.analyzer = analyzer
 
     async def do(self) -> None:
-        if self.analytics_resource.status == AnalysisStatus.saved:
-            return
+        try:
+            if self.analytics_resource.status == AnalysisStatus.saved:
+                return
 
-        await self.analyzer.analyze(
-            Analysis(
-                metadata=this.analytics_resource.metadata,
-                status=this.analytics_resource.status,
+            await self.analyzer.analyze(
+                Analysis(
+                    metadata=self.analytics_resource.metadata,
+                    result=self.analytics_resource.result,
+                    status=self.analytics_resource.status,
+                )
             )
-        )
+
+        except Exception as e:
+            logging.error(
+                {
+                    "event": "tree_cover_loss_analytics_processing_failure",
+                    "severity": "high",
+                    "metadata": self.analytics_resource.metadata,
+                    "analysis_repository": self.analysis_repository,
+                    "analyzer": self.analyzer,
+                    "error_type": e.__class__.__name__,
+                    "error_details": str(e),
+                    "stack_trace": traceback.format_exc(),
+                }
+            )
 
 
     def get_status(self) -> AnalysisStatus:
