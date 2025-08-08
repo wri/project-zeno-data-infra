@@ -128,6 +128,9 @@ class TreeCoverLossAnalyzer(Analyzer):
         if not lst:
             return "()"
         elif len(lst) == 1:
-            return f"('{lst[0]}')"
+            if isinstance(lst[0], tuple):
+                return f"({lst[0]})"
+            else:
+                return f"('{lst[0]}')"
         else:
             return str(tuple(lst))

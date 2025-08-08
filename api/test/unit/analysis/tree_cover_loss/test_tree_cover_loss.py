@@ -16,36 +16,33 @@ class DummyAnalysisRepository:
 
 
 class DummyComputeEngine(ComputeService):
-    def __init__(self, result):
-        self.dataset = None
-        self.version = None
-        self.query = None
-        self.result = result
+    def __init__(self, results):
+        self.payloads = []
+        self.results = iter(results)
 
     async def compute(self, payload: dict):
-        self.dataset = payload["dataset"]
-        self.version = payload["version"]
-        self.query = payload["query"]
-
-        return self.result
+        self.payloads.append(payload)
+        return next(self.results)
 
 
 class TestTreeCoverLossOneIso:
     @pytest_asyncio.fixture(autouse=True)
     async def run_analysis(self):
         dummy_result = [
-            {
-                "iso": "BRA",
-                "year": 2020,
-                "tree_cover_loss_ha": 10,
-                "carbon_emissions_Mg": 100,
-            },
-            {
-                "iso": "BRA",
-                "year": 2023,
-                "tree_cover_loss_ha": 100,
-                "carbon_emissions_Mg": 1000,
-            },
+            [
+                {
+                    "iso": "BRA",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "iso": "BRA",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+            ]
         ]
 
         self.analysis_repo = DummyAnalysisRepository()
@@ -68,9 +65,9 @@ class TestTreeCoverLossOneIso:
 
     @pytest.mark.asyncio
     async def test_query(self):
-        assert self.compute_engine.dataset == "gadm__tcl__iso_change"
-        assert self.compute_engine.version == "v20250515"
-        assert self.compute_engine.query == (
+        assert self.compute_engine.payloads[0]["dataset"] == "gadm__tcl__iso_change"
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
             "SELECT iso, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
             'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS '
             '"carbon_emissions_Mg" FROM data WHERE '
@@ -96,42 +93,44 @@ class TestTreeCoverLossMultipleIsos:
     @pytest_asyncio.fixture(autouse=True)
     async def run_analysis(self):
         dummy_result = [
-            {
-                "iso": "BRA",
-                "year": 2020,
-                "tree_cover_loss_ha": 10,
-                "carbon_emissions_Mg": 100,
-            },
-            {
-                "iso": "BRA",
-                "year": 2023,
-                "tree_cover_loss_ha": 100,
-                "carbon_emissions_Mg": 1000,
-            },
-            {
-                "iso": "IDN",
-                "year": 2020,
-                "tree_cover_loss_ha": 11,
-                "carbon_emissions_Mg": 110,
-            },
-            {
-                "iso": "IDN",
-                "year": 2023,
-                "tree_cover_loss_ha": 110,
-                "carbon_emissions_Mg": 1100,
-            },
-            {
-                "iso": "COD",
-                "year": 2020,
-                "tree_cover_loss_ha": 12,
-                "carbon_emissions_Mg": 120,
-            },
-            {
-                "iso": "COD",
-                "year": 2023,
-                "tree_cover_loss_ha": 120,
-                "carbon_emissions_Mg": 1200,
-            },
+            [
+                {
+                    "iso": "BRA",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "iso": "BRA",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+                {
+                    "iso": "IDN",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 11,
+                    "carbon_emissions_Mg": 110,
+                },
+                {
+                    "iso": "IDN",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 110,
+                    "carbon_emissions_Mg": 1100,
+                },
+                {
+                    "iso": "COD",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 12,
+                    "carbon_emissions_Mg": 120,
+                },
+                {
+                    "iso": "COD",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 120,
+                    "carbon_emissions_Mg": 1200,
+                },
+            ]
         ]
 
         self.analysis_repo = DummyAnalysisRepository()
@@ -154,9 +153,9 @@ class TestTreeCoverLossMultipleIsos:
 
     @pytest.mark.asyncio
     async def test_query(self):
-        assert self.compute_engine.dataset == "gadm__tcl__iso_change"
-        assert self.compute_engine.version == "v20250515"
-        assert self.compute_engine.query == (
+        assert self.compute_engine.payloads[0]["dataset"] == "gadm__tcl__iso_change"
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
             "SELECT iso, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
             'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
             " FROM data WHERE "
@@ -182,48 +181,50 @@ class TestTreeCoverLossMultipleAdm1s:
     @pytest_asyncio.fixture(autouse=True)
     async def run_analysis(self):
         dummy_result = [
-            {
-                "iso": "BRA",
-                "adm1": 1,
-                "year": 2020,
-                "tree_cover_loss_ha": 10,
-                "carbon_emissions_Mg": 100,
-            },
-            {
-                "iso": "BRA",
-                "adm1": 1,
-                "year": 2023,
-                "tree_cover_loss_ha": 100,
-                "carbon_emissions_Mg": 1000,
-            },
-            {
-                "iso": "IDN",
-                "adm1": 24,
-                "year": 2020,
-                "tree_cover_loss_ha": 11,
-                "carbon_emissions_Mg": 110,
-            },
-            {
-                "iso": "IDN",
-                "adm1": 24,
-                "year": 2023,
-                "tree_cover_loss_ha": 110,
-                "carbon_emissions_Mg": 1100,
-            },
-            {
-                "iso": "COD",
-                "adm1": 5,
-                "year": 2020,
-                "tree_cover_loss_ha": 12,
-                "carbon_emissions_Mg": 120,
-            },
-            {
-                "iso": "COD",
-                "adm1": 5,
-                "year": 2023,
-                "tree_cover_loss_ha": 120,
-                "carbon_emissions_Mg": 1200,
-            },
+            [
+                {
+                    "iso": "BRA",
+                    "adm1": 1,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "iso": "BRA",
+                    "adm1": 1,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+                {
+                    "iso": "IDN",
+                    "adm1": 24,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 11,
+                    "carbon_emissions_Mg": 110,
+                },
+                {
+                    "iso": "IDN",
+                    "adm1": 24,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 110,
+                    "carbon_emissions_Mg": 1100,
+                },
+                {
+                    "iso": "COD",
+                    "adm1": 5,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 12,
+                    "carbon_emissions_Mg": 120,
+                },
+                {
+                    "iso": "COD",
+                    "adm1": 5,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 120,
+                    "carbon_emissions_Mg": 1200,
+                },
+            ]
         ]
 
         self.analysis_repo = DummyAnalysisRepository()
@@ -246,9 +247,9 @@ class TestTreeCoverLossMultipleAdm1s:
 
     @pytest.mark.asyncio
     async def test_query(self):
-        assert self.compute_engine.dataset == "gadm__tcl__adm1_change"
-        assert self.compute_engine.version == "v20250515"
-        assert self.compute_engine.query == (
+        assert self.compute_engine.payloads[0]["dataset"] == "gadm__tcl__adm1_change"
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
             "SELECT iso, adm1, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
             'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
             " FROM data WHERE "
@@ -275,54 +276,56 @@ class TestTreeCoverLossMultipleAdm2s:
     @pytest_asyncio.fixture(autouse=True)
     async def run_analysis(self):
         dummy_result = [
-            {
-                "iso": "BRA",
-                "adm1": 1,
-                "adm2": 1,
-                "year": 2020,
-                "tree_cover_loss_ha": 10,
-                "carbon_emissions_Mg": 100,
-            },
-            {
-                "iso": "BRA",
-                "adm1": 1,
-                "adm2": 1,
-                "year": 2023,
-                "tree_cover_loss_ha": 100,
-                "carbon_emissions_Mg": 1000,
-            },
-            {
-                "iso": "IDN",
-                "adm1": 24,
-                "adm2": 9,
-                "year": 2020,
-                "tree_cover_loss_ha": 11,
-                "carbon_emissions_Mg": 110,
-            },
-            {
-                "iso": "IDN",
-                "adm1": 24,
-                "adm2": 9,
-                "year": 2023,
-                "tree_cover_loss_ha": 110,
-                "carbon_emissions_Mg": 1100,
-            },
-            {
-                "iso": "COD",
-                "adm1": 5,
-                "adm2": 1,
-                "year": 2020,
-                "tree_cover_loss_ha": 12,
-                "carbon_emissions_Mg": 120,
-            },
-            {
-                "iso": "COD",
-                "adm1": 5,
-                "adm2": 1,
-                "year": 2023,
-                "tree_cover_loss_ha": 120,
-                "carbon_emissions_Mg": 1200,
-            },
+            [
+                {
+                    "iso": "BRA",
+                    "adm1": 1,
+                    "adm2": 1,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "iso": "BRA",
+                    "adm1": 1,
+                    "adm2": 1,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+                {
+                    "iso": "IDN",
+                    "adm1": 24,
+                    "adm2": 9,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 11,
+                    "carbon_emissions_Mg": 110,
+                },
+                {
+                    "iso": "IDN",
+                    "adm1": 24,
+                    "adm2": 9,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 110,
+                    "carbon_emissions_Mg": 1100,
+                },
+                {
+                    "iso": "COD",
+                    "adm1": 5,
+                    "adm2": 1,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 12,
+                    "carbon_emissions_Mg": 120,
+                },
+                {
+                    "iso": "COD",
+                    "adm1": 5,
+                    "adm2": 1,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 120,
+                    "carbon_emissions_Mg": 1200,
+                },
+            ]
         ]
 
         self.analysis_repo = DummyAnalysisRepository()
@@ -345,9 +348,9 @@ class TestTreeCoverLossMultipleAdm2s:
 
     @pytest.mark.asyncio
     async def test_query(self):
-        assert self.compute_engine.dataset == "gadm__tcl__adm2_change"
-        assert self.compute_engine.version == "v20250515"
-        assert self.compute_engine.query == (
+        assert self.compute_engine.payloads[0]["dataset"] == "gadm__tcl__adm2_change"
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
             "SELECT iso, adm1, adm2, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
             'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
             " FROM data WHERE "
@@ -364,6 +367,229 @@ class TestTreeCoverLossMultipleAdm2s:
         assert self.analysis_repo.analysis.metadata == self.metadata
         assert self.analysis_repo.analysis.result == {
             "id": ["BRA.1.1", "BRA.1.1", "IDN.24.9", "IDN.24.9", "COD.5.1", "COD.5.1"],
+            "year": [2020, 2023] * 3,
+            "tree_cover_loss_ha": [10, 100, 11, 110, 12, 120],
+            "carbon_emissions_Mg": [100, 1000, 110, 1100, 120, 1200],
+        }
+
+
+class TestTreeCoverLossMultipleAdminLevels:
+    @pytest_asyncio.fixture(autouse=True)
+    async def run_analysis(self):
+        dummy_result = [
+            [
+                {
+                    "iso": "BRA",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "iso": "BRA",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+            ],
+            [
+                {
+                    "iso": "IDN",
+                    "adm1": 24,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 11,
+                    "carbon_emissions_Mg": 110,
+                },
+                {
+                    "iso": "IDN",
+                    "adm1": 24,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 110,
+                    "carbon_emissions_Mg": 1100,
+                },
+            ],
+            [
+                {
+                    "iso": "COD",
+                    "adm1": 5,
+                    "adm2": 1,
+                    "year": 2020,
+                    "tree_cover_loss_ha": 12,
+                    "carbon_emissions_Mg": 120,
+                },
+                {
+                    "iso": "COD",
+                    "adm1": 5,
+                    "adm2": 1,
+                    "year": 2023,
+                    "tree_cover_loss_ha": 120,
+                    "carbon_emissions_Mg": 1200,
+                },
+            ],
+        ]
+
+        self.analysis_repo = DummyAnalysisRepository()
+        self.compute_engine = DummyComputeEngine(dummy_result)
+
+        analyzer = TreeCoverLossAnalyzer(
+            analysis_repository=self.analysis_repo, compute_engine=self.compute_engine
+        )
+        self.metadata = TreeCoverLossAnalyticsIn(
+            aoi={"type": "admin", "ids": ["BRA", "IDN.24", "COD.5.1"]},
+            start_year="2020",
+            end_year="2023",
+            canopy_cover=30,
+            forest_filter="intact_forest",
+            intersections=[],
+        ).model_dump()
+
+        analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
+        await analyzer.analyze(analysis)
+
+    @pytest.mark.asyncio
+    async def test_queries_per_admin_level(self):
+        assert len(self.compute_engine.payloads) == 3
+
+    @pytest.mark.asyncio
+    async def test_query_iso(self):
+        assert self.compute_engine.payloads[0]["dataset"] == "gadm__tcl__iso_change"
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
+            "SELECT iso, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
+            'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
+            " FROM data WHERE "
+            "umd_tree_cover_density_2000__threshold = 30 AND iso in ('BRA') "
+            "AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
+            "is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, "
+            "umd_tree_cover_loss__year"
+        )
+
+    @pytest.mark.asyncio
+    async def test_query_adm1(self):
+        assert self.compute_engine.payloads[1]["dataset"] == "gadm__tcl__adm1_change"
+        assert self.compute_engine.payloads[1]["version"] == "v20250515"
+        assert self.compute_engine.payloads[1]["query"] == (
+            "SELECT iso, adm1, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
+            'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
+            " FROM data WHERE "
+            "umd_tree_cover_density_2000__threshold = 30 AND (iso, adm1) in (('IDN', 24)) "
+            "AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
+            "is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, adm1, "
+            "umd_tree_cover_loss__year"
+        )
+
+    @pytest.mark.asyncio
+    async def test_query_adm2(self):
+        assert self.compute_engine.payloads[2]["dataset"] == "gadm__tcl__adm2_change"
+        assert self.compute_engine.payloads[2]["version"] == "v20250515"
+        assert self.compute_engine.payloads[2]["query"] == (
+            "SELECT iso, adm1, adm2, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
+            'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
+            " FROM data WHERE "
+            "umd_tree_cover_density_2000__threshold = 30 AND (iso, adm1, adm2) in (('COD', 5, 1)) "
+            "AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
+            "is__ifl_intact_forest_landscapes_2000 = true GROUP BY iso, adm1, adm2, "
+            "umd_tree_cover_loss__year"
+        )
+
+    @pytest.mark.asyncio
+    async def test_analysis_result(self):
+        assert self.analysis_repo.analysis is not None
+        assert self.analysis_repo.analysis.status == AnalysisStatus.saved
+        assert self.analysis_repo.analysis.metadata == self.metadata
+        assert self.analysis_repo.analysis.result == {
+            "id": ["BRA", "BRA", "IDN.24", "IDN.24", "COD.5.1", "COD.5.1"],
+            "year": [2020, 2023] * 3,
+            "tree_cover_loss_ha": [10, 100, 11, 110, 12, 120],
+            "carbon_emissions_Mg": [100, 1000, 110, 1100, 120, 1200],
+        }
+
+
+class TestTreeCoverLossMultipleProtectedAreas:
+    @pytest_asyncio.fixture(autouse=True)
+    async def run_analysis(self):
+        dummy_result = [
+            [
+                {
+                    "id": "100",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "id": "100",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+                {
+                    "id": "101",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 11,
+                    "carbon_emissions_Mg": 110,
+                },
+                {
+                    "id": "101",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 110,
+                    "carbon_emissions_Mg": 1100,
+                },
+                {
+                    "id": "102",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 12,
+                    "carbon_emissions_Mg": 120,
+                },
+                {
+                    "id": "102",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 120,
+                    "carbon_emissions_Mg": 1200,
+                },
+            ]
+        ]
+
+        self.analysis_repo = DummyAnalysisRepository()
+        self.compute_engine = DummyComputeEngine(dummy_result)
+
+        analyzer = TreeCoverLossAnalyzer(
+            analysis_repository=self.analysis_repo, compute_engine=self.compute_engine
+        )
+        self.metadata = TreeCoverLossAnalyticsIn(
+            aoi={"type": "protected_area", "ids": ["101", "102", "103"]},
+            start_year="2020",
+            end_year="2023",
+            canopy_cover=30,
+            forest_filter="intact_forest",
+            intersections=[],
+        ).model_dump()
+
+        analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
+        await analyzer.analyze(analysis)
+
+    @pytest.mark.asyncio
+    async def test_query(self):
+        assert (
+            self.compute_engine.payloads[0]["dataset"]
+            == "wdpa_protected_areas__tcl__change"
+        )
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
+            "SELECT wdpa_protected_area__id AS id, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
+            'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
+            " FROM data WHERE "
+            "umd_tree_cover_density_2000__threshold = 30 AND wdpa_protected_area__id"
+            "AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
+            "is__ifl_intact_forest_landscapes_2000 = true GROUP BY wdpa_protected_area__id, "
+            "umd_tree_cover_loss__year"
+        )
+
+    @pytest.mark.asyncio
+    async def test_analysis_result(self):
+        assert self.analysis_repo.analysis is not None
+        assert self.analysis_repo.analysis.status == AnalysisStatus.saved
+        assert self.analysis_repo.analysis.metadata == self.metadata
+        assert self.analysis_repo.analysis.result == {
+            "id": ["100", "100", "101", "101", "102", "102"],
             "year": [2020, 2023] * 3,
             "tree_cover_loss_ha": [10, 100, 11, 110, 12, 120],
             "carbon_emissions_Mg": [100, 1000, 110, 1100, 120, 1200],
