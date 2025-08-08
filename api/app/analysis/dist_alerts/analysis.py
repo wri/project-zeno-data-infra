@@ -18,6 +18,7 @@ from ..common.analysis import (
 )
 from .query import create_gadm_dist_query
 
+
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
     3: "Natural short vegetation",
@@ -86,7 +87,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         dist_drivers = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
-        )
+        ).band_data
         dist_drivers.name = "ldacs_driver"
 
         groupby_layers.append(dist_drivers)
