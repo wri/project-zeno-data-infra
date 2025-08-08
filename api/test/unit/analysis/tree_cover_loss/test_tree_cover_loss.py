@@ -502,3 +502,95 @@ class TestTreeCoverLossMultipleAdminLevels:
             "tree_cover_loss_ha": [10, 100, 11, 110, 12, 120],
             "carbon_emissions_Mg": [100, 1000, 110, 1100, 120, 1200],
         }
+
+
+class TestTreeCoverLossMultipleProtectedAreas:
+    @pytest_asyncio.fixture(autouse=True)
+    async def run_analysis(self):
+        dummy_result = [
+            [
+                {
+                    "id": "100",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 10,
+                    "carbon_emissions_Mg": 100,
+                },
+                {
+                    "id": "100",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 100,
+                    "carbon_emissions_Mg": 1000,
+                },
+                {
+                    "id": "101",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 11,
+                    "carbon_emissions_Mg": 110,
+                },
+                {
+                    "id": "101",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 110,
+                    "carbon_emissions_Mg": 1100,
+                },
+                {
+                    "id": "102",
+                    "year": 2020,
+                    "tree_cover_loss_ha": 12,
+                    "carbon_emissions_Mg": 120,
+                },
+                {
+                    "id": "102",
+                    "year": 2023,
+                    "tree_cover_loss_ha": 120,
+                    "carbon_emissions_Mg": 1200,
+                },
+            ]
+        ]
+
+        self.analysis_repo = DummyAnalysisRepository()
+        self.compute_engine = DummyComputeEngine(dummy_result)
+
+        analyzer = TreeCoverLossAnalyzer(
+            analysis_repository=self.analysis_repo, compute_engine=self.compute_engine
+        )
+        self.metadata = TreeCoverLossAnalyticsIn(
+            aoi={"type": "protected_area", "ids": ["101", "102", "103"]},
+            start_year="2020",
+            end_year="2023",
+            canopy_cover=30,
+            forest_filter="intact_forest",
+            intersections=[],
+        ).model_dump()
+
+        analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
+        await analyzer.analyze(analysis)
+
+    @pytest.mark.asyncio
+    async def test_query(self):
+        assert (
+            self.compute_engine.payloads[0]["dataset"]
+            == "wdpa_protected_areas__tcl__change"
+        )
+        assert self.compute_engine.payloads[0]["version"] == "v20250515"
+        assert self.compute_engine.payloads[0]["query"] == (
+            "SELECT wdpa_protected_area__id AS id, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
+            'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
+            " FROM data WHERE "
+            "umd_tree_cover_density_2000__threshold = 30 AND wdpa_protected_area__id"
+            "AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
+            "is__ifl_intact_forest_landscapes_2000 = true GROUP BY wdpa_protected_area__id, "
+            "umd_tree_cover_loss__year"
+        )
+
+    @pytest.mark.asyncio
+    async def test_analysis_result(self):
+        assert self.analysis_repo.analysis is not None
+        assert self.analysis_repo.analysis.status == AnalysisStatus.saved
+        assert self.analysis_repo.analysis.metadata == self.metadata
+        assert self.analysis_repo.analysis.result == {
+            "id": ["100", "100", "101", "101", "102", "102"],
+            "year": [2020, 2023] * 3,
+            "tree_cover_loss_ha": [10, 100, 11, 110, 12, 120],
+            "carbon_emissions_Mg": [100, 1000, 110, 1100, 120, 1200],
+        }
