@@ -4,17 +4,30 @@ from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn, TreeCoverLossAnalytics
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 
 
 class TreeCoverLossService:
-    def __init__(self, analysis_repository: AnalysisRepository):
+    def __init__(
+        self,
+        analysis_repository: AnalysisRepository,
+        analyzer: TreeCoverLossAnalyzer
+    ):
         self.analytics_resource: TreeCoverLossAnalytics = None
         self.analysis_repository = analysis_repository
+        self.analyzer = analyzer
 
-    def do(self) -> None:
-        if self.analytics_resource.status == AnalysisStatus.saved: return
+    async def do(self) -> None:
+        if self.analytics_resource.status == AnalysisStatus.saved:
+            return
 
-        pass
+        await self.analyzer.analyze(
+            Analysis(
+                metadata=this.analytics_resource.metadata,
+                status=this.analytics_resource.status,
+            )
+        )
+
 
     def get_status(self) -> AnalysisStatus:
         return self.analytics_resource.status

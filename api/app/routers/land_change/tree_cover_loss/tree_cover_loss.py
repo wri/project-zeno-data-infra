@@ -15,17 +15,28 @@ from app.models.land_change.tree_cover_loss import (
 from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import TreeCoverLossService
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
-
+from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.infrastructure.external_services.compute_service import ComputeService
 
 router = APIRouter(prefix="/tree_cover_loss")
 
 def get_analysis_repository() -> AnalysisRepository:
     class FakeAnalysisRepository(AnalysisRepository):
         async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
-            return Analysis(status=AnalysisStatus.pending, metadata=None, result=None)
+            return Analysis(status=AnalysisStatus.pending, metadata={}, result=None)
         async def store_analysis(self, resource_id: uuid.UUID, analytics: Analysis):
             pass
     return FakeAnalysisRepository()
+
+def get_analyzer() -> TreeCoverLossAnalyzer:
+    class FakeComputeService(ComputeService):
+        async def compute(self, payload: dict) -> list:
+            return []
+
+    return TreeCoverLossAnalyzer(
+        analysis_repository=get_analysis_repository(),
+        compute_engine=FakeComputeService(),
+    )
 
 @router.post(
     "/analytics",
@@ -38,10 +49,14 @@ async def create(
     data: TreeCoverLossAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
-    analysis_repository: AnalysisRepository = Depends(get_analysis_repository)
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
+    analyzer: TreeCoverLossAnalyzer = Depends(get_analyzer),
 ):
     try:
-        service = TreeCoverLossService(analysis_repository=analysis_repository)
+        service = TreeCoverLossService(
+            analysis_repository=analysis_repository,
+            analyzer=analyzer,
+        )
         await service.set_resource_from(data)
         background_tasks.add_task(service.do)
         return _datamart_resource_link_response(request, service)
@@ -75,6 +90,7 @@ def _datamart_resource_link_response(request, service) -> DataMartResourceLinkRe
 async def get_tcl_analytics_result(
     resource_id: str,
     response: FastAPIResponse,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
     # Validate UUID format
     try:
@@ -85,18 +101,43 @@ async def get_tcl_analytics_result(
         )
 
     try:
-        service = TreeCoverLossService()
-        response.headers["Retry-After"] = "1"
+        analsyis: Analysis = await analysis_repository.load_analysis(resource_id)
 
-        return TreeCoverLossAnalyticsResponse(
-            data=TreeCoverLossAnalytics(
-                status=service.get_status(),
-                message="Resource is still processing, follow Retry-After header.",
-                result=None,
-                metadata=None,
-            ),
-            status="success",
-        )
+        if analsyis.status == AnalysisStatus.pending:
+            response.headers["Retry-After"] = "1"
+
+            return TreeCoverLossAnalyticsResponse(
+                data=TreeCoverLossAnalytics(
+                    status=analsyis.status,
+                    message="Resource is still processing, follow Retry-After header.",
+                    result=None,
+                    metadata=analsyis.metadata,
+                ),
+                status="success",
+            )
+
+        if analsyis.status == AnalysisStatus.saved:
+            return TreeCoverLossAnalyticsResponse(
+                data=TreeCoverLossAnalytics(
+                    status=analysis.status,
+                    message=None,
+                    result=analysis.result,
+                    metadata=analysis.metadata,
+                ),
+                status="success",
+            )
+
+        if analsyis.status == AnalysisStatus.failed:
+            return TreeCoverLossAnalyticsResponse(
+                data=TreeCoverLossAnalytics(
+                    status=analysis.status,
+                    message="Analysis failed. Result is not available.",
+                    result=None,
+                    metadata=analysis.metadata,
+                ),
+                status="success",
+            )
+
     except Exception as e:
         logging.error(
             {
