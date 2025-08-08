@@ -144,7 +144,7 @@ async def get_tcl_analytics_result(
                 "event": "tree_cover_loss_analytics_resource_request_failure",
                 "severity": "high",  # Helps with alerting
                 "resource_id": resource_id,
-                "resource_metadata": None,
+                "resource_metadata": analsyis.metadata,
                 "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
                 "error_details": str(e),
                 "traceback": traceback.format_exc(),
