@@ -87,7 +87,9 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         dist_drivers = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr",
             geojson,
-        ).band_data
+        ).band_data.reindex_like(
+            dist_alerts, method="nearest", tolerance=1e-5
+        )
         dist_drivers.name = "ldacs_driver"
 
         groupby_layers.append(dist_drivers)
