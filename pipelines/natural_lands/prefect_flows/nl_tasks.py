@@ -6,7 +6,7 @@ from pipelines.natural_lands import stages
 
 @task
 def setup_compute(
-    datasets: Tuple[xr.Dataset, ...],
+    datasets: Tuple[xr.DataArray, ...],
     expected_groups,
     contextual_name: Optional[str] = None,
 ) -> Tuple:

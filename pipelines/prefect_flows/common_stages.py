@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Optional
+from typing import Tuple, Optional
 import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
@@ -48,23 +48,23 @@ numeric_to_alpha3 = {
 def load_data(
     dist_zarr_uri: str,
     contextual_uri: Optional[str] = None,
-) -> Tuple[xr.Dataset, ...]:
+) -> Tuple[xr.DataArray, ...]:
     """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
     dist_alerts = _load_zarr(dist_zarr_uri)
 
     country = _load_zarr(country_zarr_uri)
-    country_aligned = xr.align(dist_alerts, country, join="left")[1]
+    country_aligned = xr.align(dist_alerts, country, join="left")[1].band_data
     region = _load_zarr(region_zarr_uri)
-    region_aligned = xr.align(dist_alerts, region, join="left")[1]
+    region_aligned = xr.align(dist_alerts, region, join="left")[1].band_data
     subregion = _load_zarr(subregion_zarr_uri)
-    subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1]
+    subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1].band_data
 
     if contextual_uri is not None:
         contextual_layer = _load_zarr(contextual_uri)
         contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join="left")[
             1
-        ]
+        ].band_data
     else:
         contextual_layer_aligned = None
 
@@ -92,7 +92,7 @@ def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: 
     return alerts_count
 
 
-def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     sparse_data = alerts_count.data
     dim_names = alerts_count.dims
     indices = sparse_data.coords

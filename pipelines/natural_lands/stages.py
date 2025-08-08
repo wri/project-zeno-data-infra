@@ -32,22 +32,22 @@ sbtn_natural_lands_classes = {
 
 
 def setup_compute(
-    datasets: Tuple[xr.Dataset, ...],
+    datasets: Tuple[xr.DataArray, ...],
     expected_groups: Optional[ExpectedGroupsType],
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xrarray reduce on natural lands by area"""
     base_zarr, country, region, subregion, contextual_layer = datasets
 
-    mask = base_zarr.band_data
-    groupbys: Tuple[xr.Dataset, ...] = (
-        country.band_data.rename("country"),
-        region.band_data.rename("region"),
-        subregion.band_data.rename("subregion"),
+    mask = base_zarr
+    groupbys: Tuple[xr.DataArray, ...] = (
+        country.rename("country"),
+        region.rename("region"),
+        subregion.rename("subregion"),
     )
     if contextual_layer is not None:
         groupbys = (
-            groupbys + (contextual_layer.band_data.rename(contextual_column_name),)
+            groupbys + (contextual_layer.rename(contextual_column_name),)
         )
 
     return (mask, groupbys, expected_groups)
