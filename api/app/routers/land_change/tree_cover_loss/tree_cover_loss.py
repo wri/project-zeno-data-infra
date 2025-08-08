@@ -1,4 +1,5 @@
 import logging
+import os
 import traceback
 import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -17,25 +18,18 @@ from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.infrastructure.external_services.compute_service import ComputeService
+from app.infrastructure.persistence.file_system_analysis_repository import FileSystemAnalysisRepository
+from app.infrastructure.external_services.data_api_compute_service import DataApiComputeService
 
 router = APIRouter(prefix="/tree_cover_loss")
 
 def get_analysis_repository() -> AnalysisRepository:
-    class FakeAnalysisRepository(AnalysisRepository):
-        async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
-            return Analysis(status=AnalysisStatus.pending, metadata={}, result=None)
-        async def store_analysis(self, resource_id: uuid.UUID, analytics: Analysis):
-            pass
-    return FakeAnalysisRepository()
+    return FileSystemAnalysisRepository('tree_cover_loss_analysis')
 
 def get_analyzer() -> TreeCoverLossAnalyzer:
-    class FakeComputeService(ComputeService):
-        async def compute(self, payload: dict) -> list:
-            return []
-
     return TreeCoverLossAnalyzer(
         analysis_repository=get_analysis_repository(),
-        compute_engine=FakeComputeService(),
+        compute_engine=DataApiComputeService(os.getenv('API_KEY'))
     )
 
 @router.post(
@@ -108,54 +102,48 @@ async def get_tcl_analytics_result(
             status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
         )
 
+    analysis: Analysis | None = None
+
     try:
-        analsyis: Analysis = await analysis_repository.load_analysis(resource_id)
-
-        if analsyis.status == AnalysisStatus.pending:
-            response.headers["Retry-After"] = "1"
-
-            return TreeCoverLossAnalyticsResponse(
-                data=TreeCoverLossAnalytics(
-                    status=analsyis.status,
-                    message="Resource is still processing, follow Retry-After header.",
-                    result=None,
-                    metadata=analsyis.metadata,
-                ),
-                status="success",
-            )
-
-        if analsyis.status == AnalysisStatus.saved:
-            return TreeCoverLossAnalyticsResponse(
-                data=TreeCoverLossAnalytics(
-                    status=analysis.status,
-                    message=None,
-                    result=analysis.result,
-                    metadata=analysis.metadata,
-                ),
-                status="success",
-            )
-
-        if analsyis.status == AnalysisStatus.failed:
-            return TreeCoverLossAnalyticsResponse(
-                data=TreeCoverLossAnalytics(
-                    status=analysis.status,
-                    message="Analysis failed. Result is not available.",
-                    result=None,
-                    metadata=analysis.metadata,
-                ),
-                status="success",
-            )
-
+        analysis = await analysis_repository.load_analysis(resource_id)
     except Exception as e:
         logging.error(
             {
                 "event": "tree_cover_loss_analytics_resource_request_failure",
                 "severity": "high",  # Helps with alerting
                 "resource_id": resource_id,
-                "resource_metadata": analsyis.metadata,
+                "resource_metadata": analysis.metadata,
                 "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
                 "error_details": str(e),
                 "traceback": traceback.format_exc(),
             }
         )
         raise HTTPException(status_code=500, detail="Internal server error")
+
+    if analysis.status is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    message = ""
+
+    if analysis.status == AnalysisStatus.pending:
+        response.headers["Retry-After"] = "1"
+        message = "Resource is still processing, follow Retry-After header."
+
+    if analysis.status == AnalysisStatus.saved:
+        message = "Analysis completed successfully."
+
+    if analysis.status == AnalysisStatus.failed:
+        message = "Analysis failed. Result is not available."
+
+    return _tree_cover_loss_analytics_response(analysis, message)
+
+def _tree_cover_loss_analytics_response(analysis: Analysis, message: str) -> TreeCoverLossAnalyticsResponse:
+        return TreeCoverLossAnalyticsResponse(
+            data=TreeCoverLossAnalytics(
+                status=analysis.status,
+                message=message,
+                result=analysis.result,
+                metadata=analysis.metadata,
+            ),
+            status="success",
+        )

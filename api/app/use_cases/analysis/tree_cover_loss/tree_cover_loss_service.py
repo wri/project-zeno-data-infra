@@ -53,7 +53,7 @@ class TreeCoverLossService:
             )
 
     def get_status(self) -> AnalysisStatus:
-        return self.analytics_resource.status
+        return self.analytics_resource.status or AnalysisStatus.pending
 
     async def set_resource_from(self, data: TreeCoverLossAnalyticsIn):
         analysis: Analysis = await self.analysis_repository.load_analysis(
