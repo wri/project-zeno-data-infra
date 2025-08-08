@@ -15,23 +15,26 @@ class TreeCoverLossService:
         analysis_repository: AnalysisRepository,
         analyzer: TreeCoverLossAnalyzer
     ):
-        self.analytics_resource: TreeCoverLossAnalytics = None
         self.analysis_repository = analysis_repository
         self.analyzer = analyzer
+        self.analytics_resource: TreeCoverLossAnalytics = None
+        self.analytics_resource_id = None
 
     async def do(self) -> None:
         try:
-            if self.analytics_resource.status == AnalysisStatus.saved:
-                return
+            if self.analytics_resource.status is not None:
+                return # analysis is in progress, complete, or failed
 
-            await self.analyzer.analyze(
-                Analysis(
-                    metadata=self.analytics_resource.metadata,
-                    result=self.analytics_resource.result,
-                    status=self.analytics_resource.status,
-                )
+            self.analytics_resource.status = AnalysisStatus.pending
+
+            analysis = Analysis(
+                metadata=self.analytics_resource.metadata,
+                result=self.analytics_resource.result,
+                status=self.analytics_resource.status,
             )
 
+            await self.analysis_repository.store_analysis(self.analytics_resource_id, analysis)
+            await self.analyzer.analyze(analysis)
         except Exception as e:
             logging.error(
                 {
@@ -52,22 +55,13 @@ class TreeCoverLossService:
 
     async def set_resource_from(self, data: TreeCoverLossAnalyticsIn):
         analysis: Analysis = await self.analysis_repository.load_analysis(data.thumbprint())
-        status = AnalysisStatus.pending
-
-        if analysis.status == AnalysisStatus.failed:
-            raise Exception('Analysis failed')
-
-        if analysis.result is not None:
-            status = AnalysisStatus.saved
-
+        self.analytics_resource_id = data.thumbprint()
         self.analytics_resource = TreeCoverLossAnalytics(
-            metadata=data.model_dump(),
+            metadata=analysis.metadata or data.model_dump(),
             result=analysis.result,
-            status=status
+            status=analysis.status,
         )
 
-        await self.analysis_repository.store_analysis(data.thumbprint(), analysis)
-
     def resource_thumbprint(self) -> UUID:
-        return TreeCoverLossAnalyticsIn(**self.analytics_resource.metadata).thumbprint()
+        return self.analytics_resource_id
     
