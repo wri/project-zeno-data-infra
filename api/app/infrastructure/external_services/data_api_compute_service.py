@@ -22,7 +22,7 @@ class DataApiComputeService(ComputeService):
         url = f"https://data-api.globalforestwatch.org/dataset/{payload["dataset"]}/{payload["version"]}/query/json"
         self.headers = {
             "Content-Type": "application/json",
-            "x-api-key": api_key,
+            "x-api-key": self.api_key,
         }
         params = { "sql": payload["query"] }
 
