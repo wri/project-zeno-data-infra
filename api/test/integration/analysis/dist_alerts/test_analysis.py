@@ -10,10 +10,10 @@ from app.models.land_change.dist_alerts import (
 from app.analysis.common.analysis import get_geojson
 
 
-class TestNaturalLandsServiceCompute:
+class TestDistAlertsZonalStats:
 
     @pytest.mark.asyncio
-    async def test_compute_returns_correct_status(
+    async def test_zonal_statistics_drivers_happy_path(
         self
     ):
         geojson = {
@@ -29,7 +29,7 @@ class TestNaturalLandsServiceCompute:
             ],
         }
 
-        resource: DistAlertsAnalytics = await zonal_statistics(
+        _: DistAlertsAnalytics = await zonal_statistics(
             aoi={
                 "type": "indigenous_land",
                 "ids": ["1918"]
@@ -37,4 +37,3 @@ class TestNaturalLandsServiceCompute:
             geojson=geojson,
             intersection="driver",
         )
-        print(resource)
