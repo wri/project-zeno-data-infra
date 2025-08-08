@@ -19,16 +19,17 @@ class FileSystemAnalysisRepository(AnalysisRepository):
         analytics_data = file_path / "data.json"
         data = None
         metadata = None
-        status = AnalysisStatus.pending
+        status = None
+
+        if analytics_metadata.exists():
+            metadata_content = analytics_metadata.read_text()
+            metadata = json.loads(metadata_content)
+            status = AnalysisStatus.pending
 
         if analytics_data.exists():
             data_content = analytics_data.read_text()
             data = json.loads(data_content)
             status = AnalysisStatus.saved
-
-        if analytics_metadata.exists():
-            metadata_content = analytics_metadata.read_text()
-            metadata = json.loads(metadata_content)
 
         return Analysis(
             result=data,

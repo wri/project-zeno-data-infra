@@ -24,7 +24,7 @@ class TestLoadingAnalysis:
     async def test_analysis_is_empty_if_doesnt_exist(self):
         analysis_repository = FileSystemAnalysisRepository(TEST_DIRECTORY)
         analysis_result = await analysis_repository.load_analysis(DUMMY_UUID)
-        assert analysis_result == Analysis(result=None, metadata=None, status=AnalysisStatus.pending)
+        assert analysis_result == Analysis(result=None, metadata=None, status=None)
 
     @pytest.mark.asyncio
     async def test_store_saved_analysis_for_first_time(self):
