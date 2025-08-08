@@ -85,7 +85,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
         dist_drivers = read_zarr_clipped_to_geojson(
-            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
+            "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr",
             geojson,
         ).band_data
         dist_drivers.name = "ldacs_driver"
