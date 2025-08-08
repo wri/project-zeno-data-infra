@@ -1,69 +1,57 @@
+from abc import abstractmethod
+
 import pandas as pd
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
-class TreeCoverLossAnalyzer(Analyzer):
-    def __init__(
+class DataAPIAnalyzer(Analyzer):
+    @abstractmethod
+    def analyze(self, analysis: Analysis):
+        pass
+
+    @abstractmethod
+    def build_query(
         self,
-        analysis_repository=None,
-        compute_engine=None,
-        dataset_repository=None,
+        analytics_in: AnalyticsIn,
+        select_fields: str,
+        in_fields: str,
+        in_ids: str,
     ):
-        self.analysis_repository = analysis_repository  # TreeCoverLossRepository
-        self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        pass
 
-    async def analyze(self, analysis: Analysis):
-        tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
-        if tree_cover_loss_analytics_in.aoi.type == "admin":
-            iso_results = await self._get_results_for_admin_level(
-                0, tree_cover_loss_analytics_in
-            )
-            adm1_results = await self._get_results_for_admin_level(
-                1, tree_cover_loss_analytics_in
-            )
-            adm2_results = await self._get_results_for_admin_level(
-                2, tree_cover_loss_analytics_in
-            )
 
-            iso_results_id_merged = self._merge_back_gadm_ids(0, iso_results)
-            adm1_results_id_merged = self._merge_back_gadm_ids(1, adm1_results)
-            adm2_results_id_merged = self._merge_back_gadm_ids(2, adm2_results)
+class AdminAnalysisHelper:
+    def __init__(self, analyzer: DataAPIAnalyzer):
+        self.analyzer = analyzer
 
-            combined_results = pd.concat(
-                [iso_results_id_merged, adm1_results_id_merged, adm2_results_id_merged]
-            ).to_dict(orient="list")
+    async def analyze(self, analysis: Analysis, analytics_in: AnalyticsIn):
+        iso_results = await self._get_results_for_admin_level(0, analytics_in)
+        adm1_results = await self._get_results_for_admin_level(1, analytics_in)
+        adm2_results = await self._get_results_for_admin_level(2, analytics_in)
 
-            analyzed_analysis = Analysis(
-                combined_results, analysis.metadata, AnalysisStatus.saved
-            )
+        iso_results_id_merged = self._merge_back_gadm_ids(0, iso_results)
+        adm1_results_id_merged = self._merge_back_gadm_ids(1, adm1_results)
+        adm2_results_id_merged = self._merge_back_gadm_ids(2, adm2_results)
 
-            await self.analysis_repository.store_analysis(
-                tree_cover_loss_analytics_in.thumbprint(), analyzed_analysis
-            )
-        elif tree_cover_loss_analytics_in.aoi.type == "protected_area":
-            result = await self._get_results_for_protected_area(
-                tree_cover_loss_analytics_in
-            )
-            analyzed_analysis = Analysis(
-                result.to_dict(orient="list"), analysis.metadata, AnalysisStatus.saved
-            )
+        combined_results = pd.concat(
+            [iso_results_id_merged, adm1_results_id_merged, adm2_results_id_merged]
+        ).to_dict(orient="list")
 
-            await self.analysis_repository.store_analysis(
-                tree_cover_loss_analytics_in.thumbprint(), analyzed_analysis
-            )
-        else:
-            raise NotImplementedError()
+        analyzed_analysis = Analysis(
+            combined_results, analysis.metadata, AnalysisStatus.saved
+        )
+
+        await self.analyzer.analysis_repository.store_analysis(
+            analytics_in.thumbprint(), analyzed_analysis
+        )
 
     async def _get_results_for_admin_level(
-        self, admin_level, tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn
+        self, admin_level, analytics_in: AnalyticsIn
     ) -> pd.DataFrame:
-        admin_level_ids = tree_cover_loss_analytics_in.aoi.get_ids_at_admin_level(
-            admin_level
-        )
+        admin_level_ids = analytics_in.aoi.get_ids_at_admin_level(admin_level)
         if not admin_level_ids:
             cols = ["iso"]
             if admin_level >= 1:
@@ -95,17 +83,17 @@ class TreeCoverLossAnalyzer(Analyzer):
         else:
             dataset = "gadm__tcl__adm2_change"
 
-        admin_level_ids_str = self._list_to_tuple_str(admin_level_ids)
+        admin_level_ids_str = _list_to_tuple_str(admin_level_ids)
 
         version = "v20250515"
-        query = self._build_query(
-            tree_cover_loss_analytics_in,
+        query = self.analyzer.build_query(
+            analytics_in,
             admin_select_fields,
             admin_filter_fields,
             admin_level_ids_str,
         )
 
-        results = await self.compute_engine.compute(
+        results = await self.analyzer.compute_engine.compute(
             {"dataset": dataset, "version": version, "query": query}
         )
         df = pd.DataFrame(results)
@@ -131,14 +119,45 @@ class TreeCoverLossAnalyzer(Analyzer):
         results = results.drop(columns=join_cols)
         return results
 
+
+class TreeCoverLossAnalyzer(DataAPIAnalyzer):
+    def __init__(
+        self,
+        analysis_repository=None,
+        compute_engine=None,
+        dataset_repository=None,
+    ):
+        self.analysis_repository = analysis_repository  # TreeCoverLossRepository
+        self.compute_engine = compute_engine  # Dask Client, or not?
+        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+
+    async def analyze(self, analysis: Analysis):
+        tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
+        if tree_cover_loss_analytics_in.aoi.type == "admin":
+            admin_analyzer = AdminAnalysisHelper(self)
+            await admin_analyzer.analyze(analysis, tree_cover_loss_analytics_in)
+        elif tree_cover_loss_analytics_in.aoi.type == "protected_area":
+            result = await self._get_results_for_protected_area(
+                tree_cover_loss_analytics_in
+            )
+            analyzed_analysis = Analysis(
+                result.to_dict(orient="list"), analysis.metadata, AnalysisStatus.saved
+            )
+
+            await self.analysis_repository.store_analysis(
+                tree_cover_loss_analytics_in.thumbprint(), analyzed_analysis
+            )
+        else:
+            raise NotImplementedError()
+
     async def _get_results_for_protected_area(
         self, tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn
     ):
         select_fields = "wdpa_protected_area__id"
         in_fields = "wdpa_protected_area__id"
-        in_ids = self._list_to_tuple_str(tree_cover_loss_analytics_in.aoi.ids)
+        in_ids = _list_to_tuple_str(tree_cover_loss_analytics_in.aoi.ids)
 
-        query = self._build_query(
+        query = self.build_query(
             tree_cover_loss_analytics_in, select_fields, in_fields, in_ids
         )
         dataset = "wdpa_protected_areas__tcl__change"
@@ -151,7 +170,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         df = df.rename(columns={"wdpa_protected_area__id": "id"})
         return df
 
-    def _build_query(
+    def build_query(
         self,
         tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn,
         select_fields: str,
@@ -182,14 +201,14 @@ class TreeCoverLossAnalyzer(Analyzer):
         query = f"{select_str} {where_str} {group_by}"
         return query
 
-    @staticmethod
-    def _list_to_tuple_str(lst):
-        if not lst:
-            return "()"
-        elif len(lst) == 1:
-            if isinstance(lst[0], tuple):
-                return f"({lst[0]})"
-            else:
-                return f"('{lst[0]}')"
+
+def _list_to_tuple_str(lst):
+    if not lst:
+        return "()"
+    elif len(lst) == 1:
+        if isinstance(lst[0], tuple):
+            return f"({lst[0]})"
         else:
-            return str(tuple(lst))
+            return f"('{lst[0]}')"
+    else:
+        return str(tuple(lst))
