@@ -1,13 +1,7 @@
 import pytest
 
 from app.analysis.dist_alerts.analysis import zonal_statistics
-from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.dist_alerts import (
-    DistAlertsAnalytics,
-    DistAlertsAnalyticsIn,
-)
-
-from app.analysis.common.analysis import get_geojson
+from app.models.land_change.dist_alerts import DistAlertsAnalytics
 
 
 class TestDistAlertsZonalStats:
