@@ -18,6 +18,7 @@ from ..common.analysis import (
 )
 from .query import create_gadm_dist_query
 
+
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
     3: "Natural short vegetation",
@@ -84,8 +85,10 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
         dist_drivers = read_zarr_clipped_to_geojson(
-            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
+            "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr",
             geojson,
+        ).band_data.reindex_like(
+            dist_alerts, method="nearest", tolerance=1e-5
         )
         dist_drivers.name = "ldacs_driver"
 
