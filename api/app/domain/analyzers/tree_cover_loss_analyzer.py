@@ -77,18 +77,6 @@ class TreeCoverLossAnalyzer(Analyzer):
             admin_select_fields = "iso, adm1, adm2"
             admin_filter_fields = "(iso, adm1, adm2)"
 
-        select_str = f'SELECT {admin_select_fields}, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg" FROM data'
-        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {admin_filter_fields} in {self._list_to_tuple_str(admin_level_ids)} AND umd_tree_cover_loss__year >= {tree_cover_loss_analytics_in.start_year} AND umd_tree_cover_loss__year <= {tree_cover_loss_analytics_in.end_year}"
-        if tree_cover_loss_analytics_in.forest_filter is not None:
-            if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
-                forest_filter_field = "is__umd_regional_primary_forest_2001"
-            elif tree_cover_loss_analytics_in.forest_filter == "intact_forest":
-                forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
-            where_str += f" AND {forest_filter_field} = true"
-
-        group_by = f"GROUP BY {admin_select_fields}, umd_tree_cover_loss__year"
-        query = f"{select_str} {where_str} {group_by}"
-
         if admin_level == 0:
             dataset = "gadm__tcl__iso_change"
         elif admin_level == 1:
@@ -96,12 +84,21 @@ class TreeCoverLossAnalyzer(Analyzer):
         else:
             dataset = "gadm__tcl__adm2_change"
 
+        admin_level_ids_str = self._list_to_tuple_str(admin_level_ids)
+
         version = "v20250515"
+        query = self._build_query(
+            tree_cover_loss_analytics_in,
+            admin_select_fields,
+            admin_filter_fields,
+            admin_level_ids_str,
+        )
 
         results = await self.compute_engine.compute(
             {"dataset": dataset, "version": version, "query": query}
         )
         df = pd.DataFrame(results)
+
         return df
 
     def _merge_back_gadm_ids(
@@ -122,6 +119,37 @@ class TreeCoverLossAnalyzer(Analyzer):
         # Drop the original 'iso', 'adm1', and 'adm2' columns if they exist
         results = results.drop(columns=join_cols)
         return results
+
+    def _build_query(
+        self,
+        tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn,
+        select_fields: str,
+        in_fields: str,
+        in_ids: str,
+    ):
+        """
+        Constructs a SQL query string for tree cover loss analytics based on the provided parameters.
+        Args:
+            tree_cover_loss_analytics_in (TreeCoverLossAnalyticsIn): Input object containing analytics parameters such as canopy cover, start year, end year, and optional forest filter.
+            select_fields (str): Comma-separated string of fields to select in the query.
+            in_fields (str): Field name to use in the 'IN' clause for filtering, including potentially tuple fields like (iso, adm1)
+            in_ids (str): String representation of IDs or values to filter by in the 'IN' clause.
+        Returns:
+            str: A SQL query string constructed according to the specified parameters.
+        """
+
+        select_str = f'SELECT {select_fields}, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg" FROM data'
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {in_fields} in {in_ids} AND umd_tree_cover_loss__year >= {tree_cover_loss_analytics_in.start_year} AND umd_tree_cover_loss__year <= {tree_cover_loss_analytics_in.end_year}"
+        if tree_cover_loss_analytics_in.forest_filter is not None:
+            if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
+                forest_filter_field = "is__umd_regional_primary_forest_2001"
+            elif tree_cover_loss_analytics_in.forest_filter == "intact_forest":
+                forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
+            where_str += f" AND {forest_filter_field} = true"
+
+        group_by = f"GROUP BY {select_fields}, umd_tree_cover_loss__year"
+        query = f"{select_str} {where_str} {group_by}"
+        return query
 
     @staticmethod
     def _list_to_tuple_str(lst):

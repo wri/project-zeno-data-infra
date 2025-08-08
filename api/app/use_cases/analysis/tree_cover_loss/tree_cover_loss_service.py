@@ -1,19 +1,20 @@
 import logging
-from uuid import UUID
 import traceback
+from uuid import UUID
 
-from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn, TreeCoverLossAnalytics
+from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.models.common.analysis import AnalysisStatus
+from app.models.land_change.tree_cover_loss import (
+    TreeCoverLossAnalytics,
+    TreeCoverLossAnalyticsIn,
+)
 
 
 class TreeCoverLossService:
     def __init__(
-        self,
-        analysis_repository: AnalysisRepository,
-        analyzer: TreeCoverLossAnalyzer
+        self, analysis_repository: AnalysisRepository, analyzer: TreeCoverLossAnalyzer
     ):
         self.analysis_repository = analysis_repository
         self.analyzer = analyzer
@@ -23,7 +24,7 @@ class TreeCoverLossService:
     async def do(self) -> None:
         try:
             if self.analytics_resource.status is not None:
-                return # analysis is in progress, complete, or failed
+                return  # analysis is in progress, complete, or failed
 
             self.analytics_resource.status = AnalysisStatus.pending
 
@@ -33,7 +34,9 @@ class TreeCoverLossService:
                 status=self.analytics_resource.status,
             )
 
-            await self.analysis_repository.store_analysis(self.analytics_resource_id, analysis)
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id, analysis
+            )
             await self.analyzer.analyze(analysis)
         except Exception as e:
             logging.error(
@@ -49,12 +52,13 @@ class TreeCoverLossService:
                 }
             )
 
-
     def get_status(self) -> AnalysisStatus:
         return self.analytics_resource.status
 
     async def set_resource_from(self, data: TreeCoverLossAnalyticsIn):
-        analysis: Analysis = await self.analysis_repository.load_analysis(data.thumbprint())
+        analysis: Analysis = await self.analysis_repository.load_analysis(
+            data.thumbprint()
+        )
         self.analytics_resource_id = data.thumbprint()
         self.analytics_resource = TreeCoverLossAnalytics(
             metadata=analysis.metadata or data.model_dump(),
@@ -64,4 +68,3 @@ class TreeCoverLossService:
 
     def resource_thumbprint(self) -> UUID:
         return self.analytics_resource_id
-    
