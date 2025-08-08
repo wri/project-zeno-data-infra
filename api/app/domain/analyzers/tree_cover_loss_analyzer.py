@@ -44,6 +44,17 @@ class TreeCoverLossAnalyzer(Analyzer):
             await self.analysis_repository.store_analysis(
                 tree_cover_loss_analytics_in.thumbprint(), analyzed_analysis
             )
+        elif tree_cover_loss_analytics_in.aoi.type == "protected_area":
+            result = await self._get_results_for_protected_area(
+                tree_cover_loss_analytics_in
+            )
+            analyzed_analysis = Analysis(
+                result.to_dict(orient="list"), analysis.metadata, AnalysisStatus.saved
+            )
+
+            await self.analysis_repository.store_analysis(
+                tree_cover_loss_analytics_in.thumbprint(), analyzed_analysis
+            )
         else:
             raise NotImplementedError()
 
@@ -119,6 +130,26 @@ class TreeCoverLossAnalyzer(Analyzer):
         # Drop the original 'iso', 'adm1', and 'adm2' columns if they exist
         results = results.drop(columns=join_cols)
         return results
+
+    async def _get_results_for_protected_area(
+        self, tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn
+    ):
+        select_fields = "wdpa_protected_area__id"
+        in_fields = "wdpa_protected_area__id"
+        in_ids = self._list_to_tuple_str(tree_cover_loss_analytics_in.aoi.ids)
+
+        query = self._build_query(
+            tree_cover_loss_analytics_in, select_fields, in_fields, in_ids
+        )
+        dataset = "wdpa_protected_areas__tcl__change"
+        version = "v20250515"
+
+        results = await self.compute_engine.compute(
+            {"dataset": dataset, "version": version, "query": query}
+        )
+        df = pd.DataFrame(results)
+        df = df.rename(columns={"wdpa_protected_area__id": "id"})
+        return df
 
     def _build_query(
         self,

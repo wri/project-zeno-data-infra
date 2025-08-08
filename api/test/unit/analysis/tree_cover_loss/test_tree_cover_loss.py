@@ -574,10 +574,10 @@ class TestTreeCoverLossMultipleProtectedAreas:
         )
         assert self.compute_engine.payloads[0]["version"] == "v20250515"
         assert self.compute_engine.payloads[0]["query"] == (
-            "SELECT wdpa_protected_area__id AS id, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
+            "SELECT wdpa_protected_area__id, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, "
             'SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg"'
             " FROM data WHERE "
-            "umd_tree_cover_density_2000__threshold = 30 AND wdpa_protected_area__id"
+            "umd_tree_cover_density_2000__threshold = 30 AND wdpa_protected_area__id in ('101', '102', '103') "
             "AND umd_tree_cover_loss__year >= 2020 AND umd_tree_cover_loss__year <= 2023 AND "
             "is__ifl_intact_forest_landscapes_2000 = true GROUP BY wdpa_protected_area__id, "
             "umd_tree_cover_loss__year"
