@@ -91,7 +91,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         raise
     finally:
         if dask_client:
-           dask_client.shutdown()
+            dask_client.shutdown()
 
     return result_uris
 

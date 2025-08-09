@@ -40,7 +40,7 @@ def setup_compute(
     return (mask, groupbys, expected_groups)
 
 
-def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_count)
     df.rename(columns={'value': 'count'}, inplace=True)
     df.rename(columns={'confidence': 'alert_confidence'}, inplace=True)

@@ -13,5 +13,5 @@ def setup_compute(
     return stages.setup_compute(datasets, expected_groups, contextual_name)
 
 @task
-def postprocess_result(result: xr.Dataset):
+def postprocess_result(result: xr.DataArray):
     return stages.create_result_dataframe(result)

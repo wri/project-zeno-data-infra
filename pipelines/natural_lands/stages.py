@@ -39,7 +39,7 @@ def setup_compute(
     """Setup the arguments for the xrarray reduce on natural lands by area"""
     base_zarr, country, region, subregion, contextual_layer = datasets
 
-    mask = base_zarr
+    mask = base_zarr.band_data
     groupbys: Tuple[xr.DataArray, ...] = (
         country.rename("country"),
         region.rename("region"),
@@ -53,7 +53,7 @@ def setup_compute(
     return (mask, groupbys, expected_groups)
 
 
-def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_count)
     df["natural_lands_category"] = df.natural_lands.apply(lambda x: "natural" if 1 < x < 12 else "non-natural")
     df["natural_lands_class"] = df.natural_lands.apply(lambda x: sbtn_natural_lands_classes.get(x, "unclassified"))

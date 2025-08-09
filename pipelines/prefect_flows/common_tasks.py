@@ -12,7 +12,7 @@ def load_data(dist_zarr_uri: str, contextual_uri: Optional[str] = None) -> Tuple
 
 
 @task
-def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple[xr.DataArray, ...], expected_groups: Tuple, funcname: str):
+def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple[xr.DataArray, ...], expected_groups: Tuple, funcname: str) -> xr.DataArray:
     '''Do the reduction with the specified groupbys. funcname is the name of the
     reduction function'''
     return common_stages.compute(dataset, groupbys, expected_groups, funcname)

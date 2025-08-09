@@ -76,7 +76,7 @@ def load_data(
         contextual_layer_aligned,
     )
 
-def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str):
+def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str) -> xr.DataArray:
     print("Starting reduce")
     alerts_count = xarray_reduce(
         reduce_mask,

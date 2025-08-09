@@ -35,14 +35,6 @@ def load_data(
     grasslands.coords['x'] = pixel_area.coords['x']
     grasslands.coords['y'] = pixel_area.coords['y']
 
-    # set all coords pixel area coords
-    country.coords['x'] = pixel_area.coords['x']
-    country.coords['y'] = pixel_area.coords['y']
-    region.coords['x'] = pixel_area.coords['x']
-    region.coords['y'] = pixel_area.coords['y']
-    subregion.coords['x'] = pixel_area.coords['x']
-    subregion.coords['y'] = pixel_area.coords['y']
-
     pixel_area = pixel_area.drop_vars('band').squeeze()
     grasslands_only = (grasslands == 2).astype(np.uint8)
 
