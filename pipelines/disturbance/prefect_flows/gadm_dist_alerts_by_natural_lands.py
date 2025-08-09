@@ -19,7 +19,7 @@ def dist_alerts_by_natural_lands_count(dist_zarr_uri: str, dist_version: str, ov
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
         np.arange(22),  # natural lands categories
-        np.arange(731, 1590),  # dates values
+        np.arange(731, 2000),  # dates values
         [1, 2, 3],  # confidence values
     )
     contextual_uri = f"s3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"

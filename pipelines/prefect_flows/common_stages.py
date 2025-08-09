@@ -53,15 +53,26 @@ def load_data(
 
     dist_alerts = _load_zarr(dist_zarr_uri)
 
-    country = _load_zarr(country_zarr_uri)
+    # reindex to dist alerts to avoid floating point precision issues
+    # when aligning the datasets
+    # https://github.com/pydata/xarray/issues/2217
+    country = _load_zarr(country_zarr_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
     country_aligned = xr.align(dist_alerts, country, join="left")[1].band_data
-    region = _load_zarr(region_zarr_uri)
+    region = _load_zarr(region_zarr_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
     region_aligned = xr.align(dist_alerts, region, join="left")[1].band_data
-    subregion = _load_zarr(subregion_zarr_uri)
+    subregion = _load_zarr(subregion_zarr_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
     subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1].band_data
 
     if contextual_uri is not None:
-        contextual_layer = _load_zarr(contextual_uri)
+        contextual_layer = _load_zarr(contextual_uri).reindex_like(
+            dist_alerts, method="nearest", tolerance=1e-5
+        )
         contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join="left")[
             1
         ].band_data

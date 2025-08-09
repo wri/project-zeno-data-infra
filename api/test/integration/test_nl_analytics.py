@@ -253,9 +253,10 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "value": [3.088260e+09, 1.714705e+10, 5.352373e+08],
-                "aoi_id": ["IDN.24.9", "IDN.14.13", "BRA.1.1"],
-                "aoi_type": ["admin", "admin", "admin"],
+                "natural_lands_class": [ "Bare", "Built-up", "Cropland", "Mangroves", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural peat tree cover", "Non-natural tree cover", "Non-natural water", "Wetland natural forests", "Wetland natural short vegetation", "Bare", "Built-up", "Cropland", "Mangroves", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural peat tree cover", "Non-natural tree cover", "Non-natural water", "Wetland natural forests", "Wetland natural short vegetation", "Bare", "Built-up", "Cropland", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural bare", "Non-natural hhort vegetation", "Non-natural peat short vegetation", "Wetland natural forests", "Wetland natural short vegetation" ],
+                "value": [9.740458e+06, 2.090808e+07, 2.541468e+09, 4.888979e+07, 3.328120e+08, 3.105780e+09, 5.471748e+07, 3.988614e+07, 2.174403e+08, 2.894916e+09, 3.775664e+09, 4.592512e+05, 1.000054e+04, 3.282669e+06, 4.855151e+07, 3.353656e+07, 3.509238e+07, 3.836173e+06, 7.144767e+09, 1.009753e+09, 3.081966e+09, 1.303954e+09, 2.055539e+08, 2.900014e+08, 3.041038e+09, 1.497757e+07, 8.448399e+03, 9.340168e+08, 5.305185e+03, 3.279676e+06, 7.459009e+05, 5.293314e+08, 9.941912e+06, 4.091888e+04, 7.072698e+05, 6.229126e+06, 2.008433e+05, 1.254880e+09, 1.331169e+06, 9.967673e+06, 4.069406e+05 ],
+                "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1"],
+                "aoi_type": ["admin", "admin", "admin", "admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin", "admin", "admin" ],
             }
         )
 
@@ -411,10 +412,11 @@ async def test_gadm_dist_analytics_no_intersection():
 
     expected_df = pd.DataFrame(
         {
-            "value": 3.088260e+09,
-            "aoi_id": "IDN.24.9",
-            "aoi_type": "admin",
-        }, index=[0]
+            "value": [9.740458e+06, 2.090808e+07, 2.541468e+09, 4.888979e+07, 3.328120e+08, 3.105780e+09, 5.471748e+07, 3.988614e+07, 2.174403e+08, 2.894916e+09, 3.775664e+09, 4.592512e+05, 1.000054e+04, 3.282669e+06 ],
+            "natural_lands_class": ["Bare", "Built-up", "Cropland", "Mangroves", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural peat tree cover", "Non-natural tree cover", "Non-natural water", "Wetland natural forests", "Wetland natural short vegetation" ],
+            "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9"],
+            "aoi_type": ["admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin" ]
+        }
     )
 
     actual_df = pd.DataFrame(data["result"])
