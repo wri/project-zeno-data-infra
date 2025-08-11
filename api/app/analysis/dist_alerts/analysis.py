@@ -84,6 +84,9 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         groupby_layers.append(natural_lands)
         expected_groups.append(np.arange(22))
     elif intersection == "driver":
+        # Re-index to DIST alerts to avoid floating point precision issues
+        # when aligning the datasets
+        # See https://github.com/pydata/xarray/issues/2217
         dist_drivers = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr",
             geojson,
