@@ -43,10 +43,13 @@ NATURAL_LANDS_CLASSES = {
 
 async def zonal_statistics_on_aois(aois, dask_client):
     geojsons = await get_geojson(aois)
-    aois = sorted(
-        [{"type": aois["type"], "id": id} for id in aois["ids"]],
-        key=lambda aoi: aoi["id"],
-    )
+    if aois["type"] != "feature_collection":
+        aois = sorted(
+            [{"type": aois["type"], "id": id} for id in aois["ids"]],
+            key=lambda aoi: aoi["id"],
+        )
+    else:
+        aois = aois["feature_collection"]["features"]
 
     precompute_partial = partial(zonal_statistics)
     dd_df_futures = await dask_client.gather(
@@ -59,9 +62,15 @@ async def zonal_statistics_on_aois(aois, dask_client):
 
 
 async def zonal_statistics(aoi, geojson):
-    natural_lands_obj_name = "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-    pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
-    natural_lands = read_zarr_clipped_to_geojson(natural_lands_obj_name, geojson).band_data
+    natural_lands_obj_name = (
+        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+    )
+    pixel_area_obj_name = (
+        "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
+    )
+    natural_lands = read_zarr_clipped_to_geojson(
+        natural_lands_obj_name, geojson
+    ).band_data
     natural_lands.name = "natural_lands_class"
     pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
 
@@ -84,8 +93,7 @@ async def zonal_statistics(aoi, geojson):
     )
 
     df["aoi_type"] = aoi["type"]
-    if "id" in aoi:
-        df[aoi["type"]] = aoi["id"]
+    df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
     df["natural_lands_class"] = df.natural_lands_class.apply(
         lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
@@ -165,12 +173,12 @@ async def do_analytics(file_path, dask_client):
         metadata = file_path / "metadata.json"
         json_content = metadata.read_text()
         metadata_content = json.loads(json_content)  # Convert JSON to Python object
-        aoi = metadata_content["aoi"]
+        aois = metadata_content["aoi"]
 
-        if aoi["type"] == "admin":
-            df = await get_precomputed_statistics(aoi, dask_client)
+        if aois["type"] == "admin":
+            df = await get_precomputed_statistics(aois, dask_client)
         else:
-            df = await zonal_statistics_on_aois(aoi, dask_client)
+            df = await zonal_statistics_on_aois(aois, dask_client)
 
         results_dict = df.to_dict(orient="list")
 
