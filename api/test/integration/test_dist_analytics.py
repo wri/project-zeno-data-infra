@@ -389,7 +389,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "low",
                 ],
                 "value": [2, 1, 2, 2, 1, 4, 7, 5, 1, 1],
-                "key_biodiversity_area": [
+                "aoi_id": [
                     "18392",
                     "18392",
                     "18392",
