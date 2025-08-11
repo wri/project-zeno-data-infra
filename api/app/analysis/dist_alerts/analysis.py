@@ -52,10 +52,14 @@ DIST_DRIVERS = {
 
 async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     geojsons = await get_geojson(aois)
-    aois = sorted(
-        [{"type": aois["type"], "id": id} for id in aois["ids"]],
-        key=lambda aoi: aoi["id"],
-    )
+
+    if aois["type"] != "feature_collection":
+        aois = sorted(
+            [{"type": aois["type"], "id": id} for id in aois["ids"]],
+            key=lambda aoi: aoi["id"],
+        )
+    else:
+        aois = aois["feature_collection"]["features"]
 
     precompute_partial = partial(zonal_statistics, intersection=intersection)
     dd_df_futures = await dask_client.gather(
@@ -68,7 +72,7 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
 
 
 async def zonal_statistics(aoi, geojson, intersection=None):
-    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
+    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250726/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
@@ -111,8 +115,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
-    if "id" in aoi:
-        alerts_df[aoi["type"]] = aoi["id"]
+    alerts_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
     if intersection == "natural_lands":
         alerts_df["natural_lands_category"] = alerts_df.natural_lands_class.apply(
@@ -205,7 +208,7 @@ async def do_analytics(file_path, dask_client):
         metadata = file_path / "metadata.json"
         json_content = metadata.read_text()
         metadata_content = json.loads(json_content)  # Convert JSON to Python object
-        aoi = metadata_content["aoi"]
+        aois = metadata_content["aoi"]
 
         # for now we only support one intersection, as enforced by the route
         intersections = metadata_content["intersections"]
@@ -214,10 +217,12 @@ async def do_analytics(file_path, dask_client):
         else:
             intersection = None
 
-        if aoi["type"] == "admin":
-            alerts_df = await get_precomputed_statistics(aoi, intersection, dask_client)
+        if aois["type"] == "admin":
+            alerts_df = await get_precomputed_statistics(
+                aois, intersection, dask_client
+            )
         else:
-            alerts_df = await zonal_statistics_on_aois(aoi, dask_client, intersection)
+            alerts_df = await zonal_statistics_on_aois(aois, dask_client, intersection)
 
         if metadata_content["start_date"] is not None:
             alerts_df = alerts_df[

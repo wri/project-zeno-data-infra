@@ -53,21 +53,24 @@ def get_geojson_request_for_data_api(aoi):
 
 async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_api):
     if aoi["type"] == "feature_collection":
-        geojson = aoi["feature_collection"]
+        geojson = aoi["feature_collection"]["features"]
     else:
         geojson = await geojsons_from_predefined_aoi(aoi)
     return geojson
 
 
 def clip_zarr_to_geojson(xarr, geojson):
-    geom = shape(geojson)
+    geojson_geometry = geojson["geometry"] if geojson["type"] == "Feature" else geojson
+    geom = shape(geojson_geometry)
+
     sliced = xarr.sel(
         x=slice(geom.bounds[0], geom.bounds[2]),
         y=slice(geom.bounds[3], geom.bounds[1]),
     )
     if "band" in sliced.dims:
         sliced = sliced.squeeze("band")
-    clipped = sliced.rio.clip([geojson])
+
+    clipped = sliced.rio.clip([geojson_geometry])
     return clipped
 
 
