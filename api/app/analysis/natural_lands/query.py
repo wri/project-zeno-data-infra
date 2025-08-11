@@ -21,6 +21,8 @@ def create_gadm_natural_lands_query(gadm_id: Tuple[str, int, int], table: str) -
         where_clause += f" AND subregion = {gadm_id[2]}"
         by_clause += ", subregion"
 
+    by_clause += ", natural_lands_class"
+    select_clause += ", natural_lands_class"
     group_by_clause = f"GROUP {by_clause}"
     order_by_clause = f"ORDER {by_clause}"
 
