@@ -72,7 +72,7 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
 
 
 async def zonal_statistics(aoi, geojson, intersection=None):
-    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250726/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
