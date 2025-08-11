@@ -478,7 +478,7 @@ async def test_kba_dist_analytics_no_intersection():
 
     expected_df = pd.DataFrame(
         {
-            "key_biodiversity_area": ["8111"],
+            "aoi_id": ["8111"],
             "alert_date": ["2024-08-15"],
             "confidence": ["high"],
             "value": [123],
