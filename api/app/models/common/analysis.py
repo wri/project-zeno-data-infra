@@ -2,9 +2,8 @@ import json
 import uuid
 from enum import Enum
 
+from app.models.common.areas_of_interest import AreaOfInterest
 from app.models.common.base import StrictBaseModel
-
-from api.app.models.common.areas_of_interest import AreaOfInterest
 
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
