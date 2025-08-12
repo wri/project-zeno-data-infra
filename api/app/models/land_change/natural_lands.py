@@ -49,15 +49,8 @@ class NaturalLandsAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "__dtypes__": {
-                                "country": "str",
-                                "region": "int",
-                                "subregion": "int",
-                                "natural_lands_area": "float32",
-                            },
-                            "country": ["BRA", "BRA", "BRA"],
-                            "region": [1, 1, 1],
-                            "subregion": [12, 12, 12],
+                            "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
+                            "aoi_type": ["admin", "admin", "admin"],
                             "natural_lands_area": [4851452000, 4084129000, 253008000],
                         },
                         "metadata": {

@@ -200,6 +200,10 @@ async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
 
     query = create_gadm_dist_query(gadm_id, table, intersection)
     alerts_df = duckdb.query(query).df()
+
+    alerts_df["aoi_id"] = id
+    alerts_df["aoi_type"] = "admin"
+
     return alerts_df
 
 
