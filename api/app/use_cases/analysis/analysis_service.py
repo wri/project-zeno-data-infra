@@ -1,33 +1,33 @@
 import logging
 import traceback
 import uuid
-from uuid import UUID, uuid5
 
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.tree_cover_loss import (
-    TreeCoverLossAnalytics,
-    TreeCoverLossAnalyticsIn,
-)
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn, AnalyticsOut
 
 
-class TreeCoverLossService:
+class AnalysisService:
     def __init__(
-        self, analysis_repository: AnalysisRepository, analyzer: TreeCoverLossAnalyzer
+        self, analysis_repository: AnalysisRepository, analyzer: Analyzer, event: str
     ):
         self.analysis_repository = analysis_repository
         self.analyzer = analyzer
-        self.analytics_resource: TreeCoverLossAnalytics = (
-            TreeCoverLossAnalytics()
+        self.event = event
+        self.analytics_resource: AnalyticsOut = AnalyticsOut()  # Dummy
+        self.analytics_resource_id: uuid.UUID = uuid.uuid5(
+            uuid.NAMESPACE_OID, self.event
         )  # Dummy
-        self.analytics_resource_id = uuid5(
-            uuid.NAMESPACE_OID, str(uuid.uuid4())
-        )  # Dummy
+
+    def event_name(self) -> str:
+        return self.event
 
     async def do(self) -> None:
         try:
+            if self.analytics_resource.metadata is None:
+                raise Exception("Set analysis resource before calling this method")
+
             if self.analytics_resource.status is not None:
                 return  # analysis is in progress, complete, or failed
 
@@ -46,7 +46,7 @@ class TreeCoverLossService:
         except Exception as e:
             logging.error(
                 {
-                    "event": "tree_cover_loss_analytics_processing_failure",
+                    "event": f"{self.event}_analytics_processing_failure",
                     "severity": "high",
                     "metadata": self.analytics_resource.metadata,
                     "analysis_repository": self.analysis_repository,
@@ -60,16 +60,16 @@ class TreeCoverLossService:
     def get_status(self) -> AnalysisStatus:
         return self.analytics_resource.status or AnalysisStatus.pending
 
-    async def set_resource_from(self, data: TreeCoverLossAnalyticsIn):
+    async def set_resource_from(self, data: AnalyticsIn):
         analysis: Analysis = await self.analysis_repository.load_analysis(
             data.thumbprint()
         )
         self.analytics_resource_id = data.thumbprint()
-        self.analytics_resource = TreeCoverLossAnalytics(
+        self.analytics_resource = AnalyticsOut(
             metadata=analysis.metadata or data.model_dump(),
             result=analysis.result,
             status=analysis.status,
         )
 
-    def resource_thumbprint(self) -> UUID:
+    def resource_thumbprint(self) -> uuid.UUID:
         return self.analytics_resource_id
