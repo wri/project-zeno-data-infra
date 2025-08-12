@@ -1,21 +1,45 @@
-import logging
-import traceback
-import uuid
+import os
 
-from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
+from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.external_services.data_api_compute_service import (
+    DataApiComputeService,
+)
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
+from app.models.common.analysis import AnalyticsOut
+from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.tree_cover_loss import (
     TreeCoverLossAnalytics,
     TreeCoverLossAnalyticsIn,
     TreeCoverLossAnalyticsResponse,
 )
-from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
-    TreeCoverLossService,
-)
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from app.routers.common_analytics import create_analysis, get_analysis
+from app.use_cases.analysis.analysis_service import AnalysisService
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
 
-router = APIRouter(prefix="/tree_cover_loss")
+ANALYTICS_NAME = "tree_cover_loss"
+router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
+
+
+def get_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+def create_analysis_service() -> AnalysisService:
+    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=TreeCoverLossAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=DataApiComputeService(os.getenv("API_KEY")),
+        ),
+        event=ANALYTICS_NAME,
+    )
 
 
 @router.post(
@@ -24,36 +48,28 @@ router = APIRouter(prefix="/tree_cover_loss")
     response_model=DataMartResourceLinkResponse,
     status_code=202,
 )
-def create(
+async def create(
     *,
     data: TreeCoverLossAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
+    service: AnalysisService = Depends(create_analysis_service),
 ):
-    try:
-        service = TreeCoverLossService()
-        service.set_resource_from(data)
-        background_tasks.add_task(service.do)
-        return _datamart_resource_link_response(request, service)
-    except Exception as e:
-        logging.error(
-            {
-                "event": "tree_cover_loss_analytics_processing_failure",
-                "severity": "high",  # Helps with alerting
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "stack_trace": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-
-
-def _datamart_resource_link_response(request, service) -> DataMartResourceLinkResponse:
-    link_url = request.url_for(
-        "get_tcl_analytics_result", resource_id=service.resource_thumbprint()
+    return await create_analysis(
+        data=data,
+        service=service,
+        request=request,
+        background_tasks=background_tasks,
+        resource_link_callback=_datamart_resource_link_response,
     )
-    link = DataMartResourceLink(link=str(link_url))
-    return DataMartResourceLinkResponse(data=link, status=service.get_status())
+
+
+def _datamart_resource_link_response(request, service) -> str:
+    return str(
+        request.url_for(
+            "get_tcl_analytics_result", resource_id=service.resource_thumbprint()
+        )
+    )
 
 
 @router.get(
@@ -63,40 +79,16 @@ def _datamart_resource_link_response(request, service) -> DataMartResourceLinkRe
     status_code=200,
 )
 async def get_tcl_analytics_result(
-    resource_id: str,
+    resource_id: UUID5,
     response: FastAPIResponse,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
-    # Validate UUID format
-    try:
-        uuid.UUID(resource_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
-        )
+    analytics_out: AnalyticsOut = await get_analysis(
+        resource_id=resource_id,
+        analysis_repository=analysis_repository,
+        response=response,
+    )
 
-    try:
-        service = TreeCoverLossService()
-        response.headers["Retry-After"] = "1"
-
-        return TreeCoverLossAnalyticsResponse(
-            data=TreeCoverLossAnalytics(
-                status=service.get_status(),
-                message="Resource is still processing, follow Retry-After header.",
-                result=None,
-                metadata=None,
-            ),
-            status="success",
-        )
-    except Exception as e:
-        logging.error(
-            {
-                "event": "tree_cover_loss_analytics_resource_request_failure",
-                "severity": "high",  # Helps with alerting
-                "resource_id": resource_id,
-                "resource_metadata": None,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal server error")
+    return TreeCoverLossAnalyticsResponse(
+        data=TreeCoverLossAnalytics(**analytics_out.model_dump()), status="success"
+    )
