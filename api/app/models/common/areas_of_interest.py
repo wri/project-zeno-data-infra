@@ -30,16 +30,18 @@ class AdminAreaOfInterest(AreaOfInterest):
         geostore_id = None
         return geostore_id
 
-    def get_admin_level(self):
-        admin_level = (
-            sum(
-                1
-                for field in (self.country, self.region, self.subregion)
-                if field is not None
-            )
-            - 1
-        )
-        return admin_level
+    def get_ids_at_admin_level(self, admin_level):
+        ids = []
+        for id_str in self.ids:
+            parts = id_str.split(".")
+            if len(parts) == 1 and admin_level == 0:
+                ids.append(parts[0])
+            elif len(parts) == 2 and admin_level == 1:
+                ids.append((parts[0], int(parts[1])))
+            elif len(parts) == 3 and admin_level == 2:
+                ids.append((parts[0], int(parts[1]), int(parts[2])))
+
+        return ids
 
     @model_validator(mode="after")
     def check_region_subregion(cls, values):
