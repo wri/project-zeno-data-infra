@@ -92,7 +92,7 @@ async def zonal_statistics(aoi, geojson):
         .rename(columns={"band_data": "natural_lands_area"})
     )
 
-    df["aoi_type"] = aoi["type"]
+    df["aoi_type"] = aoi["type"].lower()
     df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
     df["natural_lands_class"] = df.natural_lands_class.apply(

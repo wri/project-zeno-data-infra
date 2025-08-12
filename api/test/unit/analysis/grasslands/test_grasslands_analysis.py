@@ -198,7 +198,7 @@ class TestGrasslandsOTFAnalysis:
                 "grassland_area": np.array(([1555.85522] * len(years))).astype(
                     np.float32
                 ),
-                "aoi_type": ["feature_collection"] * len(years),
+                "aoi_type": ["feature"] * len(years),
             }
         )
 

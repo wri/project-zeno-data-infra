@@ -115,6 +115,7 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
+    alerts_df["aoi_type"] = aoi["type"].lower()
     alerts_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
     if intersection == "natural_lands":

@@ -54,9 +54,7 @@ async def zonal_statistics(aoi, geojson):
         .rename(columns={"band_data": "grassland_area"})
     )
 
-    grasslands_areas_df["aoi_type"] = aoi["type"]
-    if "id" in aoi:
-        grasslands_areas_df["aoi_id"] = aoi["id"]
+    grasslands_areas_df["aoi_type"] = aoi["type"].lower()
 
     return grasslands_areas_df
 
