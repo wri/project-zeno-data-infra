@@ -5,12 +5,8 @@ from uuid import UUID
 
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.models.common.analysis import AnalysisStatus, AnalyticsIn
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn, AnalyticsOut
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
-from app.models.land_change.tree_cover_loss import (
-    TreeCoverLossAnalytics,
-    TreeCoverLossAnalyticsResponse,
-)
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
@@ -55,7 +51,7 @@ async def get_analysis(
     resource_id: UUID,
     analysis_repository: AnalysisRepository,
     response: FastAPIResponse,
-):
+) -> AnalyticsOut:
     analysis: Analysis = Analysis(result=None, metadata=None, status=None)
 
     try:
@@ -86,14 +82,11 @@ async def get_analysis(
         case AnalysisStatus.failed:
             message = "Analysis failed. Result is not available."
         case _:
-            message = ""  # Optional default
+            message = ""
 
-    return TreeCoverLossAnalyticsResponse(
-        data=TreeCoverLossAnalytics(
-            status=analysis.status,
-            message=message,
-            result=analysis.result,
-            metadata=analysis.metadata,
-        ),
-        status="success",
+    return AnalyticsOut(
+        status=analysis.status,
+        message=message,
+        result=analysis.result,
+        metadata=analysis.metadata,
     )

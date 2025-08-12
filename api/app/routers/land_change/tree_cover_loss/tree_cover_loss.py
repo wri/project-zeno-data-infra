@@ -8,8 +8,10 @@ from app.infrastructure.external_services.data_api_compute_service import (
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
+from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.tree_cover_loss import (
+    TreeCoverLossAnalytics,
     TreeCoverLossAnalyticsIn,
     TreeCoverLossAnalyticsResponse,
 )
@@ -81,8 +83,12 @@ async def get_tcl_analytics_result(
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
-    return await get_analysis(
+    analytics_out: AnalyticsOut = await get_analysis(
         resource_id=resource_id,
         analysis_repository=analysis_repository,
         response=response,
+    )
+
+    return TreeCoverLossAnalyticsResponse(
+        data=TreeCoverLossAnalytics(**analytics_out.model_dump()), status="success"
     )
