@@ -1,7 +1,6 @@
 import logging
 import traceback
 import uuid
-from uuid import UUID
 
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
@@ -16,15 +15,17 @@ class AnalysisService:
         self.analysis_repository = analysis_repository
         self.analyzer = analyzer
         self.event = event
-        self.analytics_resource: AnalyticsOut = AnalyticsOut()
-        self.analytics_resource_id: UUID = uuid.UUID()
+        self.analytics_resource: AnalyticsOut = AnalyticsOut()  # Dummy
+        self.analytics_resource_id: uuid.UUID = uuid.uuid5(
+            uuid.NAMESPACE_OID, self.event
+        )  # Dummy
 
     def event_name(self) -> str:
         return self.event
 
     async def do(self) -> None:
         try:
-            if self.analytics_resource is None:
+            if self.analytics_resource.metadata is None:
                 raise Exception("Set analysis resource before calling this method")
 
             if self.analytics_resource.status is not None:
@@ -70,5 +71,5 @@ class AnalysisService:
             status=analysis.status,
         )
 
-    def resource_thumbprint(self) -> UUID:
+    def resource_thumbprint(self) -> uuid.UUID:
         return self.analytics_resource_id

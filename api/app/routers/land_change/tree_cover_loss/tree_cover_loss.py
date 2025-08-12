@@ -1,7 +1,6 @@
 import logging
 import os
 import traceback
-from uuid import UUID
 
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.models.analysis import Analysis
@@ -24,6 +23,7 @@ from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
 
 ANALYTICS_NAME = "tree_cover_loss"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
@@ -82,22 +82,14 @@ def _datamart_resource_link_response(request, service) -> str:
     status_code=200,
 )
 async def get_tcl_analytics_result(
-    resource_id: str,
+    resource_id: UUID5,
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
-    # Validate UUID format
-    try:
-        UUID(resource_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
-        )
-
     analysis: Analysis = Analysis(result=None, metadata=None, status=None)
 
     try:
-        analysis = await analysis_repository.load_analysis(UUID(resource_id))
+        analysis = await analysis_repository.load_analysis(resource_id)
     except Exception as e:
         logging.error(
             {

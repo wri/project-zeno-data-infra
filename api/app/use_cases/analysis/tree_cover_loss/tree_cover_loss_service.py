@@ -1,6 +1,7 @@
 import logging
 import traceback
-from uuid import UUID, uuid4
+import uuid
+from uuid import UUID, uuid5
 
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.models.analysis import Analysis
@@ -18,8 +19,12 @@ class TreeCoverLossService:
     ):
         self.analysis_repository = analysis_repository
         self.analyzer = analyzer
-        self.analytics_resource: TreeCoverLossAnalytics = TreeCoverLossAnalytics()
-        self.analytics_resource_id = uuid4()
+        self.analytics_resource: TreeCoverLossAnalytics = (
+            TreeCoverLossAnalytics()
+        )  # Dummy
+        self.analytics_resource_id = uuid5(
+            uuid.NAMESPACE_OID, str(uuid.uuid4())
+        )  # Dummy
 
     async def do(self) -> None:
         try:
