@@ -2,6 +2,7 @@ import json
 import uuid
 from enum import Enum
 
+from app.models.common.areas_of_interest import AreaOfInterest
 from app.models.common.base import StrictBaseModel
 
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
@@ -14,6 +15,8 @@ class AnalysisStatus(str, Enum):
 
 
 class AnalyticsIn(StrictBaseModel):
+    aoi: AreaOfInterest
+
     def thumbprint(self) -> uuid.UUID:
         """
         Generate a deterministic UUID thumbprint based on the model's JSON representation.

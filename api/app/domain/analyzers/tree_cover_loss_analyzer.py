@@ -1,13 +1,214 @@
+from abc import abstractmethod
+
+import pandas as pd
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn
+from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
-class TreeCoverLossAnalyzer(Analyzer):
-    def __init__(self, analysis_repository=None, otf_compute_engine=None, dataset_repository=None):
-        self.analysis_repository = analysis_repository  # TreeCoverLossRepository
-        self.otf_compute_engine = otf_compute_engine  # Dask Client
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
-
-
+class DataAPIAnalyzer(Analyzer):
+    @abstractmethod
     def analyze(self, analysis: Analysis):
         pass
+
+    @abstractmethod
+    def build_query(
+        self,
+        analytics_in: AnalyticsIn,
+        select_fields: str,
+        in_fields: str,
+        in_ids: str,
+    ):
+        pass
+
+
+class AdminAnalysisHelper:
+    def __init__(self, analyzer: DataAPIAnalyzer):
+        self.analyzer = analyzer
+
+    async def analyze(self, analysis: Analysis, analytics_in: AnalyticsIn):
+        iso_results = await self._get_results_for_admin_level(0, analytics_in)
+        adm1_results = await self._get_results_for_admin_level(1, analytics_in)
+        adm2_results = await self._get_results_for_admin_level(2, analytics_in)
+
+        iso_results_id_merged = self._merge_back_gadm_ids(0, iso_results)
+        adm1_results_id_merged = self._merge_back_gadm_ids(1, adm1_results)
+        adm2_results_id_merged = self._merge_back_gadm_ids(2, adm2_results)
+
+        combined_results = pd.concat(
+            [iso_results_id_merged, adm1_results_id_merged, adm2_results_id_merged]
+        ).to_dict(orient="list")
+
+        analyzed_analysis = Analysis(
+            combined_results, analysis.metadata, AnalysisStatus.saved
+        )
+
+        await self.analyzer.analysis_repository.store_analysis(
+            analytics_in.thumbprint(), analyzed_analysis
+        )
+
+    async def _get_results_for_admin_level(
+        self, admin_level, analytics_in: AnalyticsIn
+    ) -> pd.DataFrame:
+        admin_level_ids = analytics_in.aoi.get_ids_at_admin_level(admin_level)
+        if not admin_level_ids:
+            cols = ["iso"]
+            if admin_level >= 1:
+                cols.append("adm1")
+            if admin_level >= 2:
+                cols.append("adm2")
+
+            cols += [
+                "tree_cover_loss_ha",
+                "carbon_emissions_Mg",
+                "year",
+            ]
+            return pd.DataFrame(columns=cols)
+
+        if admin_level == 0:
+            admin_select_fields = "iso"
+            admin_filter_fields = "iso"
+        elif admin_level == 1:
+            admin_select_fields = "iso, adm1"
+            admin_filter_fields = "(iso, adm1)"
+        elif admin_level == 2:
+            admin_select_fields = "iso, adm1, adm2"
+            admin_filter_fields = "(iso, adm1, adm2)"
+
+        if admin_level == 0:
+            dataset = "gadm__tcl__iso_change"
+        elif admin_level == 1:
+            dataset = "gadm__tcl__adm1_change"
+        else:
+            dataset = "gadm__tcl__adm2_change"
+
+        admin_level_ids_str = _list_to_tuple_str(admin_level_ids)
+
+        version = "v20250515"
+        query = self.analyzer.build_query(
+            analytics_in,
+            admin_select_fields,
+            admin_filter_fields,
+            admin_level_ids_str,
+        )
+
+        results = await self.analyzer.compute_engine.compute(
+            {"dataset": dataset, "version": version, "query": query}
+        )
+        df = pd.DataFrame(results)
+
+        return df
+
+    def _merge_back_gadm_ids(
+        self, admin_level: int, results: pd.DataFrame
+    ) -> pd.DataFrame:
+        # Join 'iso', 'adm1', and 'adm2' columns into a new 'id' column separated by '.'
+        join_cols = ["iso"]
+        if admin_level >= 1:
+            join_cols.append("adm1")
+        if admin_level >= 2:
+            join_cols.append("adm2")
+
+        if results.empty:
+            results["id"] = None
+        else:
+            results["id"] = results[join_cols].astype(str).agg(".".join, axis=1)
+
+        # Drop the original 'iso', 'adm1', and 'adm2' columns if they exist
+        results = results.drop(columns=join_cols)
+        return results
+
+
+class TreeCoverLossAnalyzer(DataAPIAnalyzer):
+    def __init__(
+        self,
+        analysis_repository=None,
+        compute_engine=None,
+        dataset_repository=None,
+    ):
+        self.analysis_repository = analysis_repository  # TreeCoverLossRepository
+        self.compute_engine = compute_engine  # Dask Client, or not?
+        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+
+    async def analyze(self, analysis: Analysis):
+        tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
+        if tree_cover_loss_analytics_in.aoi.type == "admin":
+            admin_analyzer = AdminAnalysisHelper(self)
+            await admin_analyzer.analyze(analysis, tree_cover_loss_analytics_in)
+        elif tree_cover_loss_analytics_in.aoi.type == "protected_area":
+            result = await self._get_results_for_protected_area(
+                tree_cover_loss_analytics_in
+            )
+            analyzed_analysis = Analysis(
+                result.to_dict(orient="list"), analysis.metadata, AnalysisStatus.saved
+            )
+
+            await self.analysis_repository.store_analysis(
+                tree_cover_loss_analytics_in.thumbprint(), analyzed_analysis
+            )
+        else:
+            raise NotImplementedError()
+
+    async def _get_results_for_protected_area(
+        self, tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn
+    ):
+        select_fields = "wdpa_protected_area__id"
+        in_fields = "wdpa_protected_area__id"
+        in_ids = _list_to_tuple_str(tree_cover_loss_analytics_in.aoi.ids)
+
+        query = self.build_query(
+            tree_cover_loss_analytics_in, select_fields, in_fields, in_ids
+        )
+        dataset = "wdpa_protected_areas__tcl__change"
+        version = "v20250515"
+
+        results = await self.compute_engine.compute(
+            {"dataset": dataset, "version": version, "query": query}
+        )
+        df = pd.DataFrame(results)
+        df = df.rename(columns={"wdpa_protected_area__id": "id"})
+        return df
+
+    def build_query(
+        self,
+        tree_cover_loss_analytics_in: TreeCoverLossAnalyticsIn,
+        select_fields: str,
+        in_fields: str,
+        in_ids: str,
+    ):
+        """
+        Constructs a SQL query string for tree cover loss analytics based on the provided parameters.
+        Args:
+            tree_cover_loss_analytics_in (TreeCoverLossAnalyticsIn): Input object containing analytics parameters such as canopy cover, start year, end year, and optional forest filter.
+            select_fields (str): Comma-separated string of fields to select in the query.
+            in_fields (str): Field name to use in the 'IN' clause for filtering, including potentially tuple fields like (iso, adm1)
+            in_ids (str): String representation of IDs or values to filter by in the 'IN' clause.
+        Returns:
+            str: A SQL query string constructed according to the specified parameters.
+        """
+
+        select_str = f'SELECT {select_fields}, umd_tree_cover_loss__year AS year, SUM(umd_tree_cover_loss__ha) AS tree_cover_loss_ha, SUM("gfw_gross_emissions_co2e_all_gases__Mg") AS "carbon_emissions_Mg" FROM data'
+        where_str = f"WHERE umd_tree_cover_density_2000__threshold = {tree_cover_loss_analytics_in.canopy_cover} AND {in_fields} in {in_ids} AND umd_tree_cover_loss__year >= {tree_cover_loss_analytics_in.start_year} AND umd_tree_cover_loss__year <= {tree_cover_loss_analytics_in.end_year}"
+        if tree_cover_loss_analytics_in.forest_filter is not None:
+            if tree_cover_loss_analytics_in.forest_filter == "primary_forest":
+                forest_filter_field = "is__umd_regional_primary_forest_2001"
+            elif tree_cover_loss_analytics_in.forest_filter == "intact_forest":
+                forest_filter_field = "is__ifl_intact_forest_landscapes_2000"
+            where_str += f" AND {forest_filter_field} = true"
+
+        group_by = f"GROUP BY {select_fields}, umd_tree_cover_loss__year"
+        query = f"{select_str} {where_str} {group_by}"
+        return query
+
+
+def _list_to_tuple_str(lst):
+    if not lst:
+        return "()"
+    elif len(lst) == 1:
+        if isinstance(lst[0], tuple):
+            return f"({lst[0]})"
+        else:
+            return f"('{lst[0]}')"
+    else:
+        return str(tuple(lst))
