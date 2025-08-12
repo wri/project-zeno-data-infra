@@ -26,27 +26,64 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Print current directory
+        run: ls api/test/performance_tests
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.13'
 
-      - name: Run Locust Performance Tests
-        uses: thomasvjoseph/locust@v1.1.7
-        with:
-          URL: ${{ github.event.inputs.target_url }}
-          USERS: ${{ github.event.inputs.test_users }}
-          RATE: ${{ github.event.inputs.spawn_rate }}
-          RUNTIME: ${{ github.event.inputs.test_duration }}
-          LOCUSTFILE: api/test/performance_tests/locustfile.py
-          HEADLESS: true
-          LOGLEVEL: DEBUG
-          html_report: 'locust-report.html'
+      - name: Install Locust
+        run: pip install locust
+
+      - name: Run performance tests
+        run: |
+          locust -f api/test/performance_tests/locustfile.py \
+            --headless \
+            -u ${{ github.event.inputs.test_users }} \
+            -r ${{ github.event.inputs.spawn_rate }} \
+            -t ${{ github.event.inputs.test_duration }} \
+            --host ${{ github.event.inputs.target_url }} \
+            --html locust-report.html \
+            --csv locust-report
 
       - name: Upload Locust Test Results
         uses: actions/upload-artifact@v4
         with:
-          name: locust-report
+          name: locust-report.html
           path: locust-report.html
           if-no-files-found: warn
-          retention-days: 1
+          retention-days: 30
+
+      - name: Upload Locust Test Exceptions
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report_exceptions.csv
+          path: locust-report_exceptions.csv
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Locust Test Failures
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report_failures.csv
+          path: locust-report_failures.csv
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Locust Test Stats
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report_stats.csv
+          path: locust-report_stats.csv
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Locust Test Stats History
+        uses: actions/upload-artifact@v4
+        with:
+          name: locust-report_stats_history.csv
+          path: locust-report_stats_history.csv
+          if-no-files-found: warn
+          retention-days: 30
