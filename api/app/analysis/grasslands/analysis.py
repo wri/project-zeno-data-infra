@@ -114,12 +114,12 @@ async def do_analytics(file_path, dask_client):
         metadata = file_path / "metadata.json"
         json_content = metadata.read_text()
         metadata_content = json.loads(json_content)  # Convert JSON to Python object
-        aoi = metadata_content["aoi"]
+        aois = metadata_content["aoi"]
 
-        if aoi["type"] == "admin":
-            grasslands_df = await get_precomputed_statistics(aoi, dask_client)
+        if aois["type"] == "admin":
+            grasslands_df = await get_precomputed_statistics(aois, dask_client)
         else:
-            grasslands_df = await zonal_statistics_on_aois(aoi, dask_client)
+            grasslands_df = await zonal_statistics_on_aois(aois, dask_client)
 
         if metadata_content["start_year"] is not None:
             grasslands_df = grasslands_df[
