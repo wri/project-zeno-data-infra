@@ -172,7 +172,7 @@ class TestGrasslandsOTFAnalysis:
     ):
         mock_read_zarr.side_effect = [grasslands_datacube, pixel_area]
 
-        geojson = {
+        aoi = {
             "type": "Feature",
             "properties": {"id": "test_aoi"},
             "geometry": {
@@ -189,7 +189,7 @@ class TestGrasslandsOTFAnalysis:
             },
         }
 
-        result_df = await zonal_statistics(geojson, geojson)
+        result_df = await zonal_statistics(aoi, aoi["geometry"])
 
         loop = asyncio.get_event_loop()
         computed_df = await loop.run_in_executor(None, result_df.compute)
