@@ -8,7 +8,7 @@ from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
 
 @flow(name="DIST alerts area")
-def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
+def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
 
     area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
     result_filename = "dist_alerts"
@@ -26,10 +26,9 @@ def dist_alerts_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
 
     # load zarrs and align with pixel_area
     datasets = common_tasks.load_data.with_options(name="dist-alerts-load_data")(
-        area_uri, contextual_uri=dist_zarr_uri
+        dist_zarr_uri
     )
-    # Datasets returned as: (pixel_area, country, region, subregion, dist_alerts)
-    # TODO refactor stages.load_data to not hardcode distuSE alerts as the base layer
+    # Datasets returned as: (dist_alerts, country, region, subregion, pixel_area)
 
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-compute"

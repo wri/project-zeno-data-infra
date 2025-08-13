@@ -20,7 +20,7 @@ def setup_compute(
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xarray reduce on dist alerts"""
-    pixel_area, country, region, subregion, dist_alerts = datasets
+    dist_alerts, country, region, subregion, pixel_area, contextual_layer = datasets
 
     mask = dist_alerts.confidence
     groupbys: Tuple[xr.DataArray, ...] = (
