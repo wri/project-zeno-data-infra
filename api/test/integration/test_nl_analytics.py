@@ -367,7 +367,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                     "key_biodiversity_area",
                     "key_biodiversity_area",
                 ],
-                "key_biodiversity_area": [
+                "aoi_id": [
                     "18392",
                     "18392",
                     "18392",
@@ -463,7 +463,7 @@ async def test_kba_dist_analytics_no_intersection():
                 "key_biodiversity_area",
                 "key_biodiversity_area",
             ],
-            "key_biodiversity_area": [
+            "aoi_id": [
                 "8111",
                 "8111",
                 "8111",

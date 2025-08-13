@@ -19,10 +19,15 @@ from .query import create_gadm_grasslands_query
 
 async def zonal_statistics_on_aois(aois, dask_client):
     geojsons = await get_geojson(aois)
-    aois = sorted(
-        [{"type": aois["type"], "id": id} for id in aois["ids"]],
-        key=lambda aoi: aoi["id"],
-    )
+
+    if aois["type"] != "feature_collection":
+        aois = sorted(
+            [{"type": aois["type"], "id": id} for id in aois["ids"]],
+            key=lambda aoi: aoi["id"],
+        )
+    else:
+        aois = aois["feature_collection"]["features"]
+        geojsons = [geojson["geometry"] for geojson in geojsons]
 
     precompute_partial = partial(zonal_statistics)
     dd_df_futures = await dask_client.gather(
@@ -54,9 +59,10 @@ async def zonal_statistics(aoi, geojson):
         .rename(columns={"band_data": "grassland_area"})
     )
 
-    grasslands_areas_df["aoi_type"] = aoi["type"]
-    if "id" in aoi:
-        grasslands_areas_df["aoi_id"] = aoi["id"]
+    grasslands_areas_df["aoi_type"] = aoi["type"].lower()
+    grasslands_areas_df["aoi_id"] = (
+        aoi["id"] if "id" in aoi else aoi["properties"]["id"]
+    )
 
     return grasslands_areas_df
 
@@ -109,12 +115,12 @@ async def do_analytics(file_path, dask_client):
         metadata = file_path / "metadata.json"
         json_content = metadata.read_text()
         metadata_content = json.loads(json_content)  # Convert JSON to Python object
-        aoi = metadata_content["aoi"]
+        aois = metadata_content["aoi"]
 
-        if aoi["type"] == "admin":
-            grasslands_df = await get_precomputed_statistics(aoi, dask_client)
+        if aois["type"] == "admin":
+            grasslands_df = await get_precomputed_statistics(aois, dask_client)
         else:
-            grasslands_df = await zonal_statistics_on_aois(aoi, dask_client)
+            grasslands_df = await zonal_statistics_on_aois(aois, dask_client)
 
         if metadata_content["start_year"] is not None:
             grasslands_df = grasslands_df[

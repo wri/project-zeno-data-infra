@@ -48,17 +48,11 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
 
 class DistAlertsAnalytics(StrictBaseModel):
     result: Optional[dict] = {  # column oriented for loading into a dataframe
-        "__dtypes__": {
-            "country": "str",
-            "region": "int",
-            "subregion": "int",
-            "alert_date": "int",
-            "confidence": "int",
-            "value": "int",
-        },
         "country": ["BRA", "BRA", "BRA"],
         "region": [1, 1, 1],
         "subregion": [12, 12, 12],
+        "aoi_id": ["BRA.12.1", "BRA.12.1", "BRA.12.1"],
+        "aoi_type": ["admin", "admin", "admin"],
         "alert_date": [731, 733, 733],
         "confidence": [2, 2, 3],
         "value": [38, 5, 3],

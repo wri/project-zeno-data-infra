@@ -172,21 +172,24 @@ class TestGrasslandsOTFAnalysis:
     ):
         mock_read_zarr.side_effect = [grasslands_datacube, pixel_area]
 
-        geojson = {
-            "type": "Polygon",
-            "coordinates": [
-                [
-                    [105.0006, 47.9987],
-                    [105.0016, 47.9987],
-                    [105.0016, 47.9978],
-                    [105.0006, 47.9978],
-                    [105.0006, 47.9987],
-                ]
-            ],
+        aoi = {
+            "type": "Feature",
+            "properties": {"id": "test_aoi"},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [105.0006, 47.9987],
+                        [105.0016, 47.9987],
+                        [105.0016, 47.9978],
+                        [105.0006, 47.9978],
+                        [105.0006, 47.9987],
+                    ]
+                ],
+            },
         }
-        aoi = {"type": "feature_collection", "feature_collection": geojson}
 
-        result_df = await zonal_statistics(aoi, geojson)
+        result_df = await zonal_statistics(aoi, aoi["geometry"])
 
         loop = asyncio.get_event_loop()
         computed_df = await loop.run_in_executor(None, result_df.compute)
@@ -198,7 +201,8 @@ class TestGrasslandsOTFAnalysis:
                 "grassland_area": np.array(([1555.85522] * len(years))).astype(
                     np.float32
                 ),
-                "aoi_type": ["feature_collection"] * len(years),
+                "aoi_type": ["feature"] * len(years),
+                "aoi_id": ["test_aoi"] * len(years),
             }
         )
 

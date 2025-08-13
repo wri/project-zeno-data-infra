@@ -22,6 +22,7 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 
+
 class GrasslandsAnalyticsIn(StrictBaseModel):
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
@@ -42,12 +43,14 @@ class GrasslandsAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2024"],
     )
+
     @field_validator("start_year", "end_year")
     def year_must_be_at_least_2001(cls, v: str) -> str:
         year_int = int(v)
         if year_int < 2000:
             raise ValueError("Year must be at least 2000")
         return v
+
     @model_validator(mode="after")
     def validate_year_range(self) -> "GrasslandsAnalyticsIn":
         start = int(self.start_year)
@@ -55,6 +58,7 @@ class GrasslandsAnalyticsIn(StrictBaseModel):
         if end < start:
             raise ValueError("end_year must be greater than or equal to start_year")
         return self
+
 
 class GrasslandsAnalytics(StrictBaseModel):
     result: Optional[dict] = None
@@ -76,19 +80,12 @@ class GrasslandsAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "__dtypes__": {
-                                "country": "str",
-                                "region": "int",
-                                "subregion": "int",
-                                "year": "int",
-                                "grassland_area": "float",
-                            },
                             "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
                             "aoi_type": ["admin", "admin", "admin"],
                             "year": [2000, 2001, 2002],
                             "grassland_area": [384.9, 483.1, 1858.3],
                         },
-                       "metadata": {
+                        "metadata": {
                             "aoi": {
                                 "type": "admin",
                                 "ids": ["BRA.1.12"],

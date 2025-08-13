@@ -291,6 +291,8 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                 "country": ["IDN", "IDN", "IDN", "IDN", "BRA"],
                 "region": [24, 24, 14, 14, 1],
                 "subregion": [9, 9, 13, 13, 1],
+                "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "BRA.1.1"],
+                "aoi_type": ["admin"] * 5,
                 "alert_date": [
                     "2024-08-15",
                     "2024-08-15",
@@ -389,7 +391,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "low",
                 ],
                 "value": [2, 1, 2, 2, 1, 4, 7, 5, 1, 1],
-                "key_biodiversity_area": [
+                "aoi_id": [
                     "18392",
                     "18392",
                     "18392",
@@ -401,6 +403,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "18407",
                     "46942",
                 ],
+                "aoi_type": ["key_biodiversity_area"] * 10,
             }
         )
         actual_df = pd.DataFrame(data["result"])
@@ -438,6 +441,8 @@ async def test_gadm_dist_analytics_no_intersection():
             "country": ["IDN", "IDN"],
             "region": [24, 24],
             "subregion": [9, 9],
+            "aoi_id": ["IDN.24.9", "IDN.24.9"],
+            "aoi_type": ["admin"] * 2,
             "alert_date": [
                 "2024-08-15",
                 "2024-08-15",
@@ -478,7 +483,8 @@ async def test_kba_dist_analytics_no_intersection():
 
     expected_df = pd.DataFrame(
         {
-            "key_biodiversity_area": ["8111"],
+            "aoi_id": ["8111"],
+            "aoi_type": ["key_biodiversity_area"],
             "alert_date": ["2024-08-15"],
             "confidence": ["high"],
             "value": [123],
