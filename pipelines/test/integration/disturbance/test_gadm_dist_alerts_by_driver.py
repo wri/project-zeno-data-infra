@@ -5,7 +5,7 @@ from unittest.mock import patch
 from pandera.pandas import DataFrameSchema, Column, Check
 from prefect.testing.utilities import prefect_test_harness
 
-from pipelines.disturbance.prefect_flows import dist_alerts_by_drivers_count
+from pipelines.disturbance.prefect_flows import dist_alerts_by_drivers_area
 
 
 @pytest.mark.integration
@@ -19,6 +19,7 @@ def test_gadm_dist_alerts_by_driver_happy_path(
     country_ds,
     region_ds,
     subregion_ds,
+    pixel_area_ds,
     dist_drivers_ds,
 ):
     """Test full workflow with in-memory dependencies"""
@@ -28,11 +29,12 @@ def test_gadm_dist_alerts_by_driver_happy_path(
         country_ds,
         region_ds,
         subregion_ds,
+        pixel_area_ds,
         dist_drivers_ds,
     ]
 
     with prefect_test_harness():
-        result_uri = dist_alerts_by_drivers_count(
+        result_uri = dist_alerts_by_drivers_area(
             dist_zarr_uri="s3://dummy_zarr_uri",
             dist_version="test_v1",
         )
@@ -54,6 +56,7 @@ def test_gadm_dist_alerts_by_driver_result(
     country_ds,
     region_ds,
     subregion_ds,
+    pixel_area_ds,
     dist_drivers_ds,
 ):
     alert_schema = DataFrameSchema(
@@ -71,9 +74,9 @@ def test_gadm_dist_alerts_by_driver_result(
                 ],
             ),
             "alert_confidence": Column(str, Check.isin(["low", "high"])),
-            "count": Column(int, Check.isin([0, 1, 2])),
+            "area__ha": Column("float32", Check.isin([1500.0, 750.0])),
         },
-        unique=["country", "region", "subregion", "driver", "alert_date", "alert_confidence"],
+        unique=["country", "region", "subregion", "driver", "alert_date", "alert_confidence", "area_ha"],
         checks=Check(
             lambda df: (
                 df.groupby(["country", "region", "subregion", "driver", "alert_date"])[
@@ -91,11 +94,12 @@ def test_gadm_dist_alerts_by_driver_result(
         country_ds,
         region_ds,
         subregion_ds,
+        pixel_area_ds,
         dist_drivers_ds,
     ]
 
     with prefect_test_harness():
-        dist_alerts_by_drivers_count(
+        dist_alerts_by_drivers_area(
             dist_zarr_uri="s3://dummy_zarr_uri",
             dist_version="test_v1",
         )
