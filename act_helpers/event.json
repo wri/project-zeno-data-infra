@@ -1,0 +1,8 @@
+{
+  "inputs": {
+    "test_users": "10",
+    "spawn_rate": "2",
+    "test_duration": "30s",
+    "target_url": "http://yourapp.api"
+  }
+}
