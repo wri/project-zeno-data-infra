@@ -1,14 +1,14 @@
 import logging
-import os
-import requests
 import traceback
 
+import requests
 from app.infrastructure.external_services.compute_service import ComputeService
 
 
 class DataApiComputeService(ComputeService):
     def __init__(self, api_key):
         self.api_key = api_key
+        self.headers = None
 
     async def compute(self, payload: dict):
         logging.info(
@@ -19,12 +19,12 @@ class DataApiComputeService(ComputeService):
             }
         )
 
-        url = f"https://data-api.globalforestwatch.org/dataset/{payload["dataset"]}/{payload["version"]}/query/json"
+        url = f"https://data-api.globalforestwatch.org/dataset/{payload['dataset']}/{payload['version']}/query/json"
         self.headers = {
             "Content-Type": "application/json",
             "x-api-key": self.api_key,
         }
-        params = { "sql": payload["query"] }
+        params = {"sql": payload["query"]}
 
         try:
             response = requests.get(url, headers=self.headers, params=params)
@@ -32,7 +32,9 @@ class DataApiComputeService(ComputeService):
             if response.status_code == 200:
                 return response.json()["data"]
 
-            raise Exception(f"Error: HTTP {response.status_code}\nResponse: {response.text}")
+            raise Exception(
+                f"Error: HTTP {response.status_code}\nResponse: {response.text}"
+            )
         except Exception as e:
             logging.error(
                 {
