@@ -60,8 +60,7 @@ async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_a
 
 
 def clip_zarr_to_geojson(xarr, geojson):
-    geojson_geometry = geojson["geometry"] if geojson["type"] == "Feature" else geojson
-    geom = shape(geojson_geometry)
+    geom = shape(geojson)
 
     sliced = xarr.sel(
         x=slice(geom.bounds[0], geom.bounds[2]),
@@ -70,7 +69,7 @@ def clip_zarr_to_geojson(xarr, geojson):
     if "band" in sliced.dims:
         sliced = sliced.squeeze("band")
 
-    clipped = sliced.rio.clip([geojson_geometry])
+    clipped = sliced.rio.clip([geojson])
     return clipped
 
 

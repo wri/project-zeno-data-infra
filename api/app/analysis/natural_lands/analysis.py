@@ -50,6 +50,7 @@ async def zonal_statistics_on_aois(aois, dask_client):
         )
     else:
         aois = aois["feature_collection"]["features"]
+        geojsons = [geojson["geometry"] for geojson in geojsons]
 
     precompute_partial = partial(zonal_statistics)
     dd_df_futures = await dask_client.gather(
