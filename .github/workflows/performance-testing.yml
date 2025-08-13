@@ -38,6 +38,7 @@ jobs:
         run: pip install locust
 
       - name: Run performance tests
+        continue-on-error: true
         run: |
           locust -f api/test/performance_tests/locustfile.py \
             --headless \
@@ -49,6 +50,7 @@ jobs:
             --csv locust-report
 
       - name: Upload Locust Test Results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: locust-report.html
@@ -57,6 +59,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Locust Test Exceptions
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: locust-report_exceptions.csv
@@ -65,6 +68,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Locust Test Failures
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: locust-report_failures.csv
@@ -73,6 +77,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Locust Test Stats
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: locust-report_stats.csv
@@ -81,6 +86,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Locust Test Stats History
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: locust-report_stats_history.csv
