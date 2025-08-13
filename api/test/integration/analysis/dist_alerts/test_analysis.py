@@ -7,9 +7,7 @@ from app.models.land_change.dist_alerts import DistAlertsAnalytics
 class TestDistAlertsZonalStats:
 
     @pytest.mark.asyncio
-    async def test_zonal_statistics_drivers_happy_path(
-        self
-    ):
+    async def test_zonal_statistics_drivers_happy_path(self):
         geojson = {
             "type": "Polygon",
             "coordinates": [
@@ -24,10 +22,7 @@ class TestDistAlertsZonalStats:
         }
 
         _: DistAlertsAnalytics = await zonal_statistics(
-            aoi={
-                "type": "indigenous_land",
-                "ids": ["1918"]
-            },
+            aoi={"type": "indigenous_land", "id": "1918"},
             geojson=geojson,
             intersection="driver",
         )
