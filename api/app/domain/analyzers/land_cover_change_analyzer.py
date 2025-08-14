@@ -31,6 +31,9 @@ class LandCoverChangeAnalyzer(Analyzer):
                 results = self._analyze_admin_area(gadm_id)
                 results["aoi_id"] = gadm_id
                 results["aoi_type"] = "admin"
+                results = results[
+                    results.land_cover_class_start != results.land_cover_class_end
+                ]  # Filter out no change
                 gadm_results.append(results)
             combined_results = pd.concat(gadm_results).to_dict(orient="list")
             logging.info(combined_results)
