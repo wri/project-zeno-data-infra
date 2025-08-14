@@ -1,83 +1,70 @@
-from typing import List
+import logging
+import traceback
+import uuid
+from uuid import UUID, uuid5
 
-from app.infrastructure.persistence.file_resource import (
-    load_resource,
-    write_resource,
-)
+from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.models.analysis import Analysis
+from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover import (
     LandCoverChangeAnalytics,
     LandCoverChangeAnalyticsIn,
-    LandCoverChangeResult,
 )
-
-LAND_COVER_CLASSES = [
-    "Bare and sparse vegetation",
-    "Short vegetation",
-    "Tree cover",
-    "Wetland-short vegetation",
-    "Water",
-    "Snow/ice",
-    "Cropland",
-    "Built-up",
-    "Cultivated grasslands",
-]
+from app.use_cases.analysis.analysis_service import AnalysisService
 
 
-class LandCoverChangeService:
-    def __init__(self):
-        pass
-
-    async def do(
-        self,
-        land_cover_change_analytics: LandCoverChangeAnalyticsIn,
-        write_resource=write_resource,
-        load_resource=load_resource,
+class LandCoverChangeService(AnalysisService):
+    def __init__(
+        self, analysis_repository: AnalysisRepository, analyzer: LandCoverChangeAnalyzer
     ):
-        resource = await load_resource(land_cover_change_analytics.thumbprint())
-        if resource.metadata is None:
-            await write_resource(
-                land_cover_change_analytics.thumbprint(),
-                LandCoverChangeAnalytics(
-                    metadata=land_cover_change_analytics, status=AnalysisStatus.pending
-                ),
+        self.analysis_repository = analysis_repository
+        self.analyzer = analyzer
+        self.analytics_resource: LandCoverChangeAnalytics = (
+            LandCoverChangeAnalytics()
+        )  # Dummy
+        self.analytics_resource_id = uuid5(
+            uuid.NAMESPACE_OID, str(uuid.uuid4())
+        )  # Dummy
+
+    async def do(self) -> None:
+        try:
+            if self.analytics_resource.status is not None:
+                return  # analysis is in progress, complete, or failed
+
+            self.analytics_resource.status = AnalysisStatus.pending
+
+            analysis = Analysis(
+                metadata=self.analytics_resource.metadata,
+                result=self.analytics_resource.result,
+                status=self.analytics_resource.status,
             )
 
-        if resource.result is None:
-            resource = await self.compute(land_cover_change_analytics)
-            await write_resource(land_cover_change_analytics.thumbprint(), resource)
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id, analysis
+            )
+            await self.analyzer.analyze(analysis)
+        except Exception as e:
+            logging.error(
+                {
+                    "event": "land_cover_change_analytics_processing_failure",
+                    "severity": "high",
+                    "metadata": self.analytics_resource.metadata,
+                    "analysis_repository": self.analysis_repository,
+                    "analyzer": self.analyzer,
+                    "error_type": e.__class__.__name__,
+                    "error_details": str(e),
+                    "stack_trace": traceback.format_exc(),
+                }
+            )
 
-    async def get(
-        self, resource_id: str, load_resource=load_resource
-    ) -> LandCoverChangeAnalytics:
-        """
-        Retrieve the analytics result for a given resource ID.
-        """
-        return await load_resource(resource_id)
-
-    async def compute(
-        self, land_cover_change_analytics: LandCoverChangeAnalyticsIn
-    ) -> LandCoverChangeAnalytics:
-        aoi_ids: List[str] = []
-        land_cover_start: List[str] = []
-        land_cover_end: List[str] = []
-        area: List[float] = []
-
-        for aoi_id in land_cover_change_analytics.aoi.ids:
-            aoi_ids += [aoi_id] * len(LAND_COVER_CLASSES)
-            land_cover_start += LAND_COVER_CLASSES
-            land_cover_end += reversed(LAND_COVER_CLASSES)
-            area += range(1, len(LAND_COVER_CLASSES) + 1)
-
-        results = LandCoverChangeResult(
-            id=aoi_ids,
-            land_cover_class_start=land_cover_start,
-            land_cover_class_end=land_cover_end,
-            area_ha=area,
+    async def set_resource_from(self, data: LandCoverChangeAnalyticsIn):
+        analysis: Analysis = await self.analysis_repository.load_analysis(
+            data.thumbprint()
         )
-
-        return LandCoverChangeAnalytics(
-            result=results,
-            metadata=land_cover_change_analytics,
-            status=AnalysisStatus.saved,
+        self.analytics_resource_id = data.thumbprint()
+        self.analytics_resource = LandCoverChangeAnalytics(
+            metadata=analysis.metadata or data.model_dump(),
+            result=analysis.result,
+            status=analysis.status,
         )
