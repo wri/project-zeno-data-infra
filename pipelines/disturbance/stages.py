@@ -15,7 +15,7 @@ alerts_confidence = {
 
 
 def setup_compute(
-    datasets: Tuple[xr.Dataset, ...],
+    datasets: Tuple[xr.DataArray, ...],
     expected_groups: Optional[ExpectedGroupsType],
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
@@ -23,24 +23,24 @@ def setup_compute(
     dist_alerts, country, region, subregion, contextual_layer = datasets
 
     mask = dist_alerts.confidence
-    groupbys: Tuple[xr.Dataset, ...] = (
-        country.band_data.rename("country"),
-        region.band_data.rename("region"),
-        subregion.band_data.rename("subregion"),
+    groupbys: Tuple[xr.DataArray, ...] = (
+        country.rename("country"),
+        region.rename("region"),
+        subregion.rename("subregion"),
         dist_alerts.alert_date,
         dist_alerts.confidence,
     )
     if contextual_layer is not None:
         groupbys = (
             groupbys[:3]
-            + (contextual_layer.band_data.rename(contextual_column_name),)
+            + (contextual_layer.rename(contextual_column_name),)
             + groupbys[3:]
         )
 
     return (mask, groupbys, expected_groups)
 
 
-def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_count)
     df.rename(columns={'value': 'count'}, inplace=True)
     df.rename(columns={'confidence': 'alert_confidence'}, inplace=True)
