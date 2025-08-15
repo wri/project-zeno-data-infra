@@ -12,4 +12,3 @@ class AnalysisRepository(ABC):
     @abstractmethod
     async def store_analysis(self, resource_id: uuid.UUID, analytics: Analysis):
         pass
-
