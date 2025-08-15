@@ -17,6 +17,15 @@ class Dataset(Enum):
     canopy_cover = "canopy_cover"
     area_hectares = "area_hectares"
 
+    def get_field_name(self):
+        DATASET_TO_NAMES = {
+            Dataset.area_hectares: "area_ha",
+            Dataset.tree_cover_loss: "loss_year",
+            Dataset.canopy_cover: "canopy_cover",
+        }
+
+        return DATASET_TO_NAMES[self]
+
 
 class DatasetFilter(StrictBaseModel):
     dataset: Dataset
@@ -88,7 +97,7 @@ class ZarrDatasetRepository:
             storage_options={"requester_pays": True},
         ).band_data
         xarr.rio.write_crs("EPSG:4326", inplace=True)
-        xarr.name = str(dataset)
+        xarr.name = dataset.get_field_name()
 
         if geometry is not None:
             return self._clip_xarr_to_geometry(xarr, geometry)
@@ -114,8 +123,8 @@ class DataApiAoiGeometryRepository:
 
 class FloxOTFHandler:
     EXPECTED_GROUPS = {
-        Dataset.tree_cover_loss: range(0, 25),
-        Dataset.canopy_cover: range(0, 8),
+        Dataset.tree_cover_loss: np.arange(0, 25),
+        Dataset.canopy_cover: np.arange(0, 8),
     }
 
     def __init__(
@@ -129,7 +138,7 @@ class FloxOTFHandler:
     async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
         aoi_geometry = self.aoi_geometry_repository.load(aoi_type, aoi_ids)[0]
 
-        by = da = self.dataset_repository.load(
+        by = self.dataset_repository.load(
             query.aggregate.dataset, geometry=aoi_geometry
         )
         func = query.aggregate.func
@@ -138,9 +147,16 @@ class FloxOTFHandler:
         expected_groups = []
         for filter in query.filters:
             da = self.dataset_repository.load(filter.dataset, geometry=aoi_geometry)
-            filtered_da = da.where(eval(f"da {filter.op} {filter.value}"))
-            objs.append(filtered_da)
-            expected_groups.append(self.EXPECTED_GROUPS[filter.dataset])
+            by = by.where(eval(f"da {filter.op} {filter.value}"))
+
+            if filter.dataset in query.group_bys:
+                self.EXPECTED_GROUPS[filter.dataset] = self.EXPECTED_GROUPS[
+                    filter.dataset
+                ][
+                    eval(
+                        f"self.EXPECTED_GROUPS[filter.dataset] {filter.op} {filter.value}"
+                    )
+                ]
 
         for group_by in query.group_bys:
             da = self.dataset_repository.load(group_by, geometry=aoi_geometry)
@@ -152,7 +168,9 @@ class FloxOTFHandler:
             .to_dataframe()
             .reset_index()
         )
-        filtered_results = results[~np.isnan(results[query.aggregate.dataset.value])]
+        filtered_results = results[
+            ~np.isnan(results[query.aggregate.dataset.get_field_name()])
+        ]
         return filtered_results.reset_index().drop(columns="index")
 
 
@@ -180,16 +198,16 @@ class AreaOfInterestList:
                 DatasetFilter(
                     dataset=Dataset.canopy_cover, op=">=", value=canopy_cover
                 ),
-                # DatasetFilter(
-                #     dataset=Dataset.tree_cover_loss,
-                #     op=">=",
-                #     value=start_year,
-                # ),
-                # DatasetFilter(
-                #     dataset=Dataset.tree_cover_loss,
-                #     op="<=",
-                #     value=end_year,
-                # ),
+                DatasetFilter(
+                    dataset=Dataset.tree_cover_loss,
+                    op=">=",
+                    value=start_year,
+                ),
+                DatasetFilter(
+                    dataset=Dataset.tree_cover_loss,
+                    op="<=",
+                    value=end_year,
+                ),
             ],
         )
         return await self.compute_engine.compute(self.type, self.ids, query)

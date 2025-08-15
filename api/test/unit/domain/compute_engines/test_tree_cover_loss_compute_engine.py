@@ -61,20 +61,22 @@ async def test_flox_handler_happy_path():
                 data = np.full((10, 10), 0.5)
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "area_ha"
             elif dataset == Dataset.canopy_cover:
                 # left half is 1s, right half is 5s
                 data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "canopy_cover"
             elif dataset == Dataset.tree_cover_loss:
                 # top half is 15s, bottom half is 5s
                 data = np.vstack([np.full((5, 10), 15), np.full((5, 10), 5)])
                 coords = {"x": np.arange(10), "y": np.arange(10)}
-                xarr = xr.DataArray(data, coords=coords, dims=("y", "x"))
+                xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "loss_year"
             else:
                 raise ValueError("Not a valid dataset for this test")
 
-            xarr.name = dataset.value
             return xarr
 
     class TestAoiGeometryRepository:
@@ -92,25 +94,12 @@ async def test_flox_handler_happy_path():
     )
     results = await aois.get_tree_cover_loss(3, 10, 20, "primary_forest")
 
-    # pd.testing.assert_frame_equal(
-    #     results,
-    #     pd.DataFrame(
-    #         {
-    #             "id": ["1234"],
-    #             "loss_year": [15],
-    #             "area_ha": [12.5],
-    #         },
-    #     ),
-    #     check_like=True,
-    # )
-
     pd.testing.assert_frame_equal(
         results,
         pd.DataFrame(
             {
-                "canopy_cover": [5],
-                "tree_cover_loss": [5],
-                "area_hectares": [25.0],
+                "loss_year": [15],
+                "area_ha": [12.5],
             },
         ),
         check_like=True,
