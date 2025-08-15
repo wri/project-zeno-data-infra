@@ -25,9 +25,9 @@ def gadm_grasslands_area(
         return result_uri
 
     expected_groups = (
-        np.arange(0, 894),     # country iso codes
-        np.arange(1, 86),   # region codes
-        np.arange(1, 854),  # subregion codes
+        np.arange(894),  # country iso codes
+        np.arange(86),   # region codes
+        np.arange(854),  # subregion codes
     )
 
     datasets = grasslands_tasks.load_data.with_options(
