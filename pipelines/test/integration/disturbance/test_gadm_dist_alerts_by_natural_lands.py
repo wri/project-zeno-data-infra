@@ -83,7 +83,6 @@ def test_gadm_dist_alerts_result(
             "natural_lands",
             "alert_date",
             "confidence",
-            "area__ha",
         ],
         checks=Check(
             lambda df: (

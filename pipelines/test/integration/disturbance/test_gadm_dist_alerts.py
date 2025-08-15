@@ -52,10 +52,10 @@ def test_gadm_dist_alerts_result(
                     Check.less_than_or_equal_to(datetime.date.fromisoformat("2023-03-11")),
                 ],
             ),
-            "alert_confidence": Column(str, Check.isin(["low", "high"])),
             "area__ha": Column("float32", Check.isin([1500.0, 750.0])),
+            "alert_confidence": Column(str, Check.isin(["low", "high"])),
         },
-        unique=["country", "region", "subregion", "alert_date", "alert_confidence", "area__ha"],
+        unique=["country", "region", "subregion", "alert_date", "alert_confidence"],
         checks=Check(
             lambda df: (
                 df.groupby(["country", "region", "subregion", "alert_date"])[

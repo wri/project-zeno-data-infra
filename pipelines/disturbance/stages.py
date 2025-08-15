@@ -22,7 +22,7 @@ def setup_compute(
     """Setup the arguments for the xarray reduce on dist alerts"""
     dist_alerts, country, region, subregion, pixel_area, contextual_layer = datasets
 
-    mask = dist_alerts.confidence
+    base_layer = pixel_area
     groupbys: Tuple[xr.DataArray, ...] = (
         country.rename("country"),
         region.rename("region"),
@@ -37,7 +37,7 @@ def setup_compute(
             + groupbys[3:]
         )
 
-    return (mask, groupbys, expected_groups)
+    return (base_layer, groupbys, expected_groups)
 
 
 def create_result_dataframe(alerts_area: xr.Dataset) -> pd.DataFrame:

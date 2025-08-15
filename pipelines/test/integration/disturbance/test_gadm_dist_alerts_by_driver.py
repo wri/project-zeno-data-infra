@@ -76,7 +76,7 @@ def test_gadm_dist_alerts_by_driver_result(
             "alert_confidence": Column(str, Check.isin(["low", "high"])),
             "area__ha": Column("float32", Check.isin([1500.0, 750.0])),
         },
-        unique=["country", "region", "subregion", "driver", "alert_date", "alert_confidence", "area_ha"],
+        unique=["country", "region", "subregion", "driver", "alert_date", "alert_confidence"],
         checks=Check(
             lambda df: (
                 df.groupby(["country", "region", "subregion", "driver", "alert_date"])[
