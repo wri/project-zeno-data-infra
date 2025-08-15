@@ -495,3 +495,46 @@ async def test_kba_dist_analytics_no_intersection():
     print(actual_df)
 
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+
+@pytest.mark.asyncio
+async def test_admin_dist_analytics_by_grasslands():
+    delete_resource_files(
+        "dist_alerts_analytics_payloads", "3c8491e2-5176-5cfc-99b1-77140dc3feb3/"
+    )
+
+    async with LifespanManager(app):
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            resource = await client.post(
+                "/v0/land_change/dist_alerts/analytics",
+                json={
+                    "aoi": {"type": "admin", "ids": ["TZA.24.3"]},
+                    "start_date": "2024-08-15",
+                    "end_date": "2024-08-16",
+                    "intersections": ["grasslands"],
+                },
+            )
+
+            resource_id = resource.json()["data"]["link"].split("/")[-1]
+
+            data = await retry_getting_resource("dist_alerts", resource_id, client)
+
+    expected_df = pd.DataFrame(
+        {
+            "country": ["TZA", "TZA"],
+            "region": [24, 24],
+            "subregion": [3, 3],
+            "grasslands": [0, 0],
+            "alert_date": ["2024-08-15", "2024-08-16"],
+            "confidence": ["high", "high"],
+            "value": [26, 8],
+            "aoi_id": ["TZA.24.3", "TZA.24.3"],
+            "aoi_type": ["admin", "admin"],
+        }
+    )
+
+    actual_df = pd.DataFrame(data["result"])
+    print(actual_df)
+
+    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)

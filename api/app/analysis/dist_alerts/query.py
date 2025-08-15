@@ -15,6 +15,8 @@ def create_gadm_dist_query(
             intersection_col = "ldacs_driver"
         elif intersection == "natural_lands":
             intersection_col = "natural_land_class"
+        elif intersection == "grasslands":
+            intersection_col = "grasslands"
 
     from_clause = f"FROM '/tmp/{table}.parquet'"
     select_clause = "SELECT country"

@@ -41,7 +41,7 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2023-12-31"],
     )
-    intersections: List[Literal["driver", "natural_lands"]] = Field(
+    intersections: List[Literal["driver", "natural_lands", "grasslands"]] = Field(
         ..., min_length=0, max_length=1, description="List of intersection types"
     )
 
