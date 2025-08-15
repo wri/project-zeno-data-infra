@@ -37,13 +37,13 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service() -> AnalysisService:
+def create_analysis_service(request: Request) -> AnalysisService:
     analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandCoverChangeAnalyzer(
             analysis_repository=analysis_repository,
-            compute_engine=None,
+            compute_engine=request.app.state.dask_client,
         ),
         event=ANALYTICS_NAME,
     )
