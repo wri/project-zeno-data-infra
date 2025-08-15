@@ -7,8 +7,8 @@ from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
 
-@flow(name="DIST alerts count by drivers")
-def dist_alerts_by_drivers_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
+@flow(name="DIST alerts area by drivers")
+def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_filename = "dist_alerts_by_drivers"
     result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
     if not overwrite and s3_uri_exists(result_uri):
@@ -32,7 +32,7 @@ def dist_alerts_by_drivers_count(dist_zarr_uri: str, dist_version: str, overwrit
 
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-by-drivers-compute-zonal-stats"
-    )(*compute_input, funcname="count")
+    )(*compute_input, funcname="sum")
     result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-by-drivers-postprocess-result"
     )(result_dataset)

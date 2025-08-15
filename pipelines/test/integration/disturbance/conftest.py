@@ -104,3 +104,16 @@ def dist_drivers_ds():
     )
 
     return drivers
+
+@pytest.fixture
+def pixel_area_ds():
+    pixel_area = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[750.0, 750.0], [750.0, 750.0]]], dtype=np.float32),
+            )
+        },
+    )
+
+    return pixel_area

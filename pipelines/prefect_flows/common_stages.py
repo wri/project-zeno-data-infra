@@ -8,6 +8,7 @@ from pipelines.globals import (
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
+    pixel_area_uri
 )
 
 numeric_to_alpha3 = {
@@ -68,6 +69,10 @@ def load_data(
         dist_alerts, method="nearest", tolerance=1e-5
     )
     subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1].band_data
+    pixel_area = _load_zarr(pixel_area_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
+    pixel_area_aligned = xr.align(dist_alerts, pixel_area, join="left")[1].band_data
 
     if contextual_uri is not None:
         contextual_layer = _load_zarr(contextual_uri).reindex_like(
@@ -84,12 +89,13 @@ def load_data(
         country_aligned,
         region_aligned,
         subregion_aligned,
+        pixel_area_aligned,
         contextual_layer_aligned,
     )
 
 def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str) -> xr.DataArray:
     print("Starting reduce")
-    alerts_count = xarray_reduce(
+    alerts_area = xarray_reduce(
         reduce_mask,
         *reduce_groupbys,
         func=funcname,
@@ -100,7 +106,7 @@ def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: 
         fill_value=0,
     ).compute()
     print("Finished reduce")
-    return alerts_count
+    return alerts_area
 
 
 def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:

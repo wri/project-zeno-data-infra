@@ -19,10 +19,10 @@ def setup_compute(
     expected_groups: Optional[ExpectedGroupsType],
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
-    """Setup the arguments for the xrarray reduce on dist alerts"""
-    dist_alerts, country, region, subregion, contextual_layer = datasets
+    """Setup the arguments for the xarray reduce on dist alerts"""
+    dist_alerts, country, region, subregion, pixel_area, contextual_layer = datasets
 
-    mask = dist_alerts.confidence
+    base_layer = pixel_area
     groupbys: Tuple[xr.DataArray, ...] = (
         country.rename("country"),
         region.rename("region"),
@@ -37,12 +37,12 @@ def setup_compute(
             + groupbys[3:]
         )
 
-    return (mask, groupbys, expected_groups)
+    return (base_layer, groupbys, expected_groups)
 
 
-def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
-    df = common_create_result_dataframe(alerts_count)
-    df.rename(columns={'value': 'count'}, inplace=True)
+def create_result_dataframe(alerts_area: xr.Dataset) -> pd.DataFrame:
+    df = common_create_result_dataframe(alerts_area)
+    df.rename(columns={'value': 'area__ha'}, inplace=True)
     df.rename(columns={'confidence': 'alert_confidence'}, inplace=True)
     df['alert_date'] = df.sort_values(by='alert_date').alert_date.apply(lambda x: date(2020, 12, 31) + relativedelta(days=x))
     df['alert_confidence'] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
