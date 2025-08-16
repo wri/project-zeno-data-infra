@@ -48,7 +48,7 @@ class PrecalcQueryService(StrictBaseModel):
     def __init__(self):
         pass
 
-    async def execute(data_source: str, query: str) -> pd.DataFrame:
+    async def execute(self, data_source: str, query: str) -> pd.DataFrame:
         return await duckdb.sql(query).df()
 
 
@@ -86,9 +86,9 @@ class PrecalcHandler:
 
 class ZarrDatasetRepository:
     ZARR_LOCATIONS = {
-        Dataset.area_hectares: "s3://zar",
-        Dataset.tree_cover_loss: "s3://zar",
-        Dataset.canopy_cover: "s3://zarr",
+        Dataset.area_hectares: "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr",
+        Dataset.tree_cover_loss: "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr",
+        Dataset.canopy_cover: "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr",
     }
 
     def load(self, dataset: Dataset, geometry: Geometry = None) -> xr.DataArray:
