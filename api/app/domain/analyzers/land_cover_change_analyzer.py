@@ -111,7 +111,9 @@ class LandCoverChangeAnalyzer(Analyzer):
 
         umd_land_cover = umd_land_cover.assign_coords(
             year=np.arange(2015, 2025)
-        ).rename_vars({"2015": "lc_class"})
+        ).rename_vars(
+            {"2015": "lc_class"}
+        )  # TODO: fix the variable name in the zarr file
 
         lc_data_2015 = umd_land_cover.sel(year=2015).lc_class
         lc_data_2024 = umd_land_cover.sel(year=2024).lc_class
@@ -163,6 +165,9 @@ class LandCoverChangeAnalyzer(Analyzer):
             land_cover_change_ddf.land_cover_class_start
             != land_cover_change_ddf.land_cover_class_end
         ]
+        land_cover_change_ddf = land_cover_change_ddf[
+            land_cover_change_ddf.change_area > 0
+        ]
 
         return land_cover_change_ddf
 
@@ -173,7 +178,7 @@ class LandCoverChangeAnalyzer(Analyzer):
         """
         Build a query to get land cover change statistics for the given GADM IDs.
         """
-        from_clause = f"FROM '{self.results_file}'"
+        from_clause = f"FROM '{self.results_uri}'"
         select_clause = "SELECT country"
         where_clause = f"WHERE country = '{gadm_id[0]}'"
         by_clause = "BY country"
