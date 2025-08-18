@@ -5,6 +5,12 @@ from dateutil.relativedelta import relativedelta
 from datetime import date
 
 from pipelines.prefect_flows.common_stages import create_result_dataframe as common_create_result_dataframe
+from pipelines.globals import (
+    country_zarr_uri,
+    region_zarr_uri,
+    subregion_zarr_uri,
+    pixel_area_uri
+)
 
 ExpectedGroupsType = Tuple
 
@@ -13,6 +19,52 @@ alerts_confidence = {
     3: "high"
 }
 
+def load_data(
+    dist_zarr_uri: str,
+    contextual_uri: Optional[str] = None,
+) -> Tuple[xr.DataArray, ...]:
+    """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
+
+    dist_alerts = _load_zarr(dist_zarr_uri)
+
+    # reindex to dist alerts to avoid floating point precision issues
+    # when aligning the datasets
+    # https://github.com/pydata/xarray/issues/2217
+    country = _load_zarr(country_zarr_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
+    country_aligned = xr.align(dist_alerts, country, join="left")[1].band_data
+    region = _load_zarr(region_zarr_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
+    region_aligned = xr.align(dist_alerts, region, join="left")[1].band_data
+    subregion = _load_zarr(subregion_zarr_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
+    subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1].band_data
+    pixel_area = _load_zarr(pixel_area_uri).reindex_like(
+        dist_alerts, method="nearest", tolerance=1e-5
+    )
+    pixel_area_aligned = xr.align(dist_alerts, pixel_area, join="left")[1].band_data
+
+    if contextual_uri is not None:
+        contextual_layer = _load_zarr(contextual_uri).reindex_like(
+            dist_alerts, method="nearest", tolerance=1e-5
+        )
+        contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join="left")[
+            1
+        ].band_data
+    else:
+        contextual_layer_aligned = None
+
+    return (
+        dist_alerts,
+        country_aligned,
+        region_aligned,
+        subregion_aligned,
+        pixel_area_aligned,
+        contextual_layer_aligned,
+    )
 
 def setup_compute(
     datasets: Tuple[xr.DataArray, ...],
@@ -47,3 +99,6 @@ def create_result_dataframe(alerts_area: xr.Dataset) -> pd.DataFrame:
     df['alert_date'] = df.sort_values(by='alert_date').alert_date.apply(lambda x: date(2020, 12, 31) + relativedelta(days=x))
     df['alert_confidence'] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
     return df
+
+def _load_zarr(zarr_uri):
+    return xr.open_zarr(zarr_uri)

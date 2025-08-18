@@ -25,7 +25,7 @@ def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     )
 
     # load zarrs and align with pixel_area
-    datasets = common_tasks.load_data.with_options(name="dist-alerts-load_data")(
+    datasets = dist_common_tasks.load_data.with_options(name="dist-alerts-load_data")(
         dist_zarr_uri
     )
     # Datasets returned as: (dist_alerts, country, region, subregion, pixel_area)

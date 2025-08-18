@@ -11,7 +11,7 @@ from pipelines.disturbance.prefect_flows import dist_alerts_by_natural_lands_are
 @pytest.mark.integration
 @pytest.mark.slow
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
-@patch("pipelines.prefect_flows.common_stages._load_zarr")
+@patch("pipelines.disturbance.stages._load_zarr")
 def test_gadm_dist_alerts_happy_path(
     mock_load_zarr,
     mock_save_parquet,
@@ -48,7 +48,7 @@ def test_gadm_dist_alerts_happy_path(
 @pytest.mark.integration
 @pytest.mark.slow
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
-@patch("pipelines.prefect_flows.common_stages._load_zarr")
+@patch("pipelines.disturbance.stages._load_zarr")
 def test_gadm_dist_alerts_result(
     mock_load_zarr,
     mock_save_parquet,

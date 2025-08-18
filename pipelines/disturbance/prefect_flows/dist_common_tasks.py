@@ -5,7 +5,10 @@ from prefect import task
 
 from pipelines.disturbance import stages
 
-
+@task
+def load_data(dist_zarr_uri: str, contextual_uri: Optional[str] = None) -> Tuple[xr.DataArray, ...]:
+    return stages.load_data(dist_zarr_uri, contextual_uri)
+    
 @task
 def setup_compute(
     datasets: Tuple[xr.DataArray, ...],

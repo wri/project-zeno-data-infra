@@ -23,7 +23,7 @@ def dist_alerts_by_natural_lands_area(dist_zarr_uri: str, dist_version: str, ove
         [1, 2, 3],  # confidence values
     )
     contextual_uri = f"s3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-    datasets = common_tasks.load_data.with_options(
+    datasets = dist_common_tasks.load_data.with_options(
         name="dist-alerts-by-natural-lands-load-data"
     )(dist_zarr_uri, contextual_uri=contextual_uri)
     compute_input = dist_common_tasks.setup_compute.with_options(
