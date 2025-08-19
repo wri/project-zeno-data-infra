@@ -10,7 +10,6 @@ from pipelines.prefect_flows import common_tasks
 @flow(name="DIST alerts area")
 def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
 
-    area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
     result_filename = "dist_alerts"
     result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
     if not overwrite and s3_uri_exists(result_uri):
