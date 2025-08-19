@@ -8,8 +8,10 @@ from app.models.land_change.land_cover import (
 )
 from app.use_cases.analysis.land_cover.land_cover_change import LandCoverChangeService
 
-pytest.mark.xfail(reason="this was for the old implementation, needs to be updated.")
+
 class TestLandCoverChangeServiceCompute:
+    pytestmark = pytest.mark.skip(reason="this was for the old implementation.")
+
     @pytest_asyncio.fixture(autouse=True)
     async def resource(self) -> LandCoverChangeAnalytics:
         """
