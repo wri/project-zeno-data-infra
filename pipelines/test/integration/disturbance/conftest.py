@@ -136,3 +136,22 @@ def grasslands_ds():
     )
 
     return grasslands
+
+@pytest.fixture
+def land_cover_ds():
+    land_cover = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x", "year"),
+                da.array([[[[3, 4], [6, 1]], [[0, 4], [7, 2]]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": ("band", [1], {}),
+            "y": ("y", [60.0, 59.99975], {}),
+            "x": ("x", [-180.0, -179.99975], {}),
+            "year": ("year", [2023, 2024], {}),
+        }
+    )
+
+    return land_cover

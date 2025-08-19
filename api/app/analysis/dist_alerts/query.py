@@ -17,6 +17,8 @@ def create_gadm_dist_query(
             intersection_col = "natural_land_class"
         elif intersection == "grasslands":
             intersection_col = "grasslands"
+        elif intersection == "land_cover":
+            intersection_col = "land_cover"
 
     from_clause = f"FROM '/tmp/{table}.parquet'"
     select_clause = "SELECT country"
@@ -45,7 +47,12 @@ def create_gadm_dist_query(
     order_by_clause = f"ORDER {by_clause}"
 
     # Query and make sure output names match the expected schema (?)
-    select_clause += ", STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+    select_clause += ", STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, "
+    # This is temporary - we will convert all queries to area__ha soon.
+    if intersection == "land_cover":
+        select_clause += "SUM(area__ha)::FLOAT AS value"
+    else:
+        select_clause += "SUM(count)::INT AS value"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
     return query
