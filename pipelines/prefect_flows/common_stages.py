@@ -89,7 +89,7 @@ def load_data(
 
 def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str) -> xr.DataArray:
     print("Starting reduce")
-    alerts_area = xarray_reduce(
+    result = xarray_reduce(
         reduce_mask,
         *reduce_groupbys,
         func=funcname,
@@ -100,7 +100,7 @@ def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: 
         fill_value=0,
     ).compute()
     print("Finished reduce")
-    return alerts_area
+    return result
 
 
 def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
