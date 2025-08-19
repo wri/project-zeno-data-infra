@@ -7,6 +7,7 @@ from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
 
+
 @flow(name="DIST alerts count by grasslands")
 def dist_alerts_by_grasslands_count(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_filename = "dist_alerts_by_grasslands"
