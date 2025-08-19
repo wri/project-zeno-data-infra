@@ -4,12 +4,12 @@ import pandas as pd
 import pytest
 import xarray as xr
 from app.domain.compute_engines.compute_engine import (
-    AreaOfInterestList,
     ComputeEngine,
-    Dataset,
     FloxOTFHandler,
     PrecalcHandler,
 )
+from app.domain.models.area_of_interest import AreaOfInterestList
+from app.domain.models.dataset import Dataset
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,

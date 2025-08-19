@@ -1,4 +1,7 @@
 from enum import Enum
+from typing import Any, List, Literal
+
+from api.app.models.common.base import StrictBaseModel
 
 
 class Dataset(Enum):
@@ -14,3 +17,20 @@ class Dataset(Enum):
         }
 
         return DATASET_TO_NAMES[self]
+
+
+class DatasetFilter(StrictBaseModel):
+    dataset: Dataset
+    op: Literal["=", "<", ">", "<=", ">=", "!="]
+    value: Any
+
+
+class DatasetAggregate(StrictBaseModel):
+    dataset: Dataset
+    func: Literal["sum", "count"]
+
+
+class DatasetQuery(StrictBaseModel):
+    aggregate: DatasetAggregate
+    group_bys: List[Dataset]
+    filters: List[DatasetFilter]

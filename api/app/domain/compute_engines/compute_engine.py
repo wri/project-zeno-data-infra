@@ -1,34 +1,15 @@
 from functools import partial
-from typing import Any, List, Literal
 
 import duckdb
 import numpy as np
 import pandas as pd
-from app.domain.models.dataset import Dataset
+from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
-from app.models.common.areas_of_interest import AreaOfInterest
 from app.models.common.base import StrictBaseModel
 from flox.xarray import xarray_reduce
-
-
-class DatasetFilter(StrictBaseModel):
-    dataset: Dataset
-    op: Literal["=", "<", ">", "<=", ">=", "!="]
-    value: Any
-
-
-class DatasetAggregate(StrictBaseModel):
-    dataset: Dataset
-    func: Literal["sum", "count"]
-
-
-class DatasetQuery(StrictBaseModel):
-    aggregate: DatasetAggregate
-    group_bys: List[Dataset]
-    filters: List[DatasetFilter]
 
 
 class PrecalcQueryService(StrictBaseModel):
@@ -146,34 +127,3 @@ class ComputeEngine:
 
     async def compute(self, aoi_type, aoi_ids, query: DatasetQuery):
         return await self.handler.handle(aoi_type, aoi_ids, query)
-
-
-class AreaOfInterestList:
-    def __init__(self, aois: AreaOfInterest, compute_engine: ComputeEngine):
-        self.type = aois.type
-        self.ids = aois.ids
-        self.compute_engine = compute_engine
-
-    async def get_tree_cover_loss(
-        self, canopy_cover: int, start_year: int, end_year: int, forest_type: str
-    ):
-        query = DatasetQuery(
-            aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
-            group_bys=[Dataset.tree_cover_loss],
-            filters=[
-                DatasetFilter(
-                    dataset=Dataset.canopy_cover, op=">=", value=canopy_cover
-                ),
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_loss,
-                    op=">=",
-                    value=start_year,
-                ),
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_loss,
-                    op="<=",
-                    value=end_year,
-                ),
-            ],
-        )
-        return await self.compute_engine.compute(self.type, self.ids, query)
