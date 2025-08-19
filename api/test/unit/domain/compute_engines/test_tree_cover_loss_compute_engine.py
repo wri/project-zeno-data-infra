@@ -14,6 +14,7 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
+from distributed import Client, LocalCluster
 from shapely.geometry import box
 
 
@@ -54,6 +55,9 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
 
 @pytest.mark.asyncio
 async def test_flox_handler_happy_path():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
     class TestDatasetRepository:
         def load(self, dataset, geometry=None):
             if dataset == Dataset.area_hectares:
@@ -87,6 +91,7 @@ async def test_flox_handler_happy_path():
         handler=FloxOTFHandler(
             dataset_repository=TestDatasetRepository(),
             aoi_geometry_repository=TestAoiGeometryRepository(),
+            dask_client=dask_client,
         )
     )
     aois = AreaOfInterestList(

@@ -1,4 +1,5 @@
 from enum import Enum
+from functools import partial
 from typing import Any, List, Literal
 
 import duckdb
@@ -66,7 +67,7 @@ class PrecalcHandler:
         if query.aggregate.dataset == Dataset.area_hectares and query.group_bys == [
             Dataset.tree_cover_loss
         ]:
-            data_source = "s3://path/to/parquet"
+            data_source = "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/tabular/zonal_stats/umd_tree_cover_loss_by_driver.parquet"
 
         agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
         groupby_fields = ", ".join(
@@ -131,37 +132,53 @@ class FloxOTFHandler:
         self,
         dataset_repository=ZarrDatasetRepository(),
         aoi_geometry_repository=DataApiAoiGeometryRepository(),
+        dask_client=None,
     ):
         self.dataset_repository = dataset_repository
         self.aoi_geometry_repository = aoi_geometry_repository
+        self.dask_client = dask_client
 
     async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        aoi_geometry = self.aoi_geometry_repository.load(aoi_type, aoi_ids)[0]
-
-        by = self.dataset_repository.load(
-            query.aggregate.dataset, geometry=aoi_geometry
+        aoi_geometries = self.aoi_geometry_repository.load(aoi_type, aoi_ids)
+        aoi_partial = partial(
+            self._handle,
+            query=query,
+            dataset_repository=self.dataset_repository,
+            expected_groups_per_dataset=self.EXPECTED_GROUPS,
         )
+        futures = self.dask_client.map(aoi_partial, aoi_geometries)
+        results_per_aoi = await self.dask_client.gather(futures)
+
+        results = pd.concat(results_per_aoi)
+        return results
+
+    @staticmethod
+    async def _handle(
+        aoi_geometry, query, dataset_repository, expected_groups_per_dataset
+    ):
+        by = dataset_repository.load(query.aggregate.dataset, geometry=aoi_geometry)
         func = query.aggregate.func
 
         objs = []
         expected_groups = []
         for filter in query.filters:
-            da = self.dataset_repository.load(filter.dataset, geometry=aoi_geometry)
+            da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
             by = by.where(eval(f"da {filter.op} {filter.value}"))
 
             if filter.dataset in query.group_bys:
-                self.EXPECTED_GROUPS[filter.dataset] = self.EXPECTED_GROUPS[
+                # filter expected groups by the filter itself so it doesn't appear in the results as 0s
+                expected_groups_per_dataset[
                     filter.dataset
-                ][
+                ] = expected_groups_per_dataset[filter.dataset][
                     eval(
-                        f"self.EXPECTED_GROUPS[filter.dataset] {filter.op} {filter.value}"
+                        f"expected_groups_per_dataset[{filter.dataset}] {filter.op} {filter.value}"
                     )
                 ]
 
         for group_by in query.group_bys:
-            da = self.dataset_repository.load(group_by, geometry=aoi_geometry)
+            da = dataset_repository.load(group_by, geometry=aoi_geometry)
             objs.append(da)
-            expected_groups.append(self.EXPECTED_GROUPS[group_by])
+            expected_groups.append(expected_groups_per_dataset[group_by])
 
         results = (
             xarray_reduce(by, *objs, func=func, expected_groups=tuple(expected_groups))
