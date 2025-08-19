@@ -69,25 +69,25 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         result_uris.append(nl_result)
 
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = prefect_flows.dist_alerts_count(
+        gadm_dist_result = prefect_flows.dist_alerts_area(
             dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_result)
 
         gadm_dist_by_natural_lands_result = (
-            prefect_flows.dist_alerts_by_natural_lands_count(
+            prefect_flows.dist_alerts_by_natural_lands_area(
                 dist_zarr_uri, dist_version, overwrite=overwrite
             )
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
-        gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_count(
+        gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_area(
             dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_by_drivers_result)
 
         gadm_dist_by_grasslands_result = (
-            prefect_flows.dist_alerts_by_grasslands_count(
+            prefect_flows.dist_alerts_by_grasslands_area(
                 dist_zarr_uri, dist_version, overwrite=overwrite
             )
         )
