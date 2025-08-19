@@ -46,41 +46,41 @@ numeric_to_alpha3 = {
 }
 
 def load_data(
-    dist_zarr_uri: str,
+    base_zarr_uri: str,
     contextual_uri: Optional[str] = None,
 ) -> Tuple[xr.DataArray, ...]:
     """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
-    dist_alerts = _load_zarr(dist_zarr_uri)
+    base_layer = _load_zarr(base_zarr_uri)
 
     # reindex to dist alerts to avoid floating point precision issues
     # when aligning the datasets
     # https://github.com/pydata/xarray/issues/2217
     country = _load_zarr(country_zarr_uri).reindex_like(
-        dist_alerts, method="nearest", tolerance=1e-5
+        base_layer, method="nearest", tolerance=1e-5
     )
-    country_aligned = xr.align(dist_alerts, country, join="left")[1].band_data
+    country_aligned = xr.align(base_layer, country, join="left")[1].band_data
     region = _load_zarr(region_zarr_uri).reindex_like(
-        dist_alerts, method="nearest", tolerance=1e-5
+        base_layer, method="nearest", tolerance=1e-5
     )
-    region_aligned = xr.align(dist_alerts, region, join="left")[1].band_data
+    region_aligned = xr.align(base_layer, region, join="left")[1].band_data
     subregion = _load_zarr(subregion_zarr_uri).reindex_like(
-        dist_alerts, method="nearest", tolerance=1e-5
+        base_layer, method="nearest", tolerance=1e-5
     )
-    subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1].band_data
+    subregion_aligned = xr.align(base_layer, subregion, join="left")[1].band_data
 
     if contextual_uri is not None:
         contextual_layer = _load_zarr(contextual_uri).reindex_like(
-            dist_alerts, method="nearest", tolerance=1e-5
+            base_layer, method="nearest", tolerance=1e-5
         )
-        contextual_layer_aligned = xr.align(dist_alerts, contextual_layer, join="left")[
+        contextual_layer_aligned = xr.align(base_layer, contextual_layer, join="left")[
             1
         ].band_data
     else:
         contextual_layer_aligned = None
 
     return (
-        dist_alerts,
+        base_layer,
         country_aligned,
         region_aligned,
         subregion_aligned,
@@ -89,7 +89,7 @@ def load_data(
 
 def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str) -> xr.DataArray:
     print("Starting reduce")
-    alerts_count = xarray_reduce(
+    result = xarray_reduce(
         reduce_mask,
         *reduce_groupbys,
         func=funcname,
@@ -100,7 +100,7 @@ def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: 
         fill_value=0,
     ).compute()
     print("Finished reduce")
-    return alerts_count
+    return result
 
 
 def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:

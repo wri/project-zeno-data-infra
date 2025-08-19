@@ -6,22 +6,22 @@ from unittest.mock import patch
 from pandera.pandas import DataFrameSchema, Column, Check
 from prefect.testing.utilities import prefect_test_harness
 
-from pipelines.disturbance.prefect_flows import dist_alerts_count
+from pipelines.disturbance.prefect_flows import dist_alerts_area
 
 
 @pytest.mark.slow
 @pytest.mark.integration
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
-@patch("pipelines.prefect_flows.common_stages._load_zarr")
+@patch("pipelines.disturbance.stages._load_zarr")
 def test_gadm_dist_alerts_happy_path(
-    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds
+    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds
 ):
     """Test full workflow with in-memory dependencies"""
 
-    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds]
+    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds]
 
     with prefect_test_harness():
-        result_uri = dist_alerts_count(
+        result_uri = dist_alerts_area(
             dist_zarr_uri="s3://dummy_zarr_uri",
             dist_version="test_v1",
         )
@@ -35,9 +35,9 @@ def test_gadm_dist_alerts_happy_path(
 @pytest.mark.slow
 @pytest.mark.integration
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
-@patch("pipelines.prefect_flows.common_stages._load_zarr")
+@patch("pipelines.disturbance.stages._load_zarr")
 def test_gadm_dist_alerts_result(
-    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds
+    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds
 ):
     alert_schema = DataFrameSchema(
         name="GADM Dist Alerts",
@@ -52,8 +52,8 @@ def test_gadm_dist_alerts_result(
                     Check.less_than_or_equal_to(datetime.date.fromisoformat("2023-03-11")),
                 ],
             ),
+            "area__ha": Column("float32", Check.isin([1500.0, 750.0])),
             "alert_confidence": Column(str, Check.isin(["low", "high"])),
-            "count": Column(int, Check.isin([0, 1, 2])),
         },
         unique=["country", "region", "subregion", "alert_date", "alert_confidence"],
         checks=Check(
@@ -68,8 +68,8 @@ def test_gadm_dist_alerts_result(
         ),
     )
 
-    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds]
-    dist_alerts_count(
+    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds]
+    dist_alerts_area(
         dist_zarr_uri="s3://dummy_zarr_uri",
         dist_version="test_v1",
     )
