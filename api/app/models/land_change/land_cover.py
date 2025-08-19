@@ -7,7 +7,7 @@ from app.models.common.areas_of_interest import (
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
 )
-from app.models.common.base import StrictBaseModel
+from app.models.common.base import Response, StrictBaseModel
 from pydantic import Field
 
 AoiUnion = Union[
@@ -45,5 +45,5 @@ class LandCoverChangeAnalytics(StrictBaseModel):
     }
 
 
-class LandCoverChangeAnalyticsResponse(StrictBaseModel):
+class LandCoverChangeAnalyticsResponse(Response):
     data: LandCoverChangeAnalytics

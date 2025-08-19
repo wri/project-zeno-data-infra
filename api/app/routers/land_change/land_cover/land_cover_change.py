@@ -1,22 +1,91 @@
-import logging
-import traceback
-import uuid
+from typing import List
 
-from app.infrastructure.persistence.file_resource import load_resource
-from app.models.common.analysis import AnalysisStatus
-from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
+from app.domain.analyzers.analyzer import Analyzer
+from app.domain.models.analysis import Analysis
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
+from app.models.common.analysis import AnalyticsOut
+from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.land_cover import (
+    LandCoverChangeAnalytics,
     LandCoverChangeAnalyticsIn,
     LandCoverChangeAnalyticsResponse,
+    LandCoverChangeResult,
 )
-from app.use_cases.analysis.land_cover.land_cover_change import (
-    LandCoverChangeService,
-)
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from app.routers.common_analytics import create_analysis, get_analysis
+from app.use_cases.analysis.analysis_service import AnalysisService
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
 
-router = APIRouter(prefix="/land_cover_change")
+ANALYTICS_NAME = "land_cover_change"
+router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
+
+
+def get_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+LAND_COVER_CLASSES = [
+    "Bare and sparse vegetation",
+    "Short vegetation",
+    "Tree cover",
+    "Wetland-short vegetation",
+    "Water",
+    "Snow/ice",
+    "Cropland",
+    "Built-up",
+    "Cultivated grasslands",
+]
+
+
+def create_analysis_service() -> AnalysisService:
+    class DummyLandCoverChangeAnalyzer(Analyzer):
+        def __init__(self, analysis_repository: AnalysisRepository):
+            self.analysis_repository = analysis_repository
+
+        async def analyze(self, analysis: Analysis):
+            land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(
+                **analysis.metadata
+            )
+            aoi_ids: List[str] = []
+            land_cover_start: List[str] = []
+            land_cover_end: List[str] = []
+            area: List[float] = []
+
+            for aoi_id in analysis.metadata["aoi"]["ids"]:
+                aoi_ids += [aoi_id] * len(LAND_COVER_CLASSES)
+                land_cover_start += LAND_COVER_CLASSES
+                land_cover_end += reversed(LAND_COVER_CLASSES)
+                area += range(1, len(LAND_COVER_CLASSES) + 1)
+
+            results = LandCoverChangeResult(
+                id=aoi_ids,
+                land_cover_class_start=land_cover_start,
+                land_cover_class_end=land_cover_end,
+                area_ha=area,
+            ).model_dump()
+
+            await self.analysis_repository.store_analysis(
+                resource_id=land_cover_change_analytics_in.thumbprint(),
+                analytics=Analysis(
+                    metadata=analysis.metadata,
+                    result=results,
+                    status=analysis.status,
+                ),
+            )
+
+    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=DummyLandCoverChangeAnalyzer(
+            analysis_repository=analysis_repository,
+        ),
+        event=ANALYTICS_NAME,
+    )
 
 
 @router.post(
@@ -30,31 +99,24 @@ async def create(
     data: LandCoverChangeAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
+    service: AnalysisService = Depends(create_analysis_service),
 ):
-    try:
-        service = LandCoverChangeService()
-        background_tasks.add_task(service.do, data)
+    return await create_analysis(
+        data=data,
+        service=service,
+        request=request,
+        background_tasks=background_tasks,
+        resource_link_callback=_datamart_resource_link_response,
+    )
 
-        resource_id = data.thumbprint()
-        resource = await load_resource(resource_id)
 
-        link_url = request.url_for(
-            "get_land_cover_change_analytics_result", resource_id=resource_id
+def _datamart_resource_link_response(request, service) -> str:
+    return str(
+        request.url_for(
+            "get_land_cover_change_analytics_result",
+            resource_id=service.resource_thumbprint(),
         )
-        link = DataMartResourceLink(link=str(link_url))
-
-        return DataMartResourceLinkResponse(data=link, status=resource.status)
-    except Exception as e:
-        logging.error(
-            {
-                "event": "land_cover_change_analytics_processing_failure",
-                "severity": "high",
-                "error_type": e.__class__.__name__,
-                "error_details": str(e),
-                "stack_trace": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+    )
 
 
 @router.get(
@@ -64,36 +126,16 @@ async def create(
     status_code=200,
 )
 async def get_land_cover_change_analytics_result(
-    resource_id: str,
+    resource_id: UUID5,
     response: FastAPIResponse,
-    background_tasks: BackgroundTasks,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
-    # Validate UUID format
-    try:
-        uuid.UUID(resource_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
-        )
+    analytics_out: AnalyticsOut = await get_analysis(
+        resource_id=resource_id,
+        analysis_repository=analysis_repository,
+        response=response,
+    )
 
-    try:
-        service = LandCoverChangeService()
-        resource = await service.get(resource_id)
-
-        if resource.status == AnalysisStatus.pending:
-            response.headers["Retry-After"] = "1"
-
-        return LandCoverChangeAnalyticsResponse(data=resource)
-    except Exception as e:
-        logging.error(
-            {
-                "event": "land_cover_change_analytics_resource_request_failure",
-                "severity": "high",
-                "resource_id": resource_id,
-                "resource_metadata": None,
-                "error_type": e.__class__.__name__,
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal server error")
+    return LandCoverChangeAnalyticsResponse(
+        data=LandCoverChangeAnalytics(**analytics_out.model_dump()), status="success"
+    )
