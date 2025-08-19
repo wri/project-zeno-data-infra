@@ -26,7 +26,7 @@ class LandCoverChangeAnalyzer(Analyzer):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.results_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/tabular/statistics/admin_land_cover_change.parquet"
-        self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover.zarr/"
+        self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
         self.land_cover_mapping = {
             0: "Bare and sparse vegetation",
@@ -109,14 +109,8 @@ class LandCoverChangeAnalyzer(Analyzer):
         umd_land_cover = read_zarr_clipped_to_geojson(land_cover_zarr_uri, geojson)
         pixel_area = read_zarr_clipped_to_geojson(pixel_area_zarr_uri, geojson)
 
-        umd_land_cover = umd_land_cover.assign_coords(
-            year=np.arange(2015, 2025)
-        ).rename_vars(
-            {"2015": "lc_class"}
-        )  # TODO: fix the variable name in the zarr file
-
-        lc_data_2015 = umd_land_cover.sel(year=2015).lc_class
-        lc_data_2024 = umd_land_cover.sel(year=2024).lc_class
+        lc_data_2015 = umd_land_cover.lc_classes.sel(year=2015)
+        lc_data_2024 = umd_land_cover.lc_classes.sel(year=2024)
 
         lc_class_change = lc_data_2015 * 9 + lc_data_2024
         lc_class_change.name = "class_change"
