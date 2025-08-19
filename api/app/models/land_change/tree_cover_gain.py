@@ -1,10 +1,11 @@
-from typing import Annotated, Union
+from typing import Annotated, Optional, Union
 
-from app.models.common.analysis import AnalyticsIn
+from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
+from app.models.common.base import Response, StrictBaseModel
 from pydantic import Field, field_validator, model_validator
 
 AoiUnion = Union[
@@ -54,3 +55,65 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
         if end < start:
             raise ValueError("end_year must be greater than or equal to start_year")
         return self
+
+
+class TreeCoverGainAnalytics(StrictBaseModel):
+    result: Optional[dict] = None
+    metadata: Optional[dict] = None
+    message: Optional[str] = None
+    status: Optional[AnalysisStatus] = None
+
+    model_config = {
+        "from_attributes": True,
+        "validate_by_name": True,
+    }
+
+
+class TreeCoverGainAnalyticsResponse(Response):
+    data: TreeCoverGainAnalytics
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "data": {
+                        "result": {  # column oriented for loading into a dataframe
+                            "__dtypes__": {
+                                "country": "str",
+                                "region": "int",
+                                "subregion": "int",
+                                "tree_cover_loss__year": "int",
+                                "tree_cover_loss__ha": "float",
+                                "gross_emissions_co2e_all_gases__mg": "float",
+                            },
+                            "country": ["BRA", "BRA", "BRA"],
+                            "region": [1, 1, 1],
+                            "subregion": [12, 12, 12],
+                            "tree_cover_loss__year": [2022, 2023, 2024],
+                            "tree_cover_loss__ha": [
+                                4045.406160862687,
+                                4050.4061608627,
+                                4045.406160862687,
+                            ],
+                            "gross_emissions_co2e_all_gases__mg": [
+                                3490821.6510292348,
+                                114344.24741739516,
+                                114347.2474174,
+                            ],
+                        },
+                        "metadata": {
+                            "aoi": {
+                                "type": "admin",
+                                "ids": ["BRA.1.12"],
+                            },
+                            "start_year": "2022",
+                            "end_year": "2024",
+                            "canopy_cover": "30",
+                        },
+                        "message": "",
+                        "status": "saved",
+                    }
+                },
+            ]
+        }
+    }
