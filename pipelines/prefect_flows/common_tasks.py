@@ -7,8 +7,8 @@ from prefect import task
 from pipelines.prefect_flows import common_stages
 
 @task
-def load_data(dist_zarr_uri: str, contextual_uri: Optional[str] = None) -> Tuple[xr.DataArray, ...]:
-    return common_stages.load_data(dist_zarr_uri, contextual_uri)
+def load_data(base_zarr_uri: str, contextual_uri: Optional[str] = None) -> Tuple[xr.DataArray, ...]:
+    return common_stages.load_data(base_zarr_uri, contextual_uri)
 
 
 @task
