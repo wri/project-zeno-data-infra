@@ -20,7 +20,7 @@ class TestLandCoverChangeMockData:
     async def setup(self):
         """Runs before each test in this class"""
         delete_resource_files(
-            "land_cover_change_analytics_payloads",
+            "land_cover_change",
             "a8df3000-5cf6-5050-8717-592310672f0d",
         )
 

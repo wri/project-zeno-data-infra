@@ -7,19 +7,19 @@ from prefect import task
 from pipelines.prefect_flows import common_stages
 
 @task
-def load_data(dist_zarr_uri: str, contextual_uri: Optional[str] = None):
-    return common_stages.load_data(dist_zarr_uri, contextual_uri)
+def load_data(base_zarr_uri: str, contextual_uri: Optional[str] = None) -> Tuple[xr.DataArray, ...]:
+    return common_stages.load_data(base_zarr_uri, contextual_uri)
 
 
 @task
-def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple, expected_groups: Tuple, funcname: str):
+def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple[xr.DataArray, ...], expected_groups: Tuple, funcname: str) -> xr.DataArray:
     '''Do the reduction with the specified groupbys. funcname is the name of the
     reduction function'''
     return common_stages.compute(dataset, groupbys, expected_groups, funcname)
 
 
 @task
-def postprocess_result(result: xr.Dataset):
+def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     return common_stages.create_result_dataframe(result)
 
 

@@ -1,27 +1,15 @@
-import logging
-import traceback
-import uuid
-
-from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.infrastructure.persistence.file_resource import load_resource
-from app.models.common.analysis import AnalysisStatus, AnalyticsOut
-from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
+from app.models.common.analysis import AnalyticsOut
+from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.land_cover import (
     LandCoverChangeAnalytics,
     LandCoverChangeAnalyticsIn,
     LandCoverChangeAnalyticsResponse,
 )
-from app.routers.common_analytics import get_analysis
-from app.infrastructure.persistence.file_system_analysis_repository import (
-    FileSystemAnalysisRepository,
-)
-
-from app.use_cases.analysis.land_cover.land_cover_change import (
-    LandCoverChangeService,
-)
-from app.use_cases.analysis.analysis_service import AnalysisService
-
+from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -74,7 +62,8 @@ async def create(
 def _datamart_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
-            "get_lcc_analytics_result", resource_id=service.resource_thumbprint()
+            "get_land_cover_change_analytics_result",
+            resource_id=service.resource_thumbprint(),
         )
     )
 
@@ -85,7 +74,7 @@ def _datamart_resource_link_response(request, service) -> str:
     response_model=LandCoverChangeAnalyticsResponse,
     status_code=200,
 )
-async def get_lcc_analytics_result(
+async def get_land_cover_change_analytics_result(
     resource_id: UUID5,
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),

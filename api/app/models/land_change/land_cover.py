@@ -8,7 +8,7 @@ from app.models.common.areas_of_interest import (
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
 )
-from app.models.common.base import StrictBaseModel, Response
+from app.models.common.base import Response, StrictBaseModel
 from pydantic import Field
 
 AoiUnion = Union[

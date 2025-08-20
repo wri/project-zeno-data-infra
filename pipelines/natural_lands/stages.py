@@ -32,7 +32,7 @@ sbtn_natural_lands_classes = {
 
 
 def setup_compute(
-    datasets: Tuple[xr.Dataset, ...],
+    datasets: Tuple[xr.DataArray, ...],
     expected_groups: Optional[ExpectedGroupsType],
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
@@ -40,20 +40,20 @@ def setup_compute(
     base_zarr, country, region, subregion, contextual_layer = datasets
 
     mask = base_zarr.band_data
-    groupbys: Tuple[xr.Dataset, ...] = (
-        country.band_data.rename("country"),
-        region.band_data.rename("region"),
-        subregion.band_data.rename("subregion"),
+    groupbys: Tuple[xr.DataArray, ...] = (
+        country.rename("country"),
+        region.rename("region"),
+        subregion.rename("subregion"),
     )
     if contextual_layer is not None:
         groupbys = (
-            groupbys + (contextual_layer.band_data.rename(contextual_column_name),)
+            groupbys + (contextual_layer.rename(contextual_column_name),)
         )
 
     return (mask, groupbys, expected_groups)
 
 
-def create_result_dataframe(alerts_count: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_count)
     df["natural_lands_category"] = df.natural_lands.apply(lambda x: "natural" if 1 < x < 12 else "non-natural")
     df["natural_lands_class"] = df.natural_lands.apply(lambda x: sbtn_natural_lands_classes.get(x, "unclassified"))
