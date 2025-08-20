@@ -78,9 +78,7 @@ class TreeCoverGainAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "country": ["BRA", "BRA", "BRA"],
-                            "region": [1, 1, 1],
-                            "subregion": [12, 12, 12],
+                            "id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
                             "tree_cover_loss__year": [2000, 2005, 2010],
                             "tree_cover_gain__ha": [
                                 4045.406160862687,
