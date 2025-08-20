@@ -65,16 +65,17 @@ class TestLandCoverChangeMockData:
         )
 
         assert (
-            "BRA.1.12" in resource["result"]["id"]
+            "BRA.1.12" in resource["result"]["aoi_id"]
         ), "Expected result to contain AOI IDs."
         assert (
-            "IDN.24.9" in resource["result"]["id"]
+            "IDN.24.9" in resource["result"]["aoi_id"]
         ), "Expected result to contain AOI IDs."
 
         df = pd.DataFrame(resource["result"])
         assert df.columns.tolist() == [
-            "id",
+            "aoi_id",
+            "aoi_type",
             "land_cover_class_start",
             "land_cover_class_end",
-            "area_ha",
+            "change_area",
         ], "Expected re6sult to have specific columns."

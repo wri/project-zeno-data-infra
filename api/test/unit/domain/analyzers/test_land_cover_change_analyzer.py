@@ -1,3 +1,5 @@
+import duckdb
+import pandas as pd
 import pytest
 import pytest_asyncio
 import xarray as xr
@@ -8,7 +10,10 @@ from unittest.mock import patch
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.land_cover import LandCoverChangeAnalyticsIn
+from app.models.land_change.land_cover import (
+    LandCoverChangeAnalyticsIn,
+    LandCoverChangeAnalytics,
+)
 
 
 @pytest_asyncio.fixture
@@ -202,4 +207,114 @@ class TestLandCoverChangeCustomAois:
             ],
             "aoi_type": ["feature", "feature", "feature", "feature", "feature"],
             "aoi_id": ["test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi"],
+        }
+
+
+class TestLandCoverChangeAdminAois:
+    @pytest.fixture
+    def parquet_mock_data(self):
+        """Mock data that simulates the actual parquet file structure for the AOI"""
+        brazil_data = [
+            ("BRA", 12, 1, "Tree cover", "Cropland", 1250.5),
+            ("BRA", 12, 1, "Tree cover", "Built-up", 320.8),
+            ("BRA", 12, 1, "Cropland", "Short vegetation", 890.2),
+            ("BRA", 12, 2, "Tree cover", "Cropland", 800.3),
+            ("BRA", 12, 2, "Tree cover", "Built-up", 150.7),
+            ("BRA", 12, 2, "Cultivated grasslands", "Cropland", 180.4),
+            ("BRA", 12, 3, "Tree cover", "Cropland", 950.2),
+            ("BRA", 12, 3, "Wetland – short vegetation", "Tree cover", 120.4),
+        ]
+
+        indonesia_data = [
+            ("IDN", 24, 9, "Tree cover", "Cropland", 2150.3),
+            ("IDN", 24, 9, "Tree cover", "Built-up", 567.4),
+            ("IDN", 24, 9, "Wetland – short vegetation", "Water", 234.8),
+        ]
+
+        all_data = brazil_data + indonesia_data
+
+        return pd.DataFrame(
+            all_data,
+            columns=[
+                "country",
+                "region",
+                "subregion",
+                "land_cover_class_start",
+                "land_cover_class_end",
+                "area",
+            ],
+        )
+
+    @pytest_asyncio.fixture(autouse=True)
+    async def analyzer_with_test_data(self, parquet_mock_data):
+
+        self.analysis_repo = DummyAnalysisRepository()
+        analyzer = LandCoverChangeAnalyzer(analysis_repository=self.analysis_repo)
+
+        table_name = "test_parquet"
+        duckdb.register(table_name, parquet_mock_data)
+        analyzer.results_uri = table_name
+
+        return analyzer
+
+    @pytest_asyncio.fixture(autouse=True)
+    async def run_analysis(
+        self,
+        analyzer_with_test_data,
+    ):
+        analytics_in = LandCoverChangeAnalyticsIn(
+            aoi={"type": "admin", "ids": ["BRA.12", "IDN.24.9"]},
+        )
+
+        analysis = Analysis(
+            metadata=analytics_in.model_dump(),
+            result=None,
+            status=AnalysisStatus.pending,
+        )
+
+        await analyzer_with_test_data.analyze(analysis)
+
+    def test_analysis_result(self):
+        assert self.analysis_repo.analysis.result == {
+            "land_cover_class_start": [
+                "Cropland",
+                "Cultivated grasslands",
+                "Tree cover",
+                "Tree cover",
+                "Wetland – short vegetation",
+                "Tree cover",
+                "Tree cover",
+                "Wetland – short vegetation",
+            ],
+            "land_cover_class_end": [
+                "Short vegetation",
+                "Cropland",
+                "Built-up",
+                "Cropland",
+                "Tree cover",
+                "Built-up",
+                "Cropland",
+                "Water",
+            ],
+            "change_area": [890.2, 180.4, 471.5, 3001.0, 120.4, 567.4, 2150.3, 234.8],
+            "aoi_id": [
+                "BRA.12",
+                "BRA.12",
+                "BRA.12",
+                "BRA.12",
+                "BRA.12",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+            ],
+            "aoi_type": [
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+            ],
         }
