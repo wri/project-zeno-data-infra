@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Union
+from typing import Annotated, List, Optional, Union
 
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
@@ -57,9 +57,15 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
         return self
 
 
+class TreeCoverGainResult(StrictBaseModel):
+    id: List[str]
+    tree_cover_gain__year: List[int]
+    tree_cover_gain_area__ha: List[float]
+
+
 class TreeCoverGainAnalytics(StrictBaseModel):
-    result: Optional[dict] = None
-    metadata: Optional[dict] = None
+    result: Optional[TreeCoverGainResult] = None
+    metadata: Optional[TreeCoverGainAnalyticsIn] = None
     message: Optional[str] = None
     status: Optional[AnalysisStatus] = None
 
@@ -79,8 +85,8 @@ class TreeCoverGainAnalyticsResponse(Response):
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
                             "id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
-                            "tree_cover_loss__year": [2000, 2005, 2010],
-                            "tree_cover_gain__ha": [
+                            "tree_cover_gain__year": [2000, 2005, 2010],
+                            "tree_cover_gain_area__ha": [
                                 4045.406160862687,
                                 4050.4061608627,
                                 4045.406160862687,
