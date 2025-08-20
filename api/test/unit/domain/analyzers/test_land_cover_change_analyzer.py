@@ -240,7 +240,7 @@ class TestLandCoverChangeAdminAois:
 
         all_data = brazil_data + indonesia_data
 
-        df = pd.DataFrame(
+        return pd.DataFrame(
             all_data,
             columns=[
                 "country",
@@ -251,9 +251,6 @@ class TestLandCoverChangeAdminAois:
                 "area",
             ],
         )
-        df["area"] = df["area"] / 10000  # Convert to hectares
-
-        return df
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data):
