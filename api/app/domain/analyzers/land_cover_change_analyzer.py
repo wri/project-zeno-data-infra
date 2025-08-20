@@ -53,7 +53,7 @@ class LandCoverChangeAnalyzer(Analyzer):
                     results.land_cover_class_start != results.land_cover_class_end
                 ]  # Filter out no change
                 gadm_results.append(results)
-            combined_results = pd.concat(gadm_results).to_dict(orient="list")
+            combined_results_df = pd.concat(gadm_results)
 
         else:
             aois = land_cover_change_analytics_in.aoi.model_dump()
@@ -78,10 +78,13 @@ class LandCoverChangeAnalyzer(Analyzer):
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
-            combined_results = combined_results_df.to_dict(orient="list")
 
+        combined_results_df["area__ha"] = combined_results_df.pop("change_area") / 10000
+        combined_results_df = combined_results_df[combined_results_df.area__ha > 0]
         analyzed_analysis = Analysis(
-            combined_results, analysis.metadata, AnalysisStatus.saved
+            combined_results_df.to_dict(orient="list"),
+            analysis.metadata,
+            AnalysisStatus.saved,
         )
         await self.analysis_repository.store_analysis(
             land_cover_change_analytics_in.thumbprint(), analyzed_analysis
@@ -158,9 +161,6 @@ class LandCoverChangeAnalyzer(Analyzer):
         land_cover_change_ddf = land_cover_change_ddf[
             land_cover_change_ddf.land_cover_class_start
             != land_cover_change_ddf.land_cover_class_end
-        ]
-        land_cover_change_ddf = land_cover_change_ddf[
-            land_cover_change_ddf.change_area > 0
         ]
 
         return land_cover_change_ddf

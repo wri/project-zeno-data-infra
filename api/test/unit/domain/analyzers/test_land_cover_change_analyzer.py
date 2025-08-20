@@ -183,31 +183,38 @@ class TestLandCoverChangeCustomAois:
         assert self.analysis_repo.analysis is not None
         assert self.analysis_repo.analysis.status == AnalysisStatus.saved
         assert self.analysis_repo.analysis.metadata == self.metadata
-        assert self.analysis_repo.analysis.result == {
-            "change_area": [
-                12446.6923828125,
-                2074.48876953125,
-                2074.4091796875,
-                6223.34765625,
-                10372.36328125,
-            ],
-            "land_cover_class_start": [
-                "Short vegetation",
-                "Short vegetation",
-                "Tree cover",
-                "Cropland",
-                "Cultivated grasslands",
-            ],
-            "land_cover_class_end": [
-                "Cropland",
-                "Built-up",
-                "Cropland",
-                "Built-up",
-                "Cropland",
-            ],
-            "aoi_type": ["feature", "feature", "feature", "feature", "feature"],
-            "aoi_id": ["test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi"],
-        }
+
+        expected = pd.DataFrame(
+            {
+                "area__ha": [
+                    1.2446691989898682,
+                    0.20744886994361877,
+                    0.20744091272354126,
+                    0.6223347783088684,
+                    1.0372363328933716,
+                ],
+                "land_cover_class_start": [
+                    "Short vegetation",
+                    "Short vegetation",
+                    "Tree cover",
+                    "Cropland",
+                    "Cultivated grasslands",
+                ],
+                "land_cover_class_end": [
+                    "Cropland",
+                    "Built-up",
+                    "Cropland",
+                    "Built-up",
+                    "Cropland",
+                ],
+                "aoi_type": ["feature", "feature", "feature", "feature", "feature"],
+                "aoi_id": ["test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi"],
+            }
+        )
+
+        pd.testing.assert_frame_equal(
+            pd.DataFrame(self.analysis_repo.analysis.result), expected, check_like=True
+        )
 
 
 class TestLandCoverChangeAdminAois:
@@ -233,7 +240,7 @@ class TestLandCoverChangeAdminAois:
 
         all_data = brazil_data + indonesia_data
 
-        return pd.DataFrame(
+        df = pd.DataFrame(
             all_data,
             columns=[
                 "country",
@@ -244,6 +251,9 @@ class TestLandCoverChangeAdminAois:
                 "area",
             ],
         )
+        df["area"] = df["area"] / 10000  # Convert to hectares
+
+        return df
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data):
@@ -275,46 +285,68 @@ class TestLandCoverChangeAdminAois:
         await analyzer_with_test_data.analyze(analysis)
 
     def test_analysis_result(self):
-        assert self.analysis_repo.analysis.result == {
-            "land_cover_class_start": [
-                "Cropland",
-                "Cultivated grasslands",
-                "Tree cover",
-                "Tree cover",
-                "Wetland – short vegetation",
-                "Tree cover",
-                "Tree cover",
-                "Wetland – short vegetation",
-            ],
-            "land_cover_class_end": [
-                "Short vegetation",
-                "Cropland",
-                "Built-up",
-                "Cropland",
-                "Tree cover",
-                "Built-up",
-                "Cropland",
-                "Water",
-            ],
-            "change_area": [890.2, 180.4, 471.5, 3001.0, 120.4, 567.4, 2150.3, 234.8],
-            "aoi_id": [
-                "BRA.12",
-                "BRA.12",
-                "BRA.12",
-                "BRA.12",
-                "BRA.12",
-                "IDN.24.9",
-                "IDN.24.9",
-                "IDN.24.9",
-            ],
-            "aoi_type": [
-                "admin",
-                "admin",
-                "admin",
-                "admin",
-                "admin",
-                "admin",
-                "admin",
-                "admin",
-            ],
-        }
+        print("RESULTS", self.analysis_repo.analysis.result)
+        expected = pd.DataFrame(
+            {
+                "land_cover_class_start": [
+                    "Cropland",
+                    "Cultivated grasslands",
+                    "Tree cover",
+                    "Tree cover",
+                    "Wetland – short vegetation",
+                    "Tree cover",
+                    "Tree cover",
+                    "Wetland – short vegetation",
+                ],
+                "land_cover_class_end": [
+                    "Short vegetation",
+                    "Cropland",
+                    "Built-up",
+                    "Cropland",
+                    "Tree cover",
+                    "Built-up",
+                    "Cropland",
+                    "Water",
+                ],
+                "area__ha": [
+                    0.08902,
+                    0.01804,
+                    0.04715,
+                    0.3001,
+                    0.01204,
+                    0.05674,
+                    0.21503,
+                    0.02348,
+                ],
+                "aoi_id": [
+                    "BRA.12",
+                    "BRA.12",
+                    "BRA.12",
+                    "BRA.12",
+                    "BRA.12",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                ],
+                "aoi_type": [
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                ],
+            }
+        )
+
+        pd.testing.assert_frame_equal(
+            pd.DataFrame(self.analysis_repo.analysis.result),
+            expected,
+            check_like=True,
+        )
+
+        # assert (
+        #     self.analysis_repo.analysis.result == expected
+        # ), "Analysis result does not match expected output."

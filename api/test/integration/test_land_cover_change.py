@@ -57,18 +57,27 @@ class TestLandCoverChangeData:
             "land_cover_change", resource_id, client
         )
 
-        assert resource["result"] == {
-            "aoi_id": ["NGA.20.31", "NGA.20.31", "NGA.20.31"],
-            "aoi_type": ["admin", "admin", "admin"],
-            "land_cover_class_start": [
-                "Short vegetation",
-                "Short vegetation",
-                "Short vegetation",
-            ],
-            "land_cover_class_end": [
-                "Bare and sparse vegetation",
-                "Built-up",
-                "Cropland",
-            ],
-            "change_area": [1505.8458251953125, 26352.123046875, 752.923583984375],
-        }
+        expected = pd.DataFrame(
+            {
+                "aoi_id": ["NGA.20.31", "NGA.20.31", "NGA.20.31"],
+                "aoi_type": ["admin", "admin", "admin"],
+                "land_cover_class_start": [
+                    "Short vegetation",
+                    "Short vegetation",
+                    "Short vegetation",
+                ],
+                "land_cover_class_end": [
+                    "Bare and sparse vegetation",
+                    "Built-up",
+                    "Cropland",
+                ],
+                "area__ha": [0.1505, 2.635, 0.0752],
+            }
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame(resource["result"]),
+            expected,
+            check_like=True,
+            rtol=1e-4,
+            atol=1e-4,
+        )
