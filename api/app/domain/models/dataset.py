@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, List, Literal
 
-from api.app.models.common.base import StrictBaseModel
+from app.models.common.base import StrictBaseModel
 
 
 class Dataset(Enum):

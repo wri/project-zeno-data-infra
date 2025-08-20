@@ -42,7 +42,16 @@ class AnalysisService:
             await self.analysis_repository.store_analysis(
                 self.analytics_resource_id, analysis
             )
-            await self.analyzer.analyze(analysis)
+            results = await self.analyzer.analyze(analysis)
+
+            analysis = Analysis(
+                metadata=self.analytics_resource.metadata,
+                result=results,
+                status=self.analytics_resource.status,
+            )
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id, analysis
+            )
         except Exception as e:
             logging.error(
                 {

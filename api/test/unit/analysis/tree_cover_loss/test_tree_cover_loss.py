@@ -1,6 +1,8 @@
 import pytest
 import pytest_asyncio
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.analyzers.data_api_tree_cover_loss_analyzer import (
+    TreeCoverLossAnalyzer,
+)
 from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.compute_service import ComputeService
 from app.models.common.analysis import AnalysisStatus

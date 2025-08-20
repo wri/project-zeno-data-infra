@@ -3,7 +3,6 @@ import traceback
 import uuid
 from uuid import UUID, uuid5
 
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
 from app.domain.models.area_of_interest import AreaOfInterestList

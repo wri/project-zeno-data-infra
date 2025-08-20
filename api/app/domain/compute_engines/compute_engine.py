@@ -1,8 +1,10 @@
+import os
 from functools import partial
 
 import duckdb
 import numpy as np
 import pandas as pd
+import s3fs
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -12,17 +14,39 @@ from app.models.common.base import StrictBaseModel
 from flox.xarray import xarray_reduce
 
 
-class PrecalcQueryService(StrictBaseModel):
+class DuckDbPrecalcQueryService(StrictBaseModel):
     def __init__(self):
         pass
 
-    async def execute(self, data_source: str, query: str) -> pd.DataFrame:
-        return await duckdb.sql(query).df()
+    async def execute(self, table_uri: str, query: str) -> pd.DataFrame:
+        duckdb.query(
+            """
+            CREATE OR REPLACE SECRET secret (
+                TYPE s3,
+                PROVIDER credential_chain,
+                CHAIN config
+            );
+        """
+        )
+
+        fs = s3fs.S3FileSystem(requester_pays=True)
+        table = os.path.splitext(os.path.basename(table_uri))[0]
+        fs.get(
+            table_uri,
+            f"/tmp/{table}",
+        )
+
+        # need to declare this to bind FROM in SQL query
+        data_source = duckdb.read_parquet(f"/tmp/{table}")
+
+        # TODO duckdb has no native async, need to use aioduckdb? Check if blocking in load test
+        df = duckdb.sql(query).df()
+        return df.to_dict(orient="list")
 
 
 class PrecalcHandler:
     FIELDS = {
-        Dataset.area_hectares: "area_ha",
+        Dataset.area_hectares: "value",
         Dataset.tree_cover_loss: "loss_year",
         Dataset.canopy_cover: "canopy_cover",
     }

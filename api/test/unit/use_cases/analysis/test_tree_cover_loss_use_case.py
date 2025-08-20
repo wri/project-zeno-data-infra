@@ -1,15 +1,18 @@
-import pytest
-
-from uuid import UUID
 from unittest.mock import MagicMock
+from uuid import UUID
 
-from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import TreeCoverLossService
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
-from app.domain.repositories.analysis_repository import AnalysisRepository
+import pytest
+from app.domain.analyzers.data_api_tree_cover_loss_analyzer import (
+    TreeCoverLossAnalyzer,
+)
 from app.domain.models.analysis import Analysis
-
-from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
+from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
+from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
+from app.use_cases.analysis.tree_cover_loss.tree_cover_loss_service import (
+    TreeCoverLossService,
+)
+
 
 @pytest.fixture
 def stub_analysis_in():
@@ -21,12 +24,14 @@ def stub_analysis_in():
         start_year="2020",
         end_year="2021",
         canopy_cover=30,
-        intersections=[]
+        intersections=[],
     )
+
 
 @pytest.fixture
 def mock_analysis_repository():
     return MagicMock(spec=AnalysisRepository)
+
 
 @pytest.fixture
 def mock_analyzer():
@@ -61,16 +66,11 @@ class TestTreeCoverLossServiceCollaborators:
         # Arrange  #
         ############
         mock_analysis_repository.load_analysis.side_effect = [
-            Analysis(
-                result=None,
-                metadata=None,
-                status=None
-            )
+            Analysis(result=None, metadata=None, status=None)
         ]
 
         tree_cover_loss_service = TreeCoverLossService(
-            analysis_repository=mock_analysis_repository,
-            analyzer=mock_analyzer
+            analysis_repository=mock_analysis_repository, analyzer=mock_analyzer
         )
 
         ############
@@ -83,16 +83,18 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert  #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(UUID('352564f7-37ec-5211-93b6-123b85b37295'))
+        mock_analysis_repository.load_analysis.assert_called_once_with(
+            UUID("352564f7-37ec-5211-93b6-123b85b37295")
+        )
         mock_analysis_repository.store_analysis.assert_called_once_with(
-            UUID('352564f7-37ec-5211-93b6-123b85b37295'),
+            UUID("352564f7-37ec-5211-93b6-123b85b37295"),
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
                 result=None,
                 status=AnalysisStatus.pending,
-            )
+            ),
         )
-        assert result_thumbprint == UUID('352564f7-37ec-5211-93b6-123b85b37295')
+        assert result_thumbprint == UUID("352564f7-37ec-5211-93b6-123b85b37295")
         mock_analyzer.analyze.assert_called_once_with(
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
@@ -131,13 +133,12 @@ class TestTreeCoverLossServiceCollaborators:
             Analysis(
                 result=None,
                 metadata=stub_analysis_in.model_dump(),
-                status=AnalysisStatus.pending
+                status=AnalysisStatus.pending,
             )
         ]
 
         tree_cover_loss_service = TreeCoverLossService(
-            analysis_repository=mock_analysis_repository,
-            analyzer=mock_analyzer
+            analysis_repository=mock_analysis_repository, analyzer=mock_analyzer
         )
 
         ############
@@ -150,8 +151,10 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert  #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(UUID('352564f7-37ec-5211-93b6-123b85b37295'))
-        assert result_thumbprint == UUID('352564f7-37ec-5211-93b6-123b85b37295')
+        mock_analysis_repository.load_analysis.assert_called_once_with(
+            UUID("352564f7-37ec-5211-93b6-123b85b37295")
+        )
+        assert result_thumbprint == UUID("352564f7-37ec-5211-93b6-123b85b37295")
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -184,15 +187,14 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         mock_analysis_repository.load_analysis.side_effect = [
             Analysis(
-                result={ "fake": "result" },
+                result={"fake": "result"},
                 metadata=stub_analysis_in.model_dump(),
-                status=AnalysisStatus.saved
+                status=AnalysisStatus.saved,
             )
         ]
 
         tree_cover_loss_service = TreeCoverLossService(
-            analysis_repository=mock_analysis_repository,
-            analyzer=mock_analyzer
+            analysis_repository=mock_analysis_repository, analyzer=mock_analyzer
         )
 
         ############
@@ -205,17 +207,19 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(UUID('352564f7-37ec-5211-93b6-123b85b37295'))
-        assert result_thumbprint == UUID('352564f7-37ec-5211-93b6-123b85b37295')
+        mock_analysis_repository.load_analysis.assert_called_once_with(
+            UUID("352564f7-37ec-5211-93b6-123b85b37295")
+        )
+        assert result_thumbprint == UUID("352564f7-37ec-5211-93b6-123b85b37295")
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_happy_path_flow_with_failed_status_does_not_do_analysis(
-            self,
-            stub_analysis_in,
-            mock_analysis_repository,
-            mock_analyzer,
+        self,
+        stub_analysis_in,
+        mock_analysis_repository,
+        mock_analyzer,
     ):
         """
         As a climate analyst checking on a problematic tree cover request
@@ -241,13 +245,12 @@ class TestTreeCoverLossServiceCollaborators:
             Analysis(
                 result=None,
                 metadata=stub_analysis_in.model_dump(),
-                status=AnalysisStatus.failed
+                status=AnalysisStatus.failed,
             )
         ]
 
         tree_cover_loss_service = TreeCoverLossService(
-            analysis_repository=mock_analysis_repository,
-            analyzer=mock_analyzer
+            analysis_repository=mock_analysis_repository, analyzer=mock_analyzer
         )
 
         ############
@@ -260,7 +263,9 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(UUID('352564f7-37ec-5211-93b6-123b85b37295'))
-        assert result_thumbprint == UUID('352564f7-37ec-5211-93b6-123b85b37295')
+        mock_analysis_repository.load_analysis.assert_called_once_with(
+            UUID("352564f7-37ec-5211-93b6-123b85b37295")
+        )
+        assert result_thumbprint == UUID("352564f7-37ec-5211-93b6-123b85b37295")
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
