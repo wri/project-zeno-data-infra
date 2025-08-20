@@ -343,7 +343,3 @@ class TestLandCoverChangeAdminAois:
             expected,
             check_like=True,
         )
-
-        # assert (
-        #     self.analysis_repo.analysis.result == expected
-        # ), "Analysis result does not match expected output."
