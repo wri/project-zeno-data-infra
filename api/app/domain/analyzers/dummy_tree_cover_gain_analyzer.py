@@ -1,3 +1,4 @@
+from random import random
 from typing import Dict
 
 from app.domain.analyzers.analyzer import Analyzer
@@ -12,7 +13,18 @@ class DummyTreeCoverGainAnalyzer(Analyzer):
 
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
-        results: Dict = {}
+        years = list(
+            range(
+                int(land_cover_change_analytics_in.start_year),
+                int(land_cover_change_analytics_in.end_year) + 1,
+                5,
+            )
+        )
+        results: Dict = {
+            "id": analysis.metadata["aoi"]["ids"] * len(years),
+            "tree_cover_gain__year": years,
+            "tree_cover_gain_area__ha": [(random() * 100) for _ in years],
+        }
         await self.analysis_repository.store_analysis(
             resource_id=land_cover_change_analytics_in.thumbprint(),
             analytics=Analysis(
