@@ -14,8 +14,7 @@ from httpx import ASGITransport, AsyncClient
 client = TestClient(app)
 
 
-pytest.mark.xfail(reason="this was for the old implementation, needs to be updated.")
-class TestLandCoverChangeMockData:
+class TestLandCoverChangeData:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
@@ -30,16 +29,10 @@ class TestLandCoverChangeMockData:
             ) as client:
                 test_request = await client.post(
                     "/v0/land_change/land_cover_change/analytics",
-                    json={"aoi": {"type": "admin", "ids": ["BRA.1.12", "IDN.24.9"]}},
+                    json={"aoi": {"type": "admin", "ids": ["NGA.20.31"]}},
                 )
 
                 yield test_request, client
-
-    @pytest.mark.asyncio
-    async def test_post_returns_pending_status(self, setup):
-        test_request, _ = setup
-        resource = test_request.json()
-        assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
@@ -47,7 +40,7 @@ class TestLandCoverChangeMockData:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/land_cover_change/analytics/a8df3000-5cf6-5050-8717-592310672f0d"
+            == "http://testserver/v0/land_change/land_cover_change/analytics/4b5102d9-2eb7-58b1-8378-9beb8f180cea"
         )
 
     @pytest.mark.asyncio
@@ -64,18 +57,18 @@ class TestLandCoverChangeMockData:
             "land_cover_change", resource_id, client
         )
 
-        assert (
-            "BRA.1.12" in resource["result"]["aoi_id"]
-        ), "Expected result to contain AOI IDs."
-        assert (
-            "IDN.24.9" in resource["result"]["aoi_id"]
-        ), "Expected result to contain AOI IDs."
-
-        df = pd.DataFrame(resource["result"])
-        assert df.columns.tolist() == [
-            "aoi_id",
-            "aoi_type",
-            "land_cover_class_start",
-            "land_cover_class_end",
-            "change_area",
-        ], "Expected re6sult to have specific columns."
+        assert resource["result"] == {
+            "aoi_id": ["NGA.20.31", "NGA.20.31", "NGA.20.31"],
+            "aoi_type": ["admin", "admin", "admin"],
+            "land_cover_class_start": [
+                "Short vegetation",
+                "Short vegetation",
+                "Short vegetation",
+            ],
+            "land_cover_class_end": [
+                "Bare and sparse vegetation",
+                "Built-up",
+                "Cropland",
+            ],
+            "change_area": [1505.8458251953125, 26352.123046875, 752.923583984375],
+        }
