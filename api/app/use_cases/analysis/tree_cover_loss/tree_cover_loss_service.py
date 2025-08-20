@@ -4,7 +4,9 @@ import uuid
 from uuid import UUID, uuid5
 
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
+from app.domain.models.area_of_interest import AreaOfInterestList
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.tree_cover_loss import (
@@ -15,10 +17,10 @@ from app.models.land_change.tree_cover_loss import (
 
 class TreeCoverLossService:
     def __init__(
-        self, analysis_repository: AnalysisRepository, analyzer: TreeCoverLossAnalyzer
+        self, analysis_repository: AnalysisRepository, compute_engine: ComputeEngine
     ):
         self.analysis_repository = analysis_repository
-        self.analyzer = analyzer
+        self.compute_engine = compute_engine
         self.analytics_resource: TreeCoverLossAnalytics = (
             TreeCoverLossAnalytics()
         )  # Dummy
@@ -42,7 +44,26 @@ class TreeCoverLossService:
             await self.analysis_repository.store_analysis(
                 self.analytics_resource_id, analysis
             )
-            await self.analyzer.analyze(analysis)
+
+            areas_of_interest = AreaOfInterestList(
+                self.analytics_resource.metadata.aoi, self.compute_engine
+            )
+            results = await areas_of_interest.get_tree_cover_loss(
+                self.analytics_resource.metadata.canopy_cover,
+                self.analytics_resource.metadata.start_year,
+                self.analytics_resource.metadata.end_year,
+                self.analytics_resource.metadata.forest_type,
+            )
+
+            analysis = Analysis(
+                metadata=self.analytics_resource.metadata,
+                result=results,
+                status=self.analytics_resource.status,
+            )
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id, analysis
+            )
+
         except Exception as e:
             logging.error(
                 {

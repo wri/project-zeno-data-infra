@@ -27,14 +27,17 @@ class PrecalcHandler:
         Dataset.canopy_cover: "canopy_cover",
     }
 
-    def __init__(self, precalc_query_service):
+    def __init__(self, precalc_query_service, next_handler):
         self.precalc_query_service = precalc_query_service
+        self.next_handler = next_handler
 
     async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
         if query.aggregate.dataset == Dataset.area_hectares and query.group_bys == [
             Dataset.tree_cover_loss
         ]:
             data_source = "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/tabular/zonal_stats/umd_tree_cover_loss_by_driver.parquet"
+        else:
+            return await self.next_handler.handle(aoi_type, aoi_ids, query)
 
         agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
         groupby_fields = ", ".join(

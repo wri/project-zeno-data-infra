@@ -1,7 +1,15 @@
-import os
-
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.compute_engines.compute_engine import (
+    ComputeEngine,
+    FloxOTFHandler,
+    PrecalcHandler,
+    PrecalcQueryService,
+)
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.repositories.data_api_aoi_geometry_repository import (
+    DataApiAoiGeometryRepository,
+)
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.data_api_compute_service import (
     DataApiComputeService,
 )
@@ -30,14 +38,26 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
+def create_compute_engine() -> ComputeEngine:
+    compute_engine = ComputeEngine(
+        handler=PrecalcHandler(
+            precalc_query_service=PrecalcQueryService(),
+            next_handler=FloxOTFHandler(
+                dataset_repository=ZarrDatasetRepository(),
+                aoi_geometry_repository=DataApiAoiGeometryRepository(),
+                # dask_client=dask_client, TODO how to pass request object?
+            ),
+        )
+    )
+
+    return compute_engine
+
+
 def create_analysis_service() -> AnalysisService:
     analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverLossAnalyzer(
-            analysis_repository=analysis_repository,
-            compute_engine=DataApiComputeService(os.getenv("API_KEY")),
-        ),
+        compute_engine=create_compute_engine(),
         event=ANALYTICS_NAME,
     )
 
