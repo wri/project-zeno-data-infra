@@ -78,27 +78,14 @@ class TreeCoverGainAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "__dtypes__": {
-                                "country": "str",
-                                "region": "int",
-                                "subregion": "int",
-                                "tree_cover_loss__year": "int",
-                                "tree_cover_loss__ha": "float",
-                                "gross_emissions_co2e_all_gases__mg": "float",
-                            },
                             "country": ["BRA", "BRA", "BRA"],
                             "region": [1, 1, 1],
                             "subregion": [12, 12, 12],
-                            "tree_cover_loss__year": [2022, 2023, 2024],
-                            "tree_cover_loss__ha": [
+                            "tree_cover_loss__year": [2000, 2005, 2010],
+                            "tree_cover_gain__ha": [
                                 4045.406160862687,
                                 4050.4061608627,
                                 4045.406160862687,
-                            ],
-                            "gross_emissions_co2e_all_gases__mg": [
-                                3490821.6510292348,
-                                114344.24741739516,
-                                114347.2474174,
                             ],
                         },
                         "metadata": {
@@ -106,9 +93,8 @@ class TreeCoverGainAnalyticsResponse(Response):
                                 "type": "admin",
                                 "ids": ["BRA.1.12"],
                             },
-                            "start_year": "2022",
-                            "end_year": "2024",
-                            "canopy_cover": "30",
+                            "start_year": "2000",
+                            "end_year": "2010",
                         },
                         "message": "",
                         "status": "saved",
