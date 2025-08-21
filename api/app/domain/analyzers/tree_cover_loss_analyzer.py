@@ -3,6 +3,8 @@ from abc import abstractmethod
 import pandas as pd
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.external_services.compute_service import ComputeService
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
@@ -24,8 +26,15 @@ class DataAPIAnalyzer(Analyzer):
 
 
 class AdminAnalysisHelper:
-    def __init__(self, analyzer: DataAPIAnalyzer):
+    def __init__(
+        self,
+        analyzer: DataAPIAnalyzer,
+        analysis_repository: AnalysisRepository,
+        compute_service: ComputeService,
+    ):
         self.analyzer = analyzer
+        self.analysis_repository = analysis_repository
+        self.compute_service = compute_service
 
     async def analyze(self, analysis: Analysis, analytics_in: AnalyticsIn):
         iso_results = await self._get_results_for_admin_level(0, analytics_in)
@@ -44,7 +53,7 @@ class AdminAnalysisHelper:
             combined_results, analysis.metadata, AnalysisStatus.saved
         )
 
-        await self.analyzer.analysis_repository.store_analysis(
+        await self.analysis_repository.store_analysis(
             analytics_in.thumbprint(), analyzed_analysis
         )
 
@@ -93,7 +102,7 @@ class AdminAnalysisHelper:
             admin_level_ids_str,
         )
 
-        results = await self.analyzer.compute_engine.compute(
+        results = await self.compute_service.compute(
             {"dataset": dataset, "version": version, "query": query}
         )
         df = pd.DataFrame(results)
@@ -134,7 +143,9 @@ class TreeCoverLossAnalyzer(DataAPIAnalyzer):
     async def analyze(self, analysis: Analysis):
         tree_cover_loss_analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
         if tree_cover_loss_analytics_in.aoi.type == "admin":
-            admin_analyzer = AdminAnalysisHelper(self)
+            admin_analyzer = AdminAnalysisHelper(
+                self, self.analysis_repository, self.compute_engine
+            )
             await admin_analyzer.analyze(analysis, tree_cover_loss_analytics_in)
         elif tree_cover_loss_analytics_in.aoi.type == "protected_area":
             result = await self._get_results_for_protected_area(

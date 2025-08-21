@@ -56,6 +56,15 @@ class AnalysisService:
                     "stack_trace": traceback.format_exc(),
                 }
             )
+            self.analytics_resource.status = AnalysisStatus.failed
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id,
+                Analysis(
+                    metadata=self.analytics_resource.metadata,
+                    result=self.analytics_resource.result,
+                    status=AnalysisStatus.failed,
+                ),
+            )
 
     def get_status(self) -> AnalysisStatus:
         return self.analytics_resource.status or AnalysisStatus.pending
