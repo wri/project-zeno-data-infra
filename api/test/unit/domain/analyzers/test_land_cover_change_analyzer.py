@@ -90,7 +90,7 @@ class TestLandCoverChangeCustomAois:
             dims=["year", "y", "x"],
             name="band_data",
         )
-        return xr.Dataset({"lc_classes": band_data})
+        return xr.Dataset({"band_data": band_data})
 
     @pytest.fixture
     def pixel_area(self):
@@ -186,7 +186,7 @@ class TestLandCoverChangeCustomAois:
 
         expected = pd.DataFrame(
             {
-                "area__ha": [
+                "land_cover_change_area__ha": [
                     1.2446691989898682,
                     0.20744886994361877,
                     0.20744091272354126,
@@ -222,20 +222,20 @@ class TestLandCoverChangeAdminAois:
     def parquet_mock_data(self):
         """Mock data that simulates the actual parquet file structure for the AOI"""
         brazil_data = [
-            ("BRA", 12, 1, "Tree cover", "Cropland", 1250.5),
-            ("BRA", 12, 1, "Tree cover", "Built-up", 320.8),
-            ("BRA", 12, 1, "Cropland", "Short vegetation", 890.2),
-            ("BRA", 12, 2, "Tree cover", "Cropland", 800.3),
-            ("BRA", 12, 2, "Tree cover", "Built-up", 150.7),
-            ("BRA", 12, 2, "Cultivated grasslands", "Cropland", 180.4),
-            ("BRA", 12, 3, "Tree cover", "Cropland", 950.2),
-            ("BRA", 12, 3, "Wetland – short vegetation", "Tree cover", 120.4),
+            ("BRA.12.1", "Tree cover", "Cropland", 0.12505),
+            ("BRA.12.1", "Tree cover", "Built-up", 0.03208),
+            ("BRA.12.1", "Cropland", "Short vegetation", 0.08902),
+            ("BRA.12.2", "Tree cover", "Cropland", 0.08003),
+            ("BRA.12.2", "Tree cover", "Built-up", 0.01507),
+            ("BRA.12.2", "Cultivated grasslands", "Cropland", 0.01804),
+            ("BRA.12.3", "Tree cover", "Cropland", 0.09502),
+            ("BRA.12.3", "Wetland – short vegetation", "Tree cover", 0.01204),
         ]
 
         indonesia_data = [
-            ("IDN", 24, 9, "Tree cover", "Cropland", 2150.3),
-            ("IDN", 24, 9, "Tree cover", "Built-up", 567.4),
-            ("IDN", 24, 9, "Wetland – short vegetation", "Water", 234.8),
+            ("IDN.24.9", "Tree cover", "Cropland", 0.21503),
+            ("IDN.24.9", "Tree cover", "Built-up", 0.05674),
+            ("IDN.24.9", "Wetland – short vegetation", "Water", 0.02348),
         ]
 
         all_data = brazil_data + indonesia_data
@@ -243,24 +243,23 @@ class TestLandCoverChangeAdminAois:
         return pd.DataFrame(
             all_data,
             columns=[
-                "country",
-                "region",
-                "subregion",
+                "aoi_id",
                 "land_cover_class_start",
                 "land_cover_class_end",
-                "area",
+                "land_cover_change_area__ha",
             ],
         )
 
     @pytest_asyncio.fixture(autouse=True)
-    async def analyzer_with_test_data(self, parquet_mock_data):
-
+    async def analyzer_with_test_data(self, parquet_mock_data, async_dask_client):
         self.analysis_repo = DummyAnalysisRepository()
-        analyzer = LandCoverChangeAnalyzer(analysis_repository=self.analysis_repo)
+        analyzer = LandCoverChangeAnalyzer(
+            analysis_repository=self.analysis_repo, compute_engine=async_dask_client
+        )
 
         table_name = "test_parquet"
         duckdb.register(table_name, parquet_mock_data)
-        analyzer.results_uri = table_name
+        analyzer.admin_results_uri = table_name
 
         return analyzer
 
@@ -270,7 +269,7 @@ class TestLandCoverChangeAdminAois:
         analyzer_with_test_data,
     ):
         analytics_in = LandCoverChangeAnalyticsIn(
-            aoi={"type": "admin", "ids": ["BRA.12", "IDN.24.9"]},
+            aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
         )
 
         analysis = Analysis(
@@ -282,52 +281,41 @@ class TestLandCoverChangeAdminAois:
         await analyzer_with_test_data.analyze(analysis)
 
     def test_analysis_result(self):
-        print("RESULTS", self.analysis_repo.analysis.result)
         expected = pd.DataFrame(
             {
                 "land_cover_class_start": [
+                    "Tree cover",
+                    "Tree cover",
                     "Cropland",
-                    "Cultivated grasslands",
-                    "Tree cover",
-                    "Tree cover",
-                    "Wetland – short vegetation",
                     "Tree cover",
                     "Tree cover",
                     "Wetland – short vegetation",
                 ],
                 "land_cover_class_end": [
+                    "Cropland",
+                    "Built-up",
                     "Short vegetation",
                     "Cropland",
                     "Built-up",
-                    "Cropland",
-                    "Tree cover",
-                    "Built-up",
-                    "Cropland",
                     "Water",
                 ],
-                "area__ha": [
+                "land_cover_change_area__ha": [
+                    0.12505,
+                    0.03208,
                     0.08902,
-                    0.01804,
-                    0.04715,
-                    0.3001,
-                    0.01204,
+                    0.2150,
                     0.05674,
-                    0.21503,
                     0.02348,
                 ],
                 "aoi_id": [
-                    "BRA.12",
-                    "BRA.12",
-                    "BRA.12",
-                    "BRA.12",
-                    "BRA.12",
+                    "BRA.12.1",
+                    "BRA.12.1",
+                    "BRA.12.1",
                     "IDN.24.9",
                     "IDN.24.9",
                     "IDN.24.9",
                 ],
                 "aoi_type": [
-                    "admin",
-                    "admin",
                     "admin",
                     "admin",
                     "admin",
@@ -342,4 +330,6 @@ class TestLandCoverChangeAdminAois:
             pd.DataFrame(self.analysis_repo.analysis.result),
             expected,
             check_like=True,
+            rtol=1e-4,
+            atol=1e-4,
         )

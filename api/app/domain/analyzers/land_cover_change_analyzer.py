@@ -25,7 +25,7 @@ class LandCoverChangeAnalyzer(Analyzer):
         self.analysis_repository = analysis_repository  # LandCoverChangeRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
-        self.results_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/tabular/statistics/admin_land_cover_change.parquet"
+        self.admin_results_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/tabular/statistics/admin_land_cover_change.parquet"
         self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
         self.land_cover_mapping = {
@@ -43,17 +43,8 @@ class LandCoverChangeAnalyzer(Analyzer):
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
         if land_cover_change_analytics_in.aoi.type == "admin":
-            gadm_results = []
             gadm_ids = land_cover_change_analytics_in.aoi.ids
-            for gadm_id in gadm_ids:
-                results = self.analyze_admin_area(gadm_id)
-                results["aoi_id"] = gadm_id
-                results["aoi_type"] = "admin"
-                results = results[
-                    results.land_cover_class_start != results.land_cover_class_end
-                ]  # Filter out no change
-                gadm_results.append(results)
-            combined_results_df = pd.concat(gadm_results)
+            combined_results_df = self.analyze_admin_areas(gadm_ids)
 
         else:
             aois = land_cover_change_analytics_in.aoi.model_dump()
@@ -79,8 +70,9 @@ class LandCoverChangeAnalyzer(Analyzer):
             dfs = await self.compute_engine.gather(dd_df_futures)
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
 
-        combined_results_df["area__ha"] = combined_results_df.pop("change_area") / 10000
-        combined_results_df = combined_results_df[combined_results_df.area__ha > 0]
+        combined_results_df = combined_results_df[
+            combined_results_df.land_cover_change_area__ha > 0
+        ]
         analyzed_analysis = Analysis(
             combined_results_df.to_dict(orient="list"),
             analysis.metadata,
@@ -90,18 +82,10 @@ class LandCoverChangeAnalyzer(Analyzer):
             land_cover_change_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    def analyze_admin_area(self, gadm_id):
-        gadm_id = gadm_id.split(".")
-        query = self._build_query(gadm_id)
+    def analyze_admin_areas(self, gadm_ids):
+        query = f"select * from '{self.admin_results_uri}' where aoi_id in {gadm_ids} and land_cover_class_start != land_cover_class_end"
         df = duckdb.query(query).df()
-
-        columns_to_drop = ["country"]
-        if len(gadm_id) >= 2:
-            columns_to_drop += ["region"]
-        if len(gadm_id) == 3:
-            columns_to_drop += ["subregion"]
-
-        df = df.drop(columns=columns_to_drop, axis=1)
+        df["aoi_type"] = "admin"
 
         return df
 
@@ -112,8 +96,8 @@ class LandCoverChangeAnalyzer(Analyzer):
         umd_land_cover = read_zarr_clipped_to_geojson(land_cover_zarr_uri, geojson)
         pixel_area = read_zarr_clipped_to_geojson(pixel_area_zarr_uri, geojson)
 
-        lc_data_2015 = umd_land_cover.lc_classes.sel(year=2015)
-        lc_data_2024 = umd_land_cover.lc_classes.sel(year=2024)
+        lc_data_2015 = umd_land_cover.band_data.sel(year=2015)
+        lc_data_2024 = umd_land_cover.band_data.sel(year=2024)
 
         lc_class_change = lc_data_2015 * 9 + lc_data_2024
         lc_class_change.name = "class_change"
@@ -163,39 +147,8 @@ class LandCoverChangeAnalyzer(Analyzer):
             != land_cover_change_ddf.land_cover_class_end
         ]
 
+        land_cover_change_ddf["land_cover_change_area__ha"] = (
+            land_cover_change_ddf.pop("change_area") / 10000
+        )
+
         return land_cover_change_ddf
-
-    def _build_query(
-        self,
-        gadm_id,
-    ):
-        """
-        Build a query to get land cover change statistics for the given GADM IDs.
-        """
-        from_clause = f"FROM '{self.results_uri}'"
-        select_clause = "SELECT country"
-        where_clause = f"WHERE country = '{gadm_id[0]}'"
-        by_clause = "BY country"
-
-        # Includes region, so add relevant filters, selects and group bys
-        if len(gadm_id) > 1:
-            select_clause += ", region"
-            where_clause += f" AND region = {gadm_id[1]}"
-            by_clause += ", region"
-
-        # Includes subregion, so add relevant filters, selects and group bys
-        if len(gadm_id) > 2:
-            select_clause += ", subregion"
-            where_clause += f" AND subregion = {gadm_id[2]}"
-            by_clause += ", subregion"
-
-        by_clause += ", land_cover_class_start, land_cover_class_end"
-        select_clause += ", land_cover_class_start, land_cover_class_end"
-        group_by_clause = f"GROUP {by_clause}"
-        order_by_clause = f"ORDER {by_clause}"
-
-        # Query and make sure output names match the expected schema (?)
-        select_clause += ", SUM(area) AS change_area"
-        query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
-
-        return query

@@ -33,7 +33,7 @@ class LandCoverChangeResult(StrictBaseModel):
     aoi_type: List[str]
     land_cover_class_start: List[str]
     land_cover_class_end: List[str]
-    area__ha: List[float]
+    land_cover_change_area__ha: List[float]
 
 
 class LandCoverChangeAnalytics(StrictBaseModel):

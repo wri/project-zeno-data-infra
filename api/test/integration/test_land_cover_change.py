@@ -68,12 +68,13 @@ class TestLandCoverChangeData:
                 ],
                 "land_cover_class_end": [
                     "Bare and sparse vegetation",
-                    "Built-up",
                     "Cropland",
+                    "Built-up",
                 ],
-                "area__ha": [0.1505, 2.635, 0.0752],
+                "land_cover_change_area__ha": [0.1505, 0.0752, 2.635],
             }
         )
+
         pd.testing.assert_frame_equal(
             pd.DataFrame(resource["result"]),
             expected,
