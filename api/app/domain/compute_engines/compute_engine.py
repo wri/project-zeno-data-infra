@@ -56,9 +56,11 @@ class PrecalcHandler:
         self.next_handler = next_handler
 
     async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        if query.aggregate.dataset == Dataset.area_hectares and query.group_bys == [
-            Dataset.tree_cover_loss
-        ]:
+        if (
+            aoi_type == "admin"
+            and query.aggregate.dataset == Dataset.area_hectares
+            and query.group_bys == [Dataset.tree_cover_loss]
+        ):
             data_source = "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/tabular/zonal_stats/umd_tree_cover_loss_by_driver.parquet"
         else:
             return await self.next_handler.handle(aoi_type, aoi_ids, query)
@@ -96,31 +98,38 @@ class FloxOTFHandler:
         self.dask_client = dask_client
 
     async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        aoi_geometries = self.aoi_geometry_repository.load(aoi_type, aoi_ids)
+        aoi_geometries = await self.aoi_geometry_repository.load(aoi_type, aoi_ids)
         aoi_partial = partial(
             self._handle,
             query=query,
             dataset_repository=self.dataset_repository,
             expected_groups_per_dataset=self.EXPECTED_GROUPS,
         )
-        futures = self.dask_client.map(aoi_partial, aoi_geometries)
+        futures = self.dask_client.map(aoi_partial, list(zip(aoi_ids, aoi_geometries)))
         results_per_aoi = await self.dask_client.gather(futures)
 
         results = pd.concat(results_per_aoi)
-        return results
+
+        for dataset in query.group_bys:
+            col = dataset.get_field_name()
+            results[col] = self.dataset_repository.unpack(dataset, results[col])
+
+        return results.to_dict(orient="list")
 
     @staticmethod
-    async def _handle(
-        aoi_geometry, query, dataset_repository, expected_groups_per_dataset
-    ):
+    def _handle(aoi, query, dataset_repository, expected_groups_per_dataset):
+        aoi_id, aoi_geometry = aoi
         by = dataset_repository.load(query.aggregate.dataset, geometry=aoi_geometry)
         func = query.aggregate.func
 
         objs = []
         expected_groups = []
         for filter in query.filters:
+            translated_value = dataset_repository.translate(
+                filter.dataset, filter.value
+            )
             da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
-            by = by.where(eval(f"da {filter.op} {filter.value}"))
+            by = by.where(eval(f"da {filter.op} {translated_value}"))
 
             if filter.dataset in query.group_bys:
                 # filter expected groups by the filter itself so it doesn't appear in the results as 0s
@@ -128,7 +137,7 @@ class FloxOTFHandler:
                     filter.dataset
                 ] = expected_groups_per_dataset[filter.dataset][
                     eval(
-                        f"expected_groups_per_dataset[{filter.dataset}] {filter.op} {filter.value}"
+                        f"expected_groups_per_dataset[{filter.dataset}] {filter.op} {translated_value}"
                     )
                 ]
 
@@ -142,10 +151,14 @@ class FloxOTFHandler:
             .to_dataframe()
             .reset_index()
         )
+
+        results["id"] = aoi_id
         filtered_results = results[
             ~np.isnan(results[query.aggregate.dataset.get_field_name()])
         ]
-        return filtered_results.reset_index().drop(columns="index")
+        return filtered_results.reset_index().drop(
+            columns=["index", "band", "spatial_ref"]
+        )
 
 
 class ComputeEngine:

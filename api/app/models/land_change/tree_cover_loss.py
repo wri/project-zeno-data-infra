@@ -3,6 +3,8 @@ from typing import Annotated, List, Literal, Optional, Union
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    IndigenousAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
@@ -10,7 +12,9 @@ from pydantic import Field, field_validator, model_validator
 
 AoiUnion = Union[
     AdminAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
+    IndigenousAreaOfInterest,
 ]
 
 DATE_REGEX = r"^\d{4}$"

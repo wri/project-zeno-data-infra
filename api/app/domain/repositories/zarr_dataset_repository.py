@@ -23,6 +23,42 @@ class ZarrDatasetRepository:
             return self._clip_xarr_to_geometry(xarr, geometry)
         return xarr
 
+    def translate(self, dataset, value):
+        """
+        Translate a value to the pixel value in the dataset
+        """
+        if dataset == Dataset.canopy_cover:
+            match value:
+                case 0:
+                    return 0
+                case 10:
+                    return 1
+                case 15:
+                    return 2
+                case 20:
+                    return 3
+                case 25:
+                    return 4
+                case 30:
+                    return 5
+                case 50:
+                    return 6
+                case 75:
+                    return 7
+        elif dataset == Dataset.tree_cover_loss:
+            return int(value) - 2000
+        else:
+            raise NotImplementedError()
+
+    def unpack(self, dataset, series):
+        """
+        Convert Zarr pixel values to actual pixel meaning for dataset
+        """
+        if dataset == Dataset.tree_cover_loss:
+            return series + 2000
+        else:
+            raise NotImplementedError()
+
     def _clip_xarr_to_geometry(self, xarr, geom):
         sliced = xarr.sel(
             x=slice(geom.bounds[0], geom.bounds[2]),

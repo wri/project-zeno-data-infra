@@ -10,6 +10,7 @@ from app.domain.compute_engines.compute_engine import (
 )
 from app.domain.models.area_of_interest import AreaOfInterestList
 from app.domain.models.dataset import Dataset
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
@@ -54,7 +55,7 @@ async def test_flox_handler_happy_path():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
 
-    class TestDatasetRepository:
+    class TestDatasetRepository(ZarrDatasetRepository):
         def load(self, dataset, geometry=None):
             if dataset == Dataset.area_hectares:
                 # all values are 0.5
@@ -80,7 +81,7 @@ async def test_flox_handler_happy_path():
             return xarr
 
     class TestAoiGeometryRepository:
-        def load(self, aoi_type, aoi_ids):
+        async def load(self, aoi_type, aoi_ids):
             return [box(10, 0, 0, 10)]
 
     compute_engine = ComputeEngine(
@@ -93,13 +94,13 @@ async def test_flox_handler_happy_path():
     aois = AreaOfInterestList(
         ProtectedAreaOfInterest(ids=["1234"]), compute_engine=compute_engine
     )
-    results = await aois.get_tree_cover_loss(3, 10, 20, "primary_forest")
+    results = await aois.get_tree_cover_loss(20, 2010, 2020, "primary_forest")
 
     pd.testing.assert_frame_equal(
-        results,
+        pd.DataFrame(results),
         pd.DataFrame(
             {
-                "loss_year": [15],
+                "loss_year": [2015],
                 "area_ha": [12.5],
             },
         ),
