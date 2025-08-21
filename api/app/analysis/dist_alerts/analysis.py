@@ -189,7 +189,7 @@ async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_clie
     # For now, we need to just download the file temporarily
     fs = s3fs.S3FileSystem(requester_pays=True)
     fs.get(
-        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet2/{table}.parquet",
         f"/tmp/{table}.parquet",
     )
 

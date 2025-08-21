@@ -301,7 +301,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                     "2024-08-15",
                 ],
                 "confidence": ["high", "low", "high", "low", "high"],
-                "value": [1490, 95, 1414, 126, 2091],
+                "value": [1.133972e+06, 7.154635e+04, 1.064846e+06, 9.065568e+04, 1.547240e+06],
             }
         )
 
@@ -448,7 +448,7 @@ async def test_gadm_dist_analytics_no_intersection():
                 "2024-08-15",
             ],
             "confidence": ["high", "low"],
-            "value": [1490, 95],
+            "value": [1.133972e+06, 7.154635e+04],
         }
     )
 
@@ -525,10 +525,10 @@ async def test_admin_dist_analytics_by_grasslands():
             "country": ["TZA", "TZA"],
             "region": [24, 24],
             "subregion": [3, 3],
-            "grasslands": [0, 0],
+            "grasslands": ["non-grasslands", "non-grasslands"],
             "alert_date": ["2024-08-15", "2024-08-16"],
             "confidence": ["high", "high"],
-            "value": [26, 8],
+            "value": [19975.835938, 6147.143555],
             "aoi_id": ["TZA.24.3", "TZA.24.3"],
             "aoi_type": ["admin", "admin"],
         }

@@ -16,7 +16,7 @@ class TestGadmQueryAdm2NoIntersections:
         self.query = create_gadm_dist_query(["IDN", "24", "9"], "gadm_dist_alerts")
 
     def test_create_gadm_adm2_dist_query_no_intersection_select_clause(self):
-        expected_clause = "SELECT country, region, subregion, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+        expected_clause = "SELECT country, region, subregion, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
         assert expected_clause in self.query
 
     def test_create_gadm_adm2_dist_query_no_intersection_from_clause(self):
@@ -47,7 +47,7 @@ class TestGadmQueryAdm1NoIntersections:
         self.query = create_gadm_dist_query(["IDN", "24"], "gadm_dist_alerts")
 
     def test_create_gadm_adm1_dist_query_no_intersection_select_clause(self):
-        expected_clause = "SELECT country, region, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+        expected_clause = "SELECT country, region, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
         assert expected_clause in self.query
 
     def test_create_gadm_adm1_dist_query_no_intersection_from_clause(self):
@@ -74,7 +74,7 @@ class TestGadmQueryIsoNoIntersections:
         self.query = create_gadm_dist_query(["IDN"], "gadm_dist_alerts")
 
     def test_create_gadm_iso_dist_query_no_intersection_select_clause(self):
-        expected_clause = "SELECT country, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+        expected_clause = "SELECT country, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
         assert expected_clause in self.query
 
     def test_create_gadm_iso_dist_query_no_intersection_from_clause(self):
@@ -103,7 +103,7 @@ class TestGadmQueryAdm2NaturalLandsIntersections:
         )
 
     def test_create_gadm_adm2_dist_query_natural_lands_intersection_select_clause(self):
-        expected_clause = "SELECT country, region, subregion, natural_land_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+        expected_clause = "SELECT country, region, subregion, natural_land_class, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
         assert expected_clause in self.query
 
     def test_create_gadm_adm2_dist_query_natural_lands_intersection_from_clause(self):
@@ -136,7 +136,7 @@ class TestGadmQueryAdm2DriverIntersections:
         )
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_select_clause(self):
-        expected_clause = "SELECT country, region, subregion, ldacs_driver, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(count)::INT AS value"
+        expected_clause = "SELECT country, region, subregion, ldacs_driver, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
         assert expected_clause in self.query
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_from_clause(self):
