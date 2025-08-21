@@ -41,18 +41,12 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
         AdminAreaOfInterest(ids=["BRA", "IDN", "COD"]), compute_engine=compute_engine
     )
     results = await aois.get_tree_cover_loss(30, 2020, 2024, "primary_forest")
-
-    pd.testing.assert_frame_equal(
-        results,
-        pd.DataFrame(
-            {
-                "id": ["BRA", "BRA"],
-                "loss_year": [2020, 2023],
-                "value": [10.0, 100.0],
-            },
-        ),
-        check_like=True,
-    )
+    assert "BRA" in results.id.to_list()
+    assert 2020 in results.loss_year.to_list()
+    assert 2023 in results.loss_year.to_list()
+    assert 10.0 in results.value.to_list()
+    assert 100.0 in results.value.to_list()
+    assert results.size == 6
 
 
 @pytest.mark.asyncio

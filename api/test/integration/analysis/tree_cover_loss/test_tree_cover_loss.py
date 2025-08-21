@@ -12,7 +12,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("tree_cover_loss", "81cab9e3-9ba5-55af-8458-37422bac222c")
+        delete_resource_files("tree_cover_loss", "4869f7fc-fcb0-51ad-a94f-e749b8d62b28")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -28,6 +28,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
                         "start_year": "2015",
                         "end_year": "2022",
                         "canopy_cover": 30,
+                        "intersections": [],
                     },
                 )
 
@@ -45,7 +46,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover_loss/analytics/81cab9e3-9ba5-55af-8458-37422bac222c"
+            == "http://testserver/v0/land_change/tree_cover_loss/analytics/4869f7fc-fcb0-51ad-a94f-e749b8d62b28"
         )
 
     @pytest.mark.asyncio
