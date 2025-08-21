@@ -26,14 +26,16 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
                 {
                     "id": ["BRA", "BRA", "BRA"],
                     "loss_year": [2015, 2020, 2023],
-                    "area_ha": [1, 10, 100],
+                    "value": [1, 10, 100],
                     "canopy_cover": [20, 30, 50],
                 }
             )
 
             return duckdb.sql(query).df()
 
-    compute_engine = ComputeEngine(handler=PrecalcHandler(MockParquetQueryService()))
+    compute_engine = ComputeEngine(
+        handler=PrecalcHandler(MockParquetQueryService(), next_handler=None)
+    )
 
     aois = AreaOfInterestList(
         AdminAreaOfInterest(ids=["BRA", "IDN", "COD"]), compute_engine=compute_engine
@@ -46,7 +48,7 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
             {
                 "id": ["BRA", "BRA"],
                 "loss_year": [2020, 2023],
-                "area_ha": [10.0, 100.0],
+                "value": [10.0, 100.0],
             },
         ),
         check_like=True,

@@ -47,6 +47,9 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         default=None,
         title="Forest Filter",
     )
+    intersections: AllowedIntersections = Field(
+        ..., min_length=0, max_length=1, description="List of intersection types"
+    )
 
     @field_validator("start_year", "end_year")
     def year_must_be_at_least_2001(cls, v: str) -> str:
