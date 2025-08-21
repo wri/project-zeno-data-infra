@@ -92,13 +92,14 @@ def setup_compute(
     return (base_layer, groupbys, expected_groups)
 
 
-def create_result_dataframe(alerts_area: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_area)
     df.rename(columns={'value': 'area__ha'}, inplace=True)
     df.rename(columns={'confidence': 'alert_confidence'}, inplace=True)
     df['alert_date'] = df.sort_values(by='alert_date').alert_date.apply(lambda x: date(2020, 12, 31) + relativedelta(days=x))
     df['alert_confidence'] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
     return df
+
 
 def _load_zarr(zarr_uri):
     return xr.open_zarr(zarr_uri)
