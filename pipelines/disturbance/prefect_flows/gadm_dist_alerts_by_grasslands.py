@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from prefect import flow
 
@@ -37,9 +38,14 @@ def dist_alerts_by_grasslands_area(dist_zarr_uri: str, dist_version: str, overwr
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-by-grasslands-compute-zonal-stats"
     )(*compute_input, funcname="sum")
-    result_df = dist_common_tasks.postprocess_result.with_options(
+    result_df: pd.DataFrame = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-by-grasslands-postprocess-result"
     )(result_dataset)
+
+    result_df["grasslands"] = result_df["grasslands"].apply(
+        (lambda x: "grasslands" if x == 1 else "non-grasslands")
+    )
+
     result_uri = common_tasks.save_result.with_options(
         name="dist-alerts-by-grasslands-save-result"
     )(result_df, result_uri)

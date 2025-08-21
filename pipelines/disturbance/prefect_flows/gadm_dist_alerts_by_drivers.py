@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from prefect import flow
 
@@ -6,6 +7,15 @@ from pipelines.disturbance.prefect_flows import dist_common_tasks
 from pipelines.globals import DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
+
+DIST_DRIVERS = {
+    1: "Wildfire",
+    2: "Flooding",
+    3: "Crop management",
+    4: "Potential conversion",
+    5: "Unclassified",
+}
+
 
 @flow(name="DIST alerts area by drivers")
 def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
@@ -33,9 +43,13 @@ def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-by-drivers-compute-zonal-stats"
     )(*compute_input, funcname="sum")
-    result_df = dist_common_tasks.postprocess_result.with_options(
+    result_df: pd.DataFrame = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-by-drivers-postprocess-result"
     )(result_dataset)
+
+    # ldacs_driver
+    result_df["driver"] = result_df["driver"].apply(lambda x: DIST_DRIVERS.get(x, None))
+
     common_tasks.save_result.with_options(
         name="dist-alerts-by-drivers-save-result"
     )(result_df, result_uri)
