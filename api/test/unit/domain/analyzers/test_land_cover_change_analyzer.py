@@ -9,7 +9,7 @@ import xarray as xr
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.land_cover import (
+from app.models.land_change.land_cover_change import (
     LandCoverChangeAnalyticsIn,
 )
 from dask.distributed import Client

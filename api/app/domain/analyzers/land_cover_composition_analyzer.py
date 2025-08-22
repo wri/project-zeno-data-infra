@@ -1,17 +1,17 @@
+from functools import partial
+
+import dask.dataframe as dd
 import duckdb
 import numpy as np
-from flox.xarray import xarray_reduce
-
-from functools import partial
-import dask.dataframe as dd
-
-from app.analysis.common.analysis import read_zarr_clipped_to_geojson, get_geojson
+import s3fs
+from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
+from flox.xarray import xarray_reduce
 
 
 class LandCoverCompositionAnalyzer(Analyzer):
@@ -39,8 +39,17 @@ class LandCoverCompositionAnalyzer(Analyzer):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.admin_results_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/tabular/statistics/admin_land_cover_composition_2024.parquet"
+        self.admin_results_local_uri = "/tmp/admin_land_cover_composition_2024.parquet"
         self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
+
+        # TODO remove and use use REQUESTER_PAYS when this bug is resolved
+        # https://github.com/duckdb/duckdb-httpfs/issues/100
+        fs = s3fs.S3FileSystem(requester_pays=True)
+        fs.get(
+            self.admin_results_uri,
+            self.admin_results_local_uri,
+        )
 
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverCompositionAnalyticsIn(
@@ -86,7 +95,9 @@ class LandCoverCompositionAnalyzer(Analyzer):
         )
 
     def analyze_admin_areas(self, gadm_ids):
-        query = f"select * from '{self.admin_results_uri}' where aoi_id in {gadm_ids}"
+        query = (
+            f"select * from '{self.admin_results_local_uri}' where aoi_id in {gadm_ids}"
+        )
         df = duckdb.query(query).df()
         df["aoi_type"] = "admin"
 
@@ -126,10 +137,10 @@ class LandCoverCompositionAnalyzer(Analyzer):
             .drop("spatial_ref", axis=1)
             .reset_index(drop=True)
         )
-        land_cover_composition_ddf["land_cover_class"] = (
-            land_cover_composition_ddf.land_cover_class.apply(
-                lambda x: LandCoverCompositionAnalyzer.land_cover_mapping[x]
-            )
+        land_cover_composition_ddf[
+            "land_cover_class"
+        ] = land_cover_composition_ddf.land_cover_class.apply(
+            lambda x: LandCoverCompositionAnalyzer.land_cover_mapping[x]
         )
         land_cover_composition_ddf["land_cover_class_area__ha"] = (
             land_cover_composition_ddf.pop("band_data") / 10000

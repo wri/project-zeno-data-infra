@@ -8,7 +8,7 @@ from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojs
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.land_cover import LandCoverChangeAnalyticsIn
+from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
 from flox.xarray import xarray_reduce
 
 
@@ -93,18 +93,6 @@ class LandCoverChangeAnalyzer(Analyzer):
         )
 
     def analyze_admin_areas(self, gadm_ids):
-        # TODO need to resolve this issue and the use REQUESTER_PAYS true here
-        # https://github.com/duckdb/duckdb-httpfs/issues/100
-        duckdb.query(
-            """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain,
-                CHAIN config
-            );
-        """
-        )
-
         query = f"select * from '{self.admin_results_local_uri}' where aoi_id in {gadm_ids} and land_cover_class_start != land_cover_class_end"
         df = duckdb.query(query).df()
         df["aoi_type"] = "admin"
@@ -157,12 +145,16 @@ class LandCoverChangeAnalyzer(Analyzer):
         land_cover_change_ddf[
             "land_cover_class_start"
         ] = land_cover_change_ddf.class_change.apply(
-            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[x // 9]
+            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
+                x // LandCoverChangeAnalyzer.number_of_classes
+            ]
         )
         land_cover_change_ddf[
             "land_cover_class_end"
         ] = land_cover_change_ddf.class_change.apply(
-            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[x % 9]
+            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
+                x % LandCoverChangeAnalyzer.number_of_classes
+            ]
         )
 
         land_cover_change_ddf = land_cover_change_ddf.drop(
