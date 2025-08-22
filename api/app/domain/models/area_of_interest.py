@@ -1,41 +1,39 @@
-from app.domain.models.analysis import Analysis
+from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.dataset import (
     Dataset,
     DatasetAggregate,
     DatasetFilter,
     DatasetQuery,
 )
-from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
+from app.models.common.areas_of_interest import AreaOfInterest
 
 
-class TreeCoverLossAnalyzer:
-    def __init__(self, compute_engine):
+class AreaOfInterestList:
+    def __init__(self, aois: AreaOfInterest, compute_engine: ComputeEngine):
+        self.type = aois.type
+        self.ids = aois.ids
         self.compute_engine = compute_engine
 
-    async def analyze(self, analysis: Analysis):
-        analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
-
+    async def get_tree_cover_loss(
+        self, canopy_cover: int, start_year: int, end_year: int, forest_type: str
+    ):
         query = DatasetQuery(
             aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
             group_bys=[Dataset.tree_cover_loss],
             filters=[
                 DatasetFilter(
-                    dataset=Dataset.canopy_cover,
-                    op=">=",
-                    value=analytics_in.canopy_cover,
+                    dataset=Dataset.canopy_cover, op=">=", value=canopy_cover
                 ),
                 DatasetFilter(
                     dataset=Dataset.tree_cover_loss,
                     op=">=",
-                    value=analytics_in.start_year,
+                    value=start_year,
                 ),
                 DatasetFilter(
                     dataset=Dataset.tree_cover_loss,
                     op="<=",
-                    value=analytics_in.end_year,
+                    value=end_year,
                 ),
             ],
         )
-        return await self.compute_engine.compute(
-            analytics_in.aoi.type, analytics_in.aoi.ids, query
-        )
+        return await self.compute_engine.compute(self.type, self.ids, query)

@@ -32,17 +32,27 @@ class AnalysisService:
                 return  # analysis is in progress, complete, or failed
 
             self.analytics_resource.status = AnalysisStatus.pending
-
             analysis = Analysis(
                 metadata=self.analytics_resource.metadata,
                 result=self.analytics_resource.result,
                 status=self.analytics_resource.status,
             )
-
             await self.analysis_repository.store_analysis(
                 self.analytics_resource_id, analysis
             )
-            await self.analyzer.analyze(analysis)
+
+            results = await self.analyzer.analyze(analysis)
+
+            self.analytics_resource.status = AnalysisStatus.saved
+            self.analytics_resource.result = results
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id,
+                Analysis(
+                    metadata=self.analytics_resource.metadata,
+                    result=self.analytics_resource.result,
+                    status=self.analytics_resource.status,
+                ),
+            )
         except Exception as e:
             logging.error(
                 {
@@ -62,7 +72,7 @@ class AnalysisService:
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
-                    status=AnalysisStatus.failed,
+                    status=self.analytics_resource.status,
                 ),
             )
 

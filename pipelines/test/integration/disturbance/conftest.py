@@ -117,3 +117,22 @@ def pixel_area_ds():
     )
 
     return pixel_area
+
+@pytest.fixture
+def grasslands_ds():
+    grasslands = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x", "year"),
+                da.array([[[[1, 0], [0, 1]], [[1, 1], [1, 0]]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": ("band", [1], {}),
+            "y": ("y", [60.0, 59.99975], {}),
+            "x": ("x", [-180.0, -179.99975], {}),
+            "year": ("year", [2021, 2022], {}),
+        }
+    )
+
+    return grasslands
