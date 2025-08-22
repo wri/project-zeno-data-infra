@@ -80,7 +80,7 @@ class DistZonalStats(pa.DataFrameModel):
     subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
     alert_date: Series[date] = pa.Field(ge=date.fromisoformat("2023-01-01"), le=date.fromisoformat("2025-06-28")) # julian date between 2023-01-01 to latest version
     alert_confidence: Series[str] = pa.Field(isin=["low", "high"]) # low confidence, high confidence
-    count: Series[int]
+    area: Series[float]
 
     class Config:
         coerce = True
@@ -90,19 +90,19 @@ class DistZonalStats(pa.DataFrameModel):
         unique = ["country", "region", "subregion", "alert_date", "alert_confidence"]
 
     @staticmethod
-    def calculate_alert_counts_by_date(df: pd.DataFrame) -> dict:
-        """Calculate the number of dates with alerts by confidence level."""
-        alert_counts = df["alert_confidence"].value_counts().to_dict()
+    def calculate_area_sums_by_confidence(df: pd.DataFrame) -> dict:
+        """Calculate the total area by confidence level."""
+        area_sums = df.groupby("alert_confidence")["area__ha"].sum().to_dict()
         return {
-            "low_confidence": alert_counts.get("low", 0),
-            "high_confidence": alert_counts.get("high", 0),
+            "low_confidence": area_sums.get("low", 0),
+            "high_confidence": area_sums.get("high", 0),
         }
 
     @staticmethod
     def spot_check_julian_dates(df: pd.DataFrame, julian_dates: List[date]) -> pd.DataFrame:
         filtered_by_date_df = df[df["alert_date"].isin(julian_dates)]
         filtered_by_date_df = filtered_by_date_df.sort_values(by="alert_date").reset_index(drop=True)
-        return filtered_by_date_df[["alert_date", "alert_confidence", "count"]]
+        return filtered_by_date_df[["alert_date", "alert_confidence", "area__ha"]]
 
 class NaturalLandsZonalStats(pa.DataFrameModel):
     countries: Series[str] = pa.Field(isin=isos)
@@ -130,6 +130,11 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
         dist_alerts = src.read(1, window=window)
         win_affine = src.window_transform(window)
 
+    # read area for AOI
+    with rio.open(f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/default/gdal-geotiff/{aoi_tile}.tif") as src:
+        pixel_area__m = src.read(1, window=window)
+        pixel_area__ha = pixel_area__m / 10000
+
     # Extract confidence level (first digit)
     dist_confidence_levels = dist_alerts // 10000
     dist_high_conf = np.where(dist_confidence_levels == 3, 1, 0)
@@ -143,8 +148,8 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
 
     # confidence level maskings
     # anything outside the AOI becomes zero
-    dist_high_conf_aoi = aoi_mask * dist_high_conf
-    dist_low_conf_aoi = aoi_mask * dist_low_conf
+    dist_high_conf_aoi = aoi_mask * dist_high_conf * pixel_area__ha
+    dist_low_conf_aoi = aoi_mask * dist_low_conf * pixel_area__ha
     dist_julian_date_aoi = aoi_mask * dist_julian_date
 
     # create a dataframe of analysis results
@@ -170,12 +175,12 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     low_conf_results["subregion"] = 150 # placeholder for subregion (adm2) since we are running on an adm1 AOI
 
     # rename high_conf to value
-    high_conf_results.rename(columns={"high_conf": "value"}, inplace=True)
-    low_conf_results.rename(columns={"low_conf": "value"}, inplace=True)
+    high_conf_results.rename(columns={"high_conf": "area__ha"}, inplace=True)
+    low_conf_results.rename(columns={"low_conf": "area__ha"}, inplace=True)
 
     # reorder columns to country, region, subregion, alert_date, confidence, value
-    high_conf_results = high_conf_results[["country", "region", "subregion", "alert_date", "confidence", "value"]]
-    low_conf_results = low_conf_results[["country", "region", "subregion", "alert_date", "confidence", "value"]]
+    high_conf_results = high_conf_results[["country", "region", "subregion", "alert_date", "confidence", "area__ha"]]
+    low_conf_results = low_conf_results[["country", "region", "subregion", "alert_date", "confidence", "area__ha"]]
 
     # concatenate confidence dfs into one validation df
     results = pd.concat([high_conf_results, low_conf_results], ignore_index=True)
@@ -183,10 +188,7 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     # drop rows where alert_date is zero
     results = results[results["alert_date"] != 0]
 
-    # drop rows where alerts are zero
-    results = results[results["value"] != 0]
-
-    results.rename(columns={"value": "count", "confidence": "alert_confidence"}, inplace=True)
+    results.rename(columns={"confidence": "alert_confidence"}, inplace=True)
     results['alert_date'] = results.sort_values(by='alert_date').alert_date.apply(lambda x: date(2020, 12, 31) + relativedelta(days=x))
     results["country"] = results["country"].apply(lambda x: numeric_to_alpha3.get(x, None))
 
@@ -202,7 +204,6 @@ def validate(parquet_uri: str) -> bool:
     version = get_latest_version("umd_glad_dist_alerts")
     logger.info(f"Generating validation stats for version {version}.")
     validation_df = generate_validation_statistics(version)
-    #validation_df.to_csv(f"test/validation_statistics/dist_{version}_validation.csv", index=False)
 
     # load zeno stats for aoi
     zeno_df = pd.read_parquet(parquet_uri) # assumes parquet refers to latest version
@@ -217,17 +218,16 @@ def validate(parquet_uri: str) -> bool:
         logger.error(f"Schema validation failed: {e}")
         return False
 
-    # validate alert counts
-    validation_alerts = DistZonalStats.calculate_alert_counts_by_date(validation_df)
-    zeno_alerts = DistZonalStats.calculate_alert_counts_by_date(zeno_aoi_df)
-    if validation_alerts != zeno_alerts:
-        logger.error(f"Alert counts do not match: {validation_alerts} != {zeno_alerts}")
+    # validate area sums
+    validation_areas = DistZonalStats.calculate_area_sums_by_confidence(validation_df)
+    zeno_areas = DistZonalStats.calculate_area_sums_by_confidence(zeno_aoi_df)
+    if validation_areas != zeno_areas:
+        logger.error(f"Area sums do not match: {validation_areas} != {zeno_areas}")
         return False
-    logger.info("Alert counts validation passed.")
+    logger.info("Area sums validation passed.")
 
     # spot check random dates
     validation_dates = [date.fromisoformat(dstr) for dstr in ["2023-03-11", "2023-06-19", "2023-09-27", "2024-01-05", "2024-04-14", "2024-07-23", "2024-10-31", "2025-02-08"]] # example julian dates (800, 900, ..., 1500)
-    #validation_dates = np.random.choice(range(800, 1500), size=10, replace=False).tolist() # if we want to use random dates
     validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, validation_dates)
     zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, validation_dates)
     if not validation_spot_check.equals(zeno_spot_check):
