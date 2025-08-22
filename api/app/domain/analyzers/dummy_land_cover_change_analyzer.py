@@ -3,7 +3,7 @@ from typing import List
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.models.land_change.land_cover import (
+from app.models.land_change.land_cover_change import (
     LandCoverChangeAnalyticsIn,
     LandCoverChangeResult,
 )

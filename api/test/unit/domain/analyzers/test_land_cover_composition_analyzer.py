@@ -6,11 +6,13 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 import xarray as xr
-from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.analyzers.land_cover_composition_analyzer import (
+    LandCoverCompositionAnalyzer,
+)
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.land_cover_change import (
-    LandCoverChangeAnalyticsIn,
+from app.models.land_change.land_cover_composition import (
+    LandCoverCompositionAnalyticsIn,
 )
 from dask.distributed import Client
 
@@ -36,9 +38,9 @@ class DummyAnalysisRepository:
         self.analysis = analysis
 
 
-class TestLandCoverChangeCustomAois:
+class TestLandCoverCompositionCustomAois:
     @pytest.fixture
-    def land_cover_change_datacube(self):
+    def land_cover_composition_datacube(self):
         years = np.array([2015, 2024])
         y_vals = np.linspace(48.0, 47.99775, 10)
         x_vals = np.linspace(105.0, 105.00225, 10)
@@ -126,21 +128,21 @@ class TestLandCoverChangeCustomAois:
 
     @pytest_asyncio.fixture(autouse=True)
     @patch(
-        "app.domain.analyzers.land_cover_change_analyzer.read_zarr_clipped_to_geojson"
+        "app.domain.analyzers.land_cover_composition_analyzer.read_zarr_clipped_to_geojson"
     )
     async def run_analysis(
         self,
         mock_read_zarr_clipped_to_geojson,
-        land_cover_change_datacube,
+        land_cover_composition_datacube,
         pixel_area,
         async_dask_client,
     ):
         mock_read_zarr_clipped_to_geojson.side_effect = [
-            land_cover_change_datacube,
+            land_cover_composition_datacube,
             pixel_area,
         ]
         self.analysis_repo = DummyAnalysisRepository()
-        analyzer = LandCoverChangeAnalyzer(
+        analyzer = LandCoverCompositionAnalyzer(
             analysis_repository=self.analysis_repo, compute_engine=async_dask_client
         )
 
@@ -165,7 +167,7 @@ class TestLandCoverChangeCustomAois:
                 }
             ],
         }
-        self.metadata = LandCoverChangeAnalyticsIn(
+        self.metadata = LandCoverCompositionAnalyticsIn(
             aoi={
                 "type": "feature_collection",
                 "feature_collection": feature_collection,
@@ -183,26 +185,19 @@ class TestLandCoverChangeCustomAois:
 
         expected = pd.DataFrame(
             {
-                "land_cover_change_area__ha": [
-                    1.2446691989898682,
-                    0.20744886994361877,
-                    0.20744091272354126,
-                    0.6223347783088684,
-                    1.0372363328933716,
+                "land_cover_class_area__ha": [
+                    1.4521043300628662,
+                    0.20744292438030243,
+                    0.20744489133358002,
+                    2.489346504211426,
+                    0.8297836780548096,
                 ],
-                "land_cover_class_start": [
+                "land_cover_class": [
                     "Short vegetation",
-                    "Short vegetation",
-                    "Tree cover",
-                    "Cropland",
-                    "Cultivated grasslands",
-                ],
-                "land_cover_class_end": [
+                    "Wetland – short vegetation",
+                    "Water",
                     "Cropland",
                     "Built-up",
-                    "Cropland",
-                    "Built-up",
-                    "Cropland",
                 ],
                 "aoi_type": ["feature", "feature", "feature", "feature", "feature"],
                 "aoi_id": ["test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi"],
@@ -217,40 +212,36 @@ class TestLandCoverChangeCustomAois:
 class TestLandCoverChangeAdminAois:
     @pytest.fixture
     def parquet_mock_data(self):
-        """Mock data that simulates the actual parquet file structure for the AOI"""
-        brazil_data = [
-            ("BRA.12.1", "Tree cover", "Cropland", 0.12505),
-            ("BRA.12.1", "Tree cover", "Built-up", 0.03208),
-            ("BRA.12.1", "Cropland", "Short vegetation", 0.08902),
-            ("BRA.12.2", "Tree cover", "Cropland", 0.08003),
-            ("BRA.12.2", "Tree cover", "Built-up", 0.01507),
-            ("BRA.12.2", "Cultivated grasslands", "Cropland", 0.01804),
-            ("BRA.12.3", "Tree cover", "Cropland", 0.09502),
-            ("BRA.12.3", "Wetland – short vegetation", "Tree cover", 0.01204),
+        all_data = [
+            # ADM2 level
+            ("BRA.12.1", "Tree cover", 2.15032),
+            ("BRA.12.1", "Cropland", 4.89045),
+            ("BRA.12.1", "Short vegetation", 1.78934),
+            ("BRA.12.1", "Built-up", 0.85667),
+            ("BRA.12.1", "Wetland – short vegetation", 0.34521),
+            # ADM0 level - Indonesia country
+            ("IDN", "Tree cover", 987654.32),
+            ("IDN", "Cropland", 567890.12),
+            ("IDN", "Short vegetation", 345678.90),
+            ("IDN", "Wetland – short vegetation", 234567.89),
+            ("IDN", "Water", 198765.43),
+            ("IDN", "Built-up", 87654.32),
+            ("IDN", "Bare and sparse vegetation", 45678.90),
         ]
-
-        indonesia_data = [
-            ("IDN.24.9", "Tree cover", "Cropland", 0.21503),
-            ("IDN.24.9", "Tree cover", "Built-up", 0.05674),
-            ("IDN.24.9", "Wetland – short vegetation", "Water", 0.02348),
-        ]
-
-        all_data = brazil_data + indonesia_data
 
         return pd.DataFrame(
             all_data,
             columns=[
                 "aoi_id",
-                "land_cover_class_start",
-                "land_cover_class_end",
-                "land_cover_change_area__ha",
+                "land_cover_class",
+                "land_cover_class_area__ha",
             ],
         )
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data, async_dask_client):
         self.analysis_repo = DummyAnalysisRepository()
-        analyzer = LandCoverChangeAnalyzer(
+        analyzer = LandCoverCompositionAnalyzer(
             analysis_repository=self.analysis_repo, compute_engine=async_dask_client
         )
 
@@ -265,8 +256,8 @@ class TestLandCoverChangeAdminAois:
         self,
         analyzer_with_test_data,
     ):
-        analytics_in = LandCoverChangeAnalyticsIn(
-            aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
+        analytics_in = LandCoverCompositionAnalyticsIn(
+            aoi={"type": "admin", "ids": ["BRA.12.1", "IDN"]},
         )
 
         analysis = Analysis(
@@ -280,39 +271,55 @@ class TestLandCoverChangeAdminAois:
     def test_analysis_result(self):
         expected = pd.DataFrame(
             {
-                "land_cover_class_start": [
-                    "Tree cover",
+                "land_cover_class": [
                     "Tree cover",
                     "Cropland",
-                    "Tree cover",
-                    "Tree cover",
-                    "Wetland – short vegetation",
-                ],
-                "land_cover_class_end": [
-                    "Cropland",
-                    "Built-up",
                     "Short vegetation",
-                    "Cropland",
                     "Built-up",
+                    "Wetland – short vegetation",
+                    "Tree cover",
+                    "Cropland",
+                    "Short vegetation",
+                    "Wetland – short vegetation",
                     "Water",
+                    "Built-up",
+                    "Bare and sparse vegetation",
                 ],
-                "land_cover_change_area__ha": [
-                    0.12505,
-                    0.03208,
-                    0.08902,
-                    0.2150,
-                    0.05674,
-                    0.02348,
+                "land_cover_class_area__ha": [
+                    2.15032,
+                    4.89045,
+                    1.78934,
+                    0.85667,
+                    0.34521,
+                    987654.32,
+                    567890.12,
+                    345678.90,
+                    234567.89,
+                    198765.43,
+                    87654.32,
+                    45678.90,
                 ],
                 "aoi_id": [
                     "BRA.12.1",
                     "BRA.12.1",
                     "BRA.12.1",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
+                    "BRA.12.1",
+                    "BRA.12.1",
+                    "IDN",
+                    "IDN",
+                    "IDN",
+                    "IDN",
+                    "IDN",
+                    "IDN",
+                    "IDN",
                 ],
                 "aoi_type": [
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
                     "admin",
                     "admin",
                     "admin",
