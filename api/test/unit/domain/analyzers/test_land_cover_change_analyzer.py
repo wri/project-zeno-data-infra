@@ -1,19 +1,18 @@
+from unittest.mock import patch
+
 import duckdb
+import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
 import xarray as xr
-import numpy as np
-from dask.distributed import Client
-from unittest.mock import patch
-
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover import (
     LandCoverChangeAnalyticsIn,
-    LandCoverChangeAnalytics,
 )
+from dask.distributed import Client
 
 
 @pytest_asyncio.fixture
@@ -40,7 +39,6 @@ class DummyAnalysisRepository:
 class TestLandCoverChangeCustomAois:
     @pytest.fixture
     def land_cover_change_datacube(self):
-
         years = np.array([2015, 2024])
         y_vals = np.linspace(48.0, 47.99775, 10)
         x_vals = np.linspace(105.0, 105.00225, 10)
@@ -137,7 +135,6 @@ class TestLandCoverChangeCustomAois:
         pixel_area,
         async_dask_client,
     ):
-
         mock_read_zarr_clipped_to_geojson.side_effect = [
             land_cover_change_datacube,
             pixel_area,
@@ -259,7 +256,7 @@ class TestLandCoverChangeAdminAois:
 
         table_name = "test_parquet"
         duckdb.register(table_name, parquet_mock_data)
-        analyzer.admin_results_uri = table_name
+        analyzer.admin_results_local_uri = table_name
 
         return analyzer
 
