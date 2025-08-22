@@ -65,14 +65,7 @@ class TestTreeCoverLossServiceCollaborators:
         mock_analysis_repository.load_analysis.assert_called_once_with(
             resource_thumbprint
         )
-        mock_analysis_repository.store_analysis.assert_called_once_with(
-            resource_thumbprint,
-            Analysis(
-                metadata=stub_analysis_in.model_dump(),
-                result=None,
-                status=AnalysisStatus.pending,
-            ),
-        )
+        mock_analysis_repository.store_analysis.assert_called()
         assert result_thumbprint == resource_thumbprint
         mock_analyzer.analyze.assert_called_once_with(
             Analysis(

@@ -3,13 +3,16 @@ import logging
 import os
 import traceback
 from functools import partial
+from typing import Optional
 
 import dask.dataframe as dd
+from dask.dataframe import DataFrame as DaskDataFrame
 import duckdb
 import numpy as np
 import pandas as pd
 import s3fs
 from flox.xarray import xarray_reduce
+import xarray as xr
 
 from ..common.analysis import (
     JULIAN_DATE_2021,
@@ -73,7 +76,7 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     return alerts_df
 
 
-async def zonal_statistics(aoi, geojson, intersection=None):
+async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> DaskDataFrame:
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
@@ -102,8 +105,21 @@ async def zonal_statistics(aoi, geojson, intersection=None):
 
         groupby_layers.append(dist_drivers)
         expected_groups.append(np.arange(5))
+    elif intersection == "grasslands":
+        grasslands = read_zarr_clipped_to_geojson(
+            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/",
+            geojson,
+        ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
-    alerts_count = xarray_reduce(
+        # Only use a single year of grasslands when used as a contextual layer.
+        grasslands_year2022 = grasslands.sel(year=2022)
+        grasslands_only = (grasslands_year2022 == 2).astype(np.uint8)
+        grasslands_only.name = "grasslands"
+
+        groupby_layers.append(grasslands_only)
+        expected_groups.append([0, 1])
+
+    alerts_count: xr.DataArray = xarray_reduce(
         dist_alerts.alert_date,
         *tuple(groupby_layers),
         func="count",
@@ -111,13 +127,13 @@ async def zonal_statistics(aoi, geojson, intersection=None):
     )
     alerts_count.name = "value"
 
-    alerts_df = (
+    alerts_df: DaskDataFrame = (
         alerts_count.to_dask_dataframe()
         .drop("band", axis=1)
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
     )
-    alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"})
+    alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"}, meta=("confidence", "uint8"))
     alerts_df.alert_date = dd.to_datetime(
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
@@ -136,13 +152,18 @@ async def zonal_statistics(aoi, geojson, intersection=None):
         alerts_df.ldacs_driver = alerts_df.ldacs_driver.apply(
             lambda x: DIST_DRIVERS.get(x, "Unclassified")
         )
+    elif intersection == "grasslands":
+        alerts_df["grasslands"] = alerts_df["grasslands"].apply(
+            (lambda x: "grasslands" if x == 1 else "non-grasslands"), meta=("grasslands", "uint8")
+        )
+        alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
 
     alerts_df = alerts_df[alerts_df.value > 0]
     return alerts_df
 
 
-async def get_precomputed_statistics(aoi, intersection, dask_client):
-    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver"]:
+async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_client):
+    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver", "grasslands"]:
         raise ValueError(
             f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
         )
@@ -184,7 +205,7 @@ async def get_precomputed_statistics(aoi, intersection, dask_client):
     return alerts_df
 
 
-def get_precomputed_table(aoi_type, intersection):
+def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
     if aoi_type == "admin":
         # Each intersection will be in a different parquet file
         if intersection is None:
@@ -193,6 +214,8 @@ def get_precomputed_table(aoi_type, intersection):
             table = "gadm_dist_alerts_by_driver"
         elif intersection == "natural_lands":
             table = "gadm_dist_alerts_by_natural_lands"
+        elif intersection == "grasslands":
+            table = "gadm_dist_alerts_by_grasslands"
         else:
             raise ValueError(f"No way to calculate intersection {intersection}")
     else:

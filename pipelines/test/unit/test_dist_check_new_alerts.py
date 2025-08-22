@@ -68,15 +68,3 @@ def test_s3_object_exists_other_error(mock_boto_client):
 
     with pytest.raises(ClientError):
         s3_object_exists("my-bucket", "forbidden/key.zarr")
-
-
-@patch("pipelines.disturbance.check_for_new_alerts.boto3.client")
-def test_s3_object_exists_other_error(mock_boto_client):
-    mock_s3 = MagicMock()
-    mock_boto_client.return_value = mock_s3
-
-    error_response = {"Error": {"Code": "403"}}
-    mock_s3.head_object.side_effect = ClientError(error_response, "HeadObject")
-
-    with pytest.raises(ClientError):
-        s3_object_exists("my-bucket", "forbidden/key.zarr")
