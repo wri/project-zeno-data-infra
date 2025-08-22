@@ -84,7 +84,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
     pixel_area = read_zarr_clipped_to_geojson(pixel_area_uri, geojson).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
-    expected_groups = [np.arange(731, 1590), [1, 2, 3]]
+    expected_groups = [np.arange(731, 2000), [1, 2, 3]]
     if intersection == "natural_lands":
         natural_lands = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",

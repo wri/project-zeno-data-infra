@@ -25,7 +25,7 @@ def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite
         return result_uri
 
     expected_groups = (
-        np.arange(894),  # country ISO codes
+        np.arange(999),  # country ISO codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
         np.arange(5),  # driver categories
