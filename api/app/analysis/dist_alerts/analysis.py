@@ -104,7 +104,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
         ).band_data.reindex_like(
             dist_alerts, method="nearest", tolerance=1e-5
         )
-        dist_drivers.name = "ldacs_driver"
+        dist_drivers.name = "driver"
 
         groupby_layers.append(dist_drivers)
         expected_groups.append(np.arange(5))
@@ -152,7 +152,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
             lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
         )
     elif intersection == "driver":
-        alerts_df.ldacs_driver = alerts_df.ldacs_driver.apply(
+        alerts_df.driver = alerts_df.driver.apply(
             lambda x: DIST_DRIVERS.get(x, "Unclassified")
         )
     elif intersection == "grasslands":

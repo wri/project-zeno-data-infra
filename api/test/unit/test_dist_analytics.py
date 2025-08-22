@@ -136,7 +136,7 @@ class TestGadmQueryAdm2DriverIntersections:
         )
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_select_clause(self):
-        expected_clause = "SELECT country, region, subregion, ldacs_driver, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
+        expected_clause = "SELECT country, region, subregion, driver, STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
         assert expected_clause in self.query
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_from_clause(self):
@@ -148,11 +148,11 @@ class TestGadmQueryAdm2DriverIntersections:
         assert expected_clause in self.query
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_group_by_clause(self):
-        expected_clause = "GROUP BY country, region, subregion, ldacs_driver, alert_date, alert_confidence"
+        expected_clause = "GROUP BY country, region, subregion, driver, alert_date, alert_confidence"
         assert expected_clause in self.query
 
     def test_create_gadm_adm2_dist_query_drivers_intersection_order_by_clause(self):
-        expected_clause = "ORDER BY country, region, subregion, ldacs_driver, alert_date, alert_confidence"
+        expected_clause = "ORDER BY country, region, subregion, driver, alert_date, alert_confidence"
         assert expected_clause in self.query
 
 

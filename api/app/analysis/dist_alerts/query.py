@@ -12,7 +12,7 @@ def create_gadm_dist_query(
     intersection_col = None
     if intersection is not None:
         if intersection == "driver":
-            intersection_col = "ldacs_driver"
+            intersection_col = "driver"
         elif intersection == "natural_lands":
             intersection_col = "natural_land_class"
         elif intersection == "grasslands":
