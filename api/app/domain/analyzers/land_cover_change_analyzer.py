@@ -1,15 +1,15 @@
+from functools import partial
+
+import dask.dataframe as dd
 import duckdb
 import numpy as np
-from flox.xarray import xarray_reduce
-
-from functools import partial
-import dask.dataframe as dd
-
-from app.analysis.common.analysis import read_zarr_clipped_to_geojson, get_geojson
+import s3fs
+from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
+from app.models.land_change.land_cover import LandCoverChangeAnalyticsIn
+from flox.xarray import xarray_reduce
 
 
 class LandCoverChangeAnalyzer(Analyzer):
@@ -39,8 +39,17 @@ class LandCoverChangeAnalyzer(Analyzer):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.admin_results_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/tabular/statistics/admin_land_cover_change.parquet"
+        self.admin_results_local_uri = "/tmp/admin_land_cover_change.parquet"
         self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
+
+        # TODO remove and use use REQUESTER_PAYS when this bug is resolved
+        # https://github.com/duckdb/duckdb-httpfs/issues/100
+        fs = s3fs.S3FileSystem(requester_pays=True)
+        fs.get(
+            self.admin_results_uri,
+            self.admin_results_local_uri,
+        )
 
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
@@ -84,7 +93,19 @@ class LandCoverChangeAnalyzer(Analyzer):
         )
 
     def analyze_admin_areas(self, gadm_ids):
-        query = f"select * from '{self.admin_results_uri}' where aoi_id in {gadm_ids} and land_cover_class_start != land_cover_class_end"
+        # TODO need to resolve this issue and the use REQUESTER_PAYS true here
+        # https://github.com/duckdb/duckdb-httpfs/issues/100
+        duckdb.query(
+            """
+            CREATE OR REPLACE SECRET secret (
+                TYPE s3,
+                PROVIDER credential_chain,
+                CHAIN config
+            );
+        """
+        )
+
+        query = f"select * from '{self.admin_results_local_uri}' where aoi_id in {gadm_ids} and land_cover_class_start != land_cover_class_end"
         df = duckdb.query(query).df()
         df["aoi_type"] = "admin"
 
@@ -133,15 +154,15 @@ class LandCoverChangeAnalyzer(Analyzer):
             .reset_index(drop=True)
         )
 
-        land_cover_change_ddf["land_cover_class_start"] = (
-            land_cover_change_ddf.class_change.apply(
-                lambda x: LandCoverChangeAnalyzer.land_cover_mapping[x // 9]
-            )
+        land_cover_change_ddf[
+            "land_cover_class_start"
+        ] = land_cover_change_ddf.class_change.apply(
+            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[x // 9]
         )
-        land_cover_change_ddf["land_cover_class_end"] = (
-            land_cover_change_ddf.class_change.apply(
-                lambda x: LandCoverChangeAnalyzer.land_cover_mapping[x % 9]
-            )
+        land_cover_change_ddf[
+            "land_cover_class_end"
+        ] = land_cover_change_ddf.class_change.apply(
+            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[x % 9]
         )
 
         land_cover_change_ddf = land_cover_change_ddf.drop(

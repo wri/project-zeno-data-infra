@@ -1,7 +1,6 @@
-from .land_cover_change import create as create_land_cover_change
-from .land_cover_composition import create as create_land_cover_composition
+from .land_cover_change import create
 
-api_doc = """
+create.__doc__ = """
     # Primary Dataset
     | Dataset Key Aspects | Detailed Description |
     |---------------------|----------------------|
@@ -32,6 +31,3 @@ api_doc = """
     3. Stores payload as JSON file
     4. Returns resource URL for status checking
     """
-
-create_land_cover_change.__doc__ = api_doc
-create_land_cover_composition.__doc__ = api_doc
