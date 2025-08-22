@@ -102,6 +102,7 @@ async def test_flox_handler_happy_path():
             {
                 "loss_year": [2015],
                 "area_ha": [12.5],
+                "id": ["1234"],
             },
         ),
         check_like=True,

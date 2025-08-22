@@ -156,8 +156,10 @@ class FloxOTFHandler:
         filtered_results = results[
             ~np.isnan(results[query.aggregate.dataset.get_field_name()])
         ]
+
+        # TODO remove band and spatial ref from zarrs
         return filtered_results.reset_index().drop(
-            columns=["index", "band", "spatial_ref"]
+            columns=["index", "band", "spatial_ref"], errors="ignore"
         )
 
 
