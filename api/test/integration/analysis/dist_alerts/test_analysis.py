@@ -67,7 +67,7 @@ class TestDistAlertsZonalStats:
                 "alert_date": ["2024-03-16", "2024-08-08", "2024-08-13", "2024-08-16", "2024-08-16", "2024-08-18", "2025-01-07", "2025-01-23", "2025-01-23", "2025-02-04", "2025-02-16", "2025-02-19", "2025-02-24", "2025-03-04"],
                 "confidence": ["high", "high", "high", "high", "high", "high", "high", "low", "high", "high", "high", "high", "high", "low", ],
                 "grasslands": ["grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "non-grasslands", "non-grasslands", ],
-                "value": [6, 1, 198, 28, 3, 3, 4, 1, 6, 1, 3, 1, 1, 1],
+                "value": np.array([4609.902832, 768.292908, 152121.796875, 21512.226562, 2304.879883, 2304.880127, 3073.176270, 768.290833, 4609.751465, 768.293762, 2304.882080, 768.291687, 768.294250, 768.291687], dtype=np.float32),
                 "aoi_type": ["feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", ],
                 "aoi_id": ["test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", ],
             }

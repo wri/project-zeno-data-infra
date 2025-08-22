@@ -390,7 +390,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "high",
                     "low",
                 ],
-                "value": [2, 1, 2, 2, 1, 4, 7, 5, 1, 1],
+                "value": [1511.152588, 755.576965, 1511.129639, 1511.129639, 755.584412, 3025.184570, 5294.074707, 3781.512695, 756.304932, 755.576294],
                 "aoi_id": [
                     "18392",
                     "18392",
@@ -487,7 +487,7 @@ async def test_kba_dist_analytics_no_intersection():
             "aoi_type": ["key_biodiversity_area"],
             "alert_date": ["2024-08-15"],
             "confidence": ["high"],
-            "value": [123],
+            "value": [77598.828125],
         }
     )
 

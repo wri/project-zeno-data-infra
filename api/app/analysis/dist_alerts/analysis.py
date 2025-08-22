@@ -80,6 +80,9 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
+    pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
+    pixel_area = read_zarr_clipped_to_geojson(pixel_area_uri, geojson).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
+
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 1590), [1, 2, 3]]
     if intersection == "natural_lands":
@@ -119,16 +122,16 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
         groupby_layers.append(grasslands_only)
         expected_groups.append([0, 1])
 
-    alerts_count: xr.DataArray = xarray_reduce(
-        dist_alerts.alert_date,
+    alerts_area: xr.DataArray = xarray_reduce(
+        pixel_area,
         *tuple(groupby_layers),
-        func="count",
+        func="sum",
         expected_groups=tuple(expected_groups),
     )
-    alerts_count.name = "value"
+    alerts_area.name = "value"
 
     alerts_df: DaskDataFrame = (
-        alerts_count.to_dask_dataframe()
+        alerts_area.to_dask_dataframe()
         .drop("band", axis=1)
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
