@@ -13,7 +13,7 @@ class DataApiAoiGeometryRepository:
         return await self._get_geojsons_from_data_api(aoi_type, aoi_ids)
 
     async def _get_geojsons_from_data_api(self, aoi_type, aoi_ids):
-        url, params = self.get_geojson_request_for_data_api(aoi_type, aoi_ids)
+        url, params = self._get_geojson_request_for_data_api(aoi_type, aoi_ids)
         response = await self._send_request(url, params)
 
         if "data" not in response:
@@ -22,8 +22,10 @@ class DataApiAoiGeometryRepository:
             )
             raise ValueError("Unable to get GeoJSON from Data API.")
 
-        geojsons = [shape(json.loads(data["gfw_geojson"])) for data in response["data"]]
-        return geojsons
+        geometries = [
+            shape(json.loads(data["gfw_geojson"])) for data in response["data"]
+        ]
+        return geometries
 
     def _get_geojson_request_for_data_api(self, aoi_type, aoi_ids):
         value_list = self._get_sql_in_list(aoi_ids)
