@@ -140,7 +140,7 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     # read area for AOI
     with rio.open(f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/area_m/gdal-geotiff/{aoi_tile}.tif") as src:
         pixel_area__m = src.read(1, window=window)
-        pixel_area__ha = pixel_area__m
+        pixel_area__ha = pixel_area__m / 10000
 
     # Extract confidence level (first digit)
     dist_confidence_levels = dist_alerts // 10000
