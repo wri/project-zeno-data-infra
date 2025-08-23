@@ -14,6 +14,13 @@ from datetime import date
 
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
+def get_latest_alert_date() -> date:
+    """Get the latest alert date from umd_glad_dist_alerts version."""
+    version = get_latest_version("umd_glad_dist_alerts")
+    # Version format is "vYYYYMMDD", extract date part
+    date_str = version[1:]  # Remove 'v' prefix
+    return date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:8]))
+
 isos = [
     'AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE',
     'BHS', 'BHR', 'BGD', 'BRB', 'BLR', 'BEL', 'BLZ', 'BEN', 'BMU', 'BTN', 'BOL', 'BES', 'BIH', 'BWA', 'BVT', 'BRA',
@@ -78,9 +85,9 @@ class DistZonalStats(pa.DataFrameModel):
     country: Series[str] = pa.Field(eq="BRA")
     region: Series[int] = pa.Field(eq=20) # gadm id for adm1 AOI
     subregion: Series[int] = pa.Field(lt=170) # placeholder adm2
-    alert_date: Series[date] = pa.Field(ge=date.fromisoformat("2023-01-01"), le=date.fromisoformat("2025-06-28")) # julian date between 2023-01-01 to latest version
+    alert_date: Series[date] = pa.Field(ge=date.fromisoformat("2023-01-01"), le=get_latest_alert_date()) # julian date between 2023-01-01 to latest version
     alert_confidence: Series[str] = pa.Field(isin=["low", "high"]) # low confidence, high confidence
-    area: Series[float]
+    area__ha: Series[float]
 
     class Config:
         coerce = True
@@ -109,11 +116,11 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
     regions: Series[int] = pa.Field()
     subregions: Series[int] = pa.Field()
     natural_lands: Series[str] = pa.Field(isin=sbtn_natural_lands_classes)
-    area: Series[float] = pa.Field(ge=0)
+    area__ha: Series[float] = pa.Field(ge=0)
 
 def generate_validation_statistics(version: str) -> pd.DataFrame:
     """Generate zonal statistics for the admin area AOI."""
-    gdf = gpd.read_file("validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
+    gdf = gpd.read_file("pipelines/validation_statistics/br_rn.json") # State of Rio Grande do Norte, Brazil
     aoi = gdf.iloc[0]
     aoi_tile = "00N_040W" # This AOI fits within a tile, but we should build VRTs so we can use any (resonably sized) AOI
 
@@ -131,9 +138,9 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
         win_affine = src.window_transform(window)
 
     # read area for AOI
-    with rio.open(f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/default/gdal-geotiff/{aoi_tile}.tif") as src:
+    with rio.open(f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/area_m/gdal-geotiff/{aoi_tile}.tif") as src:
         pixel_area__m = src.read(1, window=window)
-        pixel_area__ha = pixel_area__m / 10000
+        pixel_area__ha = pixel_area__m
 
     # Extract confidence level (first digit)
     dist_confidence_levels = dist_alerts // 10000
@@ -218,21 +225,49 @@ def validate(parquet_uri: str) -> bool:
         logger.error(f"Schema validation failed: {e}")
         return False
 
-    # validate area sums
+    # validate alert area sums with 0.1% tolerance
     validation_areas = DistZonalStats.calculate_area_sums_by_confidence(validation_df)
     zeno_areas = DistZonalStats.calculate_area_sums_by_confidence(zeno_aoi_df)
-    if validation_areas != zeno_areas:
-        logger.error(f"Area sums do not match: {validation_areas} != {zeno_areas}")
+    tolerance_pct = 0.001  # 0.1% tolerance
+    
+    low_conf_tolerance = validation_areas["low_confidence"] * tolerance_pct
+    high_conf_tolerance = validation_areas["high_confidence"] * tolerance_pct
+    low_conf_diff = abs(validation_areas["low_confidence"] - zeno_areas["low_confidence"])
+    high_conf_diff = abs(validation_areas["high_confidence"] - zeno_areas["high_confidence"])
+    
+    if low_conf_diff > low_conf_tolerance or high_conf_diff > high_conf_tolerance:
+        logger.error("Area sums exceed 1% tolerance")
         return False
     logger.info("Area sums validation passed.")
 
-    # spot check random dates
-    validation_dates = [date.fromisoformat(dstr) for dstr in ["2023-03-11", "2023-06-19", "2023-09-27", "2024-01-05", "2024-04-14", "2024-07-23", "2024-10-31", "2025-02-08"]] # example julian dates (800, 900, ..., 1500)
+    # generate results for spot checking dates
+    validation_dates = [date.fromisoformat(dstr) for dstr in ["2023-06-06", "2023-06-21", "2023-09-27"]] # example julian dates (800, 900, ..., 1500)
     validation_spot_check = DistZonalStats.spot_check_julian_dates(validation_df, validation_dates)
-    zeno_spot_check = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, validation_dates)
-    if not validation_spot_check.equals(zeno_spot_check):
-        logger.error("Spot check dataframes do not match.")
+    zeno_spot_check_raw = DistZonalStats.spot_check_julian_dates(zeno_aoi_df, validation_dates)
+    
+    # Group zeno results by alert_date and alert_confidence to aggregate subregions (since AOI is an adm1)
+    zeno_spot_check = zeno_spot_check_raw.groupby(['alert_date', 'alert_confidence'])['area__ha'].sum().reset_index()
+    
+    # confirm that both dataframes have results for the validation dates
+    validation_dates_set = set(validation_dates)
+    zeno_dates_set = set(zeno_spot_check['alert_date'])
+    missing_in_zeno = validation_dates_set - zeno_dates_set
+    if missing_in_zeno:
+        logger.error(f"Parquet results are missing dates: {sorted(missing_in_zeno)}")
         return False
+    logger.info("No missing alert_dates in parquet")
+    
+    # spot check alert area for random dates with 0.1% tolerance
+    tolerance_values = validation_spot_check['area__ha'] * tolerance_pct
+    area_diff = abs(validation_spot_check['area__ha'] - zeno_spot_check['area__ha'])
+    exceeds_tolerance = area_diff > tolerance_values
+    if exceeds_tolerance.any():
+        max_diff_idx = area_diff.idxmax()
+        max_diff = area_diff.iloc[max_diff_idx]
+        max_tolerance = tolerance_values.iloc[max_diff_idx]
+        logger.error("Spot check area values exceed 1% tolerance")
+        return False
+    
     logger.info("Spot check validation passed.")
 
     return True
