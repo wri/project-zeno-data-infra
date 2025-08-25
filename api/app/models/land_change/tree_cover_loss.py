@@ -93,27 +93,24 @@ class TreeCoverLossAnalyticsResponse(Response):
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
                             "__dtypes__": {
-                                "country": "str",
-                                "region": "int",
-                                "subregion": "int",
+                                "aoi_id": "str",
+                                "aoi_type": "str",
                                 "tree_cover_loss__year": "int",
-                                "tree_cover_loss__ha": "float",
-                                "gross_emissions_co2e_all_gases__mg": "float",
+                                "area__ha": "float",
                             },
-                            "country": ["BRA", "BRA", "BRA"],
-                            "region": [1, 1, 1],
-                            "subregion": [12, 12, 12],
+                            "aoi_id": ["IDN.24.9", "IDN.14.4", "BRA.1.1"],
+                            "aoi_type": ["admin", "admin", "admin"],
                             "tree_cover_loss__year": [2022, 2023, 2024],
-                            "tree_cover_loss__ha": [
+                            "area__ha": [
                                 4045.406160862687,
                                 4050.4061608627,
                                 4045.406160862687,
                             ],
-                            "gross_emissions_co2e_all_gases__mg": [
-                                3490821.6510292348,
-                                114344.24741739516,
-                                114347.2474174,
-                            ],
+                            # "gross_emissions_co2e_all_gases__mg": [
+                            #     3490821.6510292348,
+                            #     114344.24741739516,
+                            #     114347.2474174,
+                            # ],
                         },
                         "metadata": {
                             "aoi": {

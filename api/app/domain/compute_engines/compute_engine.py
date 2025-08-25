@@ -46,9 +46,9 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
 
 class PrecalcHandler:
     FIELDS = {
-        Dataset.area_hectares: "value",
-        Dataset.tree_cover_loss: "loss_year",
-        Dataset.canopy_cover: "canopy_cover",
+        Dataset.area_hectares: "area__ha",
+        Dataset.tree_cover_loss: "tree_cover_loss__year",
+        Dataset.canopy_cover: "canopy_cover__percent",
     }
 
     def __init__(self, precalc_query_service, next_handler):
@@ -75,8 +75,8 @@ class PrecalcHandler:
                 for filt in query.filters
             ]
         )
-        filters += f" AND id in {tuple(aoi_ids)}"
-        sql = f"SELECT id, {groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY id, {groupby_fields}"
+        filters += f" AND aoi_id in {tuple(aoi_ids)}"
+        sql = f"SELECT aoi_id, {groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, {groupby_fields}"
 
         return await self.precalc_query_service.execute(data_source, sql)
 
@@ -114,6 +114,7 @@ class FloxOTFHandler:
             col = dataset.get_field_name()
             results[col] = self.dataset_repository.unpack(dataset, results[col])
 
+        results["aoi_type"] = aoi_type
         return results.to_dict(orient="list")
 
     @staticmethod
@@ -152,7 +153,7 @@ class FloxOTFHandler:
             .reset_index()
         )
 
-        results["id"] = aoi_id
+        results["aoi_id"] = aoi_id
         filtered_results = results[
             ~np.isnan(results[query.aggregate.dataset.get_field_name()])
         ]
