@@ -288,17 +288,20 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
         expected_df = pd.DataFrame(
             {
+                "country": ["IDN", "IDN", "IDN", "IDN", "BRA"],
+                "region": [24, 24, 14, 14, 1],
+                "subregion": [9, 9, 13, 13, 1],
                 "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "BRA.1.1"],
                 "aoi_type": ["admin"] * 5,
-                "disturbance_alerts_date": [
+                "alert_date": [
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                 ],
-                "disturbance_alerts_confidence": ["high", "low", "high", "low", "high"],
-                "disturbance_alerts_area__ha": [
+                "confidence": ["high", "low", "high", "low", "high"],
+                "value": [
                     1.133972e06,
                     7.154635e04,
                     1.064846e06,

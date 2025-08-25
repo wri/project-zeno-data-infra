@@ -96,12 +96,12 @@ class TreeCoverLossAnalyticsResponse(Response):
                                 "aoi_id": "str",
                                 "aoi_type": "str",
                                 "tree_cover_loss_year": "int",
-                                "area__ha": "float",
+                                "area_ha": "float",
                             },
                             "aoi_id": ["IDN.24.9", "IDN.14.4", "BRA.1.1"],
                             "aoi_type": ["admin", "admin", "admin"],
                             "tree_cover_loss_year": [2022, 2023, 2024],
-                            "area__ha": [
+                            "area_ha": [
                                 4045.406160862687,
                                 4050.4061608627,
                                 4045.406160862687,

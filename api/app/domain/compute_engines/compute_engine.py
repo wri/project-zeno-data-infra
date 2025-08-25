@@ -37,7 +37,7 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
 
 class PrecalcHandler:
     FIELDS = {
-        Dataset.area_hectares: "area__ha",
+        Dataset.area_hectares: "area_ha",
         Dataset.tree_cover_loss: "tree_cover_loss_year",
         Dataset.canopy_cover: "canopy_cover",
     }
