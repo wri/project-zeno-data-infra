@@ -93,6 +93,11 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         )
         result_uris.append(gadm_dist_by_grasslands_result)
 
+        gadm_dist_by_land_cover_result = prefect_flows.dist_alerts_by_land_cover_area(
+            dist_zarr_uri, dist_version, overwrite=overwrite
+        )
+        result_uris.append(gadm_dist_by_land_cover_result)
+
         validate_result = run_validation_suite(gadm_dist_result)
 
     except Exception:

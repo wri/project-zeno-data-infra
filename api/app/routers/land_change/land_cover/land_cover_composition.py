@@ -4,12 +4,14 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
-from app.models.land_change.land_cover_change import (
-    LandCoverChangeAnalytics,
-    LandCoverChangeAnalyticsIn,
-    LandCoverChangeAnalyticsResponse,
+from app.models.land_change.land_cover_composition import (
+    LandCoverCompositionAnalytics,
+    LandCoverCompositionAnalyticsIn,
+    LandCoverCompositionAnalyticsResponse,
 )
-from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.analyzers.land_cover_composition_analyzer import (
+    LandCoverCompositionAnalyzer,
+)
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -17,7 +19,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-ANALYTICS_NAME = "land_cover_change"
+ANALYTICS_NAME = "land_cover_composition"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
@@ -29,7 +31,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
     analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=LandCoverChangeAnalyzer(
+        analyzer=LandCoverCompositionAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
         ),
@@ -45,7 +47,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
 )
 async def create(
     *,
-    data: LandCoverChangeAnalyticsIn,
+    data: LandCoverCompositionAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
@@ -62,7 +64,7 @@ async def create(
 def _datamart_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
-            "get_land_cover_change_analytics_result",
+            "get_land_cover_composition_analytics_result",
             resource_id=service.resource_thumbprint(),
         )
     )
@@ -71,10 +73,10 @@ def _datamart_resource_link_response(request, service) -> str:
 @router.get(
     "/analytics/{resource_id}",
     response_class=ORJSONResponse,
-    response_model=LandCoverChangeAnalyticsResponse,
+    response_model=LandCoverCompositionAnalyticsResponse,
     status_code=200,
 )
-async def get_land_cover_change_analytics_result(
+async def get_land_cover_composition_analytics_result(
     resource_id: UUID5,
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
@@ -85,6 +87,7 @@ async def get_land_cover_change_analytics_result(
         response=response,
     )
 
-    return LandCoverChangeAnalyticsResponse(
-        data=LandCoverChangeAnalytics(**analytics_out.model_dump()), status="success"
+    return LandCoverCompositionAnalyticsResponse(
+        data=LandCoverCompositionAnalytics(**analytics_out.model_dump()),
+        status="success",
     )

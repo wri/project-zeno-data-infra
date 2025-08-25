@@ -3,6 +3,7 @@ from typing import Annotated, List, Optional, Union
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    CustomAreaOfInterest,
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
@@ -15,6 +16,7 @@ AoiUnion = Union[
     ProtectedAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     IndigenousAreaOfInterest,
+    CustomAreaOfInterest,
 ]
 
 
@@ -27,17 +29,18 @@ class LandCoverChangeAnalyticsIn(AnalyticsIn):
 
 
 class LandCoverChangeResult(StrictBaseModel):
-    id: List[str]
+    aoi_id: List[str]
+    aoi_type: List[str]
     land_cover_class_start: List[str]
     land_cover_class_end: List[str]
-    area_ha: List[float]
+    land_cover_change_area__ha: List[float]
 
 
 class LandCoverChangeAnalytics(StrictBaseModel):
     result: Optional[LandCoverChangeResult] = None
-    metadata: Optional[LandCoverChangeAnalyticsIn] = None
+    metadata: Optional[dict] = None
     message: Optional[str] = None
-    status: AnalysisStatus
+    status: Optional[AnalysisStatus] = None
 
     model_config = {
         "from_attributes": True,

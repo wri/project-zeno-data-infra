@@ -53,6 +53,18 @@ DIST_DRIVERS = {
     5: "Unclassified",
 }
 
+LAND_COVER_MAPPING = {
+    0: "Bare and sparse vegetation",
+    1: "Short vegetation",
+    2: "Tree cover",
+    3: "Wetland – short vegetation",
+    4: "Water",
+    5: "Snow/ice",
+    6: "Cropland",
+    7: "Built-up",
+    8: "Cultivated grasslands",
+}
+
 
 async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     geojsons = await get_geojson(aois)
@@ -121,6 +133,18 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
 
         groupby_layers.append(grasslands_only)
         expected_groups.append([0, 1])
+    elif intersection == "land_cover":
+        land_cover = read_zarr_clipped_to_geojson(
+            "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr",
+            geojson,
+        ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
+
+        # Only use a single year of land_cover when used as a contextual layer.
+        land_cover_year2024 = land_cover.sel(year=2024)
+        land_cover_year2024.name = "land_cover_class"
+
+        groupby_layers.append(land_cover_year2024)
+        expected_groups.append(np.arange(8))
 
     alerts_area: xr.DataArray = xarray_reduce(
         pixel_area,
@@ -160,13 +184,18 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
             (lambda x: "grasslands" if x == 1 else "non-grasslands"), meta=("grasslands", "uint8")
         )
         alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
+    elif intersection == "land_cover":
+        alerts_df["land_cover_class"] = alerts_df["land_cover_class"].apply(
+            (lambda x: LAND_COVER_MAPPING.get(x, "Unclassified"))
+        )
+        alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
 
     alerts_df = alerts_df[alerts_df.value > 0]
     return alerts_df
 
 
 async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_client):
-    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver", "grasslands"]:
+    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver", "grasslands", "land_cover"]:
         raise ValueError(
             f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
         )
@@ -219,6 +248,8 @@ def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
             table = "gadm_dist_alerts_by_natural_lands"
         elif intersection == "grasslands":
             table = "gadm_dist_alerts_by_grasslands"
+        elif intersection == "land_cover":
+            table = "gadm_dist_alerts_by_land_cover"
         else:
             raise ValueError(f"No way to calculate intersection {intersection}")
     else:

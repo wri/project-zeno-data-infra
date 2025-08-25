@@ -10,6 +10,9 @@ services:
       - "8000:8000"  # Maps port 8000 on the host to port 8000 in the container
     command: uvicorn api.app.main:app --host 0.0.0.0 --port 8000
     environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - API_KEY=${API_KEY}
       - PYTHON_VERSION=3.13  
       - PYTHONPATH=/app/api
     volumes:
