@@ -288,20 +288,23 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "country": ["IDN", "IDN", "IDN", "IDN", "BRA"],
-                "region": [24, 24, 14, 14, 1],
-                "subregion": [9, 9, 13, 13, 1],
                 "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "BRA.1.1"],
                 "aoi_type": ["admin"] * 5,
-                "alert_date": [
+                "disturbance_alerts_date": [
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                 ],
-                "confidence": ["high", "low", "high", "low", "high"],
-                "value": [1.133972e+06, 7.154635e+04, 1.064846e+06, 9.065568e+04, 1.547240e+06],
+                "disturbance_alerts_confidence": ["high", "low", "high", "low", "high"],
+                "disturbance_alerts_area__ha": [
+                    1.133972e06,
+                    7.154635e04,
+                    1.064846e06,
+                    9.065568e04,
+                    1.547240e06,
+                ],
             }
         )
 
@@ -390,7 +393,18 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "high",
                     "low",
                 ],
-                "value": [1511.152588, 755.576965, 1511.129639, 1511.129639, 755.584412, 3025.184570, 5294.074707, 3781.512695, 756.304932, 755.576294],
+                "value": [
+                    1511.152588,
+                    755.576965,
+                    1511.129639,
+                    1511.129639,
+                    755.584412,
+                    3025.184570,
+                    5294.074707,
+                    3781.512695,
+                    756.304932,
+                    755.576294,
+                ],
                 "aoi_id": [
                     "18392",
                     "18392",
@@ -448,7 +462,7 @@ async def test_gadm_dist_analytics_no_intersection():
                 "2024-08-15",
             ],
             "confidence": ["high", "low"],
-            "value": [1.133972e+06, 7.154635e+04],
+            "value": [1.133972e06, 7.154635e04],
         }
     )
 
@@ -496,6 +510,7 @@ async def test_kba_dist_analytics_no_intersection():
 
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
+
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_grasslands():
     delete_resource_files(
@@ -539,6 +554,7 @@ async def test_admin_dist_analytics_by_grasslands():
 
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
 
+
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_land_cover():
     delete_resource_files(
@@ -565,20 +581,83 @@ async def test_admin_dist_analytics_by_land_cover():
 
     expected_df = pd.DataFrame(
         {
-            "country": ["TZA", "TZA", "TZA", "TZA", "TZA", "TZA", ],
-            "region": [24, 24, 24, 24, 24, 24, ],
-            "subregion": [3, 3, 3, 3, 3, 3, ],
-            "land_cover": ["Built-up", "Cropland", "Short vegetation", "Short vegetation", "Tree cover", "Tree cover", ],
-            "alert_date": ["2024-08-15", "2024-08-15", "2024-08-15", "2024-08-16", "2024-08-15", "2024-08-16", ],
-            "confidence": ["high", "high", "high", "high", "high", "high", ],
-            "value": [3073.667969, 7682.643555, 7682.792969, 9989.411133, 2305.148438, 6146.835938, ],
-            "aoi_id": ["TZA.24.3", "TZA.24.3", "TZA.24.3", "TZA.24.3", "TZA.24.3", "TZA.24.3", ],
-            "aoi_type": ["admin", "admin", "admin", "admin", "admin", "admin", ],
+            "country": [
+                "TZA",
+                "TZA",
+                "TZA",
+                "TZA",
+                "TZA",
+                "TZA",
+            ],
+            "region": [
+                24,
+                24,
+                24,
+                24,
+                24,
+                24,
+            ],
+            "subregion": [
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+            ],
+            "land_cover": [
+                "Built-up",
+                "Cropland",
+                "Short vegetation",
+                "Short vegetation",
+                "Tree cover",
+                "Tree cover",
+            ],
+            "alert_date": [
+                "2024-08-15",
+                "2024-08-15",
+                "2024-08-15",
+                "2024-08-16",
+                "2024-08-15",
+                "2024-08-16",
+            ],
+            "confidence": [
+                "high",
+                "high",
+                "high",
+                "high",
+                "high",
+                "high",
+            ],
+            "value": [
+                3073.667969,
+                7682.643555,
+                7682.792969,
+                9989.411133,
+                2305.148438,
+                6146.835938,
+            ],
+            "aoi_id": [
+                "TZA.24.3",
+                "TZA.24.3",
+                "TZA.24.3",
+                "TZA.24.3",
+                "TZA.24.3",
+                "TZA.24.3",
+            ],
+            "aoi_type": [
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+            ],
         }
     )
 
     actual_df = pd.DataFrame(data["result"])
-    pd.set_option('display.max_columns', None)
+    pd.set_option("display.max_columns", None)
     print(actual_df)
 
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)

@@ -1,10 +1,8 @@
-import os
 from functools import partial
 
 import duckdb
 import numpy as np
 import pandas as pd
-import s3fs
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -29,15 +27,8 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
         """
         )
 
-        fs = s3fs.S3FileSystem(requester_pays=True)
-        table = os.path.splitext(os.path.basename(table_uri))[0]
-        fs.get(
-            table_uri,
-            f"/tmp/{table}",
-        )
-
         # need to declare this to bind FROM in SQL query
-        data_source = duckdb.read_parquet(f"/tmp/{table}")
+        data_source = duckdb.read_parquet(table_uri)
 
         # TODO duckdb has no native async, need to use aioduckdb? Check if blocking in load test
         df = duckdb.sql(query).df()
@@ -47,8 +38,8 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
 class PrecalcHandler:
     FIELDS = {
         Dataset.area_hectares: "area__ha",
-        Dataset.tree_cover_loss: "tree_cover_loss__year",
-        Dataset.canopy_cover: "canopy_cover__percent",
+        Dataset.tree_cover_loss: "tree_cover_loss_year",
+        Dataset.canopy_cover: "canopy_cover",
     }
 
     def __init__(self, precalc_query_service, next_handler):
@@ -61,7 +52,9 @@ class PrecalcHandler:
             and query.aggregate.dataset == Dataset.area_hectares
             and query.group_bys == [Dataset.tree_cover_loss]
         ):
-            data_source = "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/tabular/zonal_stats/umd_tree_cover_loss_by_driver.parquet"
+            data_source = (
+                "s3://lcl-analytics/zonal-statistics/admin-tree-cover-loss.parquet"
+            )
         else:
             return await self.next_handler.handle(aoi_type, aoi_ids, query)
 
@@ -76,7 +69,7 @@ class PrecalcHandler:
             ]
         )
         filters += f" AND aoi_id in {tuple(aoi_ids)}"
-        sql = f"SELECT aoi_id, {groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, {groupby_fields}"
+        sql = f"SELECT aoi_id, aoi_type, {groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type, {groupby_fields}"
 
         return await self.precalc_query_service.execute(data_source, sql)
 

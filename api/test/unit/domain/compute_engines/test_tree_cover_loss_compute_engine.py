@@ -27,9 +27,9 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
                 {
                     "aoi_id": ["BRA", "BRA", "BRA"],
                     "aoi_type": ["admin", "admin", "admin"],
-                    "tree_cover_loss__year": [2015, 2020, 2023],
+                    "tree_cover_loss_year": [2015, 2020, 2023],
                     "area__ha": [1, 10, 100],
-                    "canopy_cover__percent": [20, 30, 50],
+                    "canopy_cover": [20, 30, 50],
                 }
             )
 
@@ -44,12 +44,12 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
     )
     results = await aois.get_tree_cover_loss(30, 2020, 2024, "primary_forest")
     assert "BRA" in results.aoi_id.to_list()
-    assert 2020 in results.tree_cover_loss__year.to_list()
-    assert 2023 in results.tree_cover_loss__year.to_list()
+    assert 2020 in results.tree_cover_loss_year.to_list()
+    assert 2023 in results.tree_cover_loss_year.to_list()
     assert 10.0 in results.area__ha.to_list()
     assert 100.0 in results.area__ha.to_list()
-    assert "admin" in results.aoi_type
-    assert results.size == 6
+    assert "admin" in results.aoi_type.to_list()
+    assert results.size == 8
 
 
 @pytest.mark.asyncio
@@ -70,13 +70,13 @@ async def test_flox_handler_happy_path():
                 data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-                xarr.name = "canopy_cover__percent"
+                xarr.name = "canopy_cover"
             elif dataset == Dataset.tree_cover_loss:
                 # top half is 15s, bottom half is 5s
                 data = np.vstack([np.full((5, 10), 15), np.full((5, 10), 5)])
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-                xarr.name = "tree_cover_loss__year"
+                xarr.name = "tree_cover_loss_year"
             else:
                 raise ValueError("Not a valid dataset for this test")
 
@@ -102,7 +102,7 @@ async def test_flox_handler_happy_path():
         pd.DataFrame(results),
         pd.DataFrame(
             {
-                "tree_cover_loss__year": [2015],
+                "tree_cover_loss_year": [2015],
                 "area__ha": [12.5],
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],
