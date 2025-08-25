@@ -63,7 +63,7 @@ def dist_alerts_by_natural_lands_area(dist_zarr_uri: str, dist_version: str, ove
     )(result_dataset)
 
     # natural_land_class
-    result_df["natural_lands"] = result_df["natural_lands"].apply(lambda x: NATURAL_LANDS_CLASSES.get(x, None))
+    result_df["natural_lands"] = result_df["natural_lands"].apply(lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified"))
 
     result_uri = common_tasks.save_result.with_options(
         name="dist-alerts-by-natural-lands-save-result"

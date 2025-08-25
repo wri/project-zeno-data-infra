@@ -54,7 +54,7 @@ def dist_alerts_by_land_cover_area(dist_zarr_uri: str, dist_version: str, overwr
         name="dist-alerts-by-land-cover-postprocess-result"
     )(result_dataset)
 
-    result_df["land_cover"] = result_df["land_cover"].apply(lambda x: LAND_COVER_MAPPING.get(x, None))
+    result_df["land_cover"] = result_df["land_cover"].apply(lambda x: LAND_COVER_MAPPING.get(x, "Unclassified"))
 
     result_uri = common_tasks.save_result.with_options(
         name="dist-alerts-by-land-cover-save-result"

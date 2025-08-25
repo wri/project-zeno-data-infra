@@ -47,7 +47,7 @@ def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite
         name="dist-alerts-by-drivers-postprocess-result"
     )(result_dataset)
 
-    result_df["driver"] = result_df["driver"].apply(lambda x: DIST_DRIVERS.get(x, None))
+    result_df["driver"] = result_df["driver"].apply(lambda x: DIST_DRIVERS.get(x, "Unclassified"))
 
     common_tasks.save_result.with_options(
         name="dist-alerts-by-drivers-save-result"
