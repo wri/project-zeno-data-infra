@@ -65,7 +65,7 @@ def test_gadm_dist_alerts_result(
             "country": Column(str, Check.ne("")),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
-            "grasslands": Column(int, Check.isin([0, 1])),
+            "grasslands": Column(str, Check.isin(["grasslands", "non-grasslands"])),
             "alert_date": Column(
                 datetime.date,
                 checks=[

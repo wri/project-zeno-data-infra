@@ -65,7 +65,7 @@ def test_gadm_dist_alerts_by_driver_result(
             "country": Column(str, Check.ne("")),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
-            "driver": Column(int, Check.ge(0)),
+            "driver": Column(str, Check.ne("")),
             "alert_date": Column(
                 datetime.date,
                 checks=[

@@ -25,7 +25,7 @@ def gadm_natural_lands_area(
         return result_uri
 
     expected_groups = (
-        np.arange(894),     # country iso codes
+        np.arange(999),     # country iso codes
         np.arange(1, 86),   # region codes
         np.arange(1, 854),  # subregion codes
         np.arange(1, 22),   # natural lands categories

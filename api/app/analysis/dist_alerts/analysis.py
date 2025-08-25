@@ -88,12 +88,15 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     return alerts_df
 
 
-async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> DaskDataFrame:
+async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> DaskDataFrame:
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
+    pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
+    pixel_area = read_zarr_clipped_to_geojson(pixel_area_uri, geojson).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
+
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
-    expected_groups = [np.arange(731, 1590), [1, 2, 3]]
+    expected_groups = [np.arange(731, 2000), [1, 2, 3]]
     if intersection == "natural_lands":
         natural_lands = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
@@ -113,7 +116,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
         ).band_data.reindex_like(
             dist_alerts, method="nearest", tolerance=1e-5
         )
-        dist_drivers.name = "ldacs_driver"
+        dist_drivers.name = "driver"
 
         groupby_layers.append(dist_drivers)
         expected_groups.append(np.arange(5))
@@ -143,16 +146,16 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
         groupby_layers.append(land_cover_year2024)
         expected_groups.append(np.arange(8))
 
-    alerts_count: xr.DataArray = xarray_reduce(
-        dist_alerts.alert_date,
+    alerts_area: xr.DataArray = xarray_reduce(
+        pixel_area,
         *tuple(groupby_layers),
-        func="count",
+        func="sum",
         expected_groups=tuple(expected_groups),
     )
-    alerts_count.name = "value"
+    alerts_area.name = "value"
 
     alerts_df: DaskDataFrame = (
-        alerts_count.to_dask_dataframe()
+        alerts_area.to_dask_dataframe()
         .drop("band", axis=1)
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
@@ -173,7 +176,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str]=None) -> Da
             lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
         )
     elif intersection == "driver":
-        alerts_df.ldacs_driver = alerts_df.ldacs_driver.apply(
+        alerts_df.driver = alerts_df.driver.apply(
             lambda x: DIST_DRIVERS.get(x, "Unclassified")
         )
     elif intersection == "grasslands":
@@ -218,7 +221,7 @@ async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_clie
     # For now, we need to just download the file temporarily
     fs = s3fs.S3FileSystem(requester_pays=True)
     fs.get(
-        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet/{table}.parquet",
+        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet2/{table}.parquet",
         f"/tmp/{table}.parquet",
     )
 
