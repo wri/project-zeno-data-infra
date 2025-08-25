@@ -1,9 +1,9 @@
 import pytest
 
 from app.analysis.dist_alerts.analysis import zonal_statistics
-from app.models.land_change.dist_alerts import DistAlertsAnalytics
 
 import asyncio
+import numpy as np
 import pandas as pd
 from dask.dataframe import DataFrame as DaskDataFrame
 
@@ -103,7 +103,7 @@ class TestDistAlertsZonalStats:
                 "alert_date": ["2024-08-13", "2024-08-13", "2024-08-13", "2024-08-13", "2024-08-16", "2025-01-23", "2025-01-23", "2025-01-23", "2025-02-19", "2025-03-04"],
                 "confidence": ["high", "high", "high", "high", "high", "low", "high", "high", "high", "low", ],
                 "land_cover_class": ["Short vegetation", "Tree cover", "Wetland – short vegetation", "Cropland", "Short vegetation", "Cropland", "Short vegetation", "Cropland", "Tree cover", "Short vegetation"],
-                "value": [43, 5, 3, 82, 3, 1, 3, 3, 1, 1],
+                "value": np.array([33036.54, 3841.4575, 2304.8757, 63000.008, 2304.8762, 768.29083, 2304.876, 2304.8755, 768.2917, 768.2917],dtype=np.float32),
                 "aoi_type": ["feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", "feature", ],
                 "aoi_id": ["test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi", "test_aoi"],
             }
