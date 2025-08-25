@@ -60,6 +60,8 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource("tree_cover_loss", resource_id, client)
 
+        assert data["status"] == "saved"
+
         df = pd.DataFrame(data["result"])
         assert "IDN.24.9" in df["aoi_id"].values
         assert "IDN.14" in df["aoi_id"].values
