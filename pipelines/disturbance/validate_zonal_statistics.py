@@ -10,7 +10,7 @@ from rasterio.windows import from_bounds
 from rasterio.features import geometry_mask
 import numpy as np
 from dateutil.relativedelta import relativedelta
-from datetime import date
+from datetime import datetime, date
 
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
@@ -18,8 +18,7 @@ def get_latest_alert_date() -> date:
     """Get the latest alert date from umd_glad_dist_alerts version."""
     version = get_latest_version("umd_glad_dist_alerts")
     # Version format is "vYYYYMMDD", extract date part
-    date_str = version[1:]  # Remove 'v' prefix
-    return date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:8]))
+    return datetime.strptime(version, "v%Y%m%d").date()
 
 isos = [
     'AFG', 'ALA', 'ALB', 'DZA', 'ASM', 'AND', 'AGO', 'AIA', 'ATA', 'ATG', 'ARG', 'ARM', 'ABW', 'AUS', 'AUT', 'AZE',
@@ -228,6 +227,7 @@ def validate(parquet_uri: str) -> bool:
     # validate alert area sums with 0.1% tolerance
     validation_areas = DistZonalStats.calculate_area_sums_by_confidence(validation_df)
     zeno_areas = DistZonalStats.calculate_area_sums_by_confidence(zeno_aoi_df)
+    zeno_aoi_df["area__ha"] = zeno_aoi_df["area__ha"] / 10000
     tolerance_pct = 0.001  # 0.1% tolerance
     
     low_conf_tolerance = validation_areas["low_confidence"] * tolerance_pct
@@ -236,7 +236,7 @@ def validate(parquet_uri: str) -> bool:
     high_conf_diff = abs(validation_areas["high_confidence"] - zeno_areas["high_confidence"])
     
     if low_conf_diff > low_conf_tolerance or high_conf_diff > high_conf_tolerance:
-        logger.error("Area sums exceed 1% tolerance")
+        logger.error("Area sums exceed 0.1% tolerance")
         return False
     logger.info("Area sums validation passed.")
 
@@ -262,10 +262,7 @@ def validate(parquet_uri: str) -> bool:
     area_diff = abs(validation_spot_check['area__ha'] - zeno_spot_check['area__ha'])
     exceeds_tolerance = area_diff > tolerance_values
     if exceeds_tolerance.any():
-        max_diff_idx = area_diff.idxmax()
-        max_diff = area_diff.iloc[max_diff_idx]
-        max_tolerance = tolerance_values.iloc[max_diff_idx]
-        logger.error("Spot check area values exceed 1% tolerance")
+        logger.error("Spot check area values exceed 0.1% tolerance")
         return False
     
     logger.info("Spot check validation passed.")
