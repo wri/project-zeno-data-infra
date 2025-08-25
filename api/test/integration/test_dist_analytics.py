@@ -538,3 +538,47 @@ async def test_admin_dist_analytics_by_grasslands():
     print(actual_df)
 
     pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+
+@pytest.mark.asyncio
+async def test_admin_dist_analytics_by_land_cover():
+    delete_resource_files(
+        "dist_alerts_analytics_payloads", "29c87d12-5998-5fa7-adef-4816ac03ef89/"
+    )
+
+    async with LifespanManager(app):
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            resource = await client.post(
+                "/v0/land_change/dist_alerts/analytics",
+                json={
+                    "aoi": {"type": "admin", "ids": ["TZA.24.3"]},
+                    "start_date": "2024-08-15",
+                    "end_date": "2024-08-16",
+                    "intersections": ["land_cover"],
+                },
+            )
+
+            resource_id = resource.json()["data"]["link"].split("/")[-1]
+
+            data = await retry_getting_resource("dist_alerts", resource_id, client)
+
+    expected_df = pd.DataFrame(
+        {
+            "country": ["TZA", "TZA", "TZA", "TZA", "TZA", "TZA", ],
+            "region": [24, 24, 24, 24, 24, 24, ],
+            "subregion": [3, 3, 3, 3, 3, 3, ],
+            "land_cover": ["Built-up", "Cropland", "Short vegetation", "Short vegetation", "Tree cover", "Tree cover", ],
+            "alert_date": ["2024-08-15", "2024-08-15", "2024-08-15", "2024-08-16", "2024-08-15", "2024-08-16", ],
+            "confidence": ["high", "high", "high", "high", "high", "high", ],
+            "value": [3073.667969, 7682.643555, 7682.792969, 9989.411133, 2305.148438, 6146.835938, ],
+            "aoi_id": ["TZA.24.3", "TZA.24.3", "TZA.24.3", "TZA.24.3", "TZA.24.3", "TZA.24.3", ],
+            "aoi_type": ["admin", "admin", "admin", "admin", "admin", "admin", ],
+        }
+    )
+
+    actual_df = pd.DataFrame(data["result"])
+    pd.set_option('display.max_columns', None)
+    print(actual_df)
+
+    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
