@@ -1,3 +1,8 @@
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import Response as FastAPIResponse
+from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
+
 from app.domain.analyzers.dummy_tree_cover_analyzer import (
     DummyTreeCoverAnalyzer,
 )
@@ -14,10 +19,7 @@ from app.models.land_change.tree_cover import (
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from fastapi import Response as FastAPIResponse
-from fastapi.responses import ORJSONResponse
-from pydantic import UUID5
+
 
 ANALYTICS_NAME = "tree_cover"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
