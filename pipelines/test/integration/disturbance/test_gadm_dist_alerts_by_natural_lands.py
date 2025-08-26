@@ -84,14 +84,20 @@ def test_gadm_dist_alerts_result(
             "country",
             "region",
             "subregion",
-            "natural_lands",
+            "natural_land_class",
             "alert_date",
             "alert_confidence",
         ],
         checks=Check(
             lambda df: (
                 df.groupby(
-                    ["country", "region", "subregion", "natural_lands", "alert_date"]
+                    [
+                        "country",
+                        "region",
+                        "subregion",
+                        "natural_land_class",
+                        "alert_date",
+                    ]
                 )["alert_confidence"].transform("nunique")
                 == 1
             ),
