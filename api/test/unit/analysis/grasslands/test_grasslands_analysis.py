@@ -1,12 +1,11 @@
 import asyncio
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
-from unittest.mock import patch
-
-
 from app.analysis.grasslands.analysis import (
     get_precomputed_statistic_on_gadm_aoi,
     zonal_statistics,
@@ -14,10 +13,8 @@ from app.analysis.grasslands.analysis import (
 
 
 class TestGrasslandsPreComputedAnalysis:
-
     @pytest.fixture
     def precomputed_gadm_results(self, tmp_path):
-
         data = [
             [2000, "BRA", 1, 1, 3.485880],
             [2001, "BRA", 1, 1, 3.864716],
@@ -60,7 +57,7 @@ class TestGrasslandsPreComputedAnalysis:
         ]
 
         df = pd.DataFrame(
-            data, columns=["year", "country", "region", "subregion", "grassland_area"]
+            data, columns=["year", "country", "region", "subregion", "area_ha"]
         )
 
         parquet_file = tmp_path / "grasslands_data.parquet"
@@ -70,7 +67,6 @@ class TestGrasslandsPreComputedAnalysis:
 
     @pytest.mark.asyncio
     async def test_precomputed_zonal_stats_for_region(self, precomputed_gadm_results):
-
         gadm_id = "BRA.1"
 
         result_df = await get_precomputed_statistic_on_gadm_aoi(
@@ -104,7 +100,7 @@ class TestGrasslandsPreComputedAnalysis:
             [2022, 97.223225],
         ]
 
-        expected_df = pd.DataFrame(data, columns=["year", "grassland_area"])
+        expected_df = pd.DataFrame(data, columns=["year", "area_ha"])
 
         expected_df["aoi_id"] = "BRA.1"
         expected_df["aoi_type"] = "admin"
@@ -198,9 +194,7 @@ class TestGrasslandsOTFAnalysis:
         expected_df = pd.DataFrame(
             {
                 "year": years,
-                "grassland_area": np.array(([1555.85522] * len(years))).astype(
-                    np.float32
-                ),
+                "area_ha": np.array(([1555.85522] * len(years))).astype(np.float32),
                 "aoi_type": ["feature"] * len(years),
                 "aoi_id": ["test_aoi"] * len(years),
             }

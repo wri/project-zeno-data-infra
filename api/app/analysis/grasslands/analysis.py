@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import traceback
 from functools import partial
 
@@ -8,7 +7,6 @@ import dask.dataframe as dd
 import duckdb
 import numpy as np
 import pandas as pd
-import s3fs
 
 from ..common.analysis import (
     get_geojson,
@@ -56,7 +54,7 @@ async def zonal_statistics(aoi, geojson):
         .to_dask_dataframe()
         .drop("spatial_ref", axis=1)
         .drop("band", axis=1)
-        .rename(columns={"band_data": "grassland_area"})
+        .rename(columns={"band_data": "area_ha"})
     )
 
     grasslands_areas_df["aoi_type"] = aoi["type"].lower()
@@ -73,17 +71,13 @@ async def get_precomputed_statistics(aoi, dask_client):
             f"No precomputed statistics available for AOI type {aoi['type']}"
         )
 
-    table = "gadm_grasslands_areas"
-    local_parquet_file = _download_parquet(table)
-
+    parquet_file_uri = "s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
     precompute_partial = partial(
-        get_precomputed_statistic_on_gadm_aoi, parquet_file=local_parquet_file
+        get_precomputed_statistic_on_gadm_aoi, parquet_file=parquet_file_uri
     )
     futures = dask_client.map(precompute_partial, aoi["ids"])
     results = await dask_client.gather(futures)
     yearly_grassland_areas_df = pd.concat(results)
-
-    os.remove(local_parquet_file)  # Clean up the temporary file"
 
     return yearly_grassland_areas_df
 
@@ -93,6 +87,16 @@ async def get_precomputed_statistic_on_gadm_aoi(id, parquet_file):
     gadm_id = id.split(".")
 
     query = create_gadm_grasslands_query(gadm_id, parquet_file)
+
+    duckdb.query(
+        """
+        CREATE OR REPLACE SECRET secret (
+            TYPE s3,
+            PROVIDER credential_chain,
+            CHAIN config
+        );
+    """
+    )
     grasslands_df = duckdb.query(query).df()
 
     grasslands_df["aoi_id"] = id
@@ -145,32 +149,3 @@ async def do_analytics(file_path, dask_client):
                 "stack_trace": traceback.format_exc(),
             }
         )
-
-
-def _download_parquet(
-    table: str,
-) -> str:
-    # Dumbly doing this per request since the STS token expires eventually otherwise
-    # According to this issue, duckdb should auto refresh the token in 1.3.0,
-    # but it doesn't seem to work for us and people are reporting the same on the issue
-    # https://github.com/duckdb/duckdb-aws/issues/26
-    # TODO do this on lifecycle start once autorefresh works
-    duckdb.query(
-        """
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain,
-            CHAIN config
-        );
-    """
-    )
-
-    # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-    # For now, we need to just download the file temporarily
-    fs = s3fs.S3FileSystem(requester_pays=True)
-    local_parquet_file = f"/tmp/{table}.parquet"
-    fs.get(
-        f"s3://gfw-data-lake/gfw_grasslands/v1/zarr/{table}.parquet", local_parquet_file
-    )
-
-    return local_parquet_file

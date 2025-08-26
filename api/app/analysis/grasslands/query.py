@@ -30,7 +30,7 @@ def create_gadm_grasslands_query(
     order_by_clause = f"ORDER {by_clause}"
 
     # Query and make sure output names match the expected schema (?)
-    select_clause += ", SUM(grassland_area) AS grassland_area"
+    select_clause += ", SUM(area_ha) AS area_ha"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
     return query
