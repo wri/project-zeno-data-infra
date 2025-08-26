@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
@@ -19,7 +19,7 @@ AoiUnion = Union[
     CustomAreaOfInterest,
 ]
 
-DATE_REGEX = r"^\d{4}$"
+AllowedCanopyCover = Literal[30, 50, 75]
 
 
 class CarbonFluxAnalyticsIn(AnalyticsIn):
@@ -28,10 +28,15 @@ class CarbonFluxAnalyticsIn(AnalyticsIn):
         title="AOI",
         description="AOI to calculate in.",
     )
+    canopy_cover: AllowedCanopyCover = Field(
+        ...,
+        title="Canopy Cover",
+    )
 
 
 class CarbonFluxResult(StrictBaseModel):
-    id: List[str]
+    aoi_id: List[str]
+    aoi_type: List[str]
     carbon_net_flux_Mg_CO2e: List[float]
     carbon_gross_emissions_Mg_CO2e: List[float]
     carbon_gross_removals_Mg_CO2e: List[float]
@@ -81,6 +86,7 @@ class CarbonFluxAnalyticsResponse(Response):
                                 "type": "admin",
                                 "ids": ["BRA.1.12"],
                             },
+                            "canopy_cover": "30",
                         },
                         "message": "",
                         "status": "saved",

@@ -10,13 +10,14 @@ def base_config():
     """Base configuration for model instances."""
     return CarbonFluxAnalyticsIn(
         aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
+        canopy_cover=30
     )
 
 
 class TestCarbonFluxAnalyticsIn:
     def test_thumbprint_is_same_for_same_fields(self, base_config):
         model = CarbonFluxAnalyticsIn(**base_config.model_dump())
-        assert model.thumbprint() == uuid.UUID("4fa371fa-5a11-5f75-9822-c6533d399f42")
+        assert model.thumbprint() == uuid.UUID("3063b7b2-8a14-54a4-b7c9-e5cc14de5c3e")
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = CarbonFluxAnalyticsIn(**base_config.model_dump())
