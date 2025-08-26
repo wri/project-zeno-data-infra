@@ -51,7 +51,7 @@ class NaturalLandsAnalyticsResponse(Response):
                         "result": {  # column oriented for loading into a dataframe
                             "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
                             "aoi_type": ["admin", "admin", "admin"],
-                            "natural_lands_area": [4851452000, 4084129000, 253008000],
+                            "area_ha": [4851452000, 4084129000, 253008000],
                         },
                         "metadata": {
                             "aoi": {
