@@ -6,13 +6,13 @@ from functools import partial
 from typing import Optional
 
 import dask.dataframe as dd
-from dask.dataframe import DataFrame as DaskDataFrame
 import duckdb
 import numpy as np
 import pandas as pd
 import s3fs
-from flox.xarray import xarray_reduce
 import xarray as xr
+from dask.dataframe import DataFrame as DaskDataFrame
+from flox.xarray import xarray_reduce
 
 from ..common.analysis import (
     JULIAN_DATE_2021,
@@ -20,7 +20,6 @@ from ..common.analysis import (
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_dist_query
-
 
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
@@ -88,12 +87,16 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     return alerts_df
 
 
-async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> DaskDataFrame:
+async def zonal_statistics(
+    aoi, geojson, intersection: Optional[str] = None
+) -> DaskDataFrame:
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
-    pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
-    pixel_area = read_zarr_clipped_to_geojson(pixel_area_uri, geojson).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
+    pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
+    pixel_area = read_zarr_clipped_to_geojson(
+        pixel_area_uri, geojson
+    ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 2000), [1, 2, 3]]
@@ -113,9 +116,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         dist_drivers = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr",
             geojson,
-        ).band_data.reindex_like(
-            dist_alerts, method="nearest", tolerance=1e-5
-        )
+        ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
         dist_drivers.name = "driver"
 
         groupby_layers.append(dist_drivers)
@@ -160,7 +161,9 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
     )
-    alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"}, meta=("confidence", "uint8"))
+    alerts_df.confidence = alerts_df.confidence.map(
+        {2: "low", 3: "high"}, meta=("confidence", "uint8")
+    )
     alerts_df.alert_date = dd.to_datetime(
         alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
@@ -181,7 +184,8 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         )
     elif intersection == "grasslands":
         alerts_df["grasslands"] = alerts_df["grasslands"].apply(
-            (lambda x: "grasslands" if x == 1 else "non-grasslands"), meta=("grasslands", "uint8")
+            (lambda x: "grasslands" if x == 1 else "non-grasslands"),
+            meta=("grasslands", "uint8"),
         )
         alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
     elif intersection == "land_cover":
@@ -195,27 +199,18 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
 
 
 async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_client):
-    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver", "grasslands", "land_cover"]:
+    if aoi["type"] != "admin" or intersection not in [
+        None,
+        "natural_lands",
+        "driver",
+        "grasslands",
+        "land_cover",
+    ]:
         raise ValueError(
             f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
         )
 
     table = get_precomputed_table(aoi["type"], intersection)
-
-    # Dumbly doing this per request since the STS token expires eventually otherwise
-    # According to this issue, duckdb should auto refresh the token in 1.3.0,
-    # but it doesn't seem to work for us and people are reporting the same on the issue
-    # https://github.com/duckdb/duckdb-aws/issues/26
-    # TODO do this on lifecycle start once autorefresh works
-    duckdb.query(
-        """
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain,
-            CHAIN config
-        );
-    """
-    )
 
     # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
     # For now, we need to just download the file temporarily

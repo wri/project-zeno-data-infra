@@ -93,20 +93,23 @@ class TestLandCoverChangeCustomAois:
     @pytest.fixture
     def pixel_area(self):
         # Define the base column (along y) — 10 values
-        column_vals = np.array(
-            [
-                518.6011,
-                518.6036,
-                518.606,
-                518.6085,
-                518.611,
-                518.61346,
-                518.61597,
-                518.61847,
-                518.6209,
-                518.6234,
-            ],
-            dtype=np.float32,
+        column_vals = (
+            np.array(
+                [
+                    518.6011,
+                    518.6036,
+                    518.606,
+                    518.6085,
+                    518.611,
+                    518.61346,
+                    518.61597,
+                    518.61847,
+                    518.6209,
+                    518.6234,
+                ],
+                dtype=np.float32,
+            )
+            / 10000
         )
 
         y_vals = np.linspace(48.0, 47.99775, 10)  # latitude
@@ -183,7 +186,7 @@ class TestLandCoverChangeCustomAois:
 
         expected = pd.DataFrame(
             {
-                "land_cover_change_area__ha": [
+                "area_ha": [
                     1.2446691989898682,
                     0.20744886994361877,
                     0.20744091272354126,
@@ -243,7 +246,7 @@ class TestLandCoverChangeAdminAois:
                 "aoi_id",
                 "land_cover_class_start",
                 "land_cover_class_end",
-                "land_cover_change_area__ha",
+                "area_ha",
             ],
         )
 
@@ -256,7 +259,7 @@ class TestLandCoverChangeAdminAois:
 
         table_name = "test_parquet"
         duckdb.register(table_name, parquet_mock_data)
-        analyzer.admin_results_local_uri = table_name
+        analyzer.admin_results_uri = table_name
 
         return analyzer
 
@@ -296,7 +299,7 @@ class TestLandCoverChangeAdminAois:
                     "Built-up",
                     "Water",
                 ],
-                "land_cover_change_area__ha": [
+                "area_ha": [
                     0.12505,
                     0.03208,
                     0.08902,

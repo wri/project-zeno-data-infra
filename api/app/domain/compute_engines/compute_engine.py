@@ -3,6 +3,7 @@ from functools import partial
 import duckdb
 import numpy as np
 import pandas as pd
+from app.analysis.common.analysis import initialize_duckdb
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -17,15 +18,7 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
         pass
 
     async def execute(self, table_uri: str, query: str) -> pd.DataFrame:
-        duckdb.query(
-            """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain,
-                CHAIN config
-            );
-        """
-        )
+        initialize_duckdb()
 
         # need to declare this to bind FROM in SQL query
         data_source = duckdb.read_parquet(table_uri)
@@ -152,9 +145,9 @@ class FloxOTFHandler:
         ]
 
         if query.aggregate.dataset == Dataset.area_hectares:
-            filtered_results[query.aggregate.dataset.get_field_name()] = (
-                filtered_results[query.aggregate.dataset.get_field_name()] / 10000
-            )
+            filtered_results[
+                query.aggregate.dataset.get_field_name()
+            ] = filtered_results[query.aggregate.dataset.get_field_name()]
 
         # TODO remove band and spatial ref from zarrs
         return filtered_results.reset_index().drop(

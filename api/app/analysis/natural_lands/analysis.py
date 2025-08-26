@@ -11,6 +11,7 @@ from flox.xarray import xarray_reduce
 
 from ..common.analysis import (
     get_geojson,
+    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_natural_lands_query
@@ -64,9 +65,7 @@ async def zonal_statistics(aoi, geojson):
     natural_lands_obj_name = (
         "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
     )
-    pixel_area_obj_name = (
-        "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
-    )
+    pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
     natural_lands = read_zarr_clipped_to_geojson(
         natural_lands_obj_name, geojson
     ).band_data
@@ -122,16 +121,8 @@ async def get_precomputed_statistic_on_gadm_aoi(id, table):
     gadm_id = id.split(".")
 
     query = create_gadm_natural_lands_query(gadm_id, table)
-    duckdb.query(
-        """
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain,
-            CHAIN config
-        );
-    """
-    )
 
+    initialize_duckdb()
     df = duckdb.query(query).df()
 
     df["aoi_id"] = id

@@ -3,6 +3,7 @@ import logging
 import os
 from typing import Iterable
 
+import duckdb
 import httpx
 import xarray as xr
 from shapely.geometry import shape
@@ -95,3 +96,20 @@ def get_sql_in_list(iter: Iterable) -> str:
     quoted = [f"'{item}'" for item in iter]
     joined = f"({', '.join(quoted)})"
     return joined
+
+
+def initialize_duckdb():
+    # Dumbly doing this per request since the STS token expires eventually otherwise
+    # According to this issue, duckdb should auto refresh the token in 1.3.0,
+    # but it doesn't seem to work for us and people are reporting the same on the issue
+    # https://github.com/duckdb/duckdb-aws/issues/26
+    # TODO do this on lifecycle start once autorefresh works
+    duckdb.query(
+        """
+        CREATE OR REPLACE SECRET secret (
+            TYPE s3,
+            PROVIDER credential_chain,
+            CHAIN config
+        );
+    """
+    )

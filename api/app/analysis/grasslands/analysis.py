@@ -10,6 +10,7 @@ import pandas as pd
 
 from ..common.analysis import (
     get_geojson,
+    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_grasslands_query
@@ -41,9 +42,7 @@ async def zonal_statistics(aoi, geojson):
     grasslands_obj_name = (
         "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_2kchunk.zarr"
     )
-    pixel_area_obj_name = (
-        "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
-    )
+    pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
     grasslands = read_zarr_clipped_to_geojson(grasslands_obj_name, geojson)
     pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
     grasslands_only = (grasslands == 2).astype(np.uint8)
@@ -88,15 +87,7 @@ async def get_precomputed_statistic_on_gadm_aoi(id, parquet_file):
 
     query = create_gadm_grasslands_query(gadm_id, parquet_file)
 
-    duckdb.query(
-        """
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain,
-            CHAIN config
-        );
-    """
-    )
+    initialize_duckdb()
     grasslands_df = duckdb.query(query).df()
 
     grasslands_df["aoi_id"] = id
