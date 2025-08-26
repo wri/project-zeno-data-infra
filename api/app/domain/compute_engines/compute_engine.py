@@ -151,6 +151,11 @@ class FloxOTFHandler:
             ~np.isnan(results[query.aggregate.dataset.get_field_name()])
         ]
 
+        if query.aggregate.dataset == Dataset.area_hectares:
+            filtered_results[query.aggregate.dataset.get_field_name()] = (
+                filtered_results[query.aggregate.dataset.get_field_name()] / 10000
+            )
+
         # TODO remove band and spatial ref from zarrs
         return filtered_results.reset_index().drop(
             columns=["index", "band", "spatial_ref"], errors="ignore"

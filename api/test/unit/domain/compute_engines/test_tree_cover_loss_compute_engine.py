@@ -61,7 +61,7 @@ async def test_flox_handler_happy_path():
         def load(self, dataset, geometry=None):
             if dataset == Dataset.area_hectares:
                 # all values are 0.5
-                data = np.full((10, 10), 0.5)
+                data = np.full((10, 10), 5000)
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
                 xarr.name = "area_ha"

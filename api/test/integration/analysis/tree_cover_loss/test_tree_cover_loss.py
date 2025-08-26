@@ -125,6 +125,8 @@ class TestTclAnalyticsPostWithKba:
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource("tree_cover_loss", resource_id, client)
 
+        assert data["status"] == "saved"
+
         df = pd.DataFrame(data["result"])
         assert "20401" in df["aoi_id"].values
         assert "19426" in df["aoi_id"].values
