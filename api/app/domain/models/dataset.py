@@ -12,7 +12,7 @@ class Dataset(Enum):
     def get_field_name(self):
         DATASET_TO_NAMES = {
             Dataset.area_hectares: "area_ha",
-            Dataset.tree_cover_loss: "loss_year",
+            Dataset.tree_cover_loss: "tree_cover_loss_year",
             Dataset.canopy_cover: "canopy_cover",
         }
 

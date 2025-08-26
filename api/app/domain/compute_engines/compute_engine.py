@@ -1,10 +1,8 @@
-import os
 from functools import partial
 
 import duckdb
 import numpy as np
 import pandas as pd
-import s3fs
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -29,15 +27,8 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
         """
         )
 
-        fs = s3fs.S3FileSystem(requester_pays=True)
-        table = os.path.splitext(os.path.basename(table_uri))[0]
-        fs.get(
-            table_uri,
-            f"/tmp/{table}",
-        )
-
         # need to declare this to bind FROM in SQL query
-        data_source = duckdb.read_parquet(f"/tmp/{table}")
+        data_source = duckdb.read_parquet(table_uri)
 
         # TODO duckdb has no native async, need to use aioduckdb? Check if blocking in load test
         df = duckdb.sql(query).df()
@@ -46,8 +37,8 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
 
 class PrecalcHandler:
     FIELDS = {
-        Dataset.area_hectares: "value",
-        Dataset.tree_cover_loss: "loss_year",
+        Dataset.area_hectares: "area_ha",
+        Dataset.tree_cover_loss: "tree_cover_loss_year",
         Dataset.canopy_cover: "canopy_cover",
     }
 
@@ -61,7 +52,9 @@ class PrecalcHandler:
             and query.aggregate.dataset == Dataset.area_hectares
             and query.group_bys == [Dataset.tree_cover_loss]
         ):
-            data_source = "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/tabular/zonal_stats/umd_tree_cover_loss_by_driver.parquet"
+            data_source = (
+                "s3://lcl-analytics/zonal-statistics/admin-tree-cover-loss.parquet"
+            )
         else:
             return await self.next_handler.handle(aoi_type, aoi_ids, query)
 
@@ -75,8 +68,8 @@ class PrecalcHandler:
                 for filt in query.filters
             ]
         )
-        filters += f" AND id in {tuple(aoi_ids)}"
-        sql = f"SELECT id, {groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY id, {groupby_fields}"
+        filters += f" AND aoi_id in {tuple(aoi_ids)}"
+        sql = f"SELECT aoi_id, aoi_type, {groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type, {groupby_fields}"
 
         return await self.precalc_query_service.execute(data_source, sql)
 
@@ -114,6 +107,7 @@ class FloxOTFHandler:
             col = dataset.get_field_name()
             results[col] = self.dataset_repository.unpack(dataset, results[col])
 
+        results["aoi_type"] = aoi_type
         return results.to_dict(orient="list")
 
     @staticmethod
@@ -152,10 +146,15 @@ class FloxOTFHandler:
             .reset_index()
         )
 
-        results["id"] = aoi_id
+        results["aoi_id"] = aoi_id
         filtered_results = results[
             ~np.isnan(results[query.aggregate.dataset.get_field_name()])
         ]
+
+        if query.aggregate.dataset == Dataset.area_hectares:
+            filtered_results[query.aggregate.dataset.get_field_name()] = (
+                filtered_results[query.aggregate.dataset.get_field_name()] / 10000
+            )
 
         # TODO remove band and spatial ref from zarrs
         return filtered_results.reset_index().drop(

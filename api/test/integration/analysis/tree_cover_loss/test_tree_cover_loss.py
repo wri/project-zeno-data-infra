@@ -60,15 +60,17 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource("tree_cover_loss", resource_id, client)
 
+        assert data["status"] == "saved"
+
         df = pd.DataFrame(data["result"])
-        assert "IDN.24.9" in df["id"].values
-        assert "IDN.14" in df["id"].values
-        assert "BRA" in df["id"].values
+        assert "IDN.24.9" in df["aoi_id"].values
+        assert "IDN.14" in df["aoi_id"].values
+        assert "BRA" in df["aoi_id"].values
 
-        assert ~(df.loss_year < 2015).any()
-        assert ~(df.loss_year > 2022).any()
+        assert ~(df.tree_cover_loss_year < 2015).any()
+        assert ~(df.tree_cover_loss_year > 2022).any()
 
-        assert df.columns.size == 3
+        assert df.columns.size == 4
 
 
 class TestTclAnalyticsPostWithKba:
@@ -123,11 +125,13 @@ class TestTclAnalyticsPostWithKba:
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource("tree_cover_loss", resource_id, client)
 
+        assert data["status"] == "saved"
+
         df = pd.DataFrame(data["result"])
-        assert "20401" in df["id"].values
-        assert "19426" in df["id"].values
+        assert "20401" in df["aoi_id"].values
+        assert "19426" in df["aoi_id"].values
 
-        assert ~(df.loss_year < 2020).any()
-        assert ~(df.loss_year > 2023).any()
+        assert ~(df.tree_cover_loss_year < 2020).any()
+        assert ~(df.tree_cover_loss_year > 2023).any()
 
-        assert df.columns.size == 3
+        assert df.columns.size == 4
