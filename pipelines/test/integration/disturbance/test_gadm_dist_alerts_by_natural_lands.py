@@ -65,12 +65,16 @@ def test_gadm_dist_alerts_result(
             "country": Column(str, Check.ne("")),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
-            "natural_lands": Column(str, Check.ne("")),
+            "natural_land_class": Column(str, Check.ne("")),
             "alert_date": Column(
                 datetime.date,
                 checks=[
-                    Check.greater_than_or_equal_to(datetime.date.fromisoformat("2023-01-01")),
-                    Check.less_than_or_equal_to(datetime.date.fromisoformat("2023-03-11")),
+                    Check.greater_than_or_equal_to(
+                        datetime.date.fromisoformat("2023-01-01")
+                    ),
+                    Check.less_than_or_equal_to(
+                        datetime.date.fromisoformat("2023-03-11")
+                    ),
                 ],
             ),
             "alert_confidence": Column(str, Check.isin(["low", "high"])),
