@@ -172,7 +172,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         alerts_df["natural_lands_category"] = alerts_df.natural_lands_class.apply(
             lambda x: "natural" if 1 < x < 12 else "non-natural"
         )
-        alerts_df["natural_lands_class"] = alerts_df.natural_lands_class.apply(
+        alerts_df["natural_land_class"] = alerts_df.natural_lands_class.apply(
             lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
         )
     elif intersection == "driver":
