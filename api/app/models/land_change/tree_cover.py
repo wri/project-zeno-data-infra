@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional, Union, Literal
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import Field
 
@@ -36,22 +36,6 @@ class TreeCoverAnalyticsIn(AnalyticsIn):
         description="Minimum canopy density to consider tree cover, in percent.",
         examples=["10", "35"],
     )
-
-    # @field_validator("tcd_threshold")
-    # def year_must_be_at_least_2000(cls, v: str) -> str:
-    #     year_int = int(v)
-    #     if year_int < 2000:
-    #         raise ValueError("Year must be at least 2000")
-    #
-    #     return v
-    #
-    # @model_validator(mode="after")
-    # def validate_year_range(self) -> "TreeCoverAnalyticsIn":
-    #     start = int(self.start_year)
-    #     end = int(self.end_year)
-    #     if end < start:
-    #         raise ValueError("end_year must be greater than or equal to start_year")
-    #     return self
 
 
 class TreeCoverResult(StrictBaseModel):
