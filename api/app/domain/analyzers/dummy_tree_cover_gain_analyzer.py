@@ -18,7 +18,7 @@ class DummyTreeCoverGainAnalyzer(Analyzer):
 
         return {
             "aoi_id": analysis.metadata["aoi"]["ids"] * len(years),
-            "aoi_type": land_cover_change_analytics_in.aoi.type * len(years),
+            "aoi_type": [land_cover_change_analytics_in.aoi.type] * len(years),
             "tree_cover_gain_year": years,
             "area_ha": [(random() * 100) for _ in years],
         }
