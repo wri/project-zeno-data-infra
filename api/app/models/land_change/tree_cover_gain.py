@@ -64,9 +64,10 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
 
 
 class TreeCoverGainResult(StrictBaseModel):
-    id: List[str]
-    tree_cover_gain__year: List[int]
-    tree_cover_gain_area__ha: List[float]
+    aoi_id: List[str]
+    aoi_type: List[str]
+    tree_cover_gain_year: List[int]
+    area_ha: List[float]
 
 
 class TreeCoverGainAnalytics(StrictBaseModel):
@@ -90,9 +91,10 @@ class TreeCoverGainAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
-                            "tree_cover_gain__year": [2000, 2005, 2010],
-                            "tree_cover_gain_area__ha": [
+                            "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
+                            "aoi_type": ["admin", "admin", "admin"],
+                            "tree_cover_gain_year": [2000, 2005, 2010],
+                            "area_ha": [
                                 4045.406160862687,
                                 4050.4061608627,
                                 4045.406160862687,

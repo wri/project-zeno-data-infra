@@ -1,3 +1,4 @@
+from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import (
     Dataset,
@@ -8,7 +9,7 @@ from app.domain.models.dataset import (
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
-class TreeCoverLossAnalyzer:
+class TreeCoverLossAnalyzer(Analyzer):
     def __init__(self, compute_engine):
         self.compute_engine = compute_engine
 
