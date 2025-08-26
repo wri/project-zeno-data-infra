@@ -44,10 +44,10 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
     )
 
     @field_validator("start_year", "end_year")
-    def year_must_be_at_least_2001(cls, v: str) -> str:
+    def year_must_be_at_least_2000(cls, v: str) -> str:
         year_int = int(v)
         if year_int < 2000:
-            raise ValueError("Year must be at least 2001")
+            raise ValueError("Year must be at least 2000")
 
         if year_int % 5 != 0:
             raise ValueError("Year must be a multiple of 5 (e.g., 2000, 2005, 2010)")
