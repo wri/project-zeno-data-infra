@@ -57,7 +57,7 @@ class ZarrDatasetRepository:
         if dataset == Dataset.tree_cover_loss:
             return series + 2000
         else:
-            raise NotImplementedError()
+            return series
 
     def _clip_xarr_to_geometry(self, xarr, geom):
         sliced = xarr.sel(
