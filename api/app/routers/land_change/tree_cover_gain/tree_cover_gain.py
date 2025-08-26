@@ -28,9 +28,8 @@ def get_analysis_repository() -> AnalysisRepository:
 
 
 def create_analysis_service() -> AnalysisService:
-    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
     return AnalysisService(
-        analysis_repository=analysis_repository,
+        analysis_repository=get_analysis_repository(),
         analyzer=DummyTreeCoverGainAnalyzer(),
         event=ANALYTICS_NAME,
     )
