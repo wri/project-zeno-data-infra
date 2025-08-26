@@ -15,7 +15,7 @@ def base_config():
     )
 
 
-class TestTreeCoverLossAnalyticsIn:
+class TestTreeCoverGainAnalyticsIn:
     def test_thumbprint_is_same_for_same_fields(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
         assert model.thumbprint() == uuid.UUID("cc74d56f-667c-5be6-bdaf-59e8c3144172")
@@ -42,7 +42,7 @@ class TestTreeCoverLossAnalyticsIn:
         assert model.thumbprint() != base_config.thumbprint()
 
 
-class TestTreeCoverLossAnalyticsInValidations:
+class TestTreeCoverGainAnalyticsInValidations:
     def test_year_cannot_be_less_than_2000(self):
         with pytest.raises(ValueError):
             TreeCoverGainAnalyticsIn(
