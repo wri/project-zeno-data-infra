@@ -5,5 +5,5 @@ from app.domain.models.analysis import Analysis
 
 class Analyzer(ABC):
     @abstractmethod
-    def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis):
         pass
