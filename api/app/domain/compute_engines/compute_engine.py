@@ -22,7 +22,7 @@ class DuckDbPrecalcQueryService(StrictBaseModel):
             CREATE OR REPLACE SECRET secret (
                 TYPE s3,
                 PROVIDER credential_chain,
-                CHAIN config
+                CHAIN 'instance;env;config'
             );
         """
         )
