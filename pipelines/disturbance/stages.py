@@ -1,23 +1,24 @@
-from typing import Tuple, Optional
-import xarray as xr
-import pandas as pd
-from dateutil.relativedelta import relativedelta
 from datetime import date
+from typing import Optional, Tuple
 
-from pipelines.prefect_flows.common_stages import create_result_dataframe as common_create_result_dataframe
+import pandas as pd
+import xarray as xr
+from dateutil.relativedelta import relativedelta
+
 from pipelines.globals import (
     country_zarr_uri,
+    pixel_area_uri,
     region_zarr_uri,
     subregion_zarr_uri,
-    pixel_area_uri
+)
+from pipelines.prefect_flows.common_stages import (
+    create_result_dataframe as common_create_result_dataframe,
 )
 
 ExpectedGroupsType = Tuple
 
-alerts_confidence = {
-    2: "low",
-    3: "high"
-}
+alerts_confidence = {2: "low", 3: "high"}
+
 
 def load_data(
     dist_zarr_uri: str,
@@ -66,6 +67,7 @@ def load_data(
         contextual_layer_aligned,
     )
 
+
 def setup_compute(
     datasets: Tuple[xr.DataArray, ...],
     expected_groups: Optional[ExpectedGroupsType],
@@ -79,7 +81,7 @@ def setup_compute(
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
-        dist_alerts.alert_date,
+        dist_alerts.dist_alert_date,
         dist_alerts.confidence,
     )
     if contextual_layer is not None:
@@ -94,10 +96,14 @@ def setup_compute(
 
 def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_area)
-    df.rename(columns={'value': 'area__ha'}, inplace=True)
-    df.rename(columns={'confidence': 'alert_confidence'}, inplace=True)
-    df['alert_date'] = df.sort_values(by='alert_date').alert_date.apply(lambda x: date(2020, 12, 31) + relativedelta(days=x))
-    df['alert_confidence'] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
+    df.rename(columns={"value": "area_ha"}, inplace=True)
+    df.rename(columns={"confidence": "dist_alert_confidence"}, inplace=True)
+    df["dist_alert_date"] = df.sort_values(by="dist_alert_date").dist_alert_date.apply(
+        lambda x: date(2020, 12, 31) + relativedelta(days=x)
+    )
+    df["dist_alert_confidence"] = df.dist_alert_confidence.apply(
+        lambda x: alerts_confidence[x]
+    )
     return df
 
 

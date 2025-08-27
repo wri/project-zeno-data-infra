@@ -1,9 +1,8 @@
-import pytest
 import datetime
-
 from unittest.mock import patch
 
-from pandera.pandas import DataFrameSchema, Column, Check
+import pytest
+from pandera.pandas import Check, Column, DataFrameSchema
 from prefect.testing.utilities import prefect_test_harness
 
 from pipelines.disturbance.prefect_flows import dist_alerts_area
@@ -14,11 +13,23 @@ from pipelines.disturbance.prefect_flows import dist_alerts_area
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.disturbance.stages._load_zarr")
 def test_gadm_dist_alerts_happy_path(
-    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds
+    mock_load_zarr,
+    mock_save_parquet,
+    dist_ds,
+    country_ds,
+    region_ds,
+    subregion_ds,
+    pixel_area_ds,
 ):
     """Test full workflow with in-memory dependencies"""
 
-    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds]
+    mock_load_zarr.side_effect = [
+        dist_ds,
+        country_ds,
+        region_ds,
+        subregion_ds,
+        pixel_area_ds,
+    ]
 
     with prefect_test_harness():
         result_uri = dist_alerts_area(
@@ -37,7 +48,13 @@ def test_gadm_dist_alerts_happy_path(
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.disturbance.stages._load_zarr")
 def test_gadm_dist_alerts_result(
-    mock_load_zarr, mock_save_parquet, dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds
+    mock_load_zarr,
+    mock_save_parquet,
+    dist_ds,
+    country_ds,
+    region_ds,
+    subregion_ds,
+    pixel_area_ds,
 ):
     alert_schema = DataFrameSchema(
         name="GADM Dist Alerts",
@@ -45,21 +62,31 @@ def test_gadm_dist_alerts_result(
             "country": Column(str, Check.ne("")),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
-            "alert_date": Column(
+            "dist_alert_date": Column(
                 datetime.date,
                 checks=[
-                    Check.greater_than_or_equal_to(datetime.date.fromisoformat("2023-01-01")),
-                    Check.less_than_or_equal_to(datetime.date.fromisoformat("2023-03-11")),
+                    Check.greater_than_or_equal_to(
+                        datetime.date.fromisoformat("2023-01-01")
+                    ),
+                    Check.less_than_or_equal_to(
+                        datetime.date.fromisoformat("2023-03-11")
+                    ),
                 ],
             ),
-            "area__ha": Column("float32", Check.isin([1500.0, 750.0])),
-            "alert_confidence": Column(str, Check.isin(["low", "high"])),
+            "area_ha": Column("float32", Check.isin([1500.0, 750.0])),
+            "dist_alert_confidence": Column(str, Check.isin(["low", "high"])),
         },
-        unique=["country", "region", "subregion", "alert_date", "alert_confidence"],
+        unique=[
+            "country",
+            "region",
+            "subregion",
+            "dist_alert_date",
+            "dist_alert_confidence",
+        ],
         checks=Check(
             lambda df: (
-                df.groupby(["country", "region", "subregion", "alert_date"])[
-                    "alert_confidence"
+                df.groupby(["country", "region", "subregion", "dist_alert_date"])[
+                    "dist_alert_confidence"
                 ].transform("nunique")
                 == 1
             ),
@@ -68,7 +95,13 @@ def test_gadm_dist_alerts_result(
         ),
     )
 
-    mock_load_zarr.side_effect = [dist_ds, country_ds, region_ds, subregion_ds, pixel_area_ds]
+    mock_load_zarr.side_effect = [
+        dist_ds,
+        country_ds,
+        region_ds,
+        subregion_ds,
+        pixel_area_ds,
+    ]
     dist_alerts_area(
         dist_zarr_uri="s3://dummy_zarr_uri",
         dist_version="test_v1",
