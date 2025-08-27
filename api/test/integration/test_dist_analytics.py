@@ -196,9 +196,9 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
                 "country": ["IDN", "IDN"],
                 "region": [24, 24],
                 "subregion": [9, 9],
-                "alert_date": ["2024-08-15", "2024-08-15"],
-                "confidence": ["high", "low"],
-                "value": [1490, 95],
+                "dist_alert_date": ["2024-08-15", "2024-08-15"],
+                "dist_alert_confidence": ["high", "low"],
+                "area_ha": [1490, 95],
             },
         )
 
@@ -216,12 +216,12 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
                 "country": ["IDN", "IDN"],
                 "region": [24, 24],
                 "subregion": [9, 9],
-                "alert_date": [
+                "dist_alert_date": [
                     "2024-08-15",
                     "2024-08-15",
                 ],
-                "confidence": ["high", "low"],
-                "value": [1490, 95],
+                "dist_alert_confidence": ["high", "low"],
+                "area_ha": [1490, 95],
             }
         )
 
@@ -293,15 +293,15 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                 "subregion": [9, 9, 13, 13, 1],
                 "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "BRA.1.1"],
                 "aoi_type": ["admin"] * 5,
-                "alert_date": [
+                "dist_alert_date": [
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                 ],
-                "confidence": ["high", "low", "high", "low", "high"],
-                "value": [
+                "dist_alert_confidence": ["high", "low", "high", "low", "high"],
+                "area_ha": [
                     1.133972e06,
                     7.154635e04,
                     1.064846e06,
@@ -372,7 +372,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "alert_date": [
+                "dist_alert_date": [
                     "2025-02-03",
                     "2025-02-03",
                     "2025-02-11",
@@ -384,7 +384,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "2025-03-05",
                     "2025-02-23",
                 ],
-                "confidence": [
+                "dist_alert_confidence": [
                     "low",
                     "high",
                     "high",
@@ -396,7 +396,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "high",
                     "low",
                 ],
-                "value": [
+                "area_ha": [
                     1511.152588,
                     755.576965,
                     1511.129639,
@@ -460,12 +460,12 @@ async def test_gadm_dist_analytics_no_intersection():
             "subregion": [9, 9],
             "aoi_id": ["IDN.24.9", "IDN.24.9"],
             "aoi_type": ["admin"] * 2,
-            "alert_date": [
+            "dist_alert_date": [
                 "2024-08-15",
                 "2024-08-15",
             ],
-            "confidence": ["high", "low"],
-            "value": [1.133972e06, 7.154635e04],
+            "dist_alert_confidence": ["high", "low"],
+            "area_ha": [113.3972, 7.154635],
         }
     )
 
@@ -502,9 +502,9 @@ async def test_kba_dist_analytics_no_intersection():
         {
             "aoi_id": ["8111"],
             "aoi_type": ["key_biodiversity_area"],
-            "alert_date": ["2024-08-15"],
-            "confidence": ["high"],
-            "value": [77598.828125],
+            "dist_alert_date": ["2024-08-15"],
+            "dist_alert_confidence": ["high"],
+            "area_ha": [7.7598828125],
         }
     )
 
@@ -544,9 +544,9 @@ async def test_admin_dist_analytics_by_grasslands():
             "region": [24, 24],
             "subregion": [3, 3],
             "grasslands": ["non-grasslands", "non-grasslands"],
-            "alert_date": ["2024-08-15", "2024-08-16"],
-            "confidence": ["high", "high"],
-            "value": [19975.835938, 6147.143555],
+            "dist_alert_date": ["2024-08-15", "2024-08-16"],
+            "dist_alert_confidence": ["high", "high"],
+            "area_ha": [19975.835938, 6147.143555],
             "aoi_id": ["TZA.24.3", "TZA.24.3"],
             "aoi_type": ["admin", "admin"],
         }
@@ -616,7 +616,7 @@ async def test_admin_dist_analytics_by_land_cover():
                 "Tree cover",
                 "Tree cover",
             ],
-            "alert_date": [
+            "dist_alert_date": [
                 "2024-08-15",
                 "2024-08-15",
                 "2024-08-15",
@@ -624,7 +624,7 @@ async def test_admin_dist_analytics_by_land_cover():
                 "2024-08-15",
                 "2024-08-16",
             ],
-            "confidence": [
+            "dist_alert_confidence": [
                 "high",
                 "high",
                 "high",
@@ -632,13 +632,13 @@ async def test_admin_dist_analytics_by_land_cover():
                 "high",
                 "high",
             ],
-            "value": [
-                3073.667969,
-                7682.643555,
-                7682.792969,
-                9989.411133,
-                2305.148438,
-                6146.835938,
+            "area_ha": [
+                0.3073667969,
+                0.7682643555,
+                0.7682792969,
+                0.9989411133,
+                0.2305148438,
+                0.6146835938,
             ],
             "aoi_id": [
                 "TZA.24.3",

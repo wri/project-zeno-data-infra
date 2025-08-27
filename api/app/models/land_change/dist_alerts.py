@@ -41,9 +41,9 @@ class DistAlertsAnalyticsIn(StrictBaseModel):
         pattern=DATE_REGEX,
         examples=["2023", "2023-12-31"],
     )
-    intersections: List[Literal["driver", "natural_lands", "grasslands", "land_cover"]] = Field(
-        ..., min_length=0, max_length=1, description="List of intersection types"
-    )
+    intersections: List[
+        Literal["driver", "natural_lands", "grasslands", "land_cover"]
+    ] = Field(..., min_length=0, max_length=1, description="List of intersection types")
 
 
 class DistAlertsAnalytics(StrictBaseModel):
@@ -53,9 +53,9 @@ class DistAlertsAnalytics(StrictBaseModel):
         "subregion": [12, 12, 12],
         "aoi_id": ["BRA.12.1", "BRA.12.1", "BRA.12.1"],
         "aoi_type": ["admin", "admin", "admin"],
-        "alert_date": [731, 733, 733],
-        "confidence": [2, 2, 3],
-        "value": [38, 5, 3],
+        "dist_alert_date": [731, 733, 733],
+        "dist_alert_confidence": [2, 2, 3],
+        "area_ha": [38, 5, 3],
     }
     metadata: Optional[dict] = None
     message: Optional[str] = None

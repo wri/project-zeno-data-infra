@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import traceback
 from functools import partial
 from typing import Optional
@@ -9,7 +8,6 @@ import dask.dataframe as dd
 import duckdb
 import numpy as np
 import pandas as pd
-import s3fs
 import xarray as xr
 from dask.dataframe import DataFrame as DaskDataFrame
 from flox.xarray import xarray_reduce
@@ -17,6 +15,7 @@ from flox.xarray import xarray_reduce
 from ..common.analysis import (
     JULIAN_DATE_2021,
     get_geojson,
+    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_dist_query
@@ -153,7 +152,7 @@ async def zonal_statistics(
         func="sum",
         expected_groups=tuple(expected_groups),
     )
-    alerts_area.name = "value"
+    alerts_area.name = "area_ha"
 
     alerts_df: DaskDataFrame = (
         alerts_area.to_dask_dataframe()
@@ -161,11 +160,11 @@ async def zonal_statistics(
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
     )
-    alerts_df.confidence = alerts_df.confidence.map(
-        {2: "low", 3: "high"}, meta=("confidence", "uint8")
+    alerts_df.dist_alert_confidence = alerts_df.dist_alert_confidence.map(
+        {2: "low", 3: "high"}, meta=("dist_alert_confidence", "uint8")
     )
-    alerts_df.alert_date = dd.to_datetime(
-        alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
+    alerts_df.dist_alert_confidence = dd.to_datetime(
+        alerts_df.dist_alert_confidence + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
     alerts_df["aoi_type"] = aoi["type"].lower()
@@ -194,7 +193,7 @@ async def zonal_statistics(
         )
         alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
 
-    alerts_df = alerts_df[alerts_df.value > 0]
+    alerts_df = alerts_df[alerts_df.area_ha > 0]
     return alerts_df
 
 
@@ -211,23 +210,12 @@ async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_clie
         )
 
     table = get_precomputed_table(aoi["type"], intersection)
-
-    # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-    # For now, we need to just download the file temporarily
-    fs = s3fs.S3FileSystem(requester_pays=True)
-    fs.get(
-        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet2/{table}.parquet",
-        f"/tmp/{table}.parquet",
-    )
-
     precompute_partial = partial(
         get_precomputed_statistic_on_gadm_aoi, table=table, intersection=intersection
     )
     futures = dask_client.map(precompute_partial, aoi["ids"])
     results = await dask_client.gather(futures)
     alerts_df = pd.concat(results)
-
-    os.remove(f"/tmp/{table}.parquet")
 
     return alerts_df
 
@@ -236,27 +224,28 @@ def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
     if aoi_type == "admin":
         # Each intersection will be in a different parquet file
         if intersection is None:
-            table = "gadm_dist_alerts"
+            table = "admin-dist-alerts"
         elif intersection == "driver":
-            table = "gadm_dist_alerts_by_driver"
+            table = "admin-dist-alerts-by-driver"
         elif intersection == "natural_lands":
-            table = "gadm_dist_alerts_by_natural_lands"
+            table = "admin-dist-alerts-by-natural-land-class"
         elif intersection == "grasslands":
-            table = "gadm_dist_alerts_by_grasslands"
+            table = "admin-dist-alerts-by-grassland-class"
         elif intersection == "land_cover":
-            table = "gadm_dist_alerts_by_land_cover"
+            table = "admin-dist-alerts-by-land-cover-class"
         else:
             raise ValueError(f"No way to calculate intersection {intersection}")
     else:
         raise ValueError(f"No way to calculate aoi type {aoi_type}")
 
-    return table
+    return f"s3://lcl-analytics/zonal-statistics/{table}.parquet"
 
 
 async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
     # GADM IDs are coming joined by '.', e.g. IDN.24.9
     gadm_id = id.split(".")
 
+    initialize_duckdb()
     query = create_gadm_dist_query(gadm_id, table, intersection)
     alerts_df = duckdb.query(query).df()
 
@@ -290,10 +279,12 @@ async def do_analytics(file_path, dask_client):
 
         if metadata_content["start_date"] is not None:
             alerts_df = alerts_df[
-                alerts_df.alert_date >= metadata_content["start_date"]
+                alerts_df.dist_alert_date >= metadata_content["start_date"]
             ]
         if metadata_content["end_date"] is not None:
-            alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+            alerts_df = alerts_df[
+                alerts_df.dist_alert_date <= metadata_content["end_date"]
+            ]
         alerts_dict = alerts_df.to_dict(orient="list")
 
         data = file_path / "data.json"
