@@ -160,11 +160,17 @@ async def zonal_statistics(
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
     )
+    alerts_df = alerts_df.rename(
+        columns={
+            "confidence": "dist_alert_confidence",
+            "alert_date": "dist_alert_date",
+        }
+    )
     alerts_df.dist_alert_confidence = alerts_df.dist_alert_confidence.map(
         {2: "low", 3: "high"}, meta=("dist_alert_confidence", "uint8")
     )
-    alerts_df.dist_alert_confidence = dd.to_datetime(
-        alerts_df.dist_alert_confidence + JULIAN_DATE_2021, origin="julian", unit="D"
+    alerts_df.dist_alert_date = dd.to_datetime(
+        alerts_df.dist_alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
     alerts_df["aoi_type"] = aoi["type"].lower()

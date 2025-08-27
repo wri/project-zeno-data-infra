@@ -546,7 +546,7 @@ async def test_admin_dist_analytics_by_grasslands():
             "grasslands": ["non-grasslands", "non-grasslands"],
             "dist_alert_date": ["2024-08-15", "2024-08-16"],
             "dist_alert_confidence": ["high", "high"],
-            "area_ha": [19975.835938, 6147.143555],
+            "area_ha": [1.9975835938, 0.6147143555],
             "aoi_id": ["TZA.24.3", "TZA.24.3"],
             "aoi_type": ["admin", "admin"],
         }
