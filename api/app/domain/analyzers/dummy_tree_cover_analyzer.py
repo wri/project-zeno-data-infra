@@ -11,6 +11,12 @@ class DummyTreeCoverAnalyzer(Analyzer):
 
         return {
             "aoi_id": analysis.metadata["aoi"]["ids"] ,
-            "aoi_type": [land_cover_change_analytics_in.aoi.type],
-            "area_ha": random() * 100,
+            "aoi_type": [
+                land_cover_change_analytics_in.aoi.type
+                for _ in analysis.metadata["aoi"]["ids"]
+            ],
+            "area_ha": [
+                random() * 100
+                for _ in analysis.metadata["aoi"]["ids"]
+            ]
         }
