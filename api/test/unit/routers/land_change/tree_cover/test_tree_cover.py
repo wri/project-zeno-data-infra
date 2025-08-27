@@ -26,7 +26,7 @@ def dummy_analytics_in():
             type="admin",
             ids=["IDN.24.9"],
         ),
-        tcd_threshold="30",
+        canopy_cover="30",
     )
 
 
