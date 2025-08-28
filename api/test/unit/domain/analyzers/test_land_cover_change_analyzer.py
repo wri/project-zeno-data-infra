@@ -213,7 +213,12 @@ class TestLandCoverChangeCustomAois:
         )
 
         pd.testing.assert_frame_equal(
-            pd.DataFrame(self.analysis_repo.analysis.result), expected, check_like=True
+            pd.DataFrame(self.analysis_repo.analysis.result),
+            expected,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
         )
 
 

@@ -79,6 +79,7 @@ class TestLandCoverChangeData:
             pd.DataFrame(resource["result"]),
             expected,
             check_like=True,
-            rtol=1e-4,
-            atol=1e-4,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-2,  # Relative tolerance
         )

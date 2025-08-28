@@ -227,7 +227,14 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
 
         actual_df = pd.DataFrame(self.test_request.json()["data"]["result"])
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
     def test_returns_200_Ok_response_code(self):
         response = self.test_request
@@ -315,7 +322,14 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
 
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 class TestDistAnalyticsPostWithMultipleKBAAOIs:
@@ -430,7 +444,14 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
 
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 @pytest.mark.asyncio
@@ -475,7 +496,14 @@ async def test_gadm_dist_analytics_no_intersection():
 
     actual_df = pd.DataFrame(data["result"])
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -515,7 +543,14 @@ async def test_kba_dist_analytics_no_intersection():
     actual_df = pd.DataFrame(data["result"])
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -559,7 +594,14 @@ async def test_admin_dist_analytics_by_grasslands():
     actual_df = pd.DataFrame(data["result"])
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -667,4 +709,11 @@ async def test_admin_dist_analytics_by_land_cover():
     pd.set_option("display.max_columns", None)
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )

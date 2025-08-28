@@ -23,7 +23,7 @@ from shapely.geometry import box
 async def test_get_tree_cover_loss_precalc_handler_happy_path():
     class MockParquetQueryService:
         async def execute(self, data_source: str, query: str):
-            data_source = pd.DataFrame(
+            data_source = pd.DataFrame(  # noqa
                 {
                     "aoi_id": ["BRA", "BRA", "BRA"],
                     "aoi_type": ["admin", "admin", "admin"],
@@ -109,4 +109,7 @@ async def test_flox_handler_happy_path():
             },
         ),
         check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
     )

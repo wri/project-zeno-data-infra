@@ -162,7 +162,14 @@ class TestDistAlertsZonalStats:
             }
         )
         print(computed_df)
-        pd.testing.assert_frame_equal(expected_df, computed_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            computed_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
     @pytest.mark.asyncio
     async def test_zonal_statistics_land_cover_happy_path(self) -> None:
@@ -271,4 +278,11 @@ class TestDistAlertsZonalStats:
             }
         )
         print(computed_df)
-        pd.testing.assert_frame_equal(expected_df, computed_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            computed_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )

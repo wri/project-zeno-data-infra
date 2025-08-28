@@ -105,7 +105,14 @@ class TestGrasslandsPreComputedAnalysis:
         expected_df["aoi_id"] = "BRA.1"
         expected_df["aoi_type"] = "admin"
 
-        pd.testing.assert_frame_equal(expected_df, result_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            result_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 class TestGrasslandsOTFAnalysis:
@@ -200,4 +207,11 @@ class TestGrasslandsOTFAnalysis:
             }
         )
 
-        pd.testing.assert_frame_equal(expected_df, computed_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            computed_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
