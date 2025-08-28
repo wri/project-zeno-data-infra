@@ -81,7 +81,7 @@ def setup_compute(
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
-        dist_alerts.dist_alert_date,
+        dist_alerts.alert_date,
         dist_alerts.confidence,
     )
     if contextual_layer is not None:
@@ -98,6 +98,7 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_area)
     df.rename(columns={"value": "area_ha"}, inplace=True)
     df.rename(columns={"confidence": "dist_alert_confidence"}, inplace=True)
+    df.rename(columns={"alert_date": "dist_alert_date"}, inplace=True)
     df["dist_alert_date"] = df.sort_values(by="dist_alert_date").dist_alert_date.apply(
         lambda x: date(2020, 12, 31) + relativedelta(days=x)
     )

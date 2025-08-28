@@ -77,7 +77,7 @@ def test_gadm_dist_alerts_result(
                     ),
                 ],
             ),
-            "alert_confidence": Column(str, Check.isin(["low", "high"])),
+            "dist_alert_confidence": Column(str, Check.isin(["low", "high"])),
             "area_ha": Column("float32", Check.isin([1500.0, 750.0])),
         },
         unique=[
@@ -86,13 +86,13 @@ def test_gadm_dist_alerts_result(
             "subregion",
             "land_cover",
             "dist_alert_date",
-            "alert_confidence",
+            "dist_alert_confidence",
         ],
         checks=Check(
             lambda df: (
                 df.groupby(
                     ["country", "region", "subregion", "land_cover", "dist_alert_date"]
-                )["alert_confidence"].transform("nunique")
+                )["dist_alert_confidence"].transform("nunique")
                 == 1
             ),
             name="two_confidences_per_group",
