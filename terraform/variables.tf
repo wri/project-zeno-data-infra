@@ -19,3 +19,11 @@ variable "api_image" {
 variable "api_key" {
   type        = string
 }
+
+variable "aws_secret_access_key" {
+  default = string
+}
+
+variable "aws_access_key_id" {
+  default = string
+}

@@ -199,16 +199,20 @@ jobs:
         if: success()
         env:
           API_KEY: ${{ secrets.API_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         run: |
           IMAGE_PATH=${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
           cd terraform
           terraform init
-          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" --out=tf.plan
+          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" -var="aws_secret_access_key=${{env.AWS_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ACCESS_KEY_ID}}" --out=tf.plan
 
       - name: Terraform Apply
         if: success()
         env:
           API_KEY: ${{ secrets.API_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         run: |
           cd terraform
           terraform apply -auto-approve tf.plan

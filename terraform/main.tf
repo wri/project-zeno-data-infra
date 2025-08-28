@@ -68,6 +68,14 @@ module "ecs" {
             {
               name = "API_KEY"
               value = var.api_key
+            },
+            {
+              name = "AWS_SECRET_ACCESS_KEY"
+              value = var.aws_secret_access_key
+            },
+            {
+              name = "AWS_ACCESS_KEY_ID"
+              value = var.aws_access_key_id
             }
           ]
         }
