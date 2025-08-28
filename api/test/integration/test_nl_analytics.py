@@ -3,6 +3,7 @@ import os
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -501,23 +502,26 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                     "Cropland",
                     "Built-up",
                 ],
-                "area_ha": [
-                    1283753.375,
-                    537220.6875,
-                    755.5975341796875,
-                    755.5962524414062,
-                    3408339.5,
-                    24179.55859375,
-                    2266.7939453125,
-                    28739.07421875,
-                    14369.591796875,
-                    756.2982788085938,
-                    756.300048828125,
-                    540757.5,
-                    53697.4140625,
-                    222894.53125,
-                    982229.875,
-                ],
+                "area_ha": np.array(
+                    [
+                        1283753.375,
+                        537220.6875,
+                        755.5975341796875,
+                        755.5962524414062,
+                        3408339.5,
+                        24179.55859375,
+                        2266.7939453125,
+                        28739.07421875,
+                        14369.591796875,
+                        756.2982788085938,
+                        756.300048828125,
+                        540757.5,
+                        53697.4140625,
+                        222894.53125,
+                        982229.875,
+                    ]
+                )
+                / 10000,
                 "aoi_type": [
                     "key_biodiversity_area",
                     "key_biodiversity_area",
@@ -679,7 +683,10 @@ async def test_kba_dist_analytics_no_intersection():
                 "Cropland",
                 "Built-up",
             ],
-            "area_ha": [9463.1279296875, 630.880126953125, 56548228.0, 2698569.5],
+            "area_ha": np.array(
+                [9463.1279296875, 630.880126953125, 56548228.0, 2698569.5]
+            )
+            / 10000,
             "aoi_type": [
                 "key_biodiversity_area",
                 "key_biodiversity_area",

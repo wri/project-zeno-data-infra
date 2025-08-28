@@ -47,7 +47,7 @@ def create_gadm_dist_query(
     order_by_clause = f"ORDER {by_clause}"
 
     # Query and make sure output names match the expected schema
-    select_clause += ", STRFTIME(dist_alert_date, '%Y-%m-%d') AS dist_alert_date, dist_alert_confidence AS dist_alert_confidence, SUM(area_ha)::FLOAT AS area_ha"
+    select_clause += ", STRFTIME(dist_alert_date, '%Y-%m-%d') AS dist_alert_date, dist_alert_confidence, SUM(area_ha)::FLOAT AS area_ha"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
     return query

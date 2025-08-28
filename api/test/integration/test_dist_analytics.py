@@ -5,6 +5,7 @@ from test.integration import (
     write_metadata_file,
 )
 
+import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -302,11 +303,11 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                 ],
                 "dist_alert_confidence": ["high", "low", "high", "low", "high"],
                 "area_ha": [
-                    1.133972e06,
-                    7.154635e04,
-                    1.064846e06,
-                    9.065568e04,
-                    1.547240e06,
+                    113.39714813232422,
+                    7.154634952545166,
+                    106.48455047607422,
+                    9.065567970275879,
+                    154.72398376464844,
                 ],
             }
         )
@@ -396,18 +397,21 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "high",
                     "low",
                 ],
-                "area_ha": [
-                    1511.152588,
-                    755.576965,
-                    1511.129639,
-                    1511.129639,
-                    755.584412,
-                    3025.184570,
-                    5294.074707,
-                    3781.512695,
-                    756.304932,
-                    755.576294,
-                ],
+                "area_ha": np.array(
+                    [
+                        1511.152588,
+                        755.576965,
+                        1511.129639,
+                        1511.129639,
+                        755.584412,
+                        3025.184570,
+                        5294.074707,
+                        3781.512695,
+                        756.304932,
+                        755.576294,
+                    ]
+                )
+                / 10000,
                 "aoi_id": [
                     "18392",
                     "18392",

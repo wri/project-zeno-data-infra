@@ -103,7 +103,7 @@ async def test_flox_handler_happy_path():
         pd.DataFrame(
             {
                 "tree_cover_loss_year": [2015],
-                "area_ha": [12.5],
+                "area_ha": [125000.0],
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],
             },

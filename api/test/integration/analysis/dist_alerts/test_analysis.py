@@ -107,7 +107,7 @@ class TestDistAlertsZonalStats:
                     "non-grasslands",
                     "non-grasslands",
                 ],
-                "value": np.array(
+                "area_ha": np.array(
                     [
                         4609.902832,
                         768.292908,
@@ -228,7 +228,7 @@ class TestDistAlertsZonalStats:
                     "Tree cover",
                     "Short vegetation",
                 ],
-                "value": np.array(
+                "area_ha": np.array(
                     [
                         33036.54,
                         3841.4575,
