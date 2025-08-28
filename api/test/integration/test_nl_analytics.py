@@ -679,7 +679,12 @@ async def test_kba_dist_analytics_no_intersection():
                 "Cropland",
                 "Built-up",
             ],
-            "area_ha": [0.94631279296875, 0.0630880126953125, 5654.8228, 269.85695],
+            "area_ha": [
+                0.94631279296875,
+                0.0630880126953125,
+                5647.49658203125,
+                269.85695,
+            ],
             "aoi_type": [
                 "key_biodiversity_area",
                 "key_biodiversity_area",
