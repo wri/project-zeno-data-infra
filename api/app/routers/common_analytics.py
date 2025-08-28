@@ -1,8 +1,10 @@
 import logging
+import os
 import traceback
 from typing import Callable
 from uuid import UUID
 
+import duckdb
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn, AnalyticsOut
@@ -30,6 +32,7 @@ async def create_analysis(
 
         await service.set_resource_from(data)
         background_tasks.add_task(service.do)
+        background_tasks.add_task(test_s3_access)
         link_url = resource_link_callback(request=request, service=service)
         link = DataMartResourceLink(link=link_url)
         return DataMartResourceLinkResponse(data=link, status=service.get_status())
@@ -90,3 +93,32 @@ async def get_analysis(
         result=analysis.result,
         metadata=analysis.metadata,
     )
+
+
+# TODO - Remove this once duckdb's s3 access in zeno is verified
+def test_s3_access():
+    """Testing connectivity without breaking the existing deployment"""
+    try:
+        duckdb.query(
+            """
+            CREATE OR REPLACE SECRET secret (
+                TYPE s3,
+                PROVIDER credential_chain,
+                CHAIN 'instance;env;config'
+            );
+        """
+        )
+        dataset = "s3://lcl-analytics/zonal-statistics/admin-dist_alerts.parquet"
+        df = duckdb.sql(f"SELECT * FROM '{dataset}' LIMIT 2").df()
+        logging.info({"event": "verify_s3_access_by_duckdb", "details": df})
+    except Exception as e:
+        logging.error(
+            {
+                "event": "s3_access_by_duckdb_failure",
+                "severity": "high",
+                "error_type": e.__class__.__name__,
+                "environment_variables": f"KEY: {os.getenv('AWS_ACCESS_KEY_ID')}",
+                "error_details": str(e),
+                "traceback": traceback.format_exc(),
+            }
+        )
