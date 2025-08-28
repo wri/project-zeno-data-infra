@@ -21,9 +21,9 @@ variable "api_key" {
 }
 
 variable "aws_secret_access_key" {
-  default = string
+  type = string
 }
 
 variable "aws_access_key_id" {
-  default = string
+  type = string
 }
