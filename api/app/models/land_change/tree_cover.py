@@ -21,7 +21,7 @@ AoiUnion = Union[
 ]
 
 
-ValidCC = Literal["10", "15", "20", "25", "30", "50", "75"]
+ValidCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 
 
 class TreeCoverAnalyticsIn(AnalyticsIn):
@@ -30,11 +30,11 @@ class TreeCoverAnalyticsIn(AnalyticsIn):
         title="AOI",
         description="AOI to calculate in.",
     )
-    canopy_cover: ValidCC = Field(
+    canopy_cover: ValidCanopyCover = Field(
         ...,
         title="Canopy cover threshold",
         description="Minimum canopy density to consider tree cover, in percent.",
-        examples=["10", "35"],
+        examples=[10, 35],
     )
 
 
@@ -76,7 +76,7 @@ class TreeCoverAnalyticsResponse(Response):
                                 "type": "admin",
                                 "ids": ["BRA.1.12"],
                             },
-                            "canopy_cover": "10",
+                            "canopy_cover": 10,
                         },
                         "message": "",
                         "status": "saved",
