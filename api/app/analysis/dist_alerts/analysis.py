@@ -1,26 +1,24 @@
 import json
 import logging
-import os
 import traceback
 from functools import partial
 from typing import Optional
 
 import dask.dataframe as dd
-from dask.dataframe import DataFrame as DaskDataFrame
 import duckdb
 import numpy as np
 import pandas as pd
-import s3fs
-from flox.xarray import xarray_reduce
 import xarray as xr
+from dask.dataframe import DataFrame as DaskDataFrame
+from flox.xarray import xarray_reduce
 
 from ..common.analysis import (
     JULIAN_DATE_2021,
     get_geojson,
+    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_dist_query
-
 
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
@@ -88,12 +86,16 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
     return alerts_df
 
 
-async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> DaskDataFrame:
+async def zonal_statistics(
+    aoi, geojson, intersection: Optional[str] = None
+) -> DaskDataFrame:
     dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
-    pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr"
-    pixel_area = read_zarr_clipped_to_geojson(pixel_area_uri, geojson).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
+    pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
+    pixel_area = read_zarr_clipped_to_geojson(
+        pixel_area_uri, geojson
+    ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 2000), [1, 2, 3]]
@@ -113,9 +115,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         dist_drivers = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr",
             geojson,
-        ).band_data.reindex_like(
-            dist_alerts, method="nearest", tolerance=1e-5
-        )
+        ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
         dist_drivers.name = "driver"
 
         groupby_layers.append(dist_drivers)
@@ -152,7 +152,7 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         func="sum",
         expected_groups=tuple(expected_groups),
     )
-    alerts_area.name = "value"
+    alerts_area.name = "area_ha"
 
     alerts_df: DaskDataFrame = (
         alerts_area.to_dask_dataframe()
@@ -160,9 +160,17 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         .drop("spatial_ref", axis=1)
         .reset_index(drop=True)
     )
-    alerts_df.confidence = alerts_df.confidence.map({2: "low", 3: "high"}, meta=("confidence", "uint8"))
-    alerts_df.alert_date = dd.to_datetime(
-        alerts_df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
+    alerts_df = alerts_df.rename(
+        columns={
+            "confidence": "dist_alert_confidence",
+            "alert_date": "dist_alert_date",
+        }
+    )
+    alerts_df.dist_alert_confidence = alerts_df.dist_alert_confidence.map(
+        {2: "low", 3: "high"}, meta=("dist_alert_confidence", "uint8")
+    )
+    alerts_df.dist_alert_date = dd.to_datetime(
+        alerts_df.dist_alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
     ).dt.strftime("%Y-%m-%d")
 
     alerts_df["aoi_type"] = aoi["type"].lower()
@@ -181,7 +189,8 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         )
     elif intersection == "grasslands":
         alerts_df["grasslands"] = alerts_df["grasslands"].apply(
-            (lambda x: "grasslands" if x == 1 else "non-grasslands"), meta=("grasslands", "uint8")
+            (lambda x: "grasslands" if x == 1 else "non-grasslands"),
+            meta=("grasslands", "uint8"),
         )
         alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
     elif intersection == "land_cover":
@@ -190,49 +199,29 @@ async def zonal_statistics(aoi, geojson, intersection: Optional[str] = None) -> 
         )
         alerts_df = alerts_df.drop("year", axis=1).reset_index(drop=True)
 
-    alerts_df = alerts_df[alerts_df.value > 0]
+    alerts_df = alerts_df[alerts_df.area_ha > 0]
     return alerts_df
 
 
 async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_client):
-    if aoi["type"] != "admin" or intersection not in [None, "natural_lands", "driver", "grasslands", "land_cover"]:
+    if aoi["type"] != "admin" or intersection not in [
+        None,
+        "natural_lands",
+        "driver",
+        "grasslands",
+        "land_cover",
+    ]:
         raise ValueError(
             f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
         )
 
     table = get_precomputed_table(aoi["type"], intersection)
-
-    # Dumbly doing this per request since the STS token expires eventually otherwise
-    # According to this issue, duckdb should auto refresh the token in 1.3.0,
-    # but it doesn't seem to work for us and people are reporting the same on the issue
-    # https://github.com/duckdb/duckdb-aws/issues/26
-    # TODO do this on lifecycle start once autorefresh works
-    duckdb.query(
-        """
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain,
-            CHAIN config
-        );
-    """
-    )
-
-    # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-    # For now, we need to just download the file temporarily
-    fs = s3fs.S3FileSystem(requester_pays=True)
-    fs.get(
-        f"s3://gfw-data-lake/umd_glad_dist_alerts/parquet2/{table}.parquet",
-        f"/tmp/{table}.parquet",
-    )
-
     precompute_partial = partial(
         get_precomputed_statistic_on_gadm_aoi, table=table, intersection=intersection
     )
     futures = dask_client.map(precompute_partial, aoi["ids"])
     results = await dask_client.gather(futures)
     alerts_df = pd.concat(results)
-
-    os.remove(f"/tmp/{table}.parquet")
 
     return alerts_df
 
@@ -241,27 +230,28 @@ def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
     if aoi_type == "admin":
         # Each intersection will be in a different parquet file
         if intersection is None:
-            table = "gadm_dist_alerts"
+            table = "admin-dist-alerts"
         elif intersection == "driver":
-            table = "gadm_dist_alerts_by_driver"
+            table = "admin-dist-alerts-by-driver"
         elif intersection == "natural_lands":
-            table = "gadm_dist_alerts_by_natural_lands"
+            table = "admin-dist-alerts-by-natural-land-class"
         elif intersection == "grasslands":
-            table = "gadm_dist_alerts_by_grasslands"
+            table = "admin-dist-alerts-by-grassland-class"
         elif intersection == "land_cover":
-            table = "gadm_dist_alerts_by_land_cover"
+            table = "admin-dist-alerts-by-land-cover-class"
         else:
             raise ValueError(f"No way to calculate intersection {intersection}")
     else:
         raise ValueError(f"No way to calculate aoi type {aoi_type}")
 
-    return table
+    return f"s3://lcl-analytics/zonal-statistics/{table}.parquet"
 
 
 async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
     # GADM IDs are coming joined by '.', e.g. IDN.24.9
     gadm_id = id.split(".")
 
+    initialize_duckdb()
     query = create_gadm_dist_query(gadm_id, table, intersection)
     alerts_df = duckdb.query(query).df()
 
@@ -295,10 +285,12 @@ async def do_analytics(file_path, dask_client):
 
         if metadata_content["start_date"] is not None:
             alerts_df = alerts_df[
-                alerts_df.alert_date >= metadata_content["start_date"]
+                alerts_df.dist_alert_date >= metadata_content["start_date"]
             ]
         if metadata_content["end_date"] is not None:
-            alerts_df = alerts_df[alerts_df.alert_date <= metadata_content["end_date"]]
+            alerts_df = alerts_df[
+                alerts_df.dist_alert_date <= metadata_content["end_date"]
+            ]
         alerts_dict = alerts_df.to_dict(orient="list")
 
         data = file_path / "data.json"

@@ -4,7 +4,7 @@ from typing import Tuple
 def create_gadm_natural_lands_query(gadm_id: Tuple[str, int, int], table: str) -> str:
     # Build up the DuckDB query based on GADM ID and intersection
 
-    from_clause = f"FROM '/tmp/{table}.parquet'"
+    from_clause = f"FROM '{table}'"
     select_clause = "SELECT country"
     where_clause = f"WHERE country = '{gadm_id[0]}'"
     by_clause = "BY country"
@@ -27,7 +27,7 @@ def create_gadm_natural_lands_query(gadm_id: Tuple[str, int, int], table: str) -
     order_by_clause = f"ORDER {by_clause}"
 
     # Query and make sure output names match the expected schema (?)
-    select_clause += ", SUM(value) AS value"
+    select_clause += ", SUM(area_ha) AS area_ha"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
     return query

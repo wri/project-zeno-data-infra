@@ -83,7 +83,7 @@ class GrasslandsAnalyticsResponse(Response):
                             "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
                             "aoi_type": ["admin", "admin", "admin"],
                             "year": [2000, 2001, 2002],
-                            "grassland_area": [384.9, 483.1, 1858.3],
+                            "area_ha": [384.9, 483.1, 1858.3],
                         },
                         "metadata": {
                             "aoi": {

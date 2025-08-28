@@ -56,7 +56,7 @@ async def retry_getting_resource(router: str, resource_id: str, client):
         resp = await client.get(f"/v0/land_change/{router}/analytics/{resource_id}")
         data = resp.json()["data"]
         status = data["status"]
-        time.sleep(10)
+        time.sleep(1)
         attempts += 1
     if attempts >= 10:
         pytest.fail("Resource stuck on 'pending' status")

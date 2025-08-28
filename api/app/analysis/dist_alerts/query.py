@@ -20,7 +20,7 @@ def create_gadm_dist_query(
         elif intersection == "land_cover":
             intersection_col = "land_cover"
 
-    from_clause = f"FROM '/tmp/{table}.parquet'"
+    from_clause = f"FROM '{table}'"
     select_clause = "SELECT country"
     where_clause = f"WHERE country = '{gadm_id[0]}'"
     by_clause = "BY country"
@@ -42,12 +42,12 @@ def create_gadm_dist_query(
         select_clause += f", {intersection_col}"
         by_clause += f", {intersection_col}"
 
-    by_clause += ", alert_date, alert_confidence"
+    by_clause += ", dist_alert_date, dist_alert_confidence"
     group_by_clause = f"GROUP {by_clause}"
     order_by_clause = f"ORDER {by_clause}"
 
     # Query and make sure output names match the expected schema
-    select_clause += ", STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, alert_confidence AS confidence, SUM(area__ha)::FLOAT AS value"
+    select_clause += ", STRFTIME(dist_alert_date, '%Y-%m-%d') AS dist_alert_date, dist_alert_confidence, SUM(area_ha)::FLOAT AS area_ha"
     query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
 
     return query

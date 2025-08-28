@@ -173,7 +173,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
                 "country": ["IDN", "IDN"],
                 "region": [24, 24],
                 "subregion": [9, 9],
-                "value": [1490, 95],
+                "area_ha": [1490, 95],
             },
         )
 
@@ -191,12 +191,19 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
                 "country": ["IDN", "IDN"],
                 "region": [24, 24],
                 "subregion": [9, 9],
-                "value": [1490, 95],
+                "area_ha": [1490, 95],
             }
         )
 
         actual_df = pd.DataFrame(self.test_request.json()["data"]["result"])
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
     def test_returns_200_Ok_response_code(self):
         response = self.test_request
@@ -253,17 +260,192 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "natural_lands_class": [ "Bare", "Built-up", "Cropland", "Mangroves", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural peat tree cover", "Non-natural tree cover", "Non-natural water", "Wetland natural forests", "Wetland natural short vegetation", "Bare", "Built-up", "Cropland", "Mangroves", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural peat tree cover", "Non-natural tree cover", "Non-natural water", "Wetland natural forests", "Wetland natural short vegetation", "Bare", "Built-up", "Cropland", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural bare", "Non-natural hhort vegetation", "Non-natural peat short vegetation", "Wetland natural forests", "Wetland natural short vegetation" ],
-                "value": [9.740458e+06, 2.090808e+07, 2.541468e+09, 4.888979e+07, 3.328120e+08, 3.105780e+09, 5.471748e+07, 3.988614e+07, 2.174403e+08, 2.894916e+09, 3.775664e+09, 4.592512e+05, 1.000054e+04, 3.282669e+06, 4.855151e+07, 3.353656e+07, 3.509238e+07, 3.836173e+06, 7.144767e+09, 1.009753e+09, 3.081966e+09, 1.303954e+09, 2.055539e+08, 2.900014e+08, 3.041038e+09, 1.497757e+07, 8.448399e+03, 9.340168e+08, 5.305185e+03, 3.279676e+06, 7.459009e+05, 5.293314e+08, 9.941912e+06, 4.091888e+04, 7.072698e+05, 6.229126e+06, 2.008433e+05, 1.254880e+09, 1.331169e+06, 9.967673e+06, 4.069406e+05 ],
-                "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "IDN.14.13", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1", "BRA.1.1"],
-                "aoi_type": ["admin", "admin", "admin", "admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin","admin", "admin", "admin", "admin", "admin" ],
+                "natural_lands_class": [
+                    "Bare",
+                    "Built-up",
+                    "Cropland",
+                    "Mangroves",
+                    "Natural forests",
+                    "Natural peat forests",
+                    "Natural peat short vegetation",
+                    "Natural short vegetation",
+                    "Natural water",
+                    "Non-natural peat tree cover",
+                    "Non-natural tree cover",
+                    "Non-natural water",
+                    "Wetland natural forests",
+                    "Wetland natural short vegetation",
+                    "Bare",
+                    "Built-up",
+                    "Cropland",
+                    "Mangroves",
+                    "Natural forests",
+                    "Natural peat forests",
+                    "Natural peat short vegetation",
+                    "Natural short vegetation",
+                    "Natural water",
+                    "Non-natural peat tree cover",
+                    "Non-natural tree cover",
+                    "Non-natural water",
+                    "Wetland natural forests",
+                    "Wetland natural short vegetation",
+                    "Bare",
+                    "Built-up",
+                    "Cropland",
+                    "Natural forests",
+                    "Natural peat forests",
+                    "Natural peat short vegetation",
+                    "Natural short vegetation",
+                    "Natural water",
+                    "Non-natural bare",
+                    "Non-natural hhort vegetation",
+                    "Non-natural peat short vegetation",
+                    "Wetland natural forests",
+                    "Wetland natural short vegetation",
+                ],
+                "area_ha": [
+                    9.740458e06,
+                    2.090808e07,
+                    2.541468e09,
+                    4.888979e07,
+                    3.328120e08,
+                    3.105780e09,
+                    5.471748e07,
+                    3.988614e07,
+                    2.174403e08,
+                    2.894916e09,
+                    3.775664e09,
+                    4.592512e05,
+                    1.000054e04,
+                    3.282669e06,
+                    4.855151e07,
+                    3.353656e07,
+                    3.509238e07,
+                    3.836173e06,
+                    7.144767e09,
+                    1.009753e09,
+                    3.081966e09,
+                    1.303954e09,
+                    2.055539e08,
+                    2.900014e08,
+                    3.041038e09,
+                    1.497757e07,
+                    8.448399e03,
+                    9.340168e08,
+                    5.305185e03,
+                    3.279676e06,
+                    7.459009e05,
+                    5.293314e08,
+                    9.941912e06,
+                    4.091888e04,
+                    7.072698e05,
+                    6.229126e06,
+                    2.008433e05,
+                    1.254880e09,
+                    1.331169e06,
+                    9.967673e06,
+                    4.069406e05,
+                ],
+                "aoi_id": [
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                    "BRA.1.1",
+                ],
+                "aoi_type": [
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                    "admin",
+                ],
             }
         )
 
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
 
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 class TestNLAnalyticsPostWithMultipleKBAAOIs:
@@ -333,22 +515,22 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                     "Cropland",
                     "Built-up",
                 ],
-                "natural_lands_area": [
-                    1283753.375,
-                    537220.6875,
-                    755.5975341796875,
-                    755.5962524414062,
-                    3408339.5,
-                    24179.55859375,
-                    2266.7939453125,
-                    28739.07421875,
-                    14369.591796875,
-                    756.2982788085938,
-                    756.300048828125,
-                    540757.5,
-                    53697.4140625,
-                    222894.53125,
-                    982229.875
+                "area_ha": [
+                    128.3753375,
+                    53.72206875,
+                    0.07555975341796875,
+                    0.07555962524414063,
+                    340.83395,
+                    2.417955859375,
+                    0.22667939453125,
+                    2.873907421875,
+                    1.4369591796875,
+                    0.07562982788085937,
+                    0.0756300048828125,
+                    54.07575,
+                    5.36974140625,
+                    22.289453125,
+                    98.2229875,
                 ],
                 "aoi_type": [
                     "key_biodiversity_area",
@@ -388,7 +570,15 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
         )
         actual_df = pd.DataFrame(data["result"])
 
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        # Use tolerance for floating-point comparison
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 @pytest.mark.asyncio
@@ -412,16 +602,83 @@ async def test_gadm_dist_analytics_no_intersection():
 
     expected_df = pd.DataFrame(
         {
-            "value": [9.740458e+06, 2.090808e+07, 2.541468e+09, 4.888979e+07, 3.328120e+08, 3.105780e+09, 5.471748e+07, 3.988614e+07, 2.174403e+08, 2.894916e+09, 3.775664e+09, 4.592512e+05, 1.000054e+04, 3.282669e+06 ],
-            "natural_lands_class": ["Bare", "Built-up", "Cropland", "Mangroves", "Natural forests", "Natural peat forests", "Natural peat short vegetation", "Natural short vegetation", "Natural water", "Non-natural peat tree cover", "Non-natural tree cover", "Non-natural water", "Wetland natural forests", "Wetland natural short vegetation" ],
-            "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9", "IDN.24.9"],
-            "aoi_type": ["admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin", "admin" ]
+            "area_ha": [
+                9.740458e06,
+                2.090808e07,
+                2.541468e09,
+                4.888979e07,
+                3.328120e08,
+                3.105780e09,
+                5.471748e07,
+                3.988614e07,
+                2.174403e08,
+                2.894916e09,
+                3.775664e09,
+                4.592512e05,
+                1.000054e04,
+                3.282669e06,
+            ],
+            "natural_lands_class": [
+                "Bare",
+                "Built-up",
+                "Cropland",
+                "Mangroves",
+                "Natural forests",
+                "Natural peat forests",
+                "Natural peat short vegetation",
+                "Natural short vegetation",
+                "Natural water",
+                "Non-natural peat tree cover",
+                "Non-natural tree cover",
+                "Non-natural water",
+                "Wetland natural forests",
+                "Wetland natural short vegetation",
+            ],
+            "aoi_id": [
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
+            ],
+            "aoi_type": [
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+                "admin",
+            ],
         }
     )
 
     actual_df = pd.DataFrame(data["result"])
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -451,11 +708,11 @@ async def test_kba_dist_analytics_no_intersection():
                 "Cropland",
                 "Built-up",
             ],
-            "natural_lands_area": [
-                9463.1279296875,
-                630.880126953125,
-                56548228.0,
-                2698569.5
+            "area_ha": [
+                0.94631279296875,
+                0.0630880126953125,
+                5647.49658203125,
+                269.85695,
             ],
             "aoi_type": [
                 "key_biodiversity_area",
@@ -473,10 +730,17 @@ async def test_kba_dist_analytics_no_intersection():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    pd.set_option('display.max_columns', 10)
+    pd.set_option("display.max_columns", 10)
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 ##################################################################
@@ -518,12 +782,16 @@ def write_data_file(dir_path, data):
 
 
 async def retry_getting_resource(resource_id: str, client):
-    resource = await client.get(f"/v0/land_change/natural_lands/analytics/{resource_id}")
+    resource = await client.get(
+        f"/v0/land_change/natural_lands/analytics/{resource_id}"
+    )
     data = resource.json()["data"]
     status = data["status"]
     attempts = 1
     while status == "pending" and attempts < 10:
-        resp = await client.get(f"/v0/land_change/natural_lands/analytics/{resource_id}")
+        resp = await client.get(
+            f"/v0/land_change/natural_lands/analytics/{resource_id}"
+        )
         data = resp.json()["data"]
         status = data["status"]
         time.sleep(1)

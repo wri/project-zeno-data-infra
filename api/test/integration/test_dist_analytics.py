@@ -5,6 +5,7 @@ from test.integration import (
     write_metadata_file,
 )
 
+import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -196,9 +197,9 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
                 "country": ["IDN", "IDN"],
                 "region": [24, 24],
                 "subregion": [9, 9],
-                "alert_date": ["2024-08-15", "2024-08-15"],
-                "confidence": ["high", "low"],
-                "value": [1490, 95],
+                "dist_alert_date": ["2024-08-15", "2024-08-15"],
+                "dist_alert_confidence": ["high", "low"],
+                "area_ha": [1490, 95],
             },
         )
 
@@ -216,17 +217,24 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
                 "country": ["IDN", "IDN"],
                 "region": [24, 24],
                 "subregion": [9, 9],
-                "alert_date": [
+                "dist_alert_date": [
                     "2024-08-15",
                     "2024-08-15",
                 ],
-                "confidence": ["high", "low"],
-                "value": [1490, 95],
+                "dist_alert_confidence": ["high", "low"],
+                "area_ha": [1490, 95],
             }
         )
 
         actual_df = pd.DataFrame(self.test_request.json()["data"]["result"])
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
     def test_returns_200_Ok_response_code(self):
         response = self.test_request
@@ -293,20 +301,20 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                 "subregion": [9, 9, 13, 13, 1],
                 "aoi_id": ["IDN.24.9", "IDN.24.9", "IDN.14.13", "IDN.14.13", "BRA.1.1"],
                 "aoi_type": ["admin"] * 5,
-                "alert_date": [
+                "dist_alert_date": [
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                     "2024-08-15",
                 ],
-                "confidence": ["high", "low", "high", "low", "high"],
-                "value": [
-                    1.133972e06,
-                    7.154635e04,
-                    1.064846e06,
-                    9.065568e04,
-                    1.547240e06,
+                "dist_alert_confidence": ["high", "low", "high", "low", "high"],
+                "area_ha": [
+                    113.39714813232422,
+                    7.154634952545166,
+                    106.48455047607422,
+                    9.065567970275879,
+                    154.72398376464844,
                 ],
             }
         )
@@ -314,7 +322,14 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
 
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 class TestDistAnalyticsPostWithMultipleKBAAOIs:
@@ -372,7 +387,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
         expected_df = pd.DataFrame(
             {
-                "alert_date": [
+                "dist_alert_date": [
                     "2025-02-03",
                     "2025-02-03",
                     "2025-02-11",
@@ -384,7 +399,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "2025-03-05",
                     "2025-02-23",
                 ],
-                "confidence": [
+                "dist_alert_confidence": [
                     "low",
                     "high",
                     "high",
@@ -396,18 +411,21 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     "high",
                     "low",
                 ],
-                "value": [
-                    1511.152588,
-                    755.576965,
-                    1511.129639,
-                    1511.129639,
-                    755.584412,
-                    3025.184570,
-                    5294.074707,
-                    3781.512695,
-                    756.304932,
-                    755.576294,
-                ],
+                "area_ha": np.array(
+                    [
+                        1511.152588,
+                        755.576965,
+                        1511.129639,
+                        1511.129639,
+                        755.584412,
+                        3025.184570,
+                        5294.074707,
+                        3781.512695,
+                        756.304932,
+                        755.576294,
+                    ]
+                )
+                / 10000,
                 "aoi_id": [
                     "18392",
                     "18392",
@@ -426,7 +444,14 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         actual_df = pd.DataFrame(data["result"])
         print(actual_df)
 
-        pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+        pd.testing.assert_frame_equal(
+            expected_df,
+            actual_df,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
+        )
 
 
 @pytest.mark.asyncio
@@ -460,18 +485,25 @@ async def test_gadm_dist_analytics_no_intersection():
             "subregion": [9, 9],
             "aoi_id": ["IDN.24.9", "IDN.24.9"],
             "aoi_type": ["admin"] * 2,
-            "alert_date": [
+            "dist_alert_date": [
                 "2024-08-15",
                 "2024-08-15",
             ],
-            "confidence": ["high", "low"],
-            "value": [1.133972e06, 7.154635e04],
+            "dist_alert_confidence": ["high", "low"],
+            "area_ha": [113.3972, 7.154635],
         }
     )
 
     actual_df = pd.DataFrame(data["result"])
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -502,16 +534,23 @@ async def test_kba_dist_analytics_no_intersection():
         {
             "aoi_id": ["8111"],
             "aoi_type": ["key_biodiversity_area"],
-            "alert_date": ["2024-08-15"],
-            "confidence": ["high"],
-            "value": [77598.828125],
+            "dist_alert_date": ["2024-08-15"],
+            "dist_alert_confidence": ["high"],
+            "area_ha": [7.7598828125],
         }
     )
 
     actual_df = pd.DataFrame(data["result"])
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -544,9 +583,9 @@ async def test_admin_dist_analytics_by_grasslands():
             "region": [24, 24],
             "subregion": [3, 3],
             "grasslands": ["non-grasslands", "non-grasslands"],
-            "alert_date": ["2024-08-15", "2024-08-16"],
-            "confidence": ["high", "high"],
-            "value": [19975.835938, 6147.143555],
+            "dist_alert_date": ["2024-08-15", "2024-08-16"],
+            "dist_alert_confidence": ["high", "high"],
+            "area_ha": [1.9975835938, 0.6147143555],
             "aoi_id": ["TZA.24.3", "TZA.24.3"],
             "aoi_type": ["admin", "admin"],
         }
@@ -555,7 +594,14 @@ async def test_admin_dist_analytics_by_grasslands():
     actual_df = pd.DataFrame(data["result"])
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
 
 
 @pytest.mark.asyncio
@@ -616,7 +662,7 @@ async def test_admin_dist_analytics_by_land_cover():
                 "Tree cover",
                 "Tree cover",
             ],
-            "alert_date": [
+            "dist_alert_date": [
                 "2024-08-15",
                 "2024-08-15",
                 "2024-08-15",
@@ -624,7 +670,7 @@ async def test_admin_dist_analytics_by_land_cover():
                 "2024-08-15",
                 "2024-08-16",
             ],
-            "confidence": [
+            "dist_alert_confidence": [
                 "high",
                 "high",
                 "high",
@@ -632,13 +678,13 @@ async def test_admin_dist_analytics_by_land_cover():
                 "high",
                 "high",
             ],
-            "value": [
-                3073.667969,
-                7682.643555,
-                7682.792969,
-                9989.411133,
-                2305.148438,
-                6146.835938,
+            "area_ha": [
+                0.3073667969,
+                0.7682643555,
+                0.7682792969,
+                0.9989411133,
+                0.2305148438,
+                0.6146835938,
             ],
             "aoi_id": [
                 "TZA.24.3",
@@ -663,4 +709,11 @@ async def test_admin_dist_analytics_by_land_cover():
     pd.set_option("display.max_columns", None)
     print(actual_df)
 
-    pd.testing.assert_frame_equal(expected_df, actual_df, check_like=True)
+    pd.testing.assert_frame_equal(
+        expected_df,
+        actual_df,
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )

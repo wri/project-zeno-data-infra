@@ -1,8 +1,8 @@
-import pytest
 import datetime
 from unittest.mock import patch
 
-from pandera.pandas import DataFrameSchema, Column, Check
+import pytest
+from pandera.pandas import Check, Column, DataFrameSchema
 from prefect.testing.utilities import prefect_test_harness
 
 from pipelines.disturbance.prefect_flows import dist_alerts_by_natural_lands_area
@@ -66,7 +66,7 @@ def test_gadm_dist_alerts_result(
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
             "natural_land_class": Column(str, Check.ne("")),
-            "alert_date": Column(
+            "dist_alert_date": Column(
                 datetime.date,
                 checks=[
                     Check.greater_than_or_equal_to(
@@ -77,16 +77,16 @@ def test_gadm_dist_alerts_result(
                     ),
                 ],
             ),
-            "alert_confidence": Column(str, Check.isin(["low", "high"])),
-            "area__ha": Column("float32", Check.isin([1500.0, 750.0])),
+            "dist_alert_confidence": Column(str, Check.isin(["low", "high"])),
+            "area_ha": Column("float32", Check.isin([1500.0, 750.0])),
         },
         unique=[
             "country",
             "region",
             "subregion",
             "natural_land_class",
-            "alert_date",
-            "alert_confidence",
+            "dist_alert_date",
+            "dist_alert_confidence",
         ],
         checks=Check(
             lambda df: (
@@ -96,9 +96,9 @@ def test_gadm_dist_alerts_result(
                         "region",
                         "subregion",
                         "natural_land_class",
-                        "alert_date",
+                        "dist_alert_date",
                     ]
-                )["alert_confidence"].transform("nunique")
+                )["dist_alert_confidence"].transform("nunique")
                 == 1
             ),
             name="two_confidences_per_group",

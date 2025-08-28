@@ -95,20 +95,23 @@ class TestLandCoverCompositionCustomAois:
     @pytest.fixture
     def pixel_area(self):
         # Define the base column (along y) — 10 values
-        column_vals = np.array(
-            [
-                518.6011,
-                518.6036,
-                518.606,
-                518.6085,
-                518.611,
-                518.61346,
-                518.61597,
-                518.61847,
-                518.6209,
-                518.6234,
-            ],
-            dtype=np.float32,
+        column_vals = (
+            np.array(
+                [
+                    518.6011,
+                    518.6036,
+                    518.606,
+                    518.6085,
+                    518.611,
+                    518.61346,
+                    518.61597,
+                    518.61847,
+                    518.6209,
+                    518.6234,
+                ],
+                dtype=np.float32,
+            )
+            / 10000
         )
 
         y_vals = np.linspace(48.0, 47.99775, 10)  # latitude
@@ -185,7 +188,7 @@ class TestLandCoverCompositionCustomAois:
 
         expected = pd.DataFrame(
             {
-                "land_cover_class_area__ha": [
+                "area_ha": [
                     1.4521043300628662,
                     0.20744292438030243,
                     0.20744489133358002,
@@ -205,7 +208,12 @@ class TestLandCoverCompositionCustomAois:
         )
 
         pd.testing.assert_frame_equal(
-            pd.DataFrame(self.analysis_repo.analysis.result), expected, check_like=True
+            pd.DataFrame(self.analysis_repo.analysis.result),
+            expected,
+            check_like=True,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-4,  # Relative tolerance
         )
 
 
@@ -234,7 +242,7 @@ class TestLandCoverChangeAdminAois:
             columns=[
                 "aoi_id",
                 "land_cover_class",
-                "land_cover_class_area__ha",
+                "area_ha",
             ],
         )
 
@@ -247,7 +255,7 @@ class TestLandCoverChangeAdminAois:
 
         table_name = "test_parquet"
         duckdb.register(table_name, parquet_mock_data)
-        analyzer.admin_results_local_uri = table_name
+        analyzer.admin_results_uri = table_name
 
         return analyzer
 
@@ -285,7 +293,7 @@ class TestLandCoverChangeAdminAois:
                     "Built-up",
                     "Bare and sparse vegetation",
                 ],
-                "land_cover_class_area__ha": [
+                "area_ha": [
                     2.15032,
                     4.89045,
                     1.78934,

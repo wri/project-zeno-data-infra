@@ -32,7 +32,7 @@ class LandCoverCompositionResult(StrictBaseModel):
     aoi_id: List[str]
     aoi_type: List[str]
     land_cover_class: List[str]
-    land_cover_class_area__ha: List[float]
+    area_ha: List[float]
 
 
 class LandCoverCompositionAnalytics(StrictBaseModel):

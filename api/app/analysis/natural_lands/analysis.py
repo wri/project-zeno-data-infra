@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import traceback
 from functools import partial
 
@@ -8,11 +7,11 @@ import dask.dataframe as dd
 import duckdb
 import numpy as np
 import pandas as pd
-import s3fs
 from flox.xarray import xarray_reduce
 
 from ..common.analysis import (
     get_geojson,
+    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_natural_lands_query
@@ -66,9 +65,7 @@ async def zonal_statistics(aoi, geojson):
     natural_lands_obj_name = (
         "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
     )
-    pixel_area_obj_name = (
-        "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area.zarr/"
-    )
+    pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
     natural_lands = read_zarr_clipped_to_geojson(
         natural_lands_obj_name, geojson
     ).band_data
@@ -84,13 +81,12 @@ async def zonal_statistics(aoi, geojson):
         func="sum",
         expected_groups=tuple(expected_groups),
     )
-    # counts.name = "natural_lands_area"
 
     df = (
         counts.to_dask_dataframe()
         .drop("band", axis=1)
         .drop("spatial_ref", axis=1)
-        .rename(columns={"band_data": "natural_lands_area"})
+        .rename(columns={"band_data": "area_ha"})
     )
 
     df["aoi_type"] = aoi["type"].lower()
@@ -100,7 +96,7 @@ async def zonal_statistics(aoi, geojson):
         lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
     )
 
-    df = df[df.natural_lands_area > 0]
+    df = df[df.area_ha > 0]
     return df
 
 
@@ -110,39 +106,12 @@ async def get_precomputed_statistics(aoi, dask_client):
             f"No precomputed statistics available for AOI type {aoi['type']}"
         )
 
-    # Dumbly doing this per request since the STS token expires eventually otherwise
-    # According to this issue, duckdb should auto refresh the token in 1.3.0,
-    # but it doesn't seem to work for us and people are reporting the same on the issue
-    # https://github.com/duckdb/duckdb-aws/issues/26
-    # TODO do this on lifecycle start once autorefresh works
-    duckdb.query(
-        """
-        CREATE OR REPLACE SECRET secret (
-            TYPE s3,
-            PROVIDER credential_chain,
-            CHAIN config
-        );
-    """
-    )
-
-    # Should eventually rename to this, but currently parquet file is "gadm_adm2".
-    # table = "gadm_natural_lands_areas"
-    table = "gadm_adm2"
-
-    # PZB-271 just use DuckDB requester pays when this PR gets released: https://github.com/duckdb/duckdb/pull/18258
-    # For now, we need to just download the file temporarily
-    fs = s3fs.S3FileSystem(requester_pays=True)
-    fs.get(
-        f"s3://gfw-data-lake/sbtn_natural_lands/tabular/zonal_stats/gadm/{table}.parquet",
-        f"/tmp/{table}.parquet",
-    )
+    table = "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet"
 
     precompute_partial = partial(get_precomputed_statistic_on_gadm_aoi, table=table)
     futures = dask_client.map(precompute_partial, aoi["ids"])
     results = await dask_client.gather(futures)
     df = pd.concat(results)
-
-    os.remove(f"/tmp/{table}.parquet")
 
     return df
 
@@ -152,6 +121,8 @@ async def get_precomputed_statistic_on_gadm_aoi(id, table):
     gadm_id = id.split(".")
 
     query = create_gadm_natural_lands_query(gadm_id, table)
+
+    initialize_duckdb()
     df = duckdb.query(query).df()
 
     df["aoi_id"] = id

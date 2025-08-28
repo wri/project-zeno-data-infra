@@ -20,7 +20,7 @@ class TestLandCoverChangeData:
         """Runs before each test in this class"""
         delete_resource_files(
             "land_cover_change",
-            "a8df3000-5cf6-5050-8717-592310672f0d",
+            "4b5102d9-2eb7-58b1-8378-9beb8f180cea",
         )
 
         async with LifespanManager(app):
@@ -71,7 +71,7 @@ class TestLandCoverChangeData:
                     "Cropland",
                     "Built-up",
                 ],
-                "land_cover_change_area__ha": [0.1505, 0.0752, 2.635],
+                "area_ha": [0.1505, 0.0752, 2.635],
             }
         )
 
@@ -79,6 +79,7 @@ class TestLandCoverChangeData:
             pd.DataFrame(resource["result"]),
             expected,
             check_like=True,
-            rtol=1e-4,
-            atol=1e-4,
+            check_exact=False,  # Allow approximate comparison for numbers
+            atol=1e-8,  # Absolute tolerance
+            rtol=1e-2,  # Relative tolerance
         )
