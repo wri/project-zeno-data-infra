@@ -9,7 +9,7 @@ from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
 
 
-@flow(name="DIST alerts count by grasslands")
+@flow(name="DIST alerts area by grasslands")
 def dist_alerts_by_grasslands_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_filename = "dist_alerts_by_grasslands"
     result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
