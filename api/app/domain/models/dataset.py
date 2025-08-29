@@ -23,7 +23,7 @@ class Dataset(Enum):
 
 class DatasetFilter(StrictBaseModel):
     dataset: Dataset
-    op: Literal["=", "<", ">", "<=", ">=", "!="]
+    op: Literal["=", "<", ">", "<=", ">=", "!=", "in"]
     value: Any
 
 
