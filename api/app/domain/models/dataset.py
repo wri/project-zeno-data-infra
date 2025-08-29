@@ -6,6 +6,7 @@ from app.models.common.base import StrictBaseModel
 
 class Dataset(Enum):
     tree_cover_loss = "tree_cover_loss"
+    tree_cover_gain = "tree_cover_gain"
     canopy_cover = "canopy_cover"
     area_hectares = "area_hectares"
 
@@ -13,6 +14,7 @@ class Dataset(Enum):
         DATASET_TO_NAMES = {
             Dataset.area_hectares: "area_ha",
             Dataset.tree_cover_loss: "tree_cover_loss_year",
+            Dataset.tree_cover_gain: "tree_cover_gain_year",
             Dataset.canopy_cover: "canopy_cover",
         }
 
@@ -21,7 +23,7 @@ class Dataset(Enum):
 
 class DatasetFilter(StrictBaseModel):
     dataset: Dataset
-    op: Literal["=", "<", ">", "<=", ">=", "!="]
+    op: Literal["=", "<", ">", "<=", ">=", "!=", "in"]
     value: Any
 
 
