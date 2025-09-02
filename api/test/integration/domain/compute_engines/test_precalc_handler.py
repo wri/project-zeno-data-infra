@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from app.domain.compute_engines.compute_engine import (
     DuckDbPrecalcQueryService,
-    PrecalcHandler,
+    GeneralPrecalcHandler,
 )
 from app.domain.models.dataset import (
     Dataset,
@@ -13,7 +13,7 @@ from app.domain.models.dataset import (
 )
 
 
-class TestPrecalcHandler:
+class TestGeneralPrecalcHandler:
     @pytest.mark.asyncio
     async def test_happy_path(self):
         query = DatasetQuery(
@@ -42,7 +42,7 @@ class TestPrecalcHandler:
                 # and query.group_bys == [Dataset.tree_cover_gain]
             )
 
-        handler = PrecalcHandler(query_service, None, predicate)
+        handler = GeneralPrecalcHandler(query_service, None, predicate)
 
         await handler.handle(aoi_type, ["AUS"], query)
 
