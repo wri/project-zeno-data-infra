@@ -71,6 +71,40 @@ class PrecalcHandler:
         return await self.precalc_query_service.execute(data_source, sql)
 
 
+class GeneralPrecalcHandler:
+    FIELDS = {
+        Dataset.area_hectares: "area_ha",
+        Dataset.tree_cover_loss: "tree_cover_loss_year",
+        Dataset.tree_cover_gain: "gain_period",
+        Dataset.canopy_cover: "canopy_cover",
+    }
+
+    def __init__(self, precalc_query_service, next_handler, predicate_function=None):
+        self.precalc_query_service = precalc_query_service
+        self.next_handler = next_handler
+        self.predicate_function = predicate_function
+
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        if not self.predicate_function():
+            return await self.next_handler.handle(aoi_type, aoi_ids, query)
+
+        agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
+        groupby_fields = ", ".join(
+            [self.FIELDS[dataset] for dataset in query.group_bys]
+        ) if len(query.group_bys) > 0 else None
+        groupby_fields = f", {groupby_fields}" if groupby_fields else ""
+        filters = " AND ".join(
+            [
+                f"{self.FIELDS[filt.dataset]} {filt.op} {str(filt.value)}"
+                for filt in query.filters
+            ]
+        )
+        filters += f" AND aoi_id in ({", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
+        sql = f"SELECT aoi_id, aoi_type{groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type{groupby_fields}"
+
+        return await self.precalc_query_service.execute(None, sql)
+
+
 class FloxOTFHandler:
     EXPECTED_GROUPS = {
         Dataset.tree_cover_loss: np.arange(0, 25),
