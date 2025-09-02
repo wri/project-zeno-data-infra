@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from functools import partial
-from typing import Callable
 
 import duckdb
 import numpy as np
@@ -15,85 +14,34 @@ from flox.xarray import xarray_reduce
 
 
 class DuckDbPrecalcQueryService:
-    def __init__(self, table_uri=None):
+    def __init__(self, table_uri):
         self.table_uri = table_uri
 
-    async def execute(self, table_uri: str, query: str) -> pd.DataFrame:
+    async def execute(self, query: str) -> pd.DataFrame:
         initialize_duckdb()
 
         # need to declare this to bind FROM in SQL query
-        data_source = duckdb.read_parquet(self.table_uri or table_uri)  # noqa: F841
+        data_source = duckdb.read_parquet(self.table_uri)  # noqa: F841
 
         # TODO duckdb has no native async, need to use aioduckdb? Check if blocking in load test
         df = duckdb.sql(query).df()
         return df.to_dict(orient="list")
 
 
-class PrecalcHandler:
-    FIELDS = {
-        Dataset.area_hectares: "area_ha",
-        Dataset.tree_cover_loss: "tree_cover_loss_year",
-        Dataset.tree_cover_gain: "gain_period",
-        Dataset.canopy_cover: "canopy_cover",
-    }
-
-    def __init__(self, precalc_query_service, next_handler, predicate_function=None):
-        self.precalc_query_service = precalc_query_service
-        self.next_handler = next_handler
-        self.predicate_function = predicate_function
-
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        data_source = None
-        if (
-            aoi_type == "admin"
-            and query.aggregate.dataset == Dataset.area_hectares
-            and query.group_bys == [Dataset.tree_cover_loss]
-        ):
-            data_source = (
-                "s3://lcl-analytics/zonal-statistics/admin-tree-cover-loss.parquet"
-            )
-
-        if not data_source and (not self.predicate_function or not self.predicate_function()):
-            return await self.next_handler.handle(aoi_type, aoi_ids, query)
-
-        agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
-        groupby_fields = ", ".join(
-            [self.FIELDS[dataset] for dataset in query.group_bys]
-        ) if len(query.group_bys) > 0 else None
-        groupby_fields = f", {groupby_fields}" if groupby_fields else ""
-        filters = " AND ".join(
-            [
-                f"{self.FIELDS[filt.dataset]} {filt.op} {str(filt.value)}"
-                for filt in query.filters
-            ]
-        )
-        filters += f" AND aoi_id in ({", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
-        sql = f"SELECT aoi_id, aoi_type{groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type{groupby_fields}"
-
-        return await self.precalc_query_service.execute(data_source, sql)
-
-
 class AnalyticsPrecalcHandler(ABC):
     @abstractmethod
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery, should_handle: Callable[[], bool]):
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
         pass
 
 
 class GeneralPrecalcHandler():
-    def __init__(self, precalc_query_builder, precalc_query_service, next_handler):
+    def __init__(self, precalc_query_builder, precalc_query_service):
         self.precalc_query_builder = precalc_query_builder
         self.precalc_query_service = precalc_query_service
-        self.next_handler = next_handler
 
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery, should_handle: Callable[[], bool]):
-        if should_handle():
-            sql = self.precalc_query_builder.build(aoi_ids, query)
-            return await self.precalc_query_service.execute(None, sql)
-
-        if self.next_handler:
-            self.next_handler.handle(aoi_type, aoi_ids, query)
-
-        return None
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        sql = self.precalc_query_builder.build(aoi_ids, query)
+        return await self.precalc_query_service.execute(sql)
 
 
 class PrecalcQueryBuilder:
@@ -119,6 +67,43 @@ class PrecalcQueryBuilder:
         filters += f" AND aoi_id in ({", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
         sql = f"SELECT aoi_id, aoi_type{groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type{groupby_fields}"
         return sql
+
+
+class TreeCoverGainPrecalcHandler(AnalyticsPrecalcHandler):
+    def __init__(self, precalc_handler, next_handler):
+        self.precalc_handler = precalc_handler
+        self.next_handler = next_handler
+
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        if (
+                aoi_type == "admin"
+                and query.aggregate.dataset == Dataset.area_hectares
+        ):
+            return await self.precalc_handler.handle(aoi_type, aoi_ids, query)
+
+        if self.next_handler is not None:
+            return await self.next_handler.handle(aoi_type, aoi_ids, query)
+
+        return None
+
+
+class TreeCoverLossPrecalcHandler(AnalyticsPrecalcHandler):
+    def __init__(self, precalc_handler, next_handler):
+        self.precalc_handler = precalc_handler
+        self.next_handler = next_handler
+
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        if (
+                aoi_type == "admin"
+                and query.aggregate.dataset == Dataset.area_hectares
+                and query.group_bys == [Dataset.tree_cover_loss]
+        ):
+            return await self.precalc_handler.handle(aoi_type, aoi_ids, query)
+
+        if self.next_handler is not None:
+            return await self.next_handler.handle(aoi_type, aoi_ids, query)
+
+        return None
 
 
 class FloxOTFHandler:
