@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.domain.compute_engines.compute_engine import (
+    AnalyticsPrecalcHandler,
     DuckDbPrecalcQueryService,
     GeneralPrecalcHandler,
 )
@@ -13,7 +14,19 @@ from app.domain.models.dataset import (
 )
 
 
-class TestGeneralPrecalcHandler:
+class TreeCoverGainPrecalcHandler(AnalyticsPrecalcHandler):
+    def __init__(self, handler: GeneralPrecalcHandler):
+        self.handler = handler
+
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        predicate = (
+            lambda: aoi_type == "admin"
+            and query.aggregate.dataset == Dataset.area_hectares
+        )
+        return await self.handler.handle(aoi_type, aoi_ids, query, predicate)
+
+
+class TestTreeCoverGainPrecalcHandler:
     @pytest.mark.asyncio
     async def test_happy_path(self):
         query = DatasetQuery(
@@ -28,21 +41,13 @@ class TestGeneralPrecalcHandler:
             ],
         )
 
-        # query_service = DuckDbPrecalcQueryService(
-        #     table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet"
-        # )
         query_service = MagicMock(spec=DuckDbPrecalcQueryService)
 
         aoi_type = "admin"
 
-        def predicate() -> bool:
-            return (
-                aoi_type == "admin"
-                and query.aggregate.dataset == Dataset.area_hectares
-                # and query.group_bys == [Dataset.tree_cover_gain]
-            )
-
-        handler = GeneralPrecalcHandler(query_service, None, predicate)
+        handler = TreeCoverGainPrecalcHandler(
+            GeneralPrecalcHandler(query_service, None)
+        )
 
         await handler.handle(aoi_type, ["AUS"], query)
 

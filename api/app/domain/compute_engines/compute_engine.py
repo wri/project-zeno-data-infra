@@ -1,4 +1,6 @@
+from abc import ABC, abstractmethod
 from functools import partial
+from typing import Callable
 
 import duckdb
 import numpy as np
@@ -71,7 +73,13 @@ class PrecalcHandler:
         return await self.precalc_query_service.execute(data_source, sql)
 
 
-class GeneralPrecalcHandler:
+class AnalyticsPrecalcHandler(ABC):
+    @abstractmethod
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        pass
+
+
+class GeneralPrecalcHandler(AnalyticsPrecalcHandler):
     FIELDS = {
         Dataset.area_hectares: "area_ha",
         Dataset.tree_cover_loss: "tree_cover_loss_year",
@@ -79,13 +87,12 @@ class GeneralPrecalcHandler:
         Dataset.canopy_cover: "canopy_cover",
     }
 
-    def __init__(self, precalc_query_service, next_handler, predicate_function=None):
+    def __init__(self, precalc_query_service, next_handler):
         self.precalc_query_service = precalc_query_service
         self.next_handler = next_handler
-        self.predicate_function = predicate_function
 
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        if not self.predicate_function():
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery, predicate_function: Callable):
+        if self.next_handler and not predicate_function():
             return await self.next_handler.handle(aoi_type, aoi_ids, query)
 
         agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
