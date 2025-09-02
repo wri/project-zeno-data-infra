@@ -1,7 +1,19 @@
 from app.domain.analyzers.dummy_tree_cover_gain_analyzer import (
     DummyTreeCoverGainAnalyzer,
 )
+from app.domain.compute_engines.compute_engine import (
+    ComputeEngine,
+    DuckDbPrecalcQueryService,
+    FloxOTFHandler,
+    GeneralPrecalcHandler,
+    PrecalcQueryBuilder,
+    TreeCoverGainPrecalcHandler,
+)
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.repositories.data_api_aoi_geometry_repository import (
+    DataApiAoiGeometryRepository,
+)
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -27,10 +39,26 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service() -> AnalysisService:
+def create_analysis_service(request: Request) -> AnalysisService:
+    compute_engine = ComputeEngine(
+        handler=TreeCoverGainPrecalcHandler(
+            precalc_handler=GeneralPrecalcHandler(
+                precalc_query_builder=PrecalcQueryBuilder(),
+                precalc_query_service=DuckDbPrecalcQueryService(
+                    table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet"
+                ),
+            ),
+            next_handler=FloxOTFHandler(
+                dataset_repository=ZarrDatasetRepository(),
+                aoi_geometry_repository=DataApiAoiGeometryRepository(),
+                dask_client=request.app.state.dask_client,
+            ),
+        )
+    )
+
     return AnalysisService(
         analysis_repository=get_analysis_repository(),
-        analyzer=DummyTreeCoverGainAnalyzer(),
+        analyzer=DummyTreeCoverGainAnalyzer(compute_engine),  # DUMMY DATA
         event=ANALYTICS_NAME,
     )
 
