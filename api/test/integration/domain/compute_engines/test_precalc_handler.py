@@ -2,9 +2,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.domain.compute_engines.compute_engine import (
-    AnalyticsPrecalcHandler,
     DuckDbPrecalcQueryService,
     GeneralPrecalcHandler,
+    PrecalcQueryBuilder,
 )
 from app.domain.models.dataset import (
     Dataset,
@@ -14,21 +14,12 @@ from app.domain.models.dataset import (
 )
 
 
-class TreeCoverGainPrecalcHandler(AnalyticsPrecalcHandler):
-    def __init__(self, handler: GeneralPrecalcHandler):
-        self.handler = handler
-
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        predicate = (
-            lambda: aoi_type == "admin"
-            and query.aggregate.dataset == Dataset.area_hectares
-        )
-        return await self.handler.handle(aoi_type, aoi_ids, query, predicate)
-
-
 class TestTreeCoverGainPrecalcHandler:
     @pytest.mark.asyncio
     async def test_happy_path(self):
+        query_service = MagicMock(spec=DuckDbPrecalcQueryService)
+        handler = GeneralPrecalcHandler(PrecalcQueryBuilder(), query_service, None)
+
         query = DatasetQuery(
             aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
             group_bys=[],
@@ -41,15 +32,14 @@ class TestTreeCoverGainPrecalcHandler:
             ],
         )
 
-        query_service = MagicMock(spec=DuckDbPrecalcQueryService)
-
         aoi_type = "admin"
 
-        handler = TreeCoverGainPrecalcHandler(
-            GeneralPrecalcHandler(query_service, None)
-        )
+        def should_handle() -> bool:
+            return (
+                aoi_type == "admin" and query.aggregate.dataset == Dataset.area_hectares
+            )
 
-        await handler.handle(aoi_type, ["AUS"], query)
+        await handler.handle(aoi_type, ["AUS"], query, should_handle)
 
         query_service.execute.assert_called_once_with(
             None,

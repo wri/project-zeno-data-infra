@@ -75,11 +75,28 @@ class PrecalcHandler:
 
 class AnalyticsPrecalcHandler(ABC):
     @abstractmethod
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery, should_handle: Callable[[], bool]):
         pass
 
 
-class GeneralPrecalcHandler(AnalyticsPrecalcHandler):
+class GeneralPrecalcHandler():
+    def __init__(self, precalc_query_builder, precalc_query_service, next_handler):
+        self.precalc_query_builder = precalc_query_builder
+        self.precalc_query_service = precalc_query_service
+        self.next_handler = next_handler
+
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery, should_handle: Callable[[], bool]):
+        if should_handle():
+            sql = self.precalc_query_builder.build(aoi_ids, query)
+            return await self.precalc_query_service.execute(None, sql)
+
+        if self.next_handler:
+            self.next_handler.handle(aoi_type, aoi_ids, query)
+
+        return None
+
+
+class PrecalcQueryBuilder:
     FIELDS = {
         Dataset.area_hectares: "area_ha",
         Dataset.tree_cover_loss: "tree_cover_loss_year",
@@ -87,14 +104,7 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler):
         Dataset.canopy_cover: "canopy_cover",
     }
 
-    def __init__(self, precalc_query_service, next_handler):
-        self.precalc_query_service = precalc_query_service
-        self.next_handler = next_handler
-
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery, predicate_function: Callable):
-        if self.next_handler and not predicate_function():
-            return await self.next_handler.handle(aoi_type, aoi_ids, query)
-
+    def build(self, aoi_ids, query: DatasetQuery) -> str:
         agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
         groupby_fields = ", ".join(
             [self.FIELDS[dataset] for dataset in query.group_bys]
@@ -108,8 +118,7 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler):
         )
         filters += f" AND aoi_id in ({", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
         sql = f"SELECT aoi_id, aoi_type{groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type{groupby_fields}"
-
-        return await self.precalc_query_service.execute(None, sql)
+        return sql
 
 
 class FloxOTFHandler:
