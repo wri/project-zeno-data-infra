@@ -3,23 +3,34 @@ from unittest.mock import MagicMock
 import pytest
 from app.domain.analyzers.tree_cover_gain_analyzer import TreeCoverGainAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
+    TreeCoverGainPrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
+)
 from app.domain.models.analysis import Analysis
-from app.domain.models.dataset import (
-    Dataset,
-    DatasetAggregate,
-    DatasetFilter,
-    DatasetQuery,
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
 )
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
 
 
-class TestTreeCoverGainAnalyzer:
+class TestTreeCoverGainAnalyzerAdminAOIs:
     @pytest.mark.asyncio
-    async def test_happy_path(self):
-        mock_compute_engine = MagicMock(spec=ComputeEngine)
-        analyzer = TreeCoverGainAnalyzer(compute_engine=mock_compute_engine)
+    async def test_analyzer_creates_a_query_with_one_year_range(self):
+        mock_query_service = MagicMock(spec=DuckDbPrecalcQueryService)
+        compute_engine = ComputeEngine(
+            handler=TreeCoverGainPrecalcHandler(
+                precalc_query_builder=PrecalcSqlQueryBuilder(),
+                precalc_query_service=mock_query_service,
+                next_handler=None,
+            )
+        )
+
+        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
         metadata = TreeCoverGainAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
             start_year="2000",
@@ -31,25 +42,41 @@ class TestTreeCoverGainAnalyzer:
 
         await analyzer.analyze(analysis)
 
-        mock_compute_engine.compute.assert_called_once_with(
-            metadata.aoi.type,
-            metadata.aoi.ids,
-            DatasetQuery(
-                aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
-                group_bys=[Dataset.tree_cover_gain],
-                filters=[
-                    DatasetFilter(
-                        dataset=Dataset.tree_cover_gain,
-                        op=">=",
-                        value="2000",
-                    ),
-                    DatasetFilter(
-                        dataset=Dataset.tree_cover_gain,
-                        op="<=",
-                        value="2005",
-                    ),
-                ],
-            ),
+        mock_query_service.execute.assert_called_once()
+        args, _ = mock_query_service.execute.call_args
+        sql_query = args[0]
+        # Assert that the SQL query contains the multiple gain_period filters
+        assert "gain_period in ('2000-2005')" in sql_query
+
+        mock_query_service.reset_mock()
+
+    @pytest.mark.asyncio
+    async def test_analyzer_creates_a_query_with_multiple_year_ranges(self):
+        mock_query_service = MagicMock(spec=DuckDbPrecalcQueryService)
+        compute_engine = ComputeEngine(
+            handler=TreeCoverGainPrecalcHandler(
+                precalc_query_builder=PrecalcSqlQueryBuilder(),
+                precalc_query_service=mock_query_service,
+                next_handler=None,
+            )
         )
 
-        mock_compute_engine.reset_mock()
+        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
+        metadata = TreeCoverGainAnalyticsIn(
+            aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
+            start_year="2000",
+            end_year="2010",
+        )
+        analysis = Analysis(
+            result=None, metadata=metadata.model_dump(), status=AnalysisStatus.pending
+        )
+
+        await analyzer.analyze(analysis)
+
+        mock_query_service.execute.assert_called_once()
+        args, _ = mock_query_service.execute.call_args
+        sql_query = args[0]
+        # Assert that the SQL query contains the multiple gain_period filters
+        assert "gain_period in ('2000-2005', '2005-2010')" in sql_query
+
+        mock_query_service.reset_mock()

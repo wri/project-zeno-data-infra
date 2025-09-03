@@ -22,17 +22,21 @@ class TreeCoverGainAnalyzer(Analyzer):
             filters=[
                 DatasetFilter(
                     dataset=Dataset.tree_cover_gain,
-                    op=">=",
-                    value="2000",
-                ),
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_gain,
-                    op="<=",
-                    value="2005",
-                ),
+                    op="in",
+                    value=self._build_years(
+                        analytics_in.start_year, analytics_in.end_year
+                    ),
+                )
             ],
         )
 
         return await self.compute_engine.compute(
             analytics_in.aoi.type, analytics_in.aoi.ids, query
         )
+
+    def _build_years(self, start_year: str, end_year: str):
+        start = int(start_year)
+        end = int(end_year)
+
+        year_ranges = [f"'{year}-{year + 5}'" for year in range(start, end, 5)]
+        return f"({', '.join(year_ranges)})"
