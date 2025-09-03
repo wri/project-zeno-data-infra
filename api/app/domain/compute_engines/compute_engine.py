@@ -28,22 +28,6 @@ class DuckDbPrecalcQueryService:
         return df.to_dict(orient="list")
 
 
-class AnalyticsPrecalcHandler(ABC):
-    @abstractmethod
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        pass
-
-
-class GeneralPrecalcHandler():
-    def __init__(self, precalc_query_builder, precalc_query_service):
-        self.precalc_query_builder = precalc_query_builder
-        self.precalc_query_service = precalc_query_service
-
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        sql = self.precalc_query_builder.build(aoi_ids, query)
-        return await self.precalc_query_service.execute(sql)
-
-
 class PrecalcQueryBuilder:
     FIELDS = {
         Dataset.area_hectares: "area_ha",
@@ -69,17 +53,26 @@ class PrecalcQueryBuilder:
         return sql
 
 
-class TreeCoverGainPrecalcHandler(AnalyticsPrecalcHandler):
-    def __init__(self, precalc_handler, next_handler):
-        self.precalc_handler = precalc_handler
+class AnalyticsPrecalcHandler(ABC):
+    @abstractmethod
+    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
+        raise NotImplementedError()
+
+
+class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
+    def __init__(self, precalc_query_builder, precalc_query_service, next_handler):
+        self.precalc_query_builder = precalc_query_builder
+        self.precalc_query_service = precalc_query_service
         self.next_handler = next_handler
 
     async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        if (
-                aoi_type == "admin"
-                and query.aggregate.dataset == Dataset.area_hectares
-        ):
-            return await self.precalc_handler.handle(aoi_type, aoi_ids, query)
+        if self.should_handle(aoi_type, aoi_ids, query):
+            sql = self.precalc_query_builder.build(aoi_ids, query)
+            return await self.precalc_query_service.execute(sql)
 
         if self.next_handler is not None:
             return await self.next_handler.handle(aoi_type, aoi_ids, query)
@@ -87,23 +80,21 @@ class TreeCoverGainPrecalcHandler(AnalyticsPrecalcHandler):
         return None
 
 
-class TreeCoverLossPrecalcHandler(AnalyticsPrecalcHandler):
-    def __init__(self, precalc_handler, next_handler):
-        self.precalc_handler = precalc_handler
-        self.next_handler = next_handler
+class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
+    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
+        return (
+            aoi_type == "admin"
+            and query.aggregate.dataset == Dataset.area_hectares
+        )
 
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        if (
-                aoi_type == "admin"
-                and query.aggregate.dataset == Dataset.area_hectares
-                and query.group_bys == [Dataset.tree_cover_loss]
-        ):
-            return await self.precalc_handler.handle(aoi_type, aoi_ids, query)
 
-        if self.next_handler is not None:
-            return await self.next_handler.handle(aoi_type, aoi_ids, query)
-
-        return None
+class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
+    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
+        return (
+            aoi_type == "admin"
+            and query.aggregate.dataset == Dataset.area_hectares
+            and query.group_bys == [Dataset.tree_cover_loss]
+        )
 
 
 class FloxOTFHandler:
