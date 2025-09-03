@@ -5,8 +5,8 @@ from typing import Iterable
 
 import duckdb
 import httpx
+import numpy as np
 import xarray as xr
-from shapely.geometry import shape
 
 JULIAN_DATE_2021 = 2459215
 
@@ -61,16 +61,17 @@ async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_a
 
 
 def clip_zarr_to_geojson(xarr, geojson):
-    geom = shape(geojson)
+    if "band" in xarr.dims:
+        xarr = xarr.squeeze("band")
 
-    sliced = xarr.sel(
-        x=slice(geom.bounds[0], geom.bounds[2]),
-        y=slice(geom.bounds[3], geom.bounds[1]),
-    )
-    if "band" in sliced.dims:
-        sliced = sliced.squeeze("band")
+    # pad to full world so clip can fill with NoData if out of bands
+    x_res, y_res = xarr.rio.resolution()
+    padded_x = np.arange(-180, 180, x_res).astype(np.int64)
+    padded_y = np.arange(180, -180, y_res).astype(np.int64)
+    padded = xarr.reindex(x=padded_x, y=padded_y, fill_value=xarr.rio.nodata)
 
-    clipped = sliced.rio.clip([geojson])
+    clipped = padded.rio.clip([geojson])
+
     return clipped
 
 
