@@ -17,31 +17,6 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from flox.xarray import xarray_reduce
 
 
-class PrecalcSqlQueryBuilder:
-    FIELDS = {
-        Dataset.area_hectares: "area_ha",
-        Dataset.tree_cover_loss: "tree_cover_loss_year",
-        Dataset.tree_cover_gain: "gain_period",
-        Dataset.canopy_cover: "canopy_cover",
-    }
-
-    def build(self, aoi_ids, query: DatasetQuery) -> str:
-        agg = f"{query.aggregate.func.upper()}({self.FIELDS[query.aggregate.dataset]}) AS {self.FIELDS[query.aggregate.dataset]}"
-        groupby_fields = ", ".join(
-            [self.FIELDS[dataset] for dataset in query.group_bys]
-        ) if len(query.group_bys) > 0 else None
-        groupby_fields = f", {groupby_fields}" if groupby_fields else ""
-        filters = " AND ".join(
-            [
-                f"{self.FIELDS[filt.dataset]} {filt.op} {str(filt.value)}"
-                for filt in query.filters
-            ]
-        )
-        filters += f" AND aoi_id in ({", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
-        sql = f"SELECT aoi_id, aoi_type{groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type{groupby_fields}"
-        return sql
-
-
 class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
     def __init__(self, precalc_query_builder, precalc_query_service, next_handler):
         self.precalc_query_builder = precalc_query_builder
@@ -61,10 +36,7 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
 
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
-        return (
-            aoi_type == "admin"
-            and query.aggregate.dataset == Dataset.area_hectares
-        )
+        return aoi_type == "admin" and query.aggregate.dataset == Dataset.area_hectares
 
 
 class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):

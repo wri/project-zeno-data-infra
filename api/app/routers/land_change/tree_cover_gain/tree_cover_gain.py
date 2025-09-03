@@ -4,8 +4,10 @@ from app.domain.analyzers.dummy_tree_cover_gain_analyzer import (
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
     FloxOTFHandler,
-    PrecalcSqlQueryBuilder,
     TreeCoverGainPrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
 )
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (

@@ -2,8 +2,10 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.domain.compute_engines.compute_engine import (
-    PrecalcSqlQueryBuilder,
     TreeCoverGainPrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
 )
 from app.domain.models.dataset import (
     Dataset,

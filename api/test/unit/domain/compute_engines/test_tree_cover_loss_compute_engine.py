@@ -6,8 +6,10 @@ import xarray as xr
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
     FloxOTFHandler,
-    PrecalcSqlQueryBuilder,
     TreeCoverLossPrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
 )
 from app.domain.models.area_of_interest import AreaOfInterestList
 from app.domain.models.dataset import Dataset
