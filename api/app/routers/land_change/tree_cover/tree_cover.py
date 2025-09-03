@@ -3,10 +3,15 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.domain.analyzers.dummy_tree_cover_analyzer import (
-    DummyTreeCoverAnalyzer,
-)
+from app.domain.analyzers.dummy_tree_cover_analyzer import DummyTreeCoverAnalyzer
+from app.domain.compute_engines.compute_engine import ComputeEngine
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import FloxOTFHandler
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import TreeCoverPrecalcHandler
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import PrecalcSqlQueryBuilder
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.repositories.data_api_aoi_geometry_repository import DataApiAoiGeometryRepository
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
+from app.infrastructure.external_services.duck_db_query_service import DuckDbPrecalcQueryService
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -29,7 +34,21 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service() -> AnalysisService:
+def create_analysis_service(request: Request) -> AnalysisService:
+    compute_engine = ComputeEngine(  # NOTE: Ignored while using Dummy analyzer
+        handler=TreeCoverPrecalcHandler(
+            precalc_query_builder=PrecalcSqlQueryBuilder(),
+            precalc_query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet"
+            ),
+            next_handler=FloxOTFHandler(
+                dataset_repository=ZarrDatasetRepository(),
+                aoi_geometry_repository=DataApiAoiGeometryRepository(),
+                dask_client=request.app.state.dask_client,
+            ),
+        )
+    )
+
     return AnalysisService(
         analysis_repository=get_analysis_repository(),
         analyzer=DummyTreeCoverAnalyzer(),

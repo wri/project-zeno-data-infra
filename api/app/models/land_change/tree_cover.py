@@ -11,6 +11,7 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
+from app.models.land_change.tree_cover_loss import AllowedForestFilter, AllowedIntersections
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -35,6 +36,13 @@ class TreeCoverAnalyticsIn(AnalyticsIn):
         title="Canopy cover threshold",
         description="Minimum canopy density to consider tree cover, in percent.",
         examples=[10, 35],
+    )
+    forest_filter: AllowedForestFilter | None = Field(
+        default=None,
+        title="Forest Filter",
+    )
+    intersections: AllowedIntersections = Field(
+        ..., min_length=0, max_length=1, description="List of intersection types"
     )
 
 
@@ -77,6 +85,8 @@ class TreeCoverAnalyticsResponse(Response):
                                 "ids": ["BRA.1.12"],
                             },
                             "canopy_cover": 10,
+                            "forest_filter": "primary_forest",
+                            "intersections": []
                         },
                         "message": "",
                         "status": "saved",

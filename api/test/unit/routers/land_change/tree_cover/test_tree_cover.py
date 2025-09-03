@@ -27,6 +27,7 @@ def dummy_analytics_in():
             ids=["IDN.24.9"],
         ),
         canopy_cover=30,
+        intersections=[]
     )
 
 
