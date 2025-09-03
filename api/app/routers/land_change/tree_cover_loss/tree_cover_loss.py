@@ -1,7 +1,6 @@
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
-    DuckDbPrecalcQueryService,
     FloxOTFHandler,
     PrecalcQueryBuilder,
     TreeCoverLossPrecalcHandler,
@@ -11,6 +10,9 @@ from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )

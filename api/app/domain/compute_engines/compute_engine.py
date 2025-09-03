@@ -1,31 +1,14 @@
 from abc import ABC, abstractmethod
 from functools import partial
 
-import duckdb
 import numpy as np
 import pandas as pd
-from app.analysis.common.analysis import initialize_duckdb
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from flox.xarray import xarray_reduce
-
-
-class DuckDbPrecalcQueryService:
-    def __init__(self, table_uri):
-        self.table_uri = table_uri
-
-    async def execute(self, query: str) -> pd.DataFrame:
-        initialize_duckdb()
-
-        # need to declare this to bind FROM in SQL query
-        data_source = duckdb.read_parquet(self.table_uri)  # noqa: F841
-
-        # TODO duckdb has no native async, need to use aioduckdb? Check if blocking in load test
-        df = duckdb.sql(query).df()
-        return df.to_dict(orient="list")
 
 
 class PrecalcQueryBuilder:
