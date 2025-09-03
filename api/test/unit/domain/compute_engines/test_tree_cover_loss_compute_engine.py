@@ -5,7 +5,11 @@ import pytest
 import xarray as xr
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
+)
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
     TreeCoverLossPrecalcHandler,
 )
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
