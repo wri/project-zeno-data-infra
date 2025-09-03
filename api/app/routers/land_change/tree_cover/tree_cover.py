@@ -4,7 +4,6 @@ from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.domain.analyzers.dummy_tree_cover_analyzer import DummyTreeCoverAnalyzer
-from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import FloxOTFHandler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import TreeCoverPrecalcHandler
