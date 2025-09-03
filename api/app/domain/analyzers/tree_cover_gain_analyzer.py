@@ -35,6 +35,16 @@ class TreeCoverGainAnalyzer(Analyzer):
         )
 
     def _build_years(self, start_year: str, end_year: str):
+        """
+        Builds a string tuple of five-year ranges between start_year and end_year.
+
+        Args:
+            start_year: Start year as string (multiple of five, >= "2000").
+            end_year: End year as string (multiple of five, > start_year).
+
+        Returns:
+            String representation of a tuple of year ranges, e.g., "('2000-2005', '2005-2010')".
+        """
         start = int(start_year)
         end = int(end_year)
 
