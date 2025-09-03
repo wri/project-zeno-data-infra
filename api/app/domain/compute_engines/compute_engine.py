@@ -63,6 +63,14 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
         return None
 
 
+class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
+    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
+        return (
+            aoi_type == "admin"
+            and query.aggregate.dataset == Dataset.area_hectares
+        )
+
+
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
         return (
