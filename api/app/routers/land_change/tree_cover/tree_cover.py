@@ -4,8 +4,10 @@ from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
-from app.domain.compute_engines.compute_engine import ComputeEngine, \
-    FloxOTFHandler, TreeCoverPrecalcHandler, PrecalcQueryBuilder
+from app.domain.compute_engines.compute_engine import ComputeEngine
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import FloxOTFHandler
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import TreeCoverPrecalcHandler
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import PrecalcSqlQueryBuilder
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import DataApiAoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
@@ -35,7 +37,7 @@ def get_analysis_repository() -> AnalysisRepository:
 def create_analysis_service(request: Request) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverPrecalcHandler(
-            precalc_query_builder=PrecalcQueryBuilder(),
+            precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet"
             ),
