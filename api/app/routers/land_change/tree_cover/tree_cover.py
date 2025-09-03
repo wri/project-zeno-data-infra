@@ -3,6 +3,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
+from app.domain.analyzers.dummy_tree_cover_analyzer import DummyTreeCoverAnalyzer
 from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import FloxOTFHandler
@@ -35,7 +36,7 @@ def get_analysis_repository() -> AnalysisRepository:
 
 
 def create_analysis_service(request: Request) -> AnalysisService:
-    compute_engine = ComputeEngine(
+    compute_engine = ComputeEngine(  # NOTE: Ignored while using Dummy analyzer
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
@@ -51,7 +52,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
 
     return AnalysisService(
         analysis_repository=get_analysis_repository(),
-        analyzer=TreeCoverAnalyzer(compute_engine=compute_engine),
+        analyzer=DummyTreeCoverAnalyzer(),
         event=ANALYTICS_NAME,
     )
 
