@@ -17,7 +17,7 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from flox.xarray import xarray_reduce
 
 
-class PrecalcQueryBuilder:
+class PrecalcSqlQueryBuilder:
     FIELDS = {
         Dataset.area_hectares: "area_ha",
         Dataset.tree_cover_loss: "tree_cover_loss_year",

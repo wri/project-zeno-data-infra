@@ -4,7 +4,7 @@ from app.domain.analyzers.dummy_tree_cover_gain_analyzer import (
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
     FloxOTFHandler,
-    PrecalcQueryBuilder,
+    PrecalcSqlQueryBuilder,
     TreeCoverGainPrecalcHandler,
 )
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -43,7 +43,7 @@ def get_analysis_repository() -> AnalysisRepository:
 def create_analysis_service(request: Request) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverGainPrecalcHandler(
-            precalc_query_builder=PrecalcQueryBuilder(),
+            precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet"
             ),

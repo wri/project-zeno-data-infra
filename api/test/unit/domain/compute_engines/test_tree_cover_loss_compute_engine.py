@@ -6,7 +6,7 @@ import xarray as xr
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
     FloxOTFHandler,
-    PrecalcQueryBuilder,
+    PrecalcSqlQueryBuilder,
     TreeCoverLossPrecalcHandler,
 )
 from app.domain.models.area_of_interest import AreaOfInterestList
@@ -38,7 +38,7 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
 
     compute_engine = ComputeEngine(
         handler=TreeCoverLossPrecalcHandler(
-            precalc_query_builder=PrecalcQueryBuilder(),
+            precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=MockParquetQueryService(),
             next_handler=None,
         )

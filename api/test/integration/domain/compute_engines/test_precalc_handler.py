@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.domain.compute_engines.compute_engine import (
-    PrecalcQueryBuilder,
+    PrecalcSqlQueryBuilder,
     TreeCoverGainPrecalcHandler,
 )
 from app.domain.models.dataset import (
@@ -21,7 +21,7 @@ class TestTreeCoverGainPrecalcHandler:
     async def test_happy_path(self):
         query_service = MagicMock(spec=DuckDbPrecalcQueryService)
         handler = TreeCoverGainPrecalcHandler(
-            precalc_query_builder=PrecalcQueryBuilder(),
+            precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=query_service,
             next_handler=None,
         )
