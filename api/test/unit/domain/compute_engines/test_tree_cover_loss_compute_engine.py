@@ -6,9 +6,8 @@ import xarray as xr
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
     FloxOTFHandler,
-    GeneralPrecalcHandler,
     PrecalcQueryBuilder,
-    TreeCoverGainPrecalcHandler,
+    TreeCoverLossPrecalcHandler,
 )
 from app.domain.models.area_of_interest import AreaOfInterestList
 from app.domain.models.dataset import Dataset
@@ -38,10 +37,9 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
             return duckdb.sql(query).df()
 
     compute_engine = ComputeEngine(
-        handler=TreeCoverGainPrecalcHandler(
-            precalc_handler=GeneralPrecalcHandler(
-                PrecalcQueryBuilder(), MockParquetQueryService()
-            ),
+        handler=TreeCoverLossPrecalcHandler(
+            precalc_query_builder=PrecalcQueryBuilder(),
+            precalc_query_service=MockParquetQueryService(),
             next_handler=None,
         )
     )
