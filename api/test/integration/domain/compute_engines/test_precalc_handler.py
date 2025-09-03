@@ -2,7 +2,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from app.domain.compute_engines.compute_engine import (
-    DuckDbPrecalcQueryService,
     PrecalcQueryBuilder,
     TreeCoverGainPrecalcHandler,
 )
@@ -11,6 +10,9 @@ from app.domain.models.dataset import (
     DatasetAggregate,
     DatasetFilter,
     DatasetQuery,
+)
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
 )
 
 
