@@ -70,10 +70,9 @@ def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
     if "band" in sliced.dims:
         sliced = sliced.squeeze("band")
 
-    # Exit early if the geometry is full out of bounds of the dataset
-    # Not generally right, since requires data variable to be "band_data"
-    # Will take Justin's better fix.
-    if sliced.band_data.size == 0:
+    # Exit early if the geometry is fully out of bounds of the dataset, so all the
+    # data variables are already empty. Will take Justin's better fix.
+    if all(d.size == 0 for d in sliced.data_vars.values()):
         return sliced
 
     clipped = sliced.rio.clip([geojson])
