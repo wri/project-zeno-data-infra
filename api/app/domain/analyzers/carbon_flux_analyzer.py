@@ -30,7 +30,7 @@ tree_cover_density_2000_zarr_uri = "s3://gfw-data-lake/umd_tree_cover_density_20
 tree_cover_loss_zarr_uri = "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr/"
 # Parquet location
 # admin_results_uri = "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/tabular/zonal_stats/gadm/gadm_adm2.parquet"
-admin_results_uri = "s3://lcl-analytics/zonal_statistics/admin-carbon.parquet"
+admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon.parquet"
 
 
 def create_gadm_carbon_query(type, gadm_list, threshold):
