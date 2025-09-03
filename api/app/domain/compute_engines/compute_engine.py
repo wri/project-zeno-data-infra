@@ -1,8 +1,14 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from functools import partial
 
 import numpy as np
 import pandas as pd
+from app.domain.compute_engines.handlers.analytics_otf_handler import (
+    AnalyticsOTFHandler,
+)
+from app.domain.compute_engines.handlers.analytics_precalc_handler import (
+    AnalyticsPrecalcHandler,
+)
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -34,16 +40,6 @@ class PrecalcQueryBuilder:
         filters += f" AND aoi_id in ({", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
         sql = f"SELECT aoi_id, aoi_type{groupby_fields}, {agg} FROM data_source WHERE {filters} GROUP BY aoi_id, aoi_type{groupby_fields}"
         return sql
-
-
-class AnalyticsPrecalcHandler(ABC):
-    @abstractmethod
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
-        raise NotImplementedError()
 
 
 class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
@@ -80,7 +76,7 @@ class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
         )
 
 
-class FloxOTFHandler:
+class FloxOTFHandler(AnalyticsOTFHandler):
     EXPECTED_GROUPS = {
         Dataset.tree_cover_loss: np.arange(0, 25),
         Dataset.canopy_cover: np.arange(0, 8),
@@ -169,7 +165,7 @@ class FloxOTFHandler:
 
 
 class ComputeEngine:
-    def __init__(self, handler):
+    def __init__(self, handler: AnalyticsPrecalcHandler | AnalyticsOTFHandler):
         self.handler = handler
 
     async def compute(self, aoi_type, aoi_ids, query: DatasetQuery):
