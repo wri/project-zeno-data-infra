@@ -16,6 +16,7 @@ from flox.xarray import xarray_reduce
 class FloxOTFHandler(AnalyticsOTFHandler):
     EXPECTED_GROUPS = {
         Dataset.tree_cover_loss: np.arange(0, 25),
+        # TODO add Dataset.tree_cover_gain
         Dataset.canopy_cover: np.arange(0, 8),
     }
 
