@@ -1,3 +1,5 @@
+from typing import List
+
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
@@ -16,18 +18,30 @@ class TreeCoverGainAnalyzer(Analyzer):
 
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
+
+        filters: List[DatasetFilter] = [
+            DatasetFilter(
+                dataset=Dataset.tree_cover_gain,
+                op="in",
+                value=self._build_years(analytics_in.start_year, analytics_in.end_year),
+            )
+        ]
+
+        if analytics_in.forest_filter is not None:
+            filters.append(
+                DatasetFilter(
+                    dataset=Dataset.primary_forest
+                    if analytics_in.forest_filter == "primary_forest"
+                    else Dataset.intact_forest,
+                    op="=",
+                    value=True,
+                )
+            )
+
         query = DatasetQuery(
             aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
             group_bys=[Dataset.tree_cover_gain],
-            filters=[
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_gain,
-                    op="in",
-                    value=self._build_years(
-                        analytics_in.start_year, analytics_in.end_year
-                    ),
-                )
-            ],
+            filters=filters,
         )
 
         return await self.compute_engine.compute(
