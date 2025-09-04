@@ -43,10 +43,8 @@ def get_geojson_request_for_data_api(aoi):
             f"select gfw_geojson from data where wdpaid in {value_list} order by wdpaid"
         )
     elif aoi["type"] == "indigenous_land":
-        url = (
-            "https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query"
-        )
-        sql = f"select gfw_geojson from data where objectid in {value_list} order by objectid"
+        url = "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
+        sql = f"select gfw_geojson from data where landmark_id in {value_list} order by landmark_id"
     else:
         raise ValueError(f"Unable to retrieve AOI type {aoi['type']} from Data API.")
     return url, {"sql": sql}
