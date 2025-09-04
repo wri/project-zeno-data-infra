@@ -36,10 +36,6 @@ class TreeCoverAnalyzer(Analyzer):
                 )
             )
 
-        # if tree_cover_analytics_in.intersections is not None:
-        #     for intersection in tree_cover_analytics_in.intersections:
-        #         groupbys.append(
-
         query = DatasetQuery(
             aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
             group_bys=groupbys,
