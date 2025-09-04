@@ -73,8 +73,8 @@ class TreeCoverAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
-                            "aoi_type": ["admin", "admin", "admin"],
+                            "aoi_id": ["BRA.1.12"],
+                            "aoi_type": ["admin"],
                             "area_ha": [
                                 4025.406160862687,
                             ],
