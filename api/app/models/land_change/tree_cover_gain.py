@@ -63,8 +63,8 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
     def validate_year_range(self) -> "TreeCoverGainAnalyticsIn":
         start = int(self.start_year)
         end = int(self.end_year)
-        if end < start:
-            raise ValueError("end_year must be greater than or equal to start_year")
+        if end <= start:
+            raise ValueError("end_year must be greater than start_year")
         return self
 
 
