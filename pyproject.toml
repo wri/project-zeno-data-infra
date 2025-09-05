@@ -28,7 +28,8 @@ dependencies = [
     "duckdb",
     "shapely",
     "prefect-coiled>=0.0.4",
-    "python-json-logger"
+    "python-json-logger",
+    "aioboto3>=15.1.0",
 ]
 
 [tool.uv.workspace]
@@ -41,7 +42,8 @@ dev = [
     "pandera>=0.24.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",
-    "locust>=2.38.1"
+    "locust>=2.38.1",
+    "moto>=5.1.11",
 ]
 
 [tool.pytest.ini_options]
