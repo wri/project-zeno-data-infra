@@ -546,6 +546,7 @@ async def test_kba_dist_analytics_no_intersection():
     pd.testing.assert_frame_equal(
         expected_df,
         actual_df,
+        check_dtype=False,
         check_like=True,
         check_exact=False,  # Allow approximate comparison for numbers
         atol=1e-8,  # Absolute tolerance

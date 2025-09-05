@@ -83,7 +83,7 @@ class IndigenousAreaOfInterest(AreaOfInterest):
     ids: List[str] = Field(
         ...,
         title="Landmark Indigenous lands object ID",
-        examples=[["1931"], ["1918", "43053"]],
+        examples=[["MEX11287"], ["CAN1", "CAN2"]],
     )
 
 
