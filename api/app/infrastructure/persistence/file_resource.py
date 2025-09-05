@@ -2,7 +2,8 @@ import json
 import uuid
 from pathlib import Path
 
-from app.models.land_change.land_cover import AnalysisStatus, LandCoverChangeAnalytics
+from app.models.common.analysis import AnalysisStatus
+from app.models.land_change.land_cover_change import LandCoverChangeAnalytics
 
 PAYLOAD_STORE_DIR = Path("/tmp/land_cover_change_analytics_payloads")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
