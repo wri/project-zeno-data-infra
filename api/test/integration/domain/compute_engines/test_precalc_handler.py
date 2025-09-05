@@ -45,5 +45,5 @@ class TestTreeCoverGainPrecalcHandler:
         await handler.handle(aoi_type, ["AUS"], query)
 
         query_service.execute.assert_called_once_with(
-            "SELECT aoi_id, aoi_type, SUM(area_ha) AS area_ha FROM data_source WHERE gain_period in ('2000-2005') AND aoi_id in ('AUS') GROUP BY aoi_id, aoi_type",
+            "SELECT aoi_id, aoi_type, SUM(area_ha) AS area_ha FROM data_source WHERE tree_cover_gain_period in ('2000-2005') AND aoi_id in ('AUS') GROUP BY aoi_id, aoi_type",
         )

@@ -71,7 +71,7 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
 class TreeCoverGainResult(StrictBaseModel):
     aoi_id: List[str]
     aoi_type: List[str]
-    tree_cover_gain_year: List[int]
+    tree_cover_gain_period: List[str]
     area_ha: List[float]
 
 

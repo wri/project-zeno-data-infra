@@ -16,7 +16,7 @@ class Dataset(Enum):
         DATASET_TO_NAMES = {
             Dataset.area_hectares: "area_ha",
             Dataset.tree_cover_loss: "tree_cover_loss_year",
-            Dataset.tree_cover_gain: "tree_cover_gain_year",
+            Dataset.tree_cover_gain: "tree_cover_gain_period",
             Dataset.canopy_cover: "canopy_cover",
             Dataset.intact_forest: "is_intact_forest",
             Dataset.primary_forest: "is_primary_forest",

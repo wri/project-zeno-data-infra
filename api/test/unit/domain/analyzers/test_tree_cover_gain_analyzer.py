@@ -46,7 +46,7 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
         args, _ = mock_query_service.execute.call_args
         sql_query = args[0]
         # Assert that the SQL query contains the multiple gain_period filters
-        assert "gain_period in ('2000-2005')" in sql_query
+        assert "tree_cover_gain_period in ('2000-2005')" in sql_query
 
         mock_query_service.reset_mock()
 
@@ -77,7 +77,7 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
         args, _ = mock_query_service.execute.call_args
         sql_query = args[0]
         # Assert that the SQL query contains the multiple gain_period filters
-        assert "gain_period in ('2000-2005', '2005-2010')" in sql_query
+        assert "tree_cover_gain_period in ('2000-2005', '2005-2010')" in sql_query
 
         mock_query_service.reset_mock()
 

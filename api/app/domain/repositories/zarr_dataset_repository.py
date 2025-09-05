@@ -50,6 +50,8 @@ class ZarrDatasetRepository:
                     return 7
         elif dataset == Dataset.tree_cover_loss:
             return int(value) - 2000
+        elif dataset == Dataset.tree_cover_gain:
+            return value
         else:
             raise NotImplementedError()
 
@@ -59,6 +61,22 @@ class ZarrDatasetRepository:
         """
         if dataset == Dataset.tree_cover_loss:
             return series + 2000
+        elif dataset == Dataset.tree_cover_gain:
+
+            def pixel_to_gain(val):
+                match val:
+                    case 0:
+                        return None
+                    case 1:
+                        return "2000-2005"
+                    case 2:
+                        return "2005-2010"
+                    case 3:
+                        return "2010-2015"
+                    case 4:
+                        return "2015-2020"
+                return series.map(pixel_to_gain)
+
         else:
             return series
 
