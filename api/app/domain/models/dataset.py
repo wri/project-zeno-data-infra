@@ -9,8 +9,8 @@ class Dataset(Enum):
     tree_cover_gain = "tree_cover_gain"
     canopy_cover = "canopy_cover"
     area_hectares = "area_hectares"
-    intact_forest = "intact_forest"
     primary_forest = "primary_forest"
+    intact_forest = "intact_forest"
 
     def get_field_name(self):
         DATASET_TO_NAMES = {
