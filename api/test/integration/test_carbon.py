@@ -36,24 +36,15 @@ class TestCarbonDataAdmin:
                 yield test_request, client
 
     @pytest.mark.asyncio
-    async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
-        resource = test_request.json()
-        assert (
-            resource["data"]["link"]
-            == "http://testserver/v0/land_change/carbon_flux/analytics/307dd9c9-9adb-581d-8113-bd3af71764e5"
-        )
-
-    @pytest.mark.asyncio
-    async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
-        response = test_request
-        assert response.status_code == 202
-
-    @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
         test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        assert test_request.status_code == 202
+        response = test_request.json()
+        assert (
+            response["data"]["link"]
+            == "http://testserver/v0/land_change/carbon_flux/analytics/307dd9c9-9adb-581d-8113-bd3af71764e5"
+        )
+        resource_id = response["data"]["link"].split("/")[-1]
         resource = await retry_getting_resource(
             "carbon_flux", resource_id, client
         )
@@ -125,24 +116,15 @@ class TestCarbonDataFeature:
                 yield test_request, client
 
     @pytest.mark.asyncio
-    async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
-        resource = test_request.json()
-        assert (
-            resource["data"]["link"]
-            == "http://testserver/v0/land_change/carbon_flux/analytics/456cdbe3-2b3c-5531-a425-afe8c3c395da"
-        )
-
-    @pytest.mark.asyncio
-    async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
-        response = test_request
-        assert response.status_code == 202
-
-    @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
         test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        assert test_request.status_code == 202
+        response = test_request.json()
+        assert (
+            response["data"]["link"]
+            == "http://testserver/v0/land_change/carbon_flux/analytics/456cdbe3-2b3c-5531-a425-afe8c3c395da"
+        )
+        resource_id = response["data"]["link"].split("/")[-1]
         resource = await retry_getting_resource(
             "carbon_flux", resource_id, client
         )
