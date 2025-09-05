@@ -39,7 +39,7 @@ def create_gadm_carbon_query(type, gadm_list, threshold):
         query += f" AND region = {gadm_list[1]}"
     if len(gadm_list) > 2:
         query += f" AND subregion = {gadm_list[2]}"
-    query += f" AND (tree_cover_density > {threshold} or mangrove_stock_2000 > 0 OR tree_cover_gain_from_height > 0)) AS {type}"
+    query += f" AND (tree_cover_density >= {threshold} or mangrove_stock_2000 > 0 OR tree_cover_gain_from_height > 0)) AS {type}"
     return query
 
 
@@ -89,12 +89,7 @@ class CarbonFluxAnalyzer(Analyzer):
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
-            # The original commented out code works when there are multiple AOIs in
-            # the list, but not when there is only one AOI in the list (it says you
-            # can't do an await on a DataFrame). Anyone know the code that would work
-            # in both cases?
-            combined_results_df = dd.concat(dfs)
-            # combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
 
         analyzed_analysis = Analysis(
             combined_results_df.to_dict(orient="list"),
@@ -106,7 +101,7 @@ class CarbonFluxAnalyzer(Analyzer):
         )
 
     @staticmethod
-    def analyze_admin_area(gadm_id, threshold=30):
+    def analyze_admin_area(gadm_id, threshold=30) -> dd.DataFrame:
         gadm_list = gadm_id.split(".")
         query = "select "
         query += create_gadm_carbon_query("carbon_net_flux", gadm_list, threshold) + ", "
@@ -122,16 +117,15 @@ class CarbonFluxAnalyzer(Analyzer):
                            "carbon_gross_emissions": "carbon_gross_emissions_Mg_CO2e"},
                   inplace=True)
 
-        return df
+        # Return a dask data frame, so the future gather code works.
+        ddf: dd.DataFrame = dd.from_pandas(df)
+        return ddf
 
     @staticmethod
-    def analyze_area(aoi, geojson, threshold=30):
+    def analyze_area(aoi, geojson, threshold=30) -> dd.DataFrame:
         carbon_net_flux = read_zarr_clipped_to_geojson(carbon_net_flux_zarr_uri, geojson)
-        carbon_net_flux.band_data.name = "carbon_net_flux"
         carbon_gross_removals = read_zarr_clipped_to_geojson(carbon_gross_removals_zarr_uri, geojson)
-        carbon_gross_removals.band_data.name = "carbon_gross_removals"
         carbon_gross_emissions = read_zarr_clipped_to_geojson(carbon_gross_emissions_zarr_uri, geojson)
-        carbon_gross_emissions.band_data.name = "carbon_gross_emissions"
         mangrove_stock_2000 = read_zarr_clipped_to_geojson(mangrove_stock_2000_zarr_uri, geojson).band_data
         mangrove_stock_2000.name = "is_mangrove_stock_2000"
         tree_cover_gain_from_height = read_zarr_clipped_to_geojson(tree_cover_gain_from_height_zarr_uri, geojson).band_data
@@ -139,21 +133,16 @@ class CarbonFluxAnalyzer(Analyzer):
         tree_cover_density_2000 = read_zarr_clipped_to_geojson(tree_cover_density_2000_zarr_uri, geojson).band_data
         tree_cover_density_2000.name = "tree_cover_density_2000"
 
-        ds = xr.Dataset({"carbon_net_flux": carbon_net_flux.band_data,
-                         "carbon_gross_removals": carbon_gross_removals.band_data,
-                         "carbon_gross_emissions": carbon_gross_emissions.band_data})
+        ds = xr.Dataset({"carbon_net_flux_Mg_CO2e": carbon_net_flux.band_data,
+                         "carbon_gross_removals_Mg_CO2e": carbon_gross_removals.band_data,
+                         "carbon_gross_emissions_Mg_CO2e": carbon_gross_emissions.band_data})
 
         merge = ds * ((tree_cover_density_2000 >= threshold) | mangrove_stock_2000 | tree_cover_gain_from_height > 0)
-        carbon_df = merge.sum(dim=("x", "y")).to_dask_dataframe().drop("spatial_ref", axis=1).drop("band", axis=1).compute()
+        carbon_df: dd.DataFrame = merge.sum(dim=("x", "y")).to_dask_dataframe().drop("spatial_ref", axis=1).drop("band", axis=1)
 
         carbon_df["aoi_type"] = aoi["type"].lower()
         carbon_df["aoi_id"] = (
             aoi["id"] if "id" in aoi else aoi["properties"]["id"]
         )
-        carbon_df.rename(columns={"carbon_net_flux": "carbon_net_flux_Mg_CO2e",
-                                  "carbon_gross_removals": "carbon_gross_removals_Mg_CO2e",
-                                  "carbon_gross_emissions": "carbon_gross_emissions_Mg_CO2e"},
-                         inplace=True)
 
-        print(carbon_df)
         return carbon_df
