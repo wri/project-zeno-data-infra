@@ -58,15 +58,20 @@ async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_a
     return geojson
 
 
-def clip_zarr_to_geojson(xarr, geojson):
+def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
     geom = shape(geojson)
 
-    sliced = xarr.sel(
+    sliced: xr.Dataset = xarr.sel(
         x=slice(geom.bounds[0], geom.bounds[2]),
         y=slice(geom.bounds[3], geom.bounds[1]),
     )
     if "band" in sliced.dims:
         sliced = sliced.squeeze("band")
+
+    # Exit early if the geometry is fully out of bounds of the dataset, so all the
+    # data variables are already empty. Will take Justin's better fix.
+    if all(d.size == 0 for d in sliced.data_vars.values()):
+        return sliced
 
     clipped = sliced.rio.clip([geojson])
     return clipped

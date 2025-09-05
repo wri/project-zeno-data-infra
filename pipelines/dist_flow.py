@@ -13,6 +13,7 @@ from pipelines.disturbance import validate_zonal_statistics
 from pipelines.disturbance import prefect_flows
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
+from pipelines.carbon_flux.prefect_flows import carbon_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -99,6 +100,9 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         result_uris.append(gadm_dist_by_land_cover_result)
 
         validate_result = run_validation_suite(gadm_dist_result)
+
+        carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
+        result_uris.append(carbon_result)
 
     except Exception:
         logger.error("DIST alerts analysis failed.")
