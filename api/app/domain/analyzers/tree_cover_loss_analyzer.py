@@ -16,26 +16,45 @@ class TreeCoverLossAnalyzer(Analyzer):
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
+        filters = [
+            DatasetFilter(
+                dataset=Dataset.canopy_cover,
+                op=">=",
+                value=analytics_in.canopy_cover,
+            ),
+            DatasetFilter(
+                dataset=Dataset.tree_cover_loss,
+                op=">=",
+                value=analytics_in.start_year,
+            ),
+            DatasetFilter(
+                dataset=Dataset.tree_cover_loss,
+                op="<=",
+                value=analytics_in.end_year,
+            ),
+        ]
+        
+        if analytics_in.forest_filter == "primary_forest":
+            filters.append(
+                DatasetFilter(
+                    dataset=Dataset.primary_forest,
+                    op="=",
+                    value=True,
+                )
+            )
+        elif analytics_in.forest_filter == "intact_forest":
+            filters.append(
+                DatasetFilter(
+                    dataset=Dataset.intact_forest,
+                    op="=",
+                    value=True,
+                )
+            )
+
         query = DatasetQuery(
             aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
             group_bys=[Dataset.tree_cover_loss],
-            filters=[
-                DatasetFilter(
-                    dataset=Dataset.canopy_cover,
-                    op=">=",
-                    value=analytics_in.canopy_cover,
-                ),
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_loss,
-                    op=">=",
-                    value=analytics_in.start_year,
-                ),
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_loss,
-                    op="<=",
-                    value=analytics_in.end_year,
-                ),
-            ],
+            filters=filters,
         )
         return await self.compute_engine.compute(
             analytics_in.aoi.type, analytics_in.aoi.ids, query

@@ -7,6 +7,8 @@ class PrecalcSqlQueryBuilder:
         Dataset.tree_cover_loss: "tree_cover_loss_year",
         Dataset.tree_cover_gain: "gain_period",
         Dataset.canopy_cover: "canopy_cover",
+        Dataset.primary_forest: "is__regional_primary_forest_2001",
+        Dataset.intact_forest: "is__ifl_intact_forest_landscapes_2000",
     }
 
     def build(self, aoi_ids, query: DatasetQuery) -> str:
