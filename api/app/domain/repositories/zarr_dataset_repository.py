@@ -1,3 +1,5 @@
+import ast
+
 import xarray as xr
 from app.domain.models.dataset import Dataset
 from shapely import Geometry
@@ -51,7 +53,10 @@ class ZarrDatasetRepository:
         elif dataset == Dataset.tree_cover_loss:
             return int(value) - 2000
         elif dataset == Dataset.tree_cover_gain:
-            return value
+            value_tuple = ast.literal_eval(value)
+            val_map = {"2000-2005": 1, "2005-2010": 2, "2010-2015": 3, "2015-2020": 4}
+
+            return [val_map[val] for val in value_tuple]
         else:
             raise NotImplementedError()
 
@@ -66,7 +71,7 @@ class ZarrDatasetRepository:
             def pixel_to_gain(val):
                 match val:
                     case 0:
-                        return None
+                        return ""
                     case 1:
                         return "2000-2005"
                     case 2:
@@ -75,7 +80,8 @@ class ZarrDatasetRepository:
                         return "2010-2015"
                     case 4:
                         return "2015-2020"
-                return series.map(pixel_to_gain)
+
+            return series.map(pixel_to_gain)
 
         else:
             return series

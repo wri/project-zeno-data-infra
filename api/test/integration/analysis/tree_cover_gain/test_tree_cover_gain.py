@@ -125,7 +125,5 @@ class TestGainAnalyticsPostWithKba:
         assert "20401" in df["aoi_id"].values
         assert "19426" in df["aoi_id"].values
 
-        assert ~(df.tree_cover_gain_year < 2020).any()
-        assert ~(df.tree_cover_gain_year > 2023).any()
-
+        assert ~(df.tree_cover_gain_period == "2000-2005").any()
         assert df.columns.size == 4

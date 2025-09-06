@@ -2,6 +2,7 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
 )
@@ -63,15 +64,20 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 filter.dataset, filter.value
             )
             da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
-            by = by.where(eval(f"da {filter.op} {translated_value}"))
+            filter_arr = FloxOTFHandler._get_filter_by_op(
+                da, filter.op, translated_value
+            )
+            by = by.where(filter_arr)
 
             if filter.dataset in query.group_bys:
                 # filter expected groups by the filter itself so it doesn't appear in the results as 0s
                 expected_groups_per_dataset[
                     filter.dataset
                 ] = expected_groups_per_dataset[filter.dataset][
-                    eval(
-                        f"expected_groups_per_dataset[{filter.dataset}] {filter.op} {translated_value}"
+                    FloxOTFHandler._get_filter_by_op(
+                        expected_groups_per_dataset[filter.dataset],
+                        filter.op,
+                        translated_value,
                     )
                 ]
 
@@ -100,3 +106,42 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         return filtered_results.reset_index().drop(
             columns=["index", "band", "spatial_ref"], errors="ignore"
         )
+
+    @staticmethod
+    def _get_filter_by_op(arr, op, value):
+        match op:
+            case ">":
+                return arr > value
+            case "<":
+                return arr < value
+            case ">=":
+                return arr >= value
+            case "<=":
+                return arr <= value
+            case "=":
+                return arr == value
+            case "!=":
+                return arr != value
+            case "in":
+                if isinstance(arr, xr.DataArray) or isinstance(arr, xr.Dataset):
+                    return arr.isin(value)
+                elif isinstance(arr, np.ndarray):
+                    return np.isin(arr, value)
+
+    @staticmethod
+    def _get_expected_group_filter_by_op(expected_group, op, value):
+        match op:
+            case ">":
+                return expected_group > value
+            case "<":
+                return expected_group < value
+            case ">=":
+                return expected_group >= value
+            case "<=":
+                return expected_group <= value
+            case "=":
+                return expected_group == value
+            case "!=":
+                return expected_group != value
+            case "in":
+                return set(expected_group) & set(value)
