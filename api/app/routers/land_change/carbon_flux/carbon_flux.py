@@ -1,6 +1,3 @@
-from app.domain.analyzers.dummy_carbon_flux_analyzer import (
-    DummyCarbonFluxAnalyzer,
-)
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -12,6 +9,7 @@ from app.models.land_change.carbon_flux import (
     CarbonFluxAnalyticsIn,
     CarbonFluxAnalyticsResponse,
 )
+from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -27,10 +25,14 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service() -> AnalysisService:
+def create_analysis_service(request: Request) -> AnalysisService:
+    analysis_repository = get_analysis_repository()
     return AnalysisService(
-        analysis_repository=get_analysis_repository(),
-        analyzer=DummyCarbonFluxAnalyzer(),
+        analysis_repository=analysis_repository,
+        analyzer=CarbonFluxAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=request.app.state.dask_client,
+        ),
         event=ANALYTICS_NAME,
     )
 
