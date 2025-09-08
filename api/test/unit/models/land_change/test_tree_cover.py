@@ -12,7 +12,6 @@ def base_config():
     return TreeCoverAnalyticsIn(
         aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
         canopy_cover=30,
-        intersections=[],
         forest_filter=None,
     )
 
@@ -44,12 +43,10 @@ class TestTreeCoverAnalyticsInValidations:
             TreeCoverAnalyticsIn(
                 aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
                 canopy_cover=5,
-                intersections=[],
             )
 
     def test_valid_tcds_work(self):
         TreeCoverAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
             canopy_cover=15,
-            intersections=[],
         )
