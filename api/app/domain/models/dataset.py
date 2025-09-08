@@ -23,7 +23,7 @@ class Dataset(Enum):
             Dataset.intact_forest: "is_intact_forest",
             Dataset.primary_forest: "is_primary_forest",
             Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
-            Dataset.carbon_emissions: "carbon_emissions",
+            Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
         }
 
         return DATASET_TO_NAMES[self]

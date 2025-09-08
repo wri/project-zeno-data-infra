@@ -2,6 +2,7 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
 )
@@ -11,7 +12,6 @@ from app.domain.repositories.data_api_aoi_geometry_repository import (
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from flox.xarray import xarray_reduce
-import xarray as xr
 
 
 class FloxOTFHandler(AnalyticsOTFHandler):
@@ -55,10 +55,10 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         aoi_id, aoi_geometry = aoi
         func = query.aggregate.func
 
-        aggregate = xr.Dataset()
-        for agg_dataset in query.aggregate.datasets:
-            xarr = dataset_repository.load(agg_dataset, geometry=aoi_geometry)
-            aggregate[agg_dataset].get_field_name()
+        by = xr.Dataset()
+        for ds in query.aggregate.datasets:
+            xarr = dataset_repository.load(ds, geometry=aoi_geometry)
+            by[ds.get_field_name()] = xarr
 
         objs = []
         expected_groups = []
@@ -90,15 +90,10 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             .reset_index()
         )
 
+        # filrer out rows where all results are NaN
         results["aoi_id"] = aoi_id
-        filtered_results = results[
-            ~np.isnan(results[query.aggregate.dataset.get_field_name()])
-        ]
-
-        if query.aggregate.dataset == Dataset.area_hectares:
-            filtered_results[
-                query.aggregate.dataset.get_field_name()
-            ] = filtered_results[query.aggregate.dataset.get_field_name()]
+        agg_col_names = [ds.get_field_name() for ds in query.aggregate.datasets]
+        filtered_results = results[~results[agg_col_names].isna().all(axis=1)]
 
         # TODO remove band and spatial ref from zarrs
         return filtered_results.reset_index().drop(

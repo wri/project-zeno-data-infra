@@ -70,7 +70,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
         assert ~(df.tree_cover_loss_year < 2015).any()
         assert ~(df.tree_cover_loss_year > 2022).any()
 
-        assert df.columns.size == 4
+        assert df.columns.size == 5
 
 
 class TestTclAnalyticsPostWithKba:
@@ -134,4 +134,4 @@ class TestTclAnalyticsPostWithKba:
         assert ~(df.tree_cover_loss_year < 2020).any()
         assert ~(df.tree_cover_loss_year > 2023).any()
 
-        assert df.columns.size == 4
+        assert df.columns.size == 5
