@@ -2,7 +2,6 @@ from functools import partial
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
 )
@@ -12,12 +11,12 @@ from app.domain.repositories.data_api_aoi_geometry_repository import (
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from flox.xarray import xarray_reduce
+import xarray as xr
 
 
 class FloxOTFHandler(AnalyticsOTFHandler):
     EXPECTED_GROUPS = {
         Dataset.tree_cover_loss: np.arange(0, 25),
-        Dataset.tree_cover_gain: np.arange(0, 5),
         Dataset.canopy_cover: np.arange(0, 8),
     }
 
@@ -54,8 +53,12 @@ class FloxOTFHandler(AnalyticsOTFHandler):
     @staticmethod
     def _handle(aoi, query, dataset_repository, expected_groups_per_dataset):
         aoi_id, aoi_geometry = aoi
-        by = dataset_repository.load(query.aggregate.dataset, geometry=aoi_geometry)
         func = query.aggregate.func
+
+        aggregate = xr.Dataset()
+        for agg_dataset in query.aggregate.datasets:
+            xarr = dataset_repository.load(agg_dataset, geometry=aoi_geometry)
+            aggregate[agg_dataset].get_field_name()
 
         objs = []
         expected_groups = []
@@ -64,20 +67,15 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 filter.dataset, filter.value
             )
             da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
-            filter_arr = FloxOTFHandler._get_filter_by_op(
-                da, filter.op, translated_value
-            )
-            by = by.where(filter_arr)
+            by = by.where(eval(f"da {filter.op} {translated_value}"))
 
             if filter.dataset in query.group_bys:
                 # filter expected groups by the filter itself so it doesn't appear in the results as 0s
                 expected_groups_per_dataset[
                     filter.dataset
                 ] = expected_groups_per_dataset[filter.dataset][
-                    FloxOTFHandler._get_filter_by_op(
-                        expected_groups_per_dataset[filter.dataset],
-                        filter.op,
-                        translated_value,
+                    eval(
+                        f"expected_groups_per_dataset[{filter.dataset}] {filter.op} {translated_value}"
                     )
                 ]
 
@@ -106,42 +104,3 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         return filtered_results.reset_index().drop(
             columns=["index", "band", "spatial_ref"], errors="ignore"
         )
-
-    @staticmethod
-    def _get_filter_by_op(arr, op, value):
-        match op:
-            case ">":
-                return arr > value
-            case "<":
-                return arr < value
-            case ">=":
-                return arr >= value
-            case "<=":
-                return arr <= value
-            case "=":
-                return arr == value
-            case "!=":
-                return arr != value
-            case "in":
-                if isinstance(arr, xr.DataArray) or isinstance(arr, xr.Dataset):
-                    return arr.isin(value)
-                elif isinstance(arr, np.ndarray):
-                    return np.isin(arr, value)
-
-    @staticmethod
-    def _get_expected_group_filter_by_op(expected_group, op, value):
-        match op:
-            case ">":
-                return expected_group > value
-            case "<":
-                return expected_group < value
-            case ">=":
-                return expected_group >= value
-            case "<=":
-                return expected_group <= value
-            case "=":
-                return expected_group == value
-            case "!=":
-                return expected_group != value
-            case "in":
-                return set(expected_group) & set(value)

@@ -17,8 +17,8 @@ class TreeCoverLossAnalyzer(Analyzer):
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
         query = DatasetQuery(
-            aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
-            group_bys=[Dataset.tree_cover_loss],
+            aggregate=[DatasetAggregate(dataset=Dataset.area_hectares, func="sum"), DatasetAggregate(dataset=Dataset.carbon_emissions, func="sum")]
+            group_bys=[],
             filters=[
                 DatasetFilter(
                     dataset=Dataset.canopy_cover,
@@ -37,6 +37,14 @@ class TreeCoverLossAnalyzer(Analyzer):
                 ),
             ],
         )
+
+        # if by driver, return across all years since that's how the model is calculated
+        # otherwise group by TCL year
+        if "driver" in analytics_in.intersections:
+            query.group_bys.append(Dataset.tree_cover_loss_drivers)
+        else:
+            query.group_bys.append(Dataset.tree_cover_loss)
+
         return await self.compute_engine.compute(
             analytics_in.aoi.type, analytics_in.aoi.ids, query
         )

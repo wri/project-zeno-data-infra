@@ -13,7 +13,7 @@ class TreeCoverAnalyzer(Analyzer):
         tree_cover_analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
 
         query = DatasetQuery(
-            aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
+            aggregate=DatasetAggregate(datasets=[Dataset.area_hectares, Dataset.carbon_emissions], func="sum"),
             group_bys=[],
             filters=[
                 DatasetFilter(
