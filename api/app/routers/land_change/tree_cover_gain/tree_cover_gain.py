@@ -1,5 +1,5 @@
-from app.domain.analyzers.dummy_tree_cover_gain_analyzer import (
-    DummyTreeCoverGainAnalyzer,
+from app.domain.analyzers.tree_cover_gain_analyzer import (
+    TreeCoverGainAnalyzer,
 )
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
@@ -63,7 +63,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
 
     return AnalysisService(
         analysis_repository=get_analysis_repository(),
-        analyzer=DummyTreeCoverGainAnalyzer(compute_engine),  # DUMMY DATA
+        analyzer=TreeCoverGainAnalyzer(compute_engine),
         event=ANALYTICS_NAME,
     )
 
