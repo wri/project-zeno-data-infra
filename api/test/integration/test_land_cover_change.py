@@ -20,7 +20,7 @@ class TestLandCoverChangeData:
         """Runs before each test in this class"""
         delete_resource_files(
             "land_cover_change",
-            "4b5102d9-2eb7-58b1-8378-9beb8f180cea",
+            "7fc7fab7-97be-50ff-b0d9-1c19840bd142",
         )
 
         async with LifespanManager(app):
@@ -40,7 +40,7 @@ class TestLandCoverChangeData:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/land_cover_change/analytics/4b5102d9-2eb7-58b1-8378-9beb8f180cea"
+            == "http://testserver/v0/land_change/land_cover_change/analytics/7fc7fab7-97be-50ff-b0d9-1c19840bd142"
         )
 
     @pytest.mark.asyncio

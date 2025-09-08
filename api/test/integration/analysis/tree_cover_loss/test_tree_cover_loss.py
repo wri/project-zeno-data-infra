@@ -12,7 +12,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("tree_cover_loss", "4869f7fc-fcb0-51ad-a94f-e749b8d62b28")
+        delete_resource_files("tree_cover_loss", "17d38735-9e8b-5242-b1b2-31534835fd11")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -46,7 +46,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover_loss/analytics/4869f7fc-fcb0-51ad-a94f-e749b8d62b28"
+            == "http://testserver/v0/land_change/tree_cover_loss/analytics/17d38735-9e8b-5242-b1b2-31534835fd11"
         )
 
     @pytest.mark.asyncio
@@ -77,7 +77,7 @@ class TestTclAnalyticsPostWithKba:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("tree_cover_loss", "abf61c0f-4c75-5af9-abaa-91051c0a3281")
+        delete_resource_files("tree_cover_loss", "fe77ddb5-0c77-5a5f-a825-7383d90d5710")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -111,7 +111,7 @@ class TestTclAnalyticsPostWithKba:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover_loss/analytics/abf61c0f-4c75-5af9-abaa-91051c0a3281"
+            == "http://testserver/v0/land_change/tree_cover_loss/analytics/fe77ddb5-0c77-5a5f-a825-7383d90d5710"
         )
 
     @pytest.mark.asyncio

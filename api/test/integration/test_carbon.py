@@ -20,7 +20,7 @@ class TestCarbonDataAdmin:
         """Runs before each test in this class"""
         delete_resource_files(
             "carbon_flux",
-            "307dd9c9-9adb-581d-8113-bd3af71764e5",
+            "017f3170-fd63-5c12-8ca6-5010ba515c18",
         )
 
         async with LifespanManager(app):
@@ -44,7 +44,7 @@ class TestCarbonDataAdmin:
         response = test_request.json()
         assert (
             response["data"]["link"]
-            == "http://testserver/v0/land_change/carbon_flux/analytics/307dd9c9-9adb-581d-8113-bd3af71764e5"
+            == "http://testserver/v0/land_change/carbon_flux/analytics/017f3170-fd63-5c12-8ca6-5010ba515c18"
         )
         resource_id = response["data"]["link"].split("/")[-1]
         resource = await retry_getting_resource("carbon_flux", resource_id, client)
@@ -78,7 +78,7 @@ class TestCarbonDataFeature:
         """Runs before each test in this class"""
         delete_resource_files(
             "carbon_flux",
-            "456cdbe3-2b3c-5531-a425-afe8c3c395da",
+            "676ec732-f3ca-5aa1-8947-0017fe454d10",
         )
 
         async with LifespanManager(app):
@@ -124,7 +124,7 @@ class TestCarbonDataFeature:
         response = test_request.json()
         assert (
             response["data"]["link"]
-            == "http://testserver/v0/land_change/carbon_flux/analytics/456cdbe3-2b3c-5531-a425-afe8c3c395da"
+            == "http://testserver/v0/land_change/carbon_flux/analytics/676ec732-f3ca-5aa1-8947-0017fe454d10"
         )
         resource_id = response["data"]["link"].split("/")[-1]
         resource = await retry_getting_resource("carbon_flux", resource_id, client)
