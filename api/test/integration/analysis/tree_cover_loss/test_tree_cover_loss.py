@@ -135,3 +135,65 @@ class TestTclAnalyticsPostWithKba:
         assert ~(df.tree_cover_loss_year > 2023).any()
 
         assert df.columns.size == 5
+
+
+class TestTclAnalyticsAdminAOIWithDriver:
+    @pytest_asyncio.fixture(autouse=True)
+    async def setup(self):
+        """Runs before each test in this class"""
+        delete_resource_files("tree_cover_loss", "ace55a34-4088-540d-9e82-42c4942e35b3")
+
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                request = await client.post(
+                    "/v0/land_change/tree_cover_loss/analytics",
+                    json={
+                        "aoi": {
+                            "type": "admin",
+                            "ids": ["IDN.24.9"],
+                        },
+                        "start_year": "2015",
+                        "end_year": "2022",
+                        "canopy_cover": 30,
+                        "intersections": ["driver"],
+                    },
+                )
+
+                yield (request, client)
+
+    @pytest.mark.asyncio
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert resource["status"] == "pending"
+
+    @pytest.mark.asyncio
+    async def test_post_returns_resource_link(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert (
+            resource["data"]["link"]
+            == "http://testserver/v0/land_change/tree_cover_loss/analytics/ace55a34-4088-540d-9e82-42c4942e35b3"
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        assert test_request.status_code == 202
+
+    @pytest.mark.asyncio
+    async def test_resource_calculate_results(self, setup):
+        test_request, client = setup
+        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        data = await retry_getting_resource("tree_cover_loss", resource_id, client)
+
+        assert data["status"] == "saved"
+
+        df = pd.DataFrame(data["result"])
+        assert "IDN.24.9" in df["aoi_id"].values
+
+        assert "tree_cover_loss_driver" in df.columns
+        assert "tree_cover_loss_year" not in df.columns
+        assert df.columns.size == 5

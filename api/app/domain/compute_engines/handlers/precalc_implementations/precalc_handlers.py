@@ -41,5 +41,8 @@ class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
                 Dataset.area_hectares in query.aggregate.datasets
                 or Dataset.carbon_emissions in query.aggregate.datasets
             )
-            and query.group_bys == [Dataset.tree_cover_loss]
+            and (
+                query.group_bys == [Dataset.tree_cover_loss]
+                or query.group_bys == [Dataset.tree_cover_loss_drivers]
+            )
         )

@@ -1,3 +1,4 @@
+import numpy as np
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import (
@@ -47,6 +48,12 @@ class TreeCoverLossAnalyzer(Analyzer):
         else:
             query.group_bys.append(Dataset.tree_cover_loss)
 
-        return await self.compute_engine.compute(
+        results = await self.compute_engine.compute(
             analytics_in.aoi.type, analytics_in.aoi.ids, query
         )
+
+        # postprocess, set NaN for carbon if canopy cover requested is <30
+        if analytics_in.canopy_cover < 30:
+            results[Dataset.carbon_emissions.get_field_name()] = np.nan
+
+        return results
