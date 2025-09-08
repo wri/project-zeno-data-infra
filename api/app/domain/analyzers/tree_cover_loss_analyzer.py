@@ -39,7 +39,7 @@ class TreeCoverLossAnalyzer(Analyzer):
                 DatasetFilter(
                     dataset=Dataset.primary_forest,
                     op="=",
-                    value=True,
+                    value=1,
                 )
             )
         elif analytics_in.forest_filter == "intact_forest":
@@ -47,7 +47,7 @@ class TreeCoverLossAnalyzer(Analyzer):
                 DatasetFilter(
                     dataset=Dataset.intact_forest,
                     op="=",
-                    value=True,
+                    value=1,
                 )
             )
 

@@ -13,7 +13,7 @@ class ZarrDatasetRepository:
         Dataset.tree_cover_gain: "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr",
         Dataset.canopy_cover: "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr",
         Dataset.primary_forest: "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",
-        Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",
+        Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2020/v2021/raster/epsg-4326/zarr/is.zarr"
     }
 
     def load(self, dataset: Dataset, geometry: Geometry = None) -> xr.DataArray:
@@ -57,6 +57,10 @@ class ZarrDatasetRepository:
             val_map = {"2000-2005": 1, "2005-2010": 2, "2010-2015": 3, "2015-2020": 4}
 
             return [val_map[val] for val in value_tuple]
+        elif dataset == Dataset.primary_forest:
+            return int(value)
+        elif dataset == Dataset.intact_forest:
+            return int(value)
         else:
             raise NotImplementedError()
 
