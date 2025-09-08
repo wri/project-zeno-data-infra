@@ -9,6 +9,7 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
+from app.models.land_change.tree_cover_loss import AllowedForestFilter
 from pydantic import Field, field_validator, model_validator
 
 AoiUnion = Union[
@@ -42,6 +43,10 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
         pattern=DATE_REGEX,
         examples=["2000", "2005"],
     )
+    forest_filter: AllowedForestFilter | None = Field(
+        default=None,
+        title="Forest Filter",
+    )
 
     @field_validator("start_year", "end_year")
     def year_must_be_at_least_2000(cls, v: str) -> str:
@@ -58,15 +63,15 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
     def validate_year_range(self) -> "TreeCoverGainAnalyticsIn":
         start = int(self.start_year)
         end = int(self.end_year)
-        if end < start:
-            raise ValueError("end_year must be greater than or equal to start_year")
+        if end <= start:
+            raise ValueError("end_year must be greater than start_year")
         return self
 
 
 class TreeCoverGainResult(StrictBaseModel):
     aoi_id: List[str]
     aoi_type: List[str]
-    tree_cover_gain_year: List[int]
+    tree_cover_gain_period: List[str]
     area_ha: List[float]
 
 
