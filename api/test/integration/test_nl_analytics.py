@@ -713,7 +713,6 @@ async def test_kba_dist_analytics_no_intersection():
             )
 
             resource_id = resource.json()["data"]["link"].split("/")[-1]
-
             data = await retry_getting_resource(resource_id, client)
 
     expected_df = pd.DataFrame(
