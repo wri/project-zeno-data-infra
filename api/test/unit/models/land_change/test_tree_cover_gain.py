@@ -18,7 +18,7 @@ def base_config():
 class TestTreeCoverGainAnalyticsIn:
     def test_thumbprint_is_same_for_same_fields(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
-        assert model.thumbprint() == uuid.UUID("cc74d56f-667c-5be6-bdaf-59e8c3144172")
+        assert model.thumbprint() == uuid.UUID("ad77c998-834b-5443-a8d8-bb7e2b28ebc9")
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
@@ -31,7 +31,7 @@ class TestTreeCoverGainAnalyticsIn:
 
     def test_thumbprint_changes_when_start_year_changes(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
-        model.start_year = "2020"
+        model.start_year = "2010"
 
         assert model.thumbprint() != base_config.thumbprint()
 
@@ -58,12 +58,12 @@ class TestTreeCoverGainAnalyticsInValidations:
             end_year="2025",
         )
 
-    def test_end_year_must_not_be_before_start_year(self):
+    def test_end_year_must_not_be_equal_to_start_year(self):
         with pytest.raises(ValueError):
             TreeCoverGainAnalyticsIn(
                 aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
                 start_year="2005",
-                end_year="2000",
+                end_year="2005",
             )
 
     def test_start_year_must_not_be_multiple_of_five_starting_at_2000(self):

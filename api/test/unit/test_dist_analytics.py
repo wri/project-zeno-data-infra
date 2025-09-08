@@ -206,14 +206,14 @@ def test_get_geojson_request_for_data_api_protected_areas():
 
 
 def test_get_geojson_request_for_data_api_indigenous_lands():
-    aoi = {"type": "indigenous_land", "ids": ["8111"]}
+    aoi = {"type": "indigenous_land", "ids": ["CAN1"]}
     url, params = get_geojson_request_for_data_api(aoi)
     assert (
         url
-        == "https://data-api.globalforestwatch.org/dataset/landmark_icls/latest/query"
+        == "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
     )
     assert params == {
-        "sql": "select gfw_geojson from data where objectid in ('8111') order by objectid"
+        "sql": "select gfw_geojson from data where landmark_id in ('CAN1') order by landmark_id"
     }
 
 

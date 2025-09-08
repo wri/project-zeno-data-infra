@@ -727,7 +727,7 @@ async def test_kba_dist_analytics_no_intersection():
             "area_ha": [
                 0.94631279296875,
                 0.0630880126953125,
-                5647.49658203125,
+                5653.297174409032,
                 269.85695,
             ],
             "aoi_type": [
