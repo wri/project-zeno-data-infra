@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture()
     async def setup(self):
-        delete_resource_files("tree_cover", "25c2de46-7f3b-595a-a4ad-d448dd779b53")
+        delete_resource_files("tree_cover", "36479479-d961-5cca-8be5-76d10fae00d6")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -42,7 +42,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover/analytics/25c2de46-7f3b-595a-a4ad-d448dd779b53"
+            == "http://testserver/v0/land_change/tree_cover/analytics/36479479-d961-5cca-8be5-76d10fae00d6"
         )
 
     @pytest.mark.asyncio
@@ -69,7 +69,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 class TestTreeCoverAnalyticsPostWithKba:
     @pytest_asyncio.fixture()
     async def setup(self):
-        delete_resource_files("tree_cover", "45eb41d8-ae8a-5be8-b8c5-b4ddc213e6b5")
+        delete_resource_files("tree_cover", "3712d4c0-42a9-572d-aee1-9cab849320b1")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -100,7 +100,7 @@ class TestTreeCoverAnalyticsPostWithKba:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover/analytics/45eb41d8-ae8a-5be8-b8c5-b4ddc213e6b5"
+            == "http://testserver/v0/land_change/tree_cover/analytics/3712d4c0-42a9-572d-aee1-9cab849320b1"
         )
 
     @pytest.mark.asyncio
