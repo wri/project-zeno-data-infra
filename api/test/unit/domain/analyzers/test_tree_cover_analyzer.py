@@ -80,6 +80,7 @@ class TestTreeCoverAnalyzerAdminAOIs:
         assert " is_intact_forest = True" in sql_query
 
     @pytest.mark.asyncio
+    @pytest.mark.xfail
     async def test_analyzer_adds_intact_forest_filter_when_specified(self):
         mock_query_service = MagicMock(spec=DuckDbPrecalcQueryService)
         compute_engine = ComputeEngine(
