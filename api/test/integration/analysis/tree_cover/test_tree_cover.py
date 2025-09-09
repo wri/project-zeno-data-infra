@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture()
     async def setup(self):
-        delete_resource_files("tree_cover", "98d0ae70-3af2-5f4a-86fa-a353946b9a27")
+        delete_resource_files("tree_cover", "25c2de46-7f3b-595a-a4ad-d448dd779b53")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -42,7 +42,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover/analytics/98d0ae70-3af2-5f4a-86fa-a353946b9a27"
+            == "http://testserver/v0/land_change/tree_cover/analytics/25c2de46-7f3b-595a-a4ad-d448dd779b53"
         )
 
     @pytest.mark.asyncio
@@ -63,13 +63,15 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
         assert "BRA.14" in df["aoi_id"].values
 
         assert df.area_ha.any()
-        assert df.columns.size == 3  # aoi_id, aoi_type, area_ha
+        assert (
+            df.columns.size == 4
+        )  # aoi_id, aoi_type, area_ha, carbon_emissions_MgCO2e
 
 
 class TestTreeCoverAnalyticsPostWithKba:
     @pytest_asyncio.fixture()
     async def setup(self):
-        delete_resource_files("tree_cover", "bc6860d8-7fee-5023-91f8-2bef0d3e597a")
+        delete_resource_files("tree_cover", "45eb41d8-ae8a-5be8-b8c5-b4ddc213e6b5")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -100,7 +102,7 @@ class TestTreeCoverAnalyticsPostWithKba:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover/analytics/bc6860d8-7fee-5023-91f8-2bef0d3e597a"
+            == "http://testserver/v0/land_change/tree_cover/analytics/45eb41d8-ae8a-5be8-b8c5-b4ddc213e6b5"
         )
 
     @pytest.mark.asyncio
@@ -118,4 +120,6 @@ class TestTreeCoverAnalyticsPostWithKba:
 
         df = pd.DataFrame(data["result"])
         assert df.area_ha.any()
-        assert df.columns.size == 3  # aoi_id, aoi_type, area_ha
+        assert (
+            df.columns.size == 4
+        )  # aoi_id, aoi_type, area_ha, carbon_emissions_MgCO2e

@@ -1,7 +1,5 @@
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import Field
-
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
@@ -12,6 +10,7 @@ from app.models.common.areas_of_interest import (
 )
 from app.models.common.base import Response, StrictBaseModel
 from app.models.land_change.tree_cover_loss import AllowedForestFilter
+from pydantic import Field
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -47,6 +46,7 @@ class TreeCoverResult(StrictBaseModel):
     aoi_id: List[str]
     aoi_type: List[str]
     area_ha: List[float]
+    carbon_emissions_MgCO2e: List[float]
 
 
 class TreeCoverAnalytics(StrictBaseModel):
