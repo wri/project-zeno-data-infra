@@ -76,7 +76,15 @@ module "ecs" {
             {
               name = "AWS_ACCESS_KEY_ID"
               value = var.aws_access_key_id
-            }
+            },
+            {
+              name  = "ANALYSES_TABLE_NAME"
+              value = aws_dynamodb_table.analyses.name
+            },
+            {
+              name  = "ANALYSIS_RESULTS_BUCKET_NAME"
+              value = aws_s3_bucket.analysis_results.bucket
+            },
           ]
         }
       }
@@ -183,4 +191,76 @@ module "alb" {
       create_attachment = false
     }
   }
+}
+
+###############################################################
+#     Infrastructure for AwsDynamoDbS3AnalysisRepository      #
+###############################################################
+
+resource "aws_s3_bucket" "analysis_results" {
+  bucket = "gnw-analytics-api-analysis-results"
+
+  tags = {
+    Environment = "Staging"
+    Project     = "Zeno"
+  }
+}
+
+resource "aws_dynamodb_table" "analyses" {
+  name         = "Analyses"
+  billing_mode = "PAY_PER_REQUEST" # On-demand, scales automatically. Suitable for variable workloads.
+  hash_key     = "resource_id"
+
+  attribute {
+    name = "resource_id"
+    type = "S"
+  }
+
+  tags = {
+    Environment = "Staging"
+    Project     = "Zeno"
+  }
+}
+
+# Create an IAM policy that grants access to the specific DDB table and S3 bucket
+data "aws_iam_policy_document" "ecs_task_analysis_access" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
+      "dynamodb:Query",
+      "dynamodb:Scan"
+    ]
+    resources = [aws_dynamodb_table.analyses.arn]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject"
+    ]
+    resources = ["${aws_s3_bucket.analysis_results.arn}/*"]
+  }
+  # Allow listing the bucket (often needed for SDKs)
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.analysis_results.arn]
+  }
+}
+
+resource "aws_iam_policy" "ecs_task_analysis" {
+  name   = "ECSTaskAnalysisAccess"
+  path   = "/"
+  policy = data.aws_iam_policy_document.ecs_task_analysis_access.json
+}
+
+# Attach the new policy to the ECS Task Execution Role created by the module
+resource "aws_iam_role_policy_attachment" "ecs_task_analysis" {
+  role       = module.ecs.task_exec_iam_role_name # This references the role created by the ECS module
+  policy_arn = aws_iam_policy.ecs_task_analysis.arn
 }

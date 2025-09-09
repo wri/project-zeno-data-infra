@@ -8,7 +8,7 @@ from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
 from app.use_cases.analysis.analysis_service import AnalysisService
 
-resource_thumbprint = UUID("8eeb284d-cfe6-5f45-a353-e8eaf8bb302b")
+resource_thumbprint = UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c")
 
 
 @pytest.fixture
@@ -236,9 +236,9 @@ class TestTreeCoverLossServiceCollaborators:
         assert result_thumbprint == resource_thumbprint
         mock_analyzer.analyze.assert_called()
         mock_analysis_repository.store_analysis.assert_called_with(
-            UUID("8eeb284d-cfe6-5f45-a353-e8eaf8bb302b"),
+            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
             Analysis(
-                metadata={"aoi": {}},
+                metadata={"aoi": {}, "_version": "v0"},
                 result=None,
                 status=AnalysisStatus.failed,
             ),
