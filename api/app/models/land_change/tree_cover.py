@@ -1,7 +1,5 @@
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import Field
-
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
@@ -11,7 +9,8 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from app.models.land_change.tree_cover_loss import AllowedForestFilter, AllowedIntersections
+from app.models.land_change.tree_cover_loss import AllowedForestFilter
+from pydantic import Field
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -40,9 +39,6 @@ class TreeCoverAnalyticsIn(AnalyticsIn):
     forest_filter: AllowedForestFilter | None = Field(
         default=None,
         title="Forest Filter",
-    )
-    intersections: AllowedIntersections = Field(
-        ..., min_length=0, max_length=1, description="List of intersection types"
     )
 
 
@@ -73,8 +69,8 @@ class TreeCoverAnalyticsResponse(Response):
                 {
                     "data": {
                         "result": {  # column oriented for loading into a dataframe
-                            "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
-                            "aoi_type": ["admin", "admin", "admin"],
+                            "aoi_id": ["BRA.1.12"],
+                            "aoi_type": ["admin"],
                             "area_ha": [
                                 4025.406160862687,
                             ],
@@ -86,7 +82,6 @@ class TreeCoverAnalyticsResponse(Response):
                             },
                             "canopy_cover": 10,
                             "forest_filter": "primary_forest",
-                            "intersections": []
                         },
                         "message": "",
                         "status": "saved",
