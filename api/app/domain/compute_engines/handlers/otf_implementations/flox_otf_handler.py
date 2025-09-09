@@ -96,7 +96,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             .reset_index()
         )
 
-        # filrer out rows where all results are NaN
+        # Filter out rows where results for all aggregate datasets are NaN
         results["aoi_id"] = aoi_id
         agg_col_names = [ds.get_field_name() for ds in query.aggregate.datasets]
         filtered_results = results[~results[agg_col_names].isna().all(axis=1)]
