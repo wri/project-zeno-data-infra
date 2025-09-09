@@ -14,6 +14,7 @@ class ZarrDatasetRepository:
         Dataset.canopy_cover: "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr",
         Dataset.primary_forest: "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",
         Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",
+        Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",
     }
 
     def load(self, dataset: Dataset, geometry: Geometry = None) -> xr.DataArray:
