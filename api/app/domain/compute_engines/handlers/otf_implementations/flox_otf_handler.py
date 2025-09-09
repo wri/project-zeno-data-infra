@@ -54,8 +54,12 @@ class FloxOTFHandler(AnalyticsOTFHandler):
     @staticmethod
     def _handle(aoi, query, dataset_repository, expected_groups_per_dataset):
         aoi_id, aoi_geometry = aoi
-        by = dataset_repository.load(query.aggregate.dataset, geometry=aoi_geometry)
         func = query.aggregate.func
+
+        by = xr.Dataset()
+        for ds in query.aggregate.datasets:
+            xarr = dataset_repository.load(ds, geometry=aoi_geometry)
+            by[ds.get_field_name()] = xarr
 
         objs = []
         expected_groups = []
@@ -92,15 +96,10 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             .reset_index()
         )
 
+        # Filter out rows where results for all aggregate datasets are NaN
         results["aoi_id"] = aoi_id
-        filtered_results = results[
-            ~np.isnan(results[query.aggregate.dataset.get_field_name()])
-        ]
-
-        if query.aggregate.dataset == Dataset.area_hectares:
-            filtered_results[
-                query.aggregate.dataset.get_field_name()
-            ] = filtered_results[query.aggregate.dataset.get_field_name()]
+        agg_col_names = [ds.get_field_name() for ds in query.aggregate.datasets]
+        filtered_results = results[~results[agg_col_names].isna().all(axis=1)]
 
         # TODO remove band, spatial_ref, x, y from zarrs
         return filtered_results.reset_index().drop(

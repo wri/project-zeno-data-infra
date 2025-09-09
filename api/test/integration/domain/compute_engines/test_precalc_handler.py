@@ -29,7 +29,7 @@ class TestTreeCoverGainPrecalcHandler:
         )
 
         query = DatasetQuery(
-            aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
+            aggregate=DatasetAggregate(datasets=[Dataset.area_hectares], func="sum"),
             group_bys=[],
             filters=[
                 DatasetFilter(

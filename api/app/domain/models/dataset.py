@@ -11,7 +11,8 @@ class Dataset(Enum):
     area_hectares = "area_hectares"
     intact_forest = "intact_forest"
     primary_forest = "primary_forest"
-
+    carbon_emissions = "carbon_emissions"
+    tree_cover_loss_drivers = "tree_cover_loss_driver"
 
     def get_field_name(self):
         DATASET_TO_NAMES = {
@@ -21,6 +22,8 @@ class Dataset(Enum):
             Dataset.canopy_cover: "canopy_cover",
             Dataset.intact_forest: "is_intact_forest",
             Dataset.primary_forest: "is_primary_forest",
+            Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
+            Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
         }
 
         return DATASET_TO_NAMES[self]
@@ -33,7 +36,7 @@ class DatasetFilter(StrictBaseModel):
 
 
 class DatasetAggregate(StrictBaseModel):
-    dataset: Dataset
+    datasets: List[Dataset]
     func: Literal["sum", "count"]
 
 

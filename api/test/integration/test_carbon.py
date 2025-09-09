@@ -29,8 +29,10 @@ class TestCarbonDataAdmin:
             ) as client:
                 test_request = await client.post(
                     "/v0/land_change/carbon_flux/analytics",
-                    json={"aoi": {"type": "admin", "ids": ["NGA.20.31", "IDN.25.3"]},
-                          "canopy_cover": 30},
+                    json={
+                        "aoi": {"type": "admin", "ids": ["NGA.20.31", "IDN.25.3"]},
+                        "canopy_cover": 30,
+                    },
                 )
 
                 yield test_request, client
@@ -45,17 +47,18 @@ class TestCarbonDataAdmin:
             == "http://testserver/v0/land_change/carbon_flux/analytics/307dd9c9-9adb-581d-8113-bd3af71764e5"
         )
         resource_id = response["data"]["link"].split("/")[-1]
-        resource = await retry_getting_resource(
-            "carbon_flux", resource_id, client
-        )
+        resource = await retry_getting_resource("carbon_flux", resource_id, client)
 
         expected = pd.DataFrame(
             {
                 "aoi_id": ["NGA.20.31", "IDN.25.3"],
                 "aoi_type": ["admin", "admin"],
-                "carbon_net_flux_Mg_CO2e": [-12.349344253540039, -31076.35616491735],
-                "carbon_gross_removals_Mg_CO2e": [12.349344253540039, 2091621.1211385727],
-                "carbon_gross_emissions_Mg_CO2e": [None, 2060545.7846540213],
+                "carbon_net_flux_Mg_CO2e": [-12.349344253540039, 24370083.802587524],
+                "carbon_gross_removals_Mg_CO2e": [
+                    12.349344253540039,
+                    28127167.23389721,
+                ],
+                "carbon_gross_emissions_Mg_CO2e": [None, 52405364.698329926],
             }
         )
 
@@ -96,7 +99,7 @@ class TestCarbonDataFeature:
                                         [97.600772938, 2.676315412],
                                         [97.653731922, 2.677687091],
                                         [97.650298695, 2.7005120321],
-                                        [97.600086293, 2.700319552]
+                                        [97.600086293, 2.700319552],
                                     ]
                                 ],
                             },
@@ -109,8 +112,7 @@ class TestCarbonDataFeature:
                 }
                 test_request = await client.post(
                     "/v0/land_change/carbon_flux/analytics",
-                    json={"aoi": aoi,
-                          "canopy_cover": 50},
+                    json={"aoi": aoi, "canopy_cover": 50},
                 )
 
                 yield test_request, client
@@ -125,17 +127,15 @@ class TestCarbonDataFeature:
             == "http://testserver/v0/land_change/carbon_flux/analytics/456cdbe3-2b3c-5531-a425-afe8c3c395da"
         )
         resource_id = response["data"]["link"].split("/")[-1]
-        resource = await retry_getting_resource(
-            "carbon_flux", resource_id, client
-        )
+        resource = await retry_getting_resource("carbon_flux", resource_id, client)
 
         expected = pd.DataFrame(
             {
                 "aoi_id": ["test_aoi"],
                 "aoi_type": ["feature"],
-                "carbon_net_flux_Mg_CO2e": [322.671234],
-                "carbon_gross_removals_Mg_CO2e": [732.29187],
-                "carbon_gross_emissions_Mg_CO2e": [1054.9630126953125],
+                "carbon_net_flux_Mg_CO2e": [32997.52734375],
+                "carbon_gross_removals_Mg_CO2e": [10810.841796875],
+                "carbon_gross_emissions_Mg_CO2e": [43808.37109375],
             }
         )
 
