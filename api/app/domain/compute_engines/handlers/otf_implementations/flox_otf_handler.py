@@ -102,9 +102,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 query.aggregate.dataset.get_field_name()
             ] = filtered_results[query.aggregate.dataset.get_field_name()]
 
-        # TODO remove band and spatial ref from zarrs
+        # TODO remove band, spatial_ref, x, y from zarrs
         return filtered_results.reset_index().drop(
-            columns=["index", "band", "spatial_ref"], errors="ignore"
+            columns=["index", "band", "spatial_ref", "x", "y"], errors="ignore"
         )
 
     @staticmethod
