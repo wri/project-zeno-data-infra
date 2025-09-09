@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 client = TestClient(app)
 
 ENDPOINT_PATH = "/v0/land_change/tree_cover/analytics"
-RESOURCE_THUMBPRINT = "9b068e84-7b15-5ef2-b37d-415a7a844f4d"
+RESOURCE_THUMBPRINT = "a249c968-15d6-5777-9409-d29c63c63a6f"
 
 
 @pytest.fixture

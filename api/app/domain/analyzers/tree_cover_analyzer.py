@@ -3,7 +3,12 @@ from typing import List
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
-from app.domain.models.dataset import DatasetQuery, DatasetAggregate, Dataset, DatasetFilter
+from app.domain.models.dataset import (
+    Dataset,
+    DatasetAggregate,
+    DatasetFilter,
+    DatasetQuery,
+)
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
 
 
@@ -13,7 +18,7 @@ class TreeCoverAnalyzer(Analyzer):
 
     async def analyze(self, analysis: Analysis):
         tree_cover_analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
-        groupbys = []
+        groupbys: List[Dataset] = []
 
         filters: List[DatasetFilter] = [
             DatasetFilter(
@@ -39,10 +44,8 @@ class TreeCoverAnalyzer(Analyzer):
         query = DatasetQuery(
             aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
             group_bys=groupbys,
-            filters=filters
+            filters=filters,
         )
         return await self.compute_engine.compute(
-            tree_cover_analytics_in.aoi.type,
-            tree_cover_analytics_in.aoi.ids,
-            query
+            tree_cover_analytics_in.aoi.type, tree_cover_analytics_in.aoi.ids, query
         )
