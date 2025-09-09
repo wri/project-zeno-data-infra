@@ -39,7 +39,7 @@ class TreeCoverGainAnalyzer(Analyzer):
             )
 
         query = DatasetQuery(
-            aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
+            aggregate=DatasetAggregate(datasets=[Dataset.area_hectares], func="sum"),
             group_bys=[Dataset.tree_cover_gain],
             filters=filters,
         )
