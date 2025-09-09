@@ -1,17 +1,22 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from fastapi import Response as FastAPIResponse
-from fastapi.responses import ORJSONResponse
-from pydantic import UUID5
-
-from app.domain.analyzers.dummy_tree_cover_analyzer import DummyTreeCoverAnalyzer
+from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
-from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import FloxOTFHandler
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import TreeCoverPrecalcHandler
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import PrecalcSqlQueryBuilder
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
+    FloxOTFHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
+    TreeCoverPrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
+)
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.domain.repositories.data_api_aoi_geometry_repository import DataApiAoiGeometryRepository
+from app.domain.repositories.data_api_aoi_geometry_repository import (
+    DataApiAoiGeometryRepository,
+)
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
-from app.infrastructure.external_services.duck_db_query_service import DuckDbPrecalcQueryService
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -24,7 +29,10 @@ from app.models.land_change.tree_cover import (
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
-
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import Response as FastAPIResponse
+from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
 
 ANALYTICS_NAME = "tree_cover"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
@@ -35,7 +43,7 @@ def get_analysis_repository() -> AnalysisRepository:
 
 
 def create_analysis_service(request: Request) -> AnalysisService:
-    compute_engine = ComputeEngine(  # NOTE: Ignored while using Dummy analyzer
+    compute_engine = ComputeEngine(
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
@@ -51,7 +59,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
 
     return AnalysisService(
         analysis_repository=get_analysis_repository(),
-        analyzer=DummyTreeCoverAnalyzer(),
+        analyzer=TreeCoverAnalyzer(compute_engine=compute_engine),
         event=ANALYTICS_NAME,
     )
 
