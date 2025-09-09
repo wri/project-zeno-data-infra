@@ -32,7 +32,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
         analysis_repository=analysis_repository,
         analyzer=DistAlertsAnalyzer(
             analysis_repository=analysis_repository,
-            compute_engine=request.app.state.dask_client,
+            compute_engine=getattr(request.app.state, "dask_client", None),
         ),
         event=ANALYTICS_NAME,
     )
