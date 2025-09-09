@@ -1,27 +1,50 @@
-import json
-import logging
-import traceback
-import uuid
-from pathlib import Path
-
-from app.analysis.dist_alerts.analysis import do_analytics
-from app.models.common.analysis import AnalysisStatus
+from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
+from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import (
-    DataMartResourceLink,
     DataMartResourceLinkResponse,
 )
 from app.models.land_change.dist_alerts import (
+    DistAlertsAnalytics,
     DistAlertsAnalyticsIn,
     DistAlertsAnalyticsResponse,
 )
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from app.routers.common_analytics import create_analysis, get_analysis
+from app.use_cases.analysis.analysis_service import AnalysisService
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 
-router = APIRouter(prefix="/dist_alerts")
+ANALYTICS_NAME = "dist_alerts"
+router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
-PAYLOAD_STORE_DIR = Path("/tmp/dist_alerts_analytics_payloads")
-PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
+
+def get_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+def create_analysis_service(request: Request) -> AnalysisService:
+    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=DistAlertsAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=request.app.state.dask_client,
+        ),
+        event=ANALYTICS_NAME,
+    )
+
+
+def _datamart_resource_link_response(request, service) -> str:
+    return str(
+        request.url_for(
+            "get_dist_alerts_analytics_result",
+            resource_id=service.resource_thumbprint(),
+        )
+    )
 
 
 @router.post(
@@ -31,64 +54,19 @@ PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
     status_code=202,
 )
 async def create(
-    *, data: DistAlertsAnalyticsIn, request: Request, background_tasks: BackgroundTasks
+    *,
+    data: DistAlertsAnalyticsIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    service: AnalysisService = Depends(create_analysis_service),
 ):
-    try:
-        # Convert model to JSON with sorted keys
-        payload_dict = data.model_dump()
-
-        # Convert to JSON string with sorted keys
-        payload_json = json.dumps(payload_dict, sort_keys=True)
-
-        # Generate deterministic UUID from payload
-        resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
-
-        logging.info(
-            {
-                "event": "dist_alerts_analytics_request",
-                "analytics_in": payload_dict,
-                "resource_id": resource_id,
-            }
-        )
-
-        # Store payload in /tmp directory
-        payload_dir = PAYLOAD_STORE_DIR / resource_id
-        metadata_data = payload_dir / "metadata.json"
-        analytics_data = payload_dir / "data.json"
-
-        link = DataMartResourceLink(
-            link=f"{str(request.base_url).rstrip('/')}/v0/land_change/dist_alerts/analytics/{resource_id}"
-        )
-
-        if metadata_data.exists() and analytics_data.exists():
-            return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
-
-        if metadata_data.exists():
-            return DataMartResourceLinkResponse(
-                data=link, status=AnalysisStatus.pending
-            )
-
-        payload_dir.mkdir(parents=True, exist_ok=True)
-        metadata_data.write_text(payload_json)
-        background_tasks.add_task(
-            do_analytics,
-            file_path=payload_dir,
-            dask_client=request.app.state.dask_client,
-        )
-        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
-    except Exception as e:
-        logging.error(
-            {
-                "event": "dist_alerts_analytics_request_failure",
-                "severity": "high",  # Helps with alerting
-                "analytics_in": await request.json(),
-                "resource_id": resource_id,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal server error")
+    return await create_analysis(
+        data=data,
+        service=service,
+        request=request,
+        background_tasks=background_tasks,
+        resource_link_callback=_datamart_resource_link_response,
+    )
 
 
 @router.get(
@@ -97,70 +75,17 @@ async def create(
     response_model=DistAlertsAnalyticsResponse,
     status_code=200,
 )
-async def get_analytics_result(
+async def get_dist_alerts_analytics_result(
     resource_id: str,
     response: FastAPIResponse,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
-    # Validate UUID format
-    try:
-        uuid.UUID(resource_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
-        )
+    analytics_out: AnalyticsOut = await get_analysis(
+        resource_id=resource_id,
+        analysis_repository=analysis_repository,
+        response=response,
+    )
 
-    try:
-        # Construct file path
-        file_path = PAYLOAD_STORE_DIR / resource_id
-        analytics_metadata = file_path / "metadata.json"
-        analytics_data = file_path / "data.json"
-        metadata_content = None
-        alerts_dict = None
-
-        if analytics_metadata.exists() and analytics_data.exists():
-            # load resource from filesystem
-            alerts_dict = json.loads(analytics_data.read_text())
-            metadata_content = json.loads(analytics_metadata.read_text())
-
-            return DistAlertsAnalyticsResponse(
-                data={
-                    "result": alerts_dict,
-                    "metadata": metadata_content,
-                    "status": AnalysisStatus.saved,
-                },
-                status="success",
-            )
-
-        if analytics_metadata.exists():
-            metadata_content = json.loads(analytics_metadata.read_text())
-            response.headers["Retry-After"] = "1"
-
-            return DistAlertsAnalyticsResponse(
-                data={
-                    "status": AnalysisStatus.pending,
-                    "message": "Resource is still processing, follow Retry-After header.",
-                    "result": alerts_dict,
-                    "metadata": metadata_content,
-                },
-                status="success",
-            )
-
-    except Exception as e:
-        logging.error(
-            {
-                "event": "dist_alerts_analytics_resource_request_failure",
-                "severity": "high",  # Helps with alerting
-                "resource_id": resource_id,
-                "resource_metadata": metadata_content,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-    # Should've found the resource by now. So, assume it doesn't exist
-    raise HTTPException(
-        status_code=404,
-        detail="Requested resource not found. Either expired or never existed.",
+    return DistAlertsAnalyticsResponse(
+        data=DistAlertsAnalytics(**analytics_out.model_dump()), status="success"
     )
