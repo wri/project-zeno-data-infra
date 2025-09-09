@@ -141,7 +141,7 @@ class TestTclAnalyticsAdminAOIWithDriver:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("tree_cover_loss", "ace55a34-4088-540d-9e82-42c4942e35b3")
+        delete_resource_files("tree_cover_loss", "cb7cc597-2579-5ac0-9dc6-a2533a4576ad")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -175,7 +175,7 @@ class TestTclAnalyticsAdminAOIWithDriver:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/tree_cover_loss/analytics/ace55a34-4088-540d-9e82-42c4942e35b3"
+            == "http://testserver/v0/land_change/tree_cover_loss/analytics/cb7cc597-2579-5ac0-9dc6-a2533a4576ad"
         )
 
     @pytest.mark.asyncio

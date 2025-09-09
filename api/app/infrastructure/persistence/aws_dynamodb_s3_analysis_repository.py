@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import uuid
 
 import aioboto3
@@ -43,6 +44,14 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         return f"{self.analytics_category}/{resource_id}.json"
 
     async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
+        logging.info(
+            {
+                "event": "aws_dynamodb_s3_analysis_repository",
+                "message": "loading analysis resource",
+                "resource_id": resource_id,
+            }
+        )
+
         async with self._session.resource(
             "dynamodb",
             region_name=self._aws_region,
@@ -108,6 +117,14 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
             "status": analytics.status.value,  # Store the enum's value (string)
             "s3_result_key": s3_key,  # Always store the pointer, even if result is None
         }
+
+        logging.info(
+            {
+                "event": "aws_dynamodb_s3_analysis_repository",
+                "message": "storing analysis resource",
+                "dynamodb_item": ddb_item,
+            }
+        )
 
         # First, handle the S3 upload if there is a result and status is 'saved'
         if analytics.result is not None and analytics.status == AnalysisStatus.saved:
