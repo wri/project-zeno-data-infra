@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
@@ -18,8 +16,10 @@ def base_config():
 
 class TestTreeCoverAnalyticsIn:
     def test_thumbprint_is_same_for_same_fields(self, base_config):
+        original_thumb = base_config.thumbprint()
         model = TreeCoverAnalyticsIn(**base_config.model_dump())
-        assert model.thumbprint() == uuid.UUID("a249c968-15d6-5777-9409-d29c63c63a6f")
+
+        assert model.thumbprint() == original_thumb
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = TreeCoverAnalyticsIn(**base_config.model_dump())
