@@ -46,7 +46,6 @@ class TreeCoverResult(StrictBaseModel):
     aoi_id: List[str]
     aoi_type: List[str]
     area_ha: List[float]
-    carbon_emissions_MgCO2e: List[float]
 
 
 class TreeCoverAnalytics(StrictBaseModel):

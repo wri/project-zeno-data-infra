@@ -47,7 +47,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal_statistics/admin-tree-cover-loss-emissions-by-driver.parquet"
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet"
             ),
             next_handler=FloxOTFHandler(
                 dataset_repository=ZarrDatasetRepository(),

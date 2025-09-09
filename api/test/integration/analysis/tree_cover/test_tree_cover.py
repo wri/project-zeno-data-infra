@@ -63,9 +63,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
         assert "BRA.14" in df["aoi_id"].values
 
         assert df.area_ha.any()
-        assert (
-            df.columns.size == 4
-        )  # aoi_id, aoi_type, area_ha, carbon_emissions_MgCO2e
+        assert df.columns.size == 3  # aoi_id, aoi_type, area_ha
 
 
 class TestTreeCoverAnalyticsPostWithKba:
@@ -120,6 +118,4 @@ class TestTreeCoverAnalyticsPostWithKba:
 
         df = pd.DataFrame(data["result"])
         assert df.area_ha.any()
-        assert (
-            df.columns.size == 4
-        )  # aoi_id, aoi_type, area_ha, carbon_emissions_MgCO2e
+        assert df.columns.size == 3  # aoi_id, aoi_type, area_ha
