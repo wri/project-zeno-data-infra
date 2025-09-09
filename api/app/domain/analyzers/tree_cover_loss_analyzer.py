@@ -48,6 +48,15 @@ class TreeCoverLossAnalyzer(Analyzer):
         else:
             query.group_bys.append(Dataset.tree_cover_loss)
 
+        if analytics_in.forest_filter == "primary_forest":
+            query.filters.append(
+                DatasetFilter(
+                    dataset=Dataset.primary_forest,
+                    op="=",
+                    value=1,
+                )
+            )
+
         results = await self.compute_engine.compute(
             analytics_in.aoi.type, analytics_in.aoi.ids, query
         )
