@@ -765,7 +765,7 @@ async def test_kba_dist_analytics_no_intersection():
 # yet.                                                           #
 ##################################################################
 def delete_resource_files(resource_id: str) -> Path:
-    dir_path = Path(f"/tmp/natural_lands_analytics_payloads/{resource_id}")
+    dir_path = Path(f"/tmp/natural_lands/{resource_id}")
 
     if os.path.exists(dir_path):
         for filename in os.listdir(dir_path):

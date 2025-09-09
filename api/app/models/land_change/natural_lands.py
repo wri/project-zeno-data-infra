@@ -2,7 +2,7 @@ from typing import Annotated, Optional, Union
 
 from pydantic import Field
 
-from ..common.analysis import AnalysisStatus
+from ..common.analysis import AnalysisStatus, AnalyticsIn
 from ..common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
@@ -21,7 +21,7 @@ AoiUnion = Union[
 ]
 
 
-class NaturalLandsAnalyticsIn(StrictBaseModel):
+class NaturalLandsAnalyticsIn(AnalyticsIn):
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
