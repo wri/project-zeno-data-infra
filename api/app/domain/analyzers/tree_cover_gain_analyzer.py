@@ -28,15 +28,14 @@ class TreeCoverGainAnalyzer(Analyzer):
         ]
 
         if analytics_in.forest_filter is not None:
-            filters.append(
-                DatasetFilter(
-                    dataset=Dataset.primary_forest
-                    if analytics_in.forest_filter == "primary_forest"
-                    else Dataset.intact_forest,
-                    op="=",
-                    value=True,
+            if analytics_in.forest_filter == "primary_forest":
+                filters.append(
+                    DatasetFilter(
+                        dataset=Dataset.primary_forest,
+                        op="=",
+                        value=True,
+                    )
                 )
-            )
 
         query = DatasetQuery(
             aggregate=DatasetAggregate(datasets=[Dataset.area_hectares], func="sum"),

@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.models.common.areas_of_interest import AreaOfInterest
 from app.models.common.base import StrictBaseModel
+from pydantic import PrivateAttr
 
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
@@ -16,19 +17,34 @@ class AnalysisStatus(str, Enum):
 
 
 class AnalyticsIn(StrictBaseModel):
+    def __init__(self, **kwargs):
+        kwargs.pop("_version", None)  # remove _version if in serialized data
+        super().__init__(**kwargs)
+
     aoi: AreaOfInterest
+    _version: str = PrivateAttr(default="v0")
+
+    def model_dump(self, **kwargs):
+        """Add the _version private attribute"""
+        result = super().model_dump(**kwargs)
+        result["_version"] = self._version
+        return result
+
+    def model_dump_json(self, **kwargs):
+        """Add the _version private attribute"""
+        result = json.loads(super().model_dump_json(**kwargs))
+        result["_version"] = self._version
+        return json.dumps(result)
 
     def thumbprint(self) -> uuid.UUID:
         """
-        Generate a deterministic UUID thumbprint based on the model's JSON representation.
-
-        Returns:
-            uuid: UUID5 string derived from sorted JSON representation
+        Generate a deterministic UUID thumbprint including the version.
         """
-        # Convert model to dictionary with default settings
-        payload_dict = self.model_dump()
+        # Include version in dump for thumbprint consistency
+        dump_dict = self.model_dump(exclude=set())
+        dump_dict["_version"] = self._version  # Manually include version
 
-        payload_json = json.dumps(payload_dict, sort_keys=True)
+        payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
 

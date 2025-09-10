@@ -2,7 +2,7 @@ from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import Field
 
-from ..common.analysis import DATE_REGEX, AnalysisStatus
+from ..common.analysis import DATE_REGEX, AnalysisStatus, AnalyticsIn
 from ..common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
@@ -21,7 +21,7 @@ AoiUnion = Union[
 ]
 
 
-class DistAlertsAnalyticsIn(StrictBaseModel):
+class DistAlertsAnalyticsIn(AnalyticsIn):
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",

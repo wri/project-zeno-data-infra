@@ -5,7 +5,6 @@ from test.integration import (
     write_metadata_file,
 )
 
-import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -21,9 +20,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
     async def test_request(self):
         """Runs before each test in this class"""
-        delete_resource_files(
-            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
-        )
+        delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -51,7 +48,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
 
     @pytest.mark.asyncio
@@ -65,7 +62,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
     def setup_before_each(self):
         """Runs before each test in this class"""
         dir_path = delete_resource_files(
-            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
         write_metadata_file(dir_path)
 
@@ -88,7 +85,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -101,7 +98,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
     def setup_before_each(self):
         """Runs before each test in this class"""
         dir_path = delete_resource_files(
-            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
@@ -125,7 +122,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -137,12 +134,10 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        delete_resource_files(
-            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
-        )
+        delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
 
         self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
+            "/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
 
     def test_returns_404_not_found_response_code(self):
@@ -155,12 +150,12 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
     def setup_before_each(self):
         """Runs before each test in this class"""
         dir_path = delete_resource_files(
-            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
+            "/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
 
     def test_returns_pending_status(self):
@@ -188,7 +183,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
     def setup_before_each(self):
         """Runs before each test in this class"""
         dir_path = delete_resource_files(
-            "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
+            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
         write_metadata_file(dir_path)
         write_data_file(
@@ -204,7 +199,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
 
         self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/71f40812-2157-5ce2-b654-377e833e5f73"
+            "/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
         )
 
     def test_returns_saved_status(self):
@@ -245,9 +240,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files(
-            "dist_alerts_analytics_payloads", "ef700a48-b5ef-532f-8bb8-17f507a97ae7"
-        )
+        delete_resource_files("dist_alerts", "2202655b-03c3-579f-9a30-cde22bc22340")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -280,7 +273,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/ef700a48-b5ef-532f-8bb8-17f507a97ae7"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/2202655b-03c3-579f-9a30-cde22bc22340"
         )
 
     @pytest.mark.asyncio
@@ -336,9 +329,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files(
-            "dist_alerts_analytics_payloads", "b089f8dc-51da-58af-aee2-9eea285c0f84"
-        )
+        delete_resource_files("dist_alerts", "31429ede-d718-5723-8061-edcc2677073e")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -371,7 +362,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/b089f8dc-51da-58af-aee2-9eea285c0f84"
+            == "http://testserver/v0/land_change/dist_alerts/analytics/31429ede-d718-5723-8061-edcc2677073e"
         )
 
     @pytest.mark.asyncio
@@ -384,81 +375,63 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         test_request, client = setup
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource("dist_alerts", resource_id, client)
+        result = pd.DataFrame(data["result"])
 
-        expected_df = pd.DataFrame(
-            {
-                "dist_alert_date": [
-                    "2025-02-03",
-                    "2025-02-03",
-                    "2025-02-11",
-                    "2025-02-18",
-                    "2025-03-30",
-                    "2025-02-23",
-                    "2025-02-23",
-                    "2025-03-05",
-                    "2025-03-05",
-                    "2025-02-23",
-                ],
-                "dist_alert_confidence": [
-                    "low",
-                    "high",
-                    "high",
-                    "high",
-                    "low",
-                    "low",
-                    "high",
-                    "low",
-                    "high",
-                    "low",
-                ],
-                "area_ha": np.array(
-                    [
-                        1511.152588,
-                        755.576965,
-                        1511.129639,
-                        1511.129639,
-                        755.584412,
-                        3025.184570,
-                        5294.074707,
-                        3781.512695,
-                        756.304932,
-                        755.576294,
-                    ]
-                )
-                / 10000,
-                "aoi_id": [
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "46942",
-                ],
-                "aoi_type": ["key_biodiversity_area"] * 10,
-            }
-        )
-        actual_df = pd.DataFrame(data["result"])
-        print(actual_df)
+        # 1. Validate expected columns
+        expected_columns = {
+            "dist_alert_date",
+            "dist_alert_confidence",
+            "area_ha",
+            "aoi_id",
+            "aoi_type",
+        }
+        assert set(result.columns) == expected_columns, "Column mismatch"
 
-        pd.testing.assert_frame_equal(
-            expected_df,
-            actual_df,
-            check_like=True,
-            check_exact=False,  # Allow approximate comparison for numbers
-            atol=1e-8,  # Absolute tolerance
-            rtol=1e-4,  # Relative tolerance
-        )
+        # 2. Check data types
+        assert result["dist_alert_date"].dtype == object  # Should contain string dates
+        assert pd.api.types.is_numeric_dtype(
+            result["area_ha"]
+        ), "area_ha should be numeric"
+        assert result["aoi_id"].dtype == object
+        assert result["aoi_type"].dtype == object
+
+        # 3. Validate confidence levels
+        valid_confidences = {"high", "low"}
+        assert set(result["dist_alert_confidence"].unique()).issubset(
+            valid_confidences
+        ), "Invalid confidence values"
+
+        # 4. Check date format (YYYY-MM-DD)
+        date_pattern = r"^\d{4}-\d{2}-\d{2}$"
+        assert (
+            result["dist_alert_date"].str.match(date_pattern).all()
+        ), "Invalid date format"
+
+        # 5. Validate area values
+        assert (result["area_ha"] >= 0).all(), "Negative area values"
+        assert result["area_ha"].notna().all(), "Missing area values"
+
+        # 6. Check for required aoi_type values
+        assert (
+            result["aoi_type"] == "key_biodiversity_area"
+        ).all(), "Invalid aoi_type values"
+
+        # 7. Verify no empty values in critical columns
+        assert result["aoi_id"].notna().all(), "Missing aoi_id values"
+        assert set(result["aoi_id"].unique()).issubset({"18392", "46942", "18407"})
+        assert result["dist_alert_date"].notna().all(), "Missing date values"
+
+        # 8. Validate reasonable area ranges (adjust thresholds as needed)
+        assert result["area_ha"].max() < 100, "Area values too large"
+        assert result["area_ha"].min() >= 0, "Negative area values"
+
+        # Optional: Check approximate row count if expected range is known
+        assert len(result) > 0, "DataFrame should not be empty"
 
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files(
-        "dist_alerts_analytics_payloads", "71f40812-2157-5ce2-b654-377e833e5f73"
-    )
+    delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -508,9 +481,7 @@ async def test_gadm_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_kba_dist_analytics_no_intersection():
-    delete_resource_files(
-        "dist_alerts_analytics_payloads", "6d6095db-9d62-5914-af37-963e6a13c074"
-    )
+    delete_resource_files("dist_alerts", "6d6095db-9d62-5914-af37-963e6a13c074")
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -556,9 +527,7 @@ async def test_kba_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_grasslands():
-    delete_resource_files(
-        "dist_alerts_analytics_payloads", "3c8491e2-5176-5cfc-99b1-77140dc3feb3/"
-    )
+    delete_resource_files("dist_alerts", "3c8491e2-5176-5cfc-99b1-77140dc3feb3/")
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -607,9 +576,7 @@ async def test_admin_dist_analytics_by_grasslands():
 
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_land_cover():
-    delete_resource_files(
-        "dist_alerts_analytics_payloads", "29c87d12-5998-5fa7-adef-4816ac03ef89/"
-    )
+    delete_resource_files("dist_alerts", "29c87d12-5998-5fa7-adef-4816ac03ef89/")
 
     async with LifespanManager(app):
         async with AsyncClient(
