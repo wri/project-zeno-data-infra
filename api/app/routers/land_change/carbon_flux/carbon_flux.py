@@ -1,6 +1,7 @@
+from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.infrastructure.persistence.file_system_analysis_repository import (
-    FileSystemAnalysisRepository,
+from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
+    AwsDynamoDbS3AnalysisRepository,
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
@@ -9,7 +10,6 @@ from app.models.land_change.carbon_flux import (
     CarbonFluxAnalyticsIn,
     CarbonFluxAnalyticsResponse,
 )
-from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -22,11 +22,12 @@ router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
 def get_analysis_repository() -> AnalysisRepository:
-    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+    return AwsDynamoDbS3AnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
-    analysis_repository = get_analysis_repository()
+def create_analysis_service(
+    request: Request, analysis_repository=Depends(get_analysis_repository)
+) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=CarbonFluxAnalyzer(
