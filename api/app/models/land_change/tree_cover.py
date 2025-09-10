@@ -9,8 +9,10 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from app.models.land_change.tree_cover_loss import AllowedForestFilter
-from pydantic import Field
+from app.models.land_change.tree_cover_loss import (
+    AllowedForestFilter,
+)
+from pydantic import Field, PrivateAttr
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -25,6 +27,7 @@ ValidCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 
 
 class TreeCoverAnalyticsIn(AnalyticsIn):
+    _version: str = PrivateAttr(default="v20250909")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
