@@ -17,8 +17,8 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
-from app.infrastructure.persistence.file_system_analysis_repository import (
-    FileSystemAnalysisRepository,
+from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
+    AwsDynamoDbS3AnalysisRepository,
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
@@ -39,10 +39,12 @@ router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
 def get_analysis_repository() -> AnalysisRepository:
-    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+    return AwsDynamoDbS3AnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
+def create_analysis_service(
+    request: Request, analysis_repository=Depends(get_analysis_repository)
+) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
@@ -58,7 +60,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
     )
 
     return AnalysisService(
-        analysis_repository=get_analysis_repository(),
+        analysis_repository=analysis_repository,
         analyzer=TreeCoverAnalyzer(compute_engine=compute_engine),
         event=ANALYTICS_NAME,
     )

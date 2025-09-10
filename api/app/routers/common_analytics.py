@@ -37,8 +37,8 @@ async def create_analysis(
 
         await service.set_resource_from(data)
         background_tasks.add_task(service.do)
-        background_tasks.add_task(test_s3_access)
-        background_tasks.add_task(test_dynamodb_s3_repository)
+        # background_tasks.add_task(test_s3_access)
+        # background_tasks.add_task(test_dynamodb_s3_repository)
         link_url = resource_link_callback(request=request, service=service)
         link = DataMartResourceLink(link=link_url)
         return DataMartResourceLinkResponse(data=link, status=service.get_status())

@@ -12,3 +12,6 @@
 zeno_data_analytics.egg-info/
 
 .env
+
+.terraform
+.terraform.lock.hcl
