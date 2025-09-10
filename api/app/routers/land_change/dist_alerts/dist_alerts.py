@@ -27,8 +27,9 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
-    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
+def create_analysis_service(
+    request: Request, analysis_repository=Depends(get_analysis_repository)
+) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=DistAlertsAnalyzer(
