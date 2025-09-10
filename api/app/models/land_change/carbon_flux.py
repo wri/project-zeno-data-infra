@@ -9,7 +9,7 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from pydantic import Field
+from pydantic import Field, PrivateAttr
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -23,6 +23,7 @@ AllowedCanopyCover = Literal[30, 50, 75]
 
 
 class CarbonFluxAnalyticsIn(AnalyticsIn):
+    _version: str = PrivateAttr(default="v20250910")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
@@ -79,7 +80,7 @@ class CarbonFluxAnalyticsResponse(Response):
                                 4045.406160862687,
                                 4050.4061608627,
                                 4045.406160862687,
-                            ]
+                            ],
                         },
                         "metadata": {
                             "aoi": {
