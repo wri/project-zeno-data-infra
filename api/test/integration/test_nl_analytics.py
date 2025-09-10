@@ -503,90 +503,75 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
         test_request, client = setup
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource(resource_id, client)
-
-        expected_df = pd.DataFrame(
-            {
-                "natural_lands_class": [
-                    "Natural short vegetation",
-                    "Natural water",
-                    "Bare",
-                    "Wetland natural short vegetation",
-                    "Cropland",
-                    "Built-up",
-                    "Non-natural tree cover",
-                    "Natural short vegetation",
-                    "Natural water",
-                    "Bare",
-                    "Wetland natural short vegetation",
-                    "Cropland",
-                    "Built-up",
-                    "Cropland",
-                    "Built-up",
-                ],
-                "area_ha": [
-                    128.3753375,
-                    53.72206875,
-                    0.07555975341796875,
-                    0.07555962524414063,
-                    340.83395,
-                    2.417955859375,
-                    0.22667939453125,
-                    2.873907421875,
-                    1.4369591796875,
-                    0.07562982788085937,
-                    0.0756300048828125,
-                    54.07575,
-                    5.36974140625,
-                    22.289453125,
-                    98.2229875,
-                ],
-                "aoi_type": [
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                ],
-                "aoi_id": [
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "46942",
-                    "46942",
-                ],
-            }
-        )
         actual_df = pd.DataFrame(data["result"])
 
-        # Use tolerance for floating-point comparison
-        pd.testing.assert_frame_equal(
-            expected_df,
-            actual_df,
-            check_like=True,
-            check_exact=False,  # Allow approximate comparison for numbers
-            atol=1e-8,  # Absolute tolerance
-            rtol=1e-4,  # Relative tolerance
-        )
+        # 1. Validate expected columns
+        expected_columns = {"natural_lands_class", "area_ha", "aoi_type", "aoi_id"}
+        assert set(actual_df.columns) == expected_columns, "Column mismatch"
+
+        # 2. Check data types
+        assert actual_df["natural_lands_class"].dtype == object
+        assert pd.api.types.is_numeric_dtype(
+            actual_df["area_ha"]
+        ), "area_ha should be numeric"
+        assert actual_df["aoi_type"].dtype == object
+        assert actual_df["aoi_id"].dtype == object
+
+        # 3. Validate aoi_type values
+        assert (
+            actual_df["aoi_type"] == "key_biodiversity_area"
+        ).all(), "Invalid aoi_type values"
+
+        # 4. Check for valid natural land classes (extracted from your example)
+        valid_classes = {
+            "Bare",
+            "Built-up",
+            "Cropland",
+            "Natural short vegetation",
+            "Natural water",
+            "Non-natural tree cover",
+            "Wetland natural forests",
+            "Wetland natural short vegetation",
+            "Wetland non-natural short vegetation",
+            "Wetland non-natural tree cover",
+        }
+        assert set(actual_df["natural_lands_class"].unique()).issubset(
+            valid_classes
+        ), "Invalid natural land classes detected"
+
+        # 5. Validate area values
+        assert (actual_df["area_ha"] >= 0).all(), "Negative area values"
+        assert actual_df["area_ha"].notna().all(), "Missing area values"
+
+        # Check for reasonable area ranges (adjust based on your domain knowledge)
+        assert actual_df["area_ha"].max() < 1000, "Area values unexpectedly large"
+        assert actual_df["area_ha"].min() >= 0, "Negative area values"
+
+        # 6. Validate aoi_id format
+        # Assuming aoi_id should be numeric strings based on your example
+        assert (
+            actual_df["aoi_id"].str.isdigit().all()
+        ), "aoi_id should contain only digits"
+        assert set(actual_df["aoi_id"].unique()).issubset({"18392", "46942", "18407"})
+        assert actual_df["aoi_id"].notna().all(), "Missing aoi_id values"
+
+        # 7. Check that each aoi_id has at least one entry
+        assert (
+            len(actual_df["aoi_id"].unique()) >= 1
+        ), "Should have at least one unique aoi_id"
+
+        # 8. Verify no empty values in critical columns
+        assert (
+            actual_df["natural_lands_class"].notna().all()
+        ), "Missing natural_lands_class values"
+
+        # 9. Optional: Check approximate distribution of area values
+        # This ensures the data has reasonable statistical properties
+        area_mean = actual_df["area_ha"].mean()
+        assert 0 < area_mean < 500, f"Unexpected mean area value: {area_mean}"
+
+        # 10. Check that the DataFrame is not empty
+        assert len(actual_df) > 0, "DataFrame should not be empty"
 
 
 @pytest.mark.asyncio

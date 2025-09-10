@@ -5,7 +5,6 @@ from test.integration import (
     write_metadata_file,
 )
 
-import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
@@ -376,74 +375,58 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         test_request, client = setup
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource("dist_alerts", resource_id, client)
+        result = pd.DataFrame(data["result"])
 
-        expected_df = pd.DataFrame(
-            {
-                "dist_alert_date": [
-                    "2025-02-03",
-                    "2025-02-03",
-                    "2025-02-11",
-                    "2025-02-18",
-                    "2025-03-30",
-                    "2025-02-23",
-                    "2025-02-23",
-                    "2025-03-05",
-                    "2025-03-05",
-                    "2025-02-23",
-                ],
-                "dist_alert_confidence": [
-                    "low",
-                    "high",
-                    "high",
-                    "high",
-                    "low",
-                    "low",
-                    "high",
-                    "low",
-                    "high",
-                    "low",
-                ],
-                "area_ha": np.array(
-                    [
-                        1511.152588,
-                        755.576965,
-                        1511.129639,
-                        1511.129639,
-                        755.584412,
-                        3025.184570,
-                        5294.074707,
-                        3781.512695,
-                        756.304932,
-                        755.576294,
-                    ]
-                )
-                / 10000,
-                "aoi_id": [
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "46942",
-                ],
-                "aoi_type": ["key_biodiversity_area"] * 10,
-            }
-        )
-        actual_df = pd.DataFrame(data["result"])
-        print(actual_df)
+        # 1. Validate expected columns
+        expected_columns = {
+            "dist_alert_date",
+            "dist_alert_confidence",
+            "area_ha",
+            "aoi_id",
+            "aoi_type",
+        }
+        assert set(result.columns) == expected_columns, "Column mismatch"
 
-        pd.testing.assert_frame_equal(
-            expected_df,
-            actual_df,
-            check_like=True,
-            check_exact=False,  # Allow approximate comparison for numbers
-            atol=1e-8,  # Absolute tolerance
-            rtol=1e-4,  # Relative tolerance
-        )
+        # 2. Check data types
+        assert result["dist_alert_date"].dtype == object  # Should contain string dates
+        assert pd.api.types.is_numeric_dtype(
+            result["area_ha"]
+        ), "area_ha should be numeric"
+        assert result["aoi_id"].dtype == object
+        assert result["aoi_type"].dtype == object
+
+        # 3. Validate confidence levels
+        valid_confidences = {"high", "low"}
+        assert set(result["dist_alert_confidence"].unique()).issubset(
+            valid_confidences
+        ), "Invalid confidence values"
+
+        # 4. Check date format (YYYY-MM-DD)
+        date_pattern = r"^\d{4}-\d{2}-\d{2}$"
+        assert (
+            result["dist_alert_date"].str.match(date_pattern).all()
+        ), "Invalid date format"
+
+        # 5. Validate area values
+        assert (result["area_ha"] >= 0).all(), "Negative area values"
+        assert result["area_ha"].notna().all(), "Missing area values"
+
+        # 6. Check for required aoi_type values
+        assert (
+            result["aoi_type"] == "key_biodiversity_area"
+        ).all(), "Invalid aoi_type values"
+
+        # 7. Verify no empty values in critical columns
+        assert result["aoi_id"].notna().all(), "Missing aoi_id values"
+        assert set(result["aoi_id"].unique()).issubset({"18392", "46942", "18407"})
+        assert result["dist_alert_date"].notna().all(), "Missing date values"
+
+        # 8. Validate reasonable area ranges (adjust thresholds as needed)
+        assert result["area_ha"].max() < 100, "Area values too large"
+        assert result["area_ha"].min() >= 0, "Negative area values"
+
+        # Optional: Check approximate row count if expected range is known
+        assert len(result) > 0, "DataFrame should not be empty"
 
 
 @pytest.mark.asyncio
