@@ -6,10 +6,7 @@ import pandas as pd
 import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
-from app.analysis.grasslands.analysis import (
-    get_precomputed_statistic_on_gadm_aoi,
-    zonal_statistics,
-)
+from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
 
 
 class TestGrasslandsPreComputedAnalysis:
@@ -69,9 +66,9 @@ class TestGrasslandsPreComputedAnalysis:
     async def test_precomputed_zonal_stats_for_region(self, precomputed_gadm_results):
         gadm_id = "BRA.1"
 
-        result_df = await get_precomputed_statistic_on_gadm_aoi(
+        result_df = GrasslandsAnalyzer.analyze_admin_area(
             gadm_id, precomputed_gadm_results
-        )
+        ).compute()
 
         # Aggregated yearly data
         data = [
@@ -109,6 +106,7 @@ class TestGrasslandsPreComputedAnalysis:
             expected_df,
             result_df,
             check_like=True,
+            check_dtype=False,
             check_exact=False,  # Allow approximate comparison for numbers
             atol=1e-8,  # Absolute tolerance
             rtol=1e-4,  # Relative tolerance
@@ -192,7 +190,7 @@ class TestGrasslandsOTFAnalysis:
             },
         }
 
-        result_df = await zonal_statistics(aoi, aoi["geometry"])
+        result_df = GrasslandsAnalyzer.analyze_area(aoi, aoi["geometry"])
 
         loop = asyncio.get_event_loop()
         computed_df = await loop.run_in_executor(None, result_df.compute)

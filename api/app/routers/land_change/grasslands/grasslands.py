@@ -1,27 +1,40 @@
-import json
-import logging
-import traceback
-import uuid
-from pathlib import Path
-
-from app.analysis.grasslands.analysis import do_analytics
-from app.models.common.analysis import AnalysisStatus
-from app.models.common.base import (
-    DataMartResourceLink,
-    DataMartResourceLinkResponse,
+from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
 )
+from app.models.common.analysis import AnalyticsOut
+from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.grasslands import (
+    GrasslandsAnalytics,
     GrasslandsAnalyticsIn,
     GrasslandsAnalyticsResponse,
 )
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from app.routers.common_analytics import create_analysis, get_analysis
+from app.use_cases.analysis.analysis_service import AnalysisService
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
 
-router = APIRouter(prefix="/grasslands")
+ANALYTICS_NAME = "grasslands"
+router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
-PAYLOAD_STORE_DIR = Path("/tmp/grasslands_analytics_payloads")
-PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
+
+def get_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+def create_analysis_service(request: Request) -> AnalysisService:
+    analysis_repository = get_analysis_repository()
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=GrasslandsAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=request.app.state.dask_client,
+        ),
+        event=ANALYTICS_NAME,
+    )
 
 
 @router.post(
@@ -31,64 +44,28 @@ PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
     status_code=202,
 )
 async def create(
-    *, data: GrasslandsAnalyticsIn, request: Request, background_tasks: BackgroundTasks
+    *,
+    data: GrasslandsAnalyticsIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    service: AnalysisService = Depends(create_analysis_service),
 ):
-    try:
-        # Convert model to JSON with sorted keys
-        payload_dict = data.model_dump()
+    return await create_analysis(
+        data=data,
+        service=service,
+        request=request,
+        background_tasks=background_tasks,
+        resource_link_callback=_datamart_resource_link_response,
+    )
 
-        # Convert to JSON string with sorted keys
-        payload_json = json.dumps(payload_dict, sort_keys=True)
 
-        # Generate deterministic UUID from payload
-        resource_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, payload_json))
-
-        logging.info(
-            {
-                "event": "grasslands_analytics_request",
-                "analytics_in": payload_dict,
-                "resource_id": resource_id,
-            }
+def _datamart_resource_link_response(request, service) -> str:
+    return str(
+        request.url_for(
+            "get_grassslands_analytics_result",
+            resource_id=service.resource_thumbprint(),
         )
-
-        # Store payload in /tmp directory
-        payload_dir = PAYLOAD_STORE_DIR / resource_id
-        metadata_data = payload_dir / "metadata.json"
-        analytics_data = payload_dir / "data.json"
-
-        link = DataMartResourceLink(
-            link=f"{str(request.base_url).rstrip('/')}/v0/land_change/grasslands/analytics/{resource_id}"
-        )
-
-        if metadata_data.exists() and analytics_data.exists():
-            return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.saved)
-
-        if metadata_data.exists():
-            return DataMartResourceLinkResponse(
-                data=link, status=AnalysisStatus.pending
-            )
-
-        payload_dir.mkdir(parents=True, exist_ok=True)
-        metadata_data.write_text(payload_json)
-        background_tasks.add_task(
-            do_analytics,
-            file_path=payload_dir,
-            dask_client=request.app.state.dask_client,
-        )
-        return DataMartResourceLinkResponse(data=link, status=AnalysisStatus.pending)
-    except Exception as e:
-        logging.error(
-            {
-                "event": "grasslands_analytics_request_failure",
-                "severity": "high",  # Helps with alerting
-                "analytics_in": await request.json(),
-                "resource_id": resource_id,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal server error")
+    )
 
 
 @router.get(
@@ -97,70 +74,17 @@ async def create(
     response_model=GrasslandsAnalyticsResponse,
     status_code=200,
 )
-async def get_analytics_result(
-    resource_id: str,
+async def get_grasslands_analytics_result(
+    resource_id: UUID5,
     response: FastAPIResponse,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
-    # Validate UUID format
-    try:
-        uuid.UUID(resource_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail="Invalid resource ID format. Must be a valid UUID."
-        )
+    analytics_out: AnalyticsOut = await get_analysis(
+        resource_id=resource_id,
+        analysis_repository=analysis_repository,
+        response=response,
+    )
 
-    try:
-        # Construct file path
-        file_path = PAYLOAD_STORE_DIR / resource_id
-        analytics_metadata = file_path / "metadata.json"
-        analytics_data = file_path / "data.json"
-        metadata_content = None
-        alerts_dict = None
-
-        if analytics_metadata.exists() and analytics_data.exists():
-            # load resource from filesystem
-            yearly_grasslands_area = json.loads(analytics_data.read_text())
-            metadata_content = json.loads(analytics_metadata.read_text())
-
-            return GrasslandsAnalyticsResponse(
-                data={
-                    "result": yearly_grasslands_area,
-                    "metadata": metadata_content,
-                    "status": AnalysisStatus.saved,
-                },
-                status="success",
-            )
-
-        if analytics_metadata.exists():
-            metadata_content = json.loads(analytics_metadata.read_text())
-            response.headers["Retry-After"] = "1"
-
-            return GrasslandsAnalyticsResponse(
-                data={
-                    "status": AnalysisStatus.pending,
-                    "message": "Resource is still processing, follow Retry-After header.",
-                    "result": alerts_dict,
-                    "metadata": metadata_content,
-                },
-                status="success",
-            )
-
-    except Exception as e:
-        logging.error(
-            {
-                "event": "dist_alerts_analytics_resource_request_failure",
-                "severity": "high",  # Helps with alerting
-                "resource_id": resource_id,
-                "resource_metadata": metadata_content,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-    # Should've found the resource by now. So, assume it doesn't exist
-    raise HTTPException(
-        status_code=404,
-        detail="Requested resource not found. Either expired or never existed.",
+    return GrasslandsAnalyticsResponse(
+        data=GrasslandsAnalytics(**analytics_out.model_dump()), status="success"
     )

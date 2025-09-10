@@ -18,7 +18,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
     async def test_request(self):
         """Runs before each test in this class"""
-        delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -43,7 +43,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     @pytest.mark.asyncio
@@ -56,7 +56,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
 
         # now, the resource is already processing...make another post
@@ -75,7 +75,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -87,7 +87,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
@@ -107,7 +107,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -119,10 +119,10 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_returns_404_not_found_response_code(self):
@@ -134,11 +134,11 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_returns_pending_status(self):
@@ -165,7 +165,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -178,7 +178,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
         )
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_returns_saved_status(self):
@@ -214,7 +214,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("71dd3afc-167b-519d-81d9-0f3d2403fd9a/")
+        delete_resource_files("f4db2a46-990c-518a-b7ab-3421d85637c9")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -244,7 +244,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/71dd3afc-167b-519d-81d9-0f3d2403fd9a"
+            == "http://testserver/v0/land_change/natural_lands/analytics/f4db2a46-990c-518a-b7ab-3421d85637c9"
         )
 
     @pytest.mark.asyncio
@@ -460,7 +460,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("3fbf5923-0d61-5f88-b18c-6673ef6b1d62")
+        delete_resource_files("d773e92b-1df5-5d80-a3ed-e9ccede683d2")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -490,7 +490,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/3fbf5923-0d61-5f88-b18c-6673ef6b1d62"
+            == "http://testserver/v0/land_change/natural_lands/analytics/d773e92b-1df5-5d80-a3ed-e9ccede683d2"
         )
 
     @pytest.mark.asyncio
@@ -576,7 +576,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+    delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -749,7 +749,7 @@ async def test_kba_dist_analytics_no_intersection():
 # yet.                                                           #
 ##################################################################
 def delete_resource_files(resource_id: str) -> Path:
-    dir_path = Path(f"/tmp/natural_lands_analytics_payloads/{resource_id}")
+    dir_path = Path(f"/tmp/natural_lands/{resource_id}")
 
     if os.path.exists(dir_path):
         for filename in os.listdir(dir_path):

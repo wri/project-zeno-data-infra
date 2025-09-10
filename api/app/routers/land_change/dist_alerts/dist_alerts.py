@@ -17,6 +17,7 @@ from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
 
 ANALYTICS_NAME = "dist_alerts"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
@@ -76,7 +77,7 @@ async def create(
     status_code=200,
 )
 async def get_dist_alerts_analytics_result(
-    resource_id: str,
+    resource_id: UUID5,
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ):
