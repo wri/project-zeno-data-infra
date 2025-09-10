@@ -30,9 +30,6 @@ class TreeCoverAnalyzer(Analyzer):
 
         if tree_cover_analytics_in.forest_filter is not None:
             forest_filter = Dataset.primary_forest
-            if tree_cover_analytics_in.forest_filter == Dataset.intact_forest.value:
-                forest_filter = Dataset.intact_forest
-
             filters.append(
                 DatasetFilter(
                     dataset=forest_filter,
