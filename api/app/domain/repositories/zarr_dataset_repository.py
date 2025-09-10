@@ -58,6 +58,8 @@ class ZarrDatasetRepository:
             val_map = {"2000-2005": 1, "2005-2010": 2, "2010-2015": 3, "2015-2020": 4}
 
             return [val_map[val] for val in value_tuple]
+        elif dataset == Dataset.primary_forest:
+            return int(value)
         else:
             raise NotImplementedError()
 

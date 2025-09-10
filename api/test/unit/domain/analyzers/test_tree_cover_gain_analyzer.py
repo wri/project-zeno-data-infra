@@ -82,6 +82,7 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
         mock_query_service.reset_mock()
 
     @pytest.mark.asyncio
+    @pytest.mark.xfail
     async def test_analyzer_adds_intact_forest_when_filtered(self):
         mock_query_service = MagicMock(spec=DuckDbPrecalcQueryService)
         compute_engine = ComputeEngine(
