@@ -2,11 +2,12 @@ from app.analysis.dist_alerts.analysis import (
     get_precomputed_statistics,
     zonal_statistics_on_aois,
 )
+from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.land_change.dist_alerts import DistAlertsAnalyticsIn
 
 
-class DistAlertsAnalyzer:
+class DistAlertsAnalyzer(Analyzer):
     def __init__(
         self,
         analysis_repository=None,

@@ -2,7 +2,7 @@ from typing import Annotated, Optional, Union
 
 from pydantic import Field, field_validator, model_validator
 
-from ..common.analysis import AnalysisStatus
+from ..common.analysis import AnalysisStatus, AnalyticsIn
 from ..common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
@@ -23,7 +23,7 @@ AoiUnion = Union[
 DATE_REGEX = r"^\d{4}$"
 
 
-class GrasslandsAnalyticsIn(StrictBaseModel):
+class GrasslandsAnalyticsIn(AnalyticsIn):
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
