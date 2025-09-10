@@ -42,7 +42,9 @@ def get_analysis_repository() -> AnalysisRepository:
     return AwsDynamoDbS3AnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
+def create_analysis_service(
+    request: Request, analysis_repository=Depends(get_analysis_repository)
+) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
@@ -58,7 +60,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
     )
 
     return AnalysisService(
-        analysis_repository=get_analysis_repository(),
+        analysis_repository=analysis_repository,
         analyzer=TreeCoverAnalyzer(compute_engine=compute_engine),
         event=ANALYTICS_NAME,
     )
