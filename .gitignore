@@ -16,3 +16,4 @@ zeno_data_analytics.egg-info/
 .secrets
 .terraform*
 **/terraform.tfstate*
+.terraform.lock.hcl
