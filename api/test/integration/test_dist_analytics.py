@@ -561,25 +561,33 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=[],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": [],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
@@ -611,25 +619,36 @@ async def test_gadm_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_kba_dist_analytics_no_intersection():
-    delete_resource_files("dist_alerts", "6d6095db-9d62-5914-af37-963e6a13c074")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=KeyBiodiversityAreaOfInterest(
+            type="key_biodiversity_area",
+            ids=["8111"],
+        ),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=[],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "key_biodiversity_area", "ids": ["8111"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": [],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
@@ -657,25 +676,33 @@ async def test_kba_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_grasslands():
-    delete_resource_files("dist_alerts", "3c8491e2-5176-5cfc-99b1-77140dc3feb3/")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=["grasslands"],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["TZA.24.3"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": ["grasslands"],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
@@ -706,25 +733,33 @@ async def test_admin_dist_analytics_by_grasslands():
 
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_land_cover():
-    delete_resource_files("dist_alerts", "29c87d12-5998-5fa7-adef-4816ac03ef89/")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=["land_cover"],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["TZA.24.3"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": ["land_cover"],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
