@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, call
 from uuid import UUID
 
 import pytest
@@ -65,7 +65,30 @@ class TestTreeCoverLossServiceCollaborators:
         mock_analysis_repository.load_analysis.assert_called_once_with(
             resource_thumbprint
         )
-        mock_analysis_repository.store_analysis.assert_called()
+
+        mock_analysis_repository_calls = (
+            mock_analysis_repository.store_analysis.mock_calls
+        )
+        assert mock_analysis_repository.store_analysis.call_count == 3
+
+        # assert that the new Analysis is stored so it's available to clients immediately
+        assert mock_analysis_repository_calls[0] == call(
+            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
+            Analysis(None, {"aoi": {}, "_version": "v0"}, None),
+        )
+
+        # assert that the new Analysis is stored as pending before analysis starts
+        assert mock_analysis_repository_calls[1] == call(
+            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
+            Analysis(None, {"aoi": {}, "_version": "v0"}, AnalysisStatus.pending),
+        )
+
+        # assert that the failed Analysis result is stored at the end
+        assert mock_analysis_repository_calls[2] == call(
+            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
+            Analysis(None, {"aoi": {}, "_version": "v0"}, AnalysisStatus.failed),
+        )
+
         assert result_thumbprint == resource_thumbprint
         mock_analyzer.analyze.assert_called_once_with(
             Analysis(

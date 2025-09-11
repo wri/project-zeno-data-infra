@@ -92,12 +92,21 @@ class AnalysisService:
         analysis: Analysis = await self.analysis_repository.load_analysis(
             data.thumbprint()
         )
+
         self.analytics_resource_id = data.thumbprint()
         self.analytics_resource = AnalyticsOut(
             metadata=analysis.metadata or data.model_dump(),
             result=analysis.result,
             status=analysis.status,
         )
+
+        if self.analytics_resource.status is None:  # store placeholder immediately
+            await self.analysis_repository.store_analysis(
+                data.thumbprint(),
+                Analysis(
+                    metadata=self.analytics_resource.metadata, result=None, status=None
+                ),
+            )
 
     def resource_thumbprint(self) -> uuid.UUID:
         return self.analytics_resource_id
