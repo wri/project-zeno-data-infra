@@ -1,3 +1,4 @@
+from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -9,7 +10,6 @@ from app.models.land_change.land_cover_change import (
     LandCoverChangeAnalyticsIn,
     LandCoverChangeAnalyticsResponse,
 )
-from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
@@ -25,8 +25,10 @@ def get_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
-    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
+def create_analysis_service(
+    request: Request,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
+) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandCoverChangeAnalyzer(
