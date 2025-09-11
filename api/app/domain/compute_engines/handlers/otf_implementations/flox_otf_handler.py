@@ -99,18 +99,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 .reset_index()
             )
         else:
-            if func == "sum":
-                result = by.sum().compute()
-            elif func == "count":
-                result = by.count().compute()
-
-            # to convert scalar to dataframe, need to do some pandas index gymnastics
-            results = (
-                result.expand_dims(dim=["index"])
-                .to_dataframe()
-                .reset_index()
-                .drop(columns=["index"])
-            )
+            results = FloxOTFHandler._apply_xarr_func(by, func)
 
         # Filter out rows where results for all aggregate datasets are NaN
         results["aoi_id"] = aoi_id
@@ -121,6 +110,25 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         return filtered_results.reset_index().drop(
             columns=["index", "band", "spatial_ref"], errors="ignore"
         )
+
+    @staticmethod
+    def _apply_xarr_func(by, func):
+        if func == "sum":
+            scalar = by.sum().compute()
+        elif func == "count":
+            scalar = by.count().compute()
+        else:
+            raise ValueError(f"{func} unsupported.")
+
+        # to convert scalar to dataframe, need to do some pandas index gymnastics
+        results = (
+            scalar.expand_dims(dim=["index"])
+            .to_dataframe()
+            .reset_index()
+            .drop(columns=["index"])
+        )
+
+        return results
 
     @staticmethod
     def _get_filter_by_op(arr, op, value):
