@@ -1,6 +1,6 @@
 from typing import Annotated, Optional, Union
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from ..common.analysis import AnalysisStatus, AnalyticsIn
 from ..common.areas_of_interest import (
@@ -24,6 +24,7 @@ DATE_REGEX = r"^\d{4}$"
 
 
 class GrasslandsAnalyticsIn(AnalyticsIn):
+    _version: str = PrivateAttr(default="v20250911")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
