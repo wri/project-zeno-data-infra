@@ -1,10 +1,9 @@
-import json
 import logging
 import os
 from typing import Iterable, List
 
 import httpx
-from shapely import Geometry
+from shapely import Geometry, wkb
 from shapely.geometry import shape
 
 
@@ -23,7 +22,7 @@ class DataApiAoiGeometryRepository:
             raise ValueError("Unable to get GeoJSON from Data API.")
 
         geometries = [
-            shape(json.loads(data["gfw_geojson"])) for data in response["data"]
+            shape(wkb.loads(bytes.fromhex(data["geom"]))) for data in response["data"]
         ]
         return geometries
 
@@ -31,13 +30,13 @@ class DataApiAoiGeometryRepository:
         value_list = self._get_sql_in_list(aoi_ids)
         if aoi_type == "key_biodiversity_area":
             url = "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
-            sql = f"select gfw_geojson from data where sitrecid in {value_list} order by sitrecid"
+            sql = f"select geom from data where sitrecid in {value_list} order by sitrecid"
         elif aoi_type == "protected_area":
             url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-            sql = f"select gfw_geojson from data where wdpaid in {value_list} order by wdpaid"
+            sql = f"select geom from data where wdpaid in {value_list} order by wdpaid"
         elif aoi_type == "indigenous_land":
             url = "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
-            sql = f"select gfw_geojson from data where landmark_id in {value_list} order by landmark_id"
+            sql = f"select geom from data where landmark_id in {value_list} order by landmark_id"
         else:
             raise ValueError(f"Unable to retrieve AOI type {aoi_type} from Data API.")
         return url, {"sql": sql}
