@@ -117,6 +117,28 @@ class TestLoadingAnalysis:
         )
 
     @pytest.mark.asyncio
+    async def test_store_initial_analysis_and_load_successfully(self, moto_server):
+        analysis_repository = AwsDynamoDbS3AnalysisRepository(
+            TEST_CATEGORY, moto_server
+        )
+        await analysis_repository.store_analysis(
+            DUMMY_UUID,
+            Analysis(
+                result=None,
+                metadata={"val1": 12, "val2": "test", "val3": {"key": "value"}},
+                status=None,
+            ),
+        )
+
+        analysis_result = await analysis_repository.load_analysis(DUMMY_UUID)
+
+        assert analysis_result == Analysis(
+            result=None,
+            metadata={"val1": 12, "val2": "test", "val3": {"key": "value"}},
+            status=None,
+        )
+
+    @pytest.mark.asyncio
     async def test_store_analysis_twice_does_not_append_data(self, moto_server):
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
             TEST_CATEGORY, moto_server
