@@ -79,7 +79,7 @@ async def get_analysis(
         )
         raise HTTPException(status_code=500, detail="Internal server error")
 
-    if analysis.status is None:
+    if analysis.metadata is None:
         raise HTTPException(status_code=404, detail="Analysis not found")
 
     match analysis.status:
@@ -91,7 +91,8 @@ async def get_analysis(
         case AnalysisStatus.failed:
             message = "Analysis failed. Result is not available."
         case _:
-            message = ""
+            response.headers["Retry-After"] = "1"
+            message = "Resource is initializing, follow Retry-After header."
 
     return AnalyticsOut(
         status=analysis.status,
