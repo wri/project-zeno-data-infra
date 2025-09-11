@@ -35,10 +35,9 @@ class IntenseApiUser(FastHttpUser):
 
     @task
     def test_request_analytics_and_wait_for_result(self):
-        with measure_task_time("test_request_analytics_and_wait_for_result"):
-            aoi_type = random.choices(
-                ["admin", "key_biodiversity_area"], weights=[4, 1]
-            )[0]
+        aoi_type = random.choices(["admin", "key_biodiversity_area"], weights=[4, 1])[0]
+
+        with measure_task_time(f"full_run_{aoi_type}"):
 
             def _get_aoi_ids(aoi_type):
                 number_of_ids = random.choices(range(1, 25), weights=range(25, 1, -1))[
@@ -77,11 +76,11 @@ class IntenseApiUser(FastHttpUser):
             start_time = time.perf_counter()
 
             with self.rest(
-                "POST", "/v0/land_change/carbon_flux/analytics", json=analytics_in
+                "POST", "/v0/land_change/tree_cover/analytics", json=analytics_in
             ) as post_response:
                 if post_response.status_code != 202:
                     post_response.failure(
-                        f"Got {post_response.status_code} instead of 202 for carbon_flux with body {analytics_in}"
+                        f"Got {post_response.status_code} instead of 202 for tree_cover with body {analytics_in}"
                     )
                     return
 
@@ -89,13 +88,13 @@ class IntenseApiUser(FastHttpUser):
             resource_id = post_response.json()["data"]["link"].split("/")[-1]
             max_retries = 1000
             retry_count = 0
-            group_name = "land_change:analytics::carbon_flux::resource"
+            group_name = "land_change:analytics::tree_cover::resource"
 
             sleep(1)
             while retry_count < max_retries:
                 with self.rest(
                     "GET",
-                    f"/v0/land_change/carbon_flux/analytics/{resource_id}",
+                    f"/v0/land_change/tree_cover/analytics/{resource_id}",
                     name=group_name,
                 ) as response:
                     if "Retry-After" in response.headers:
@@ -103,7 +102,7 @@ class IntenseApiUser(FastHttpUser):
 
                         if retry_count >= max_retries:
                             response.failure(
-                                f"Max retries exceeded for carbon_flux resource: {resource_id}"
+                                f"Max retries exceeded for tree_cover resource: {resource_id}"
                             )
                             break
 
@@ -112,7 +111,7 @@ class IntenseApiUser(FastHttpUser):
                             sleep(wait_time)
                         except ValueError:
                             response.failure(
-                                f"Invalid Retry-After value for carbon_flux resource: {resource_id}"
+                                f"Invalid Retry-After value for tree_cover resource: {resource_id}"
                             )
                     else:
                         if response.status_code == 200:
@@ -126,7 +125,7 @@ class IntenseApiUser(FastHttpUser):
                             response.success()
                         else:
                             response.failure(
-                                f"Got {response.status_code} instead of 200 for carbon_flux resource: {resource_id}"
+                                f"Got {response.status_code} instead of 200 for tree_cover resource: {resource_id}"
                             )
 
                         break
