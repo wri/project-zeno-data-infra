@@ -90,11 +90,16 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             objs.append(da)
             expected_groups.append(expected_groups_per_dataset[group_by])
 
-        results = (
-            xarray_reduce(by, *objs, func=func, expected_groups=tuple(expected_groups))
-            .to_dataframe()
-            .reset_index()
-        )
+        if len(objs) > 0:
+            results = (
+                xarray_reduce(
+                    by, *objs, func=func, expected_groups=tuple(expected_groups)
+                )
+                .to_dataframe()
+                .reset_index()
+            )
+        else:
+            results = FloxOTFHandler._apply_xarr_func(by, func)
 
         # Filter out rows where results for all aggregate datasets are NaN
         results["aoi_id"] = aoi_id
@@ -103,8 +108,27 @@ class FloxOTFHandler(AnalyticsOTFHandler):
 
         # TODO remove band, spatial_ref, x, y from zarrs
         return filtered_results.reset_index().drop(
-            columns=["index", "band", "spatial_ref", "x", "y"], errors="ignore"
+            columns=["index", "band", "spatial_ref"], errors="ignore"
         )
+
+    @staticmethod
+    def _apply_xarr_func(by, func):
+        if func == "sum":
+            scalar = by.sum().compute()
+        elif func == "count":
+            scalar = by.count().compute()
+        else:
+            raise ValueError(f"{func} unsupported.")
+
+        # to convert scalar to dataframe, need to do some pandas index gymnastics
+        results = (
+            scalar.expand_dims(dim=["index"])
+            .to_dataframe()
+            .reset_index()
+            .drop(columns=["index"])
+        )
+
+        return results
 
     @staticmethod
     def _get_filter_by_op(arr, op, value):
