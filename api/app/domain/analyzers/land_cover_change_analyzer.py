@@ -2,6 +2,7 @@ from functools import partial
 
 import dask.dataframe as dd
 import duckdb
+import newrelic.agent as nr_agent
 import numpy as np
 from app.analysis.common.analysis import (
     get_geojson,
@@ -47,6 +48,7 @@ class LandCoverChangeAnalyzer(Analyzer):
         self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
 
+    @nr_agent.function_trace(name="LandCoverChangeAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
         if land_cover_change_analytics_in.aoi.type == "admin":
@@ -137,19 +139,19 @@ class LandCoverChangeAnalyzer(Analyzer):
             .reset_index(drop=True)
         )
 
-        land_cover_change_ddf[
-            "land_cover_class_start"
-        ] = land_cover_change_ddf.class_change.apply(
-            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
-                x // LandCoverChangeAnalyzer.number_of_classes
-            ]
+        land_cover_change_ddf["land_cover_class_start"] = (
+            land_cover_change_ddf.class_change.apply(
+                lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
+                    x // LandCoverChangeAnalyzer.number_of_classes
+                ]
+            )
         )
-        land_cover_change_ddf[
-            "land_cover_class_end"
-        ] = land_cover_change_ddf.class_change.apply(
-            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
-                x % LandCoverChangeAnalyzer.number_of_classes
-            ]
+        land_cover_change_ddf["land_cover_class_end"] = (
+            land_cover_change_ddf.class_change.apply(
+                lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
+                    x % LandCoverChangeAnalyzer.number_of_classes
+                ]
+            )
         )
 
         land_cover_change_ddf = land_cover_change_ddf.drop(

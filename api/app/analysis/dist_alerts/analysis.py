@@ -77,9 +77,8 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
         geojsons = [geojson["geometry"] for geojson in geojsons]
 
     precompute_partial = partial(zonal_statistics, intersection=intersection)
-    dd_df_futures = await dask_client.gather(
-        dask_client.map(precompute_partial, aois, geojsons)
-    )
+    futures = dask_client.map(precompute_partial, aois, geojsons)
+    dd_df_futures = await dask_client.gather(futures)
     dfs = await dask_client.gather(dd_df_futures)
     alerts_df = await dask_client.compute(dd.concat(dfs))
 

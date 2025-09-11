@@ -45,13 +45,12 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the dask cluster
-    app.state.dask_cluster = LocalCluster(processes=True, asynchronous=True)
-    app.state.dask_client = Client(app.state.dask_cluster)
+    app.state.dask_client = Client("tcp://34.238.138.79:8786", asynchronous=True)
     yield
     # Release the resources
-    close_call = app.state.dask_client.shutdown()
-    if close_call is not None:
-        await close_call
+    # close_call = app.state.dask_client.shutdown()
+    # if close_call is not None:
+    #     await close_call
 
 
 app = FastAPI(lifespan=lifespan)
