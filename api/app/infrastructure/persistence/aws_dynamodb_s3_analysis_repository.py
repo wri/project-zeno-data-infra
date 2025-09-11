@@ -81,7 +81,8 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
 
         # Extract fields from DynamoDB. Use .get() for safety.
         metadata = item.get("metadata")
-        status = AnalysisStatus(item.get("status"))
+        status_value = item.get("status")
+        status = AnalysisStatus(status_value) if status_value else None
         s3_key = item.get("s3_result_key")  # This is the pointer to the result in S3
 
         result_payload = None
