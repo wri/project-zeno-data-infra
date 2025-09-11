@@ -560,7 +560,7 @@ class DistZonalStats(pa.DataFrameModel):
     dist_alert_confidence: Series[str] = pa.Field(
         isin=["low", "high"]
     )  # low confidence, high confidence
-    area__ha: Series[float]
+    area_ha: Series[float]
 
     class Config:
         coerce = True
@@ -578,7 +578,7 @@ class DistZonalStats(pa.DataFrameModel):
     @staticmethod
     def calculate_area_sums_by_confidence(df: pd.DataFrame) -> dict:
         """Calculate the total area by confidence level."""
-        area_sums = df.groupby("dist_alert_confidence")["area__ha"].sum().to_dict()
+        area_sums = df.groupby("dist_alert_confidence")["area_ha"].sum().to_dict()
         return {
             "low_confidence": area_sums.get("low", 0),
             "high_confidence": area_sums.get("high", 0),
@@ -593,7 +593,7 @@ class DistZonalStats(pa.DataFrameModel):
             by="dist_alert_date"
         ).reset_index(drop=True)
         return filtered_by_date_df[
-            ["dist_alert_date", "dist_alert_confidence", "area__ha"]
+            ["dist_alert_date", "dist_alert_confidence", "area_ha"]
         ]
 
 
@@ -602,7 +602,7 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
     regions: Series[int] = pa.Field()
     subregions: Series[int] = pa.Field()
     natural_lands: Series[str] = pa.Field(isin=sbtn_natural_lands_classes)
-    area__ha: Series[float] = pa.Field(ge=0)
+    area_ha: Series[float] = pa.Field(ge=0)
 
 
 def generate_validation_statistics(version: str) -> pd.DataFrame:
@@ -627,7 +627,7 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
         f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/area_m/gdal-geotiff/{aoi_tile}.tif"
     ) as src:
         pixel_area__m = src.read(1, window=window)
-        pixel_area__ha = pixel_area__m / 10000
+        pixel_area_ha = pixel_area__m / 10000
 
     # Extract confidence level (first digit)
     dist_confidence_levels = dist_alerts // 10000
@@ -644,8 +644,8 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
 
     # dist_alert_confidence level maskings
     # anything outside the AOI becomes zero
-    dist_high_conf_aoi = aoi_mask * dist_high_conf * pixel_area__ha
-    dist_low_conf_aoi = aoi_mask * dist_low_conf * pixel_area__ha
+    dist_high_conf_aoi = aoi_mask * dist_high_conf * pixel_area_ha
+    dist_low_conf_aoi = aoi_mask * dist_low_conf * pixel_area_ha
     dist_julian_date_aoi = aoi_mask * dist_julian_date
 
     # create a dataframe of analysis results
@@ -677,15 +677,15 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     ] = 150  # placeholder for subregion (adm2) since we are running on an adm1 AOI
 
     # rename high_conf to value
-    high_conf_results.rename(columns={"high_conf": "area__ha"}, inplace=True)
-    low_conf_results.rename(columns={"low_conf": "area__ha"}, inplace=True)
+    high_conf_results.rename(columns={"high_conf": "area_ha"}, inplace=True)
+    low_conf_results.rename(columns={"low_conf": "area_ha"}, inplace=True)
 
     # reorder columns to country, region, subregion, dist_alert_date, confidence, value
     high_conf_results = high_conf_results[
-        ["country", "region", "subregion", "dist_alert_date", "confidence", "area__ha"]
+        ["country", "region", "subregion", "dist_alert_date", "confidence", "area_ha"]
     ]
     low_conf_results = low_conf_results[
-        ["country", "region", "subregion", "dist_alert_date", "confidence", "area__ha"]
+        ["country", "region", "subregion", "dist_alert_date", "confidence", "area_ha"]
     ]
 
     # concatenate dist_alert_confidence dfs into one validation df
@@ -732,7 +732,7 @@ def validate(parquet_uri: str) -> bool:
     # validate alert area sums with 0.1% tolerance
     validation_areas = DistZonalStats.calculate_area_sums_by_confidence(validation_df)
     zeno_areas = DistZonalStats.calculate_area_sums_by_confidence(zeno_aoi_df)
-    zeno_aoi_df["area__ha"] = zeno_aoi_df["area__ha"] / 10000
+    zeno_aoi_df["area_ha"] = zeno_aoi_df["area_ha"] / 10000
     tolerance_pct = 0.001  # 0.1% tolerance
 
     low_conf_tolerance = validation_areas["low_confidence"] * tolerance_pct
@@ -763,7 +763,7 @@ def validate(parquet_uri: str) -> bool:
     # Group zeno results by dist_alert_date and dist_alert_confidence to aggregate subregions (since AOI is an adm1)
     zeno_spot_check = (
         zeno_spot_check_raw.groupby(["dist_alert_date", "dist_alert_confidence"])[
-            "area__ha"
+            "area_ha"
         ]
         .sum()
         .reset_index()
@@ -779,8 +779,8 @@ def validate(parquet_uri: str) -> bool:
     logger.info("No missing dist_alert_dates in parquet")
 
     # spot check alert area for random dates with 0.1% tolerance
-    tolerance_values = validation_spot_check["area__ha"] * tolerance_pct
-    area_diff = abs(validation_spot_check["area__ha"] - zeno_spot_check["area__ha"])
+    tolerance_values = validation_spot_check["area_ha"] * tolerance_pct
+    area_diff = abs(validation_spot_check["area_ha"] - zeno_spot_check["area_ha"])
     exceeds_tolerance = area_diff > tolerance_values
     if exceeds_tolerance.any():
         logger.error("Spot check area values exceed 0.1% tolerance")

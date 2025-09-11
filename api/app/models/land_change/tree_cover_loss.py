@@ -19,7 +19,7 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedForestFilter = Literal["primary_forest", "intact_forest"]
+AllowedForestFilter = Literal["primary_forest"]
 AllowedIntersections = List[Literal["driver"]]
 
 
@@ -45,14 +45,17 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     )
     canopy_cover: AllowedCanopyCover = Field(
         ...,
-        title="Canopy Cover",
+        title="Minimum percent of area covered by tree canopy to count as forest. Carbon model is only valid for carbon threshold 30% or greater, and will return NaN for carbon emissions if set lower.",
     )
     forest_filter: AllowedForestFilter | None = Field(
         default=None,
         title="Forest Filter",
     )
     intersections: AllowedIntersections = Field(
-        ..., min_length=0, max_length=1, description="List of intersection types"
+        ...,
+        min_length=0,
+        max_length=1,
+        description="List of intersection types. Drivers intersections refers to dominant driver across all years of loss, and will return results aggregated across all years.",
     )
 
     @field_validator("start_year", "end_year")

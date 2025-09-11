@@ -1,11 +1,15 @@
 from random import random
 
 from app.domain.analyzers.analyzer import Analyzer
+from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
 
 
 class DummyTreeCoverGainAnalyzer(Analyzer):
+    def __init__(self, compute_engine: ComputeEngine):
+        self.compute_engine = compute_engine  # ignored
+
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
         years = list(

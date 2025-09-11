@@ -1,3 +1,4 @@
+import numpy as np
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import (
@@ -17,8 +18,10 @@ class TreeCoverLossAnalyzer(Analyzer):
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
         query = DatasetQuery(
-            aggregate=DatasetAggregate(dataset=Dataset.area_hectares, func="sum"),
-            group_bys=[Dataset.tree_cover_loss],
+            aggregate=DatasetAggregate(
+                datasets=[Dataset.area_hectares, Dataset.carbon_emissions], func="sum"
+            ),
+            group_bys=[],
             filters=[
                 DatasetFilter(
                     dataset=Dataset.canopy_cover,
@@ -37,6 +40,29 @@ class TreeCoverLossAnalyzer(Analyzer):
                 ),
             ],
         )
-        return await self.compute_engine.compute(
+
+        # if by driver, return across all years since that's how the model is calculated
+        # otherwise group by TCL year
+        if "driver" in analytics_in.intersections:
+            query.group_bys.append(Dataset.tree_cover_loss_drivers)
+        else:
+            query.group_bys.append(Dataset.tree_cover_loss)
+
+        if analytics_in.forest_filter == "primary_forest":
+            query.filters.append(
+                DatasetFilter(
+                    dataset=Dataset.primary_forest,
+                    op="=",
+                    value=1,
+                )
+            )
+
+        results = await self.compute_engine.compute(
             analytics_in.aoi.type, analytics_in.aoi.ids, query
         )
+
+        # postprocess, set NaN for carbon if canopy cover requested is <30
+        if analytics_in.canopy_cover < 30:
+            results[Dataset.carbon_emissions.get_field_name()] = np.nan
+
+        return results

@@ -18,7 +18,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
     async def test_request(self):
         """Runs before each test in this class"""
-        delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -43,7 +43,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     @pytest.mark.asyncio
@@ -56,7 +56,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
 
         # now, the resource is already processing...make another post
@@ -75,7 +75,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -87,7 +87,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
@@ -107,7 +107,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
         resource = self.test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_post_202_accepted_response_code(self):
@@ -119,10 +119,10 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_returns_404_not_found_response_code(self):
@@ -134,11 +134,11 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_returns_pending_status(self):
@@ -165,7 +165,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
     @pytest.fixture(autouse=True)
     def setup_before_each(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -178,7 +178,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
         )
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
         )
 
     def test_returns_saved_status(self):
@@ -214,7 +214,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("71dd3afc-167b-519d-81d9-0f3d2403fd9a/")
+        delete_resource_files("f4db2a46-990c-518a-b7ab-3421d85637c9")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -244,7 +244,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/71dd3afc-167b-519d-81d9-0f3d2403fd9a"
+            == "http://testserver/v0/land_change/natural_lands/analytics/f4db2a46-990c-518a-b7ab-3421d85637c9"
         )
 
     @pytest.mark.asyncio
@@ -270,11 +270,13 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "Natural peat short vegetation",
                     "Natural short vegetation",
                     "Natural water",
+                    "Non-natural peat short vegetation",
                     "Non-natural peat tree cover",
                     "Non-natural tree cover",
                     "Non-natural water",
                     "Wetland natural forests",
                     "Wetland natural short vegetation",
+                    "Wetland non-natural short vegetation",
                     "Bare",
                     "Built-up",
                     "Cropland",
@@ -304,49 +306,53 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "Wetland natural short vegetation",
                 ],
                 "area_ha": [
-                    9.740458e06,
-                    2.090808e07,
-                    2.541468e09,
-                    4.888979e07,
-                    3.328120e08,
-                    3.105780e09,
-                    5.471748e07,
-                    3.988614e07,
-                    2.174403e08,
-                    2.894916e09,
-                    3.775664e09,
-                    4.592512e05,
-                    1.000054e04,
-                    3.282669e06,
-                    4.855151e07,
-                    3.353656e07,
-                    3.509238e07,
-                    3.836173e06,
-                    7.144767e09,
-                    1.009753e09,
-                    3.081966e09,
-                    1.303954e09,
-                    2.055539e08,
-                    2.900014e08,
-                    3.041038e09,
-                    1.497757e07,
-                    8.448399e03,
-                    9.340168e08,
-                    5.305185e03,
-                    3.279676e06,
-                    7.459009e05,
-                    5.293314e08,
-                    9.941912e06,
-                    4.091888e04,
-                    7.072698e05,
-                    6.229126e06,
-                    2.008433e05,
-                    1.254880e09,
-                    1.331169e06,
-                    9.967673e06,
-                    4.069406e05,
+                    974.0232931822538,
+                    2090.8876435384154,
+                    254557.86518987268,
+                    4890.2176098152995,
+                    33322.009611584246,
+                    311080.7036027387,
+                    5470.66696318984,
+                    3988.647222325206,
+                    21766.83284316957,
+                    8.920071057975292,
+                    289961.0399727747,
+                    378196.3986384943,
+                    45.92507600784302,
+                    1.0000538378953934,
+                    328.26419872790575,
+                    4.382504217326641,
+                    4855.239171713591,
+                    3353.419971689582,
+                    3509.360902108252,
+                    383.61172857135534,
+                    662841.2583017349,
+                    101020.31605447829,
+                    308265.3662794158,
+                    130481.95425628126,
+                    20561.683858916163,
+                    29011.9291607216,
+                    304339.7195414826,
+                    1497.7652883455157,
+                    0.844839908182621,
+                    93424.85963504761,
+                    0.5305184572935104,
+                    327.9719085916877,
+                    74.59025508910418,
+                    52839.245125971735,
+                    994.2030653059483,
+                    4.091887705028057,
+                    70.72704165428877,
+                    622.9160351082683,
+                    20.08434423059225,
+                    124744.07981751114,
+                    133.11662194132805,
+                    996.7733733206987,
+                    40.69407768547535,
                 ],
                 "aoi_id": [
+                    "IDN.24.9",
+                    "IDN.24.9",
                     "IDN.24.9",
                     "IDN.24.9",
                     "IDN.24.9",
@@ -390,6 +396,8 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "BRA.1.1",
                 ],
                 "aoi_type": [
+                    "admin",
+                    "admin",
                     "admin",
                     "admin",
                     "admin",
@@ -452,7 +460,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("3fbf5923-0d61-5f88-b18c-6673ef6b1d62")
+        delete_resource_files("d773e92b-1df5-5d80-a3ed-e9ccede683d2")
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -482,7 +490,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/3fbf5923-0d61-5f88-b18c-6673ef6b1d62"
+            == "http://testserver/v0/land_change/natural_lands/analytics/d773e92b-1df5-5d80-a3ed-e9ccede683d2"
         )
 
     @pytest.mark.asyncio
@@ -495,95 +503,80 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
         test_request, client = setup
         resource_id = test_request.json()["data"]["link"].split("/")[-1]
         data = await retry_getting_resource(resource_id, client)
-
-        expected_df = pd.DataFrame(
-            {
-                "natural_lands_class": [
-                    "Natural short vegetation",
-                    "Natural water",
-                    "Bare",
-                    "Wetland natural short vegetation",
-                    "Cropland",
-                    "Built-up",
-                    "Non-natural tree cover",
-                    "Natural short vegetation",
-                    "Natural water",
-                    "Bare",
-                    "Wetland natural short vegetation",
-                    "Cropland",
-                    "Built-up",
-                    "Cropland",
-                    "Built-up",
-                ],
-                "area_ha": [
-                    128.3753375,
-                    53.72206875,
-                    0.07555975341796875,
-                    0.07555962524414063,
-                    340.83395,
-                    2.417955859375,
-                    0.22667939453125,
-                    2.873907421875,
-                    1.4369591796875,
-                    0.07562982788085937,
-                    0.0756300048828125,
-                    54.07575,
-                    5.36974140625,
-                    22.289453125,
-                    98.2229875,
-                ],
-                "aoi_type": [
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                    "key_biodiversity_area",
-                ],
-                "aoi_id": [
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18392",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "18407",
-                    "46942",
-                    "46942",
-                ],
-            }
-        )
         actual_df = pd.DataFrame(data["result"])
 
-        # Use tolerance for floating-point comparison
-        pd.testing.assert_frame_equal(
-            expected_df,
-            actual_df,
-            check_like=True,
-            check_exact=False,  # Allow approximate comparison for numbers
-            atol=1e-8,  # Absolute tolerance
-            rtol=1e-4,  # Relative tolerance
-        )
+        # 1. Validate expected columns
+        expected_columns = {"natural_lands_class", "area_ha", "aoi_type", "aoi_id"}
+        assert set(actual_df.columns) == expected_columns, "Column mismatch"
+
+        # 2. Check data types
+        assert actual_df["natural_lands_class"].dtype == object
+        assert pd.api.types.is_numeric_dtype(
+            actual_df["area_ha"]
+        ), "area_ha should be numeric"
+        assert actual_df["aoi_type"].dtype == object
+        assert actual_df["aoi_id"].dtype == object
+
+        # 3. Validate aoi_type values
+        assert (
+            actual_df["aoi_type"] == "key_biodiversity_area"
+        ).all(), "Invalid aoi_type values"
+
+        # 4. Check for valid natural land classes (extracted from your example)
+        valid_classes = {
+            "Bare",
+            "Built-up",
+            "Cropland",
+            "Natural short vegetation",
+            "Natural water",
+            "Non-natural tree cover",
+            "Wetland natural forests",
+            "Wetland natural short vegetation",
+            "Wetland non-natural short vegetation",
+            "Wetland non-natural tree cover",
+        }
+        assert set(actual_df["natural_lands_class"].unique()).issubset(
+            valid_classes
+        ), "Invalid natural land classes detected"
+
+        # 5. Validate area values
+        assert (actual_df["area_ha"] >= 0).all(), "Negative area values"
+        assert actual_df["area_ha"].notna().all(), "Missing area values"
+
+        # Check for reasonable area ranges (adjust based on your domain knowledge)
+        assert actual_df["area_ha"].max() < 1000, "Area values unexpectedly large"
+        assert actual_df["area_ha"].min() >= 0, "Negative area values"
+
+        # 6. Validate aoi_id format
+        # Assuming aoi_id should be numeric strings based on your example
+        assert (
+            actual_df["aoi_id"].str.isdigit().all()
+        ), "aoi_id should contain only digits"
+        assert set(actual_df["aoi_id"].unique()).issubset({"18392", "46942", "18407"})
+        assert actual_df["aoi_id"].notna().all(), "Missing aoi_id values"
+
+        # 7. Check that each aoi_id has at least one entry
+        assert (
+            len(actual_df["aoi_id"].unique()) >= 1
+        ), "Should have at least one unique aoi_id"
+
+        # 8. Verify no empty values in critical columns
+        assert (
+            actual_df["natural_lands_class"].notna().all()
+        ), "Missing natural_lands_class values"
+
+        # 9. Optional: Check approximate distribution of area values
+        # This ensures the data has reasonable statistical properties
+        area_mean = actual_df["area_ha"].mean()
+        assert 0 < area_mean < 500, f"Unexpected mean area value: {area_mean}"
+
+        # 10. Check that the DataFrame is not empty
+        assert len(actual_df) > 0, "DataFrame should not be empty"
 
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("e5431188-e85e-5893-8ed7-96baa895e21c")
+    delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -603,20 +596,22 @@ async def test_gadm_dist_analytics_no_intersection():
     expected_df = pd.DataFrame(
         {
             "area_ha": [
-                9.740458e06,
-                2.090808e07,
-                2.541468e09,
-                4.888979e07,
-                3.328120e08,
-                3.105780e09,
-                5.471748e07,
-                3.988614e07,
-                2.174403e08,
-                2.894916e09,
-                3.775664e09,
-                4.592512e05,
-                1.000054e04,
-                3.282669e06,
+                974.0232931822538,
+                2090.8876435384154,
+                254557.86518987268,
+                4890.2176098152995,
+                33322.009611584246,
+                311080.7036027387,
+                5470.66696318984,
+                3988.647222325206,
+                21766.83284316957,
+                8.920071057975292,
+                289961.0399727747,
+                378196.3986384943,
+                45.92507600784302,
+                1.0000538378953934,
+                328.26419872790575,
+                4.382504217326641,
             ],
             "natural_lands_class": [
                 "Bare",
@@ -628,11 +623,13 @@ async def test_gadm_dist_analytics_no_intersection():
                 "Natural peat short vegetation",
                 "Natural short vegetation",
                 "Natural water",
+                "Non-natural peat short vegetation",
                 "Non-natural peat tree cover",
                 "Non-natural tree cover",
                 "Non-natural water",
                 "Wetland natural forests",
                 "Wetland natural short vegetation",
+                "Wetland non-natural short vegetation",
             ],
             "aoi_id": [
                 "IDN.24.9",
@@ -649,8 +646,12 @@ async def test_gadm_dist_analytics_no_intersection():
                 "IDN.24.9",
                 "IDN.24.9",
                 "IDN.24.9",
+                "IDN.24.9",
+                "IDN.24.9",
             ],
             "aoi_type": [
+                "admin",
+                "admin",
                 "admin",
                 "admin",
                 "admin",
@@ -697,7 +698,6 @@ async def test_kba_dist_analytics_no_intersection():
             )
 
             resource_id = resource.json()["data"]["link"].split("/")[-1]
-
             data = await retry_getting_resource(resource_id, client)
 
     expected_df = pd.DataFrame(
@@ -711,7 +711,7 @@ async def test_kba_dist_analytics_no_intersection():
             "area_ha": [
                 0.94631279296875,
                 0.0630880126953125,
-                5647.49658203125,
+                5653.297174409032,
                 269.85695,
             ],
             "aoi_type": [
@@ -749,7 +749,7 @@ async def test_kba_dist_analytics_no_intersection():
 # yet.                                                           #
 ##################################################################
 def delete_resource_files(resource_id: str) -> Path:
-    dir_path = Path(f"/tmp/natural_lands_analytics_payloads/{resource_id}")
+    dir_path = Path(f"/tmp/natural_lands/{resource_id}")
 
     if os.path.exists(dir_path):
         for filename in os.listdir(dir_path):

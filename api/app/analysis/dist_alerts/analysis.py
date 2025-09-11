@@ -1,6 +1,3 @@
-import json
-import logging
-import traceback
 from functools import partial
 from typing import Optional
 
@@ -259,50 +256,3 @@ async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
     alerts_df["aoi_type"] = "admin"
 
     return alerts_df
-
-
-async def do_analytics(file_path, dask_client):
-    try:
-        # Read and parse JSON file
-        metadata = file_path / "metadata.json"
-        json_content = metadata.read_text()
-        metadata_content = json.loads(json_content)  # Convert JSON to Python object
-        aois = metadata_content["aoi"]
-
-        # for now we only support one intersection, as enforced by the route
-        intersections = metadata_content["intersections"]
-        if intersections:
-            intersection = intersections[0]
-        else:
-            intersection = None
-
-        if aois["type"] == "admin":
-            alerts_df = await get_precomputed_statistics(
-                aois, intersection, dask_client
-            )
-        else:
-            alerts_df = await zonal_statistics_on_aois(aois, dask_client, intersection)
-
-        if metadata_content["start_date"] is not None:
-            alerts_df = alerts_df[
-                alerts_df.dist_alert_date >= metadata_content["start_date"]
-            ]
-        if metadata_content["end_date"] is not None:
-            alerts_df = alerts_df[
-                alerts_df.dist_alert_date <= metadata_content["end_date"]
-            ]
-        alerts_dict = alerts_df.to_dict(orient="list")
-
-        data = file_path / "data.json"
-        data.write_text(json.dumps(alerts_dict))
-    except Exception as e:
-        logging.error(
-            {
-                "event": "dist_alerts_analytics_processing_failure",
-                "severity": "high",  # Helps with alerting
-                "metadata": metadata_content,
-                "error_type": e.__class__.__name__,  # e.g., "ValueError", "ConnectionError"
-                "error_details": str(e),
-                "stack_trace": traceback.format_exc(),
-            }
-        )

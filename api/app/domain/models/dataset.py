@@ -6,14 +6,24 @@ from app.models.common.base import StrictBaseModel
 
 class Dataset(Enum):
     tree_cover_loss = "tree_cover_loss"
+    tree_cover_gain = "tree_cover_gain"
     canopy_cover = "canopy_cover"
     area_hectares = "area_hectares"
+    intact_forest = "intact_forest"
+    primary_forest = "primary_forest"
+    carbon_emissions = "carbon_emissions"
+    tree_cover_loss_drivers = "tree_cover_loss_driver"
 
     def get_field_name(self):
         DATASET_TO_NAMES = {
             Dataset.area_hectares: "area_ha",
             Dataset.tree_cover_loss: "tree_cover_loss_year",
+            Dataset.tree_cover_gain: "tree_cover_gain_period",
             Dataset.canopy_cover: "canopy_cover",
+            Dataset.intact_forest: "is_intact_forest",
+            Dataset.primary_forest: "is_primary_forest",
+            Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
+            Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
         }
 
         return DATASET_TO_NAMES[self]
@@ -21,12 +31,12 @@ class Dataset(Enum):
 
 class DatasetFilter(StrictBaseModel):
     dataset: Dataset
-    op: Literal["=", "<", ">", "<=", ">=", "!="]
+    op: Literal["=", "<", ">", "<=", ">=", "!=", "in"]
     value: Any
 
 
 class DatasetAggregate(StrictBaseModel):
-    dataset: Dataset
+    datasets: List[Dataset]
     func: Literal["sum", "count"]
 
 

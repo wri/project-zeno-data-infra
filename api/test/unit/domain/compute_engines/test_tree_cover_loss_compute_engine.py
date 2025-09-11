@@ -5,8 +5,15 @@ import pytest
 import xarray as xr
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
+)
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
-    PrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
+    TreeCoverLossPrecalcHandler,
+)
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
 )
 from app.domain.models.area_of_interest import AreaOfInterestList
 from app.domain.models.dataset import Dataset
@@ -22,7 +29,7 @@ from shapely.geometry import box
 @pytest.mark.asyncio
 async def test_get_tree_cover_loss_precalc_handler_happy_path():
     class MockParquetQueryService:
-        async def execute(self, data_source: str, query: str):
+        async def execute(self, query: str):
             data_source = pd.DataFrame(  # noqa
                 {
                     "aoi_id": ["BRA", "BRA", "BRA"],
@@ -36,7 +43,11 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
             return duckdb.sql(query).df()
 
     compute_engine = ComputeEngine(
-        handler=PrecalcHandler(MockParquetQueryService(), next_handler=None)
+        handler=TreeCoverLossPrecalcHandler(
+            precalc_query_builder=PrecalcSqlQueryBuilder(),
+            precalc_query_service=MockParquetQueryService(),
+            next_handler=None,
+        )
     )
 
     aois = AreaOfInterestList(
