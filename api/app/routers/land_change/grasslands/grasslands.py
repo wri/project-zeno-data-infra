@@ -62,7 +62,7 @@ async def create(
 def _datamart_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
-            "get_grassslands_analytics_result",
+            "get_grasslands_analytics_result",
             resource_id=service.resource_thumbprint(),
         )
     )
