@@ -36,5 +36,10 @@ ENV VIRTUAL_ENV=/app/.venv
 
 COPY --chown=appuser . /app
 
+ENV PYTHONPATH=/app/api
+ENV NEW_RELIC_CONFIG_FILE=/app/newrelic.ini
+ENV NEW_RELIC_LICENSE_KEY=6a2fb5c643f3dc39272d9f6f4f382630FFFFNRAL
+ENV NEW_RELIC_ENVIRONMENT=production
+
 # Expose the port the FastAPI app will run on
 EXPOSE 8000

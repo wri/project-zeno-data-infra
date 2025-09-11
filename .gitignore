@@ -12,3 +12,7 @@
 zeno_data_analytics.egg-info/
 
 .env
+
+.secrets
+.terraform*
+**/terraform.tfstate*
