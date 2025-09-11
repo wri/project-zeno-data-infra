@@ -13,14 +13,8 @@ output "dask_worker_task_definition_arn" {
   value       = aws_ecs_task_definition.dask_worker.arn
 }
 
-
-output "dask_scheduler_endpoint" {
-  description = "Stable TCP endpoint for Dask workers"
-  value = "tcp://${module.dask_nlb.dns_name}:8786"
-}
-
-output "dask_dashboard_url" {
-  description = "HTTP dashboard URL"
-  value = "http://${module.api_alb.dns_name}:8787"
+output "dask_scheduler_task_definition_arn" {
+  description = "Dask scheduler task definition ARN"
+  value       = aws_ecs_task_definition.dask_scheduler.arn
 }
 
