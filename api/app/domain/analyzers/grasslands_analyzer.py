@@ -76,11 +76,12 @@ class GrasslandsAnalyzer(Analyzer):
     @staticmethod
     def analyze_area(aoi, geojson) -> dd.DataFrame:
         grasslands_obj_name = (
-            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_2kchunk.zarr"
+            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
         )
         pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
-        grasslands = read_zarr_clipped_to_geojson(grasslands_obj_name, geojson)
-        pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
+        pixel_area = read_zarr_clipped_to_geojson(
+            pixel_area_obj_name, geojson
+        ).reindex_like(grasslands, method="nearest", tolerance=1e-5)
         grasslands_only = (grasslands == 2).astype(np.uint8)
 
         grasslands_pixel_areas = grasslands_only * pixel_area
