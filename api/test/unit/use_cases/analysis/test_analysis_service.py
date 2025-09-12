@@ -73,7 +73,7 @@ class TestTreeCoverLossServiceCollaborators:
 
         # assert that the new Analysis is stored so it's available to clients immediately
         assert mock_analysis_repository_calls[0] == call(
-            UUID("fe76241f-63d6-5e3f-8090-e9e8e98ea9aa"),
+            stub_analysis_in.thumbprint(),
             Analysis(
                 None,
                 {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
@@ -83,7 +83,7 @@ class TestTreeCoverLossServiceCollaborators:
 
         # assert that the new Analysis is stored as pending before analysis starts
         assert mock_analysis_repository_calls[1] == call(
-            UUID("fe76241f-63d6-5e3f-8090-e9e8e98ea9aa"),
+            stub_analysis_in.thumbprint(),
             Analysis(
                 None,
                 {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
@@ -93,7 +93,7 @@ class TestTreeCoverLossServiceCollaborators:
 
         # assert that the failed Analysis result is stored at the end
         assert mock_analysis_repository_calls[2] == call(
-            UUID("fe76241f-63d6-5e3f-8090-e9e8e98ea9aa"),
+            stub_analysis_in.thumbprint(),
             Analysis(
                 None,
                 {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
@@ -271,7 +271,7 @@ class TestTreeCoverLossServiceCollaborators:
         assert result_thumbprint == resource_thumbprint
         mock_analyzer.analyze.assert_called()
         mock_analysis_repository.store_analysis.assert_called_with(
-            UUID("fe76241f-63d6-5e3f-8090-e9e8e98ea9aa"),
+            stub_analysis_in.thumbprint(),
             Analysis(
                 metadata={"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
                 result=None,
