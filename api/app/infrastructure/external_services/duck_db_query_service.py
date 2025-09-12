@@ -29,8 +29,6 @@ class DuckDbPrecalcQueryService:
         self.table_uri = table_uri
 
     async def execute(self, query: str) -> pd.DataFrame:
-        # need to declare this to bind FROM in SQL query
-        # data_source = duckdb.read_parquet(self.table_uri)  # noqa: F841
         query = query.replace("data_source", f"'{self.table_uri}'")
         loop = asyncio.get_running_loop()
         df = await loop.run_in_executor(process_pool, run_query_sync, query)
