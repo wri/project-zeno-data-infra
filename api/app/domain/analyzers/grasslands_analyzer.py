@@ -34,7 +34,12 @@ class GrasslandsAnalyzer(Analyzer):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":
             gadm_ids = grasslands_analytics_in.aoi.ids
-            combined_results_df = self.analyze_admin_areas(gadm_ids, admin_results_uri)
+            combined_results_df = self.analyze_admin_areas(
+                gadm_ids,
+                admin_results_uri,
+                grasslands_analytics_in.start_year,
+                grasslands_analytics_in.end_year,
+            )
         else:
             aois = grasslands_analytics_in.aoi.model_dump()
             geojsons = await get_geojson(aois)
@@ -70,8 +75,10 @@ class GrasslandsAnalyzer(Analyzer):
         )
 
     @staticmethod
-    def analyze_admin_areas(gadm_ids, parquet_file) -> pd.DataFrame:
-        query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} order by aoi_id, year"
+    def analyze_admin_areas(
+        gadm_ids, parquet_file, start_year, end_year
+    ) -> pd.DataFrame:
+        query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
         initialize_duckdb()
         df = duckdb.query(query).df()
         df["aoi_type"] = "admin"
