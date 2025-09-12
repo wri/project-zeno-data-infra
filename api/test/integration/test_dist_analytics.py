@@ -8,183 +8,291 @@ from test.integration import (
 import pandas as pd
 import pytest
 import pytest_asyncio
+from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
 from app.main import app
+from app.models.common.areas_of_interest import (
+    AdminAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
+)
+from app.models.land_change.dist_alerts import DistAlertsAnalyticsIn
+from app.routers.land_change.dist_alerts.dist_alerts import (
+    ANALYTICS_NAME,
+    create_analysis_service,
+    get_analysis_repository,
+)
+from app.use_cases.analysis.analysis_service import AnalysisService
 from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
 
+def get_file_system_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+def create_analysis_service_for_tests(
+    request: Request, analysis_repository=Depends(get_file_system_analysis_repository)
+) -> AnalysisService:
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=DistAlertsAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=getattr(request.app.state, "dask_client", None),
+        ),
+        event=ANALYTICS_NAME,
+    )
+
+
 class TestDistAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
-    async def test_request(self):
+    async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 test_request = await client.post(
-                    "/v0/land_change/dist_alerts/analytics",
-                    json={
-                        "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                        "start_date": "2024-08-15",
-                        "end_date": "2024-08-16",
-                        "intersections": [],
-                    },
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield test_request
+                yield test_request, analytics_in
 
     @pytest.mark.asyncio
-    async def test_post_returns_pending_status(self, test_request):
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
         resource = test_request.json()
         assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
-    async def test_post_returns_resource_link(self, test_request):
+    async def test_post_returns_resource_link(self, setup):
+        test_request, analysis_params = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
     @pytest.mark.asyncio
-    async def test_post_returns_202_accepted_response_code(self, test_request):
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        assert test_request.status_code == 202
+
+
+class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
+    @pytest.fixture
+    def setup(self):
+        """Runs before each test in this class"""
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        write_metadata_file(dir_path)
+
+        # now, the resource is already processing...make another post
+        test_request = client.post(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+            json=analytics_in.model_dump(),
+        )
+
+        yield test_request, analytics_in
+
+    def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert resource["status"] == "pending"
+
+    def test_post_returns_resource_link(self, setup):
+        test_request, analysis_params = setup
+        resource = test_request.json()
+        assert (
+            resource["data"]["link"]
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+        )
+
+    def test_post_202_accepted_response_code(self, setup):
+        test_request, _ = setup
         response = test_request
         assert response.status_code == 202
 
 
-class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
-        """Runs before each test in this class"""
-        dir_path = delete_resource_files(
-            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
-        )
-        write_metadata_file(dir_path)
-
-        # now, the resource is already processing...make another post
-        self.test_request = client.post(
-            "/v0/land_change/dist_alerts/analytics",
-            json={
-                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                "start_date": "2024-08-15",
-                "end_date": "2024-08-16",
-                "intersections": [],
-            },
-        )
-
-    def test_post_returns_pending_status(self):
-        resource = self.test_request.json()
-        assert resource["status"] == "pending"
-
-    def test_post_returns_resource_link(self):
-        resource = self.test_request.json()
-        assert (
-            resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
-        )
-
-    def test_post_202_accepted_response_code(self):
-        response = self.test_request
-        assert response.status_code == 202
-
-
 class TestDistAnalyticsPostWhenPreviousRequestComplete:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest.fixture
+    def setup(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files(
-            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
         )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
         # now, the resource is already processing...make another post
-        self.test_request = client.post(
-            "/v0/land_change/dist_alerts/analytics",
-            json={
-                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                "start_date": "2024-08-15",
-                "end_date": "2024-08-16",
-                "intersections": [],
-            },
+        test_request = client.post(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+            json=analytics_in.model_dump(),
         )
 
-    def test_post_returns_saved_status(self):
-        resource = self.test_request.json()
+        yield test_request, analytics_in
+
+    def test_post_returns_saved_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["status"] == "saved"
 
-    def test_post_returns_resource_link(self):
-        resource = self.test_request.json()
+    def test_post_returns_resource_link(self, setup):
+        test_request, analysis_params = setup
+        resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
-    def test_post_202_accepted_response_code(self):
-        response = self.test_request
+    def test_post_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 202
 
 
 class TestDistAnalyticsGetWithNoPreviousRequest:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest.fixture
+    def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
 
-        self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+
+        test_request = client.get(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
         )
 
-    def test_returns_404_not_found_response_code(self):
-        response = self.test_request
+        yield test_request, analytics_in
+
+    def test_returns_404_not_found_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 404
 
 
 class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest.fixture
+    def setup(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files(
-            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
         )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
 
-        self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+        test_request = client.get(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
         )
 
-    def test_returns_pending_status(self):
-        resource = self.test_request.json()
+        yield test_request, analytics_in
+
+    def test_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["data"]["status"] == "pending"
 
-    def test_returns_retry_after_message(self):
-        resource = self.test_request.json()
+    def test_returns_retry_after_message(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert (
             resource["data"]["message"]
             == "Resource is still processing, follow Retry-After header."
         )
 
-    def test_returns_200_Ok_response_code(self):
-        response = self.test_request
+    def test_returns_200_Ok_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 200
 
-    def test_has_a_retry_after_header_set_to_1_second(self):
-        headers = self.test_request.headers
+    def test_has_a_retry_after_header_set_to_1_second(self, setup):
+        test_request, _ = setup
+        headers = test_request.headers
         assert headers["Retry-After"] == "1"
 
 
 class TestDistAnalyticsGetWithPreviousRequestComplete:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest.fixture
+    def setup(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files(
-            "dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
         )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -198,15 +306,19 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             },
         )
 
-        self.test_request = client.get(
-            "/v0/land_change/dist_alerts/analytics/bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342"
+        test_request = client.get(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
         )
 
-    def test_returns_saved_status(self):
-        resource = self.test_request.json()
+        yield test_request, analytics_in
+
+    def test_returns_saved_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["data"]["status"] == "saved"
 
-    def test_returns_results(self):
+    def test_returns_results(self, setup):
+        test_request, _ = setup
         expected_df = pd.DataFrame(
             {
                 "country": ["IDN", "IDN"],
@@ -221,7 +333,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             }
         )
 
-        actual_df = pd.DataFrame(self.test_request.json()["data"]["result"])
+        actual_df = pd.DataFrame(test_request.json()["data"]["result"])
         pd.testing.assert_frame_equal(
             expected_df,
             actual_df,
@@ -231,61 +343,70 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             rtol=1e-4,  # Relative tolerance
         )
 
-    def test_returns_200_Ok_response_code(self):
-        response = self.test_request
+    def test_returns_200_Ok_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 200
 
 
 class TestDistAnalyticsPostWithMultipleAdminAOIs:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("dist_alerts", "2202655b-03c3-579f-9a30-cde22bc22340")
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=AdminAreaOfInterest(
+                type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
+            ),
+            start_date="2024-08-15",
+            end_date="2024-08-16",
+            intersections=[],
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 request = await client.post(
-                    "/v0/land_change/dist_alerts/analytics",
-                    json={
-                        "aoi": {
-                            "type": "admin",
-                            "ids": ["IDN.24.9", "IDN.14.13", "BRA.1.1"],
-                        },
-                        "start_date": "2024-08-15",
-                        "end_date": "2024-08-16",
-                        "intersections": [],
-                    },
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield (request, client)
+                yield request, client, analytics_in
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         resource = test_request.json()
         assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
+        test_request, _, analysis_params = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/2202655b-03c3-579f-9a30-cde22bc22340"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
     @pytest.mark.asyncio
     async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         assert test_request.status_code == 202
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
-        data = await retry_getting_resource("dist_alerts", resource_id, client)
+        test_request, client, analysis_params = setup
+        data = await retry_getting_resource(
+            ANALYTICS_NAME, analysis_params.thumbprint(), client
+        )
 
         expected_df = pd.DataFrame(
             {
@@ -326,55 +447,64 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
 
 class TestDistAnalyticsPostWithMultipleKBAAOIs:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files("dist_alerts", "31429ede-d718-5723-8061-edcc2677073e")
+        analytics_in = DistAlertsAnalyticsIn(
+            aoi=KeyBiodiversityAreaOfInterest(
+                type="key_biodiversity_area",
+                ids=["18392", "46942", "18407"],
+            ),
+            start_date="2025-02-01",
+            end_date="2025-04-30",
+            intersections=[],
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 request = await client.post(
-                    "/v0/land_change/dist_alerts/analytics",
-                    json={
-                        "aoi": {
-                            "type": "key_biodiversity_area",
-                            "ids": ["18392", "46942", "18407"],
-                        },
-                        "start_date": "2025-02-01",
-                        "end_date": "2025-04-30",
-                        "intersections": [],
-                    },
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield (request, client)
+                yield request, client, analytics_in
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         resource = test_request.json()
         assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
+        test_request, _, analysis_params = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/dist_alerts/analytics/31429ede-d718-5723-8061-edcc2677073e"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
     @pytest.mark.asyncio
     async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         assert test_request.status_code == 202
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
-        data = await retry_getting_resource("dist_alerts", resource_id, client)
+        test_request, client, analysis_params = setup
+        data = await retry_getting_resource(
+            ANALYTICS_NAME, analysis_params.thumbprint(), client
+        )
         result = pd.DataFrame(data["result"])
 
         # 1. Validate expected columns
@@ -431,25 +561,33 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("dist_alerts", "bb5e72ea-f7e6-5f2a-9e0c-2beeb6706342")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=[],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": [],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
@@ -481,25 +619,36 @@ async def test_gadm_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_kba_dist_analytics_no_intersection():
-    delete_resource_files("dist_alerts", "6d6095db-9d62-5914-af37-963e6a13c074")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=KeyBiodiversityAreaOfInterest(
+            type="key_biodiversity_area",
+            ids=["8111"],
+        ),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=[],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "key_biodiversity_area", "ids": ["8111"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": [],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
@@ -527,25 +676,33 @@ async def test_kba_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_grasslands():
-    delete_resource_files("dist_alerts", "3c8491e2-5176-5cfc-99b1-77140dc3feb3/")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=["grasslands"],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["TZA.24.3"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": ["grasslands"],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
@@ -576,25 +733,33 @@ async def test_admin_dist_analytics_by_grasslands():
 
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_land_cover():
-    delete_resource_files("dist_alerts", "29c87d12-5998-5fa7-adef-4816ac03ef89/")
+    analytics_in = DistAlertsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
+        start_date="2024-08-15",
+        end_date="2024-08-16",
+        intersections=["land_cover"],
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/dist_alerts/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["TZA.24.3"]},
-                    "start_date": "2024-08-15",
-                    "end_date": "2024-08-16",
-                    "intersections": ["land_cover"],
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource("dist_alerts", resource_id, client)
+            data = await retry_getting_resource(
+                ANALYTICS_NAME, analytics_in.thumbprint(), client
+            )
 
     expected_df = pd.DataFrame(
         {
