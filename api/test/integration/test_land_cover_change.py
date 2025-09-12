@@ -6,55 +6,94 @@ from test.integration import (  # write_data_file,; write_metadata_file,
 import pandas as pd
 import pytest
 import pytest_asyncio
+from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
 from app.main import app
+from app.models.common.areas_of_interest import AdminAreaOfInterest
+from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
+from app.routers.land_change.land_cover.land_cover_change import (
+    ANALYTICS_NAME,
+    create_analysis_service,
+    get_analysis_repository,
+)
+from app.use_cases.analysis.analysis_service import AnalysisService
 from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
 
+def get_file_system_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+def create_analysis_service_for_tests(
+    request: Request,
+    analysis_repository: AnalysisRepository = Depends(
+        get_file_system_analysis_repository
+    ),
+) -> AnalysisService:
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=LandCoverChangeAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=request.app.state.dask_client,
+        ),
+        event=ANALYTICS_NAME,
+    )
+
+
 class TestLandCoverChangeData:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
         """Runs before each test in this class"""
-        delete_resource_files(
-            "land_cover_change",
-            "7fc7fab7-97be-50ff-b0d9-1c19840bd142",
+        analytics_in = LandCoverChangeAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 test_request = await client.post(
-                    "/v0/land_change/land_cover_change/analytics",
-                    json={"aoi": {"type": "admin", "ids": ["NGA.20.31"]}},
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield test_request, client
+                yield test_request, client, analytics_in
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
+        test_request, _, analysis_params = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/land_cover_change/analytics/7fc7fab7-97be-50ff-b0d9-1c19840bd142"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
     @pytest.mark.asyncio
     async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         response = test_request
         assert response.status_code == 202
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        test_request, client, analysis_params = setup
         resource = await retry_getting_resource(
-            "land_cover_change", resource_id, client
+            ANALYTICS_NAME, analysis_params.thumbprint(), client
         )
 
         expected = pd.DataFrame(
