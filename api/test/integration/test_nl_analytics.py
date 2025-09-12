@@ -6,166 +6,279 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import pytest_asyncio
+from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
+from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.persistence.file_system_analysis_repository import (
+    FileSystemAnalysisRepository,
+)
 from app.main import app
+from app.models.common.areas_of_interest import (
+    AdminAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
+)
+from app.models.land_change.natural_lands import NaturalLandsAnalyticsIn
+from app.routers.land_change.natural_lands.natural_lands import (
+    ANALYTICS_NAME,
+    create_analysis_service,
+    get_analysis_repository,
+)
+from app.use_cases.analysis.analysis_service import AnalysisService
 from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
 
+def get_file_system_analysis_repository() -> AnalysisRepository:
+    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+def create_analysis_service_for_tests(
+    request: Request,
+    analysis_repository: AnalysisRepository = Depends(
+        get_file_system_analysis_repository
+    ),
+) -> AnalysisService:
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=NaturalLandsAnalyzer(
+            analysis_repository=analysis_repository,
+            compute_engine=request.app.state.dask_client,
+        ),
+        event=ANALYTICS_NAME,
+    )
+
+
 class TestNLAnalyticsPostWithNoPreviousRequest:
-    @pytest_asyncio.fixture(autouse=True)
-    async def test_request(self):
-        """Runs before each test in this class"""
-        delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+    @pytest_asyncio.fixture
+    async def setup(self):
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+        delete_resource_files(analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 test_request = await client.post(
-                    "/v0/land_change/natural_lands/analytics",
-                    json={
-                        "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                    },
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield test_request
+                yield test_request, analytics_in
 
     @pytest.mark.asyncio
-    async def test_post_returns_pending_status(self, test_request):
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
         resource = test_request.json()
         assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
-    async def test_post_returns_resource_link(self, test_request):
+    async def test_post_returns_resource_link(self, setup):
+        test_request, analysis_params = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
     @pytest.mark.asyncio
-    async def test_post_returns_202_accepted_response_code(self, test_request):
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _ = setup
         response = test_request
         assert response.status_code == 202
 
 
 class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
-        """Runs before each test in this class"""
-        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+    @pytest_asyncio.fixture
+    async def setup(self):
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
 
-        # now, the resource is already processing...make another post
-        self.test_request = client.post(
-            "/v0/land_change/natural_lands/analytics",
-            json={
-                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-            },
-        )
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                test_request = await client.post(
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
+                )
 
-    def test_post_returns_pending_status(self):
-        resource = self.test_request.json()
+                yield test_request, analytics_in
+
+    def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["status"] == "pending"
 
-    def test_post_returns_resource_link(self):
-        resource = self.test_request.json()
+    def test_post_returns_resource_link(self, setup):
+        test_request, analysis_params = setup
+        resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
-    def test_post_202_accepted_response_code(self):
-        response = self.test_request
+    def test_post_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 202
 
 
 class TestNLAnalyticsPostWhenPreviousRequestComplete:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
-        """Runs before each test in this class"""
-        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+    @pytest_asyncio.fixture
+    async def setup(self):
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
-        # now, the resource is already processing...make another post
-        self.test_request = client.post(
-            "/v0/land_change/natural_lands/analytics",
-            json={
-                "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-            },
-        )
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                test_request = await client.post(
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
+                )
 
-    def test_post_returns_saved_status(self):
-        resource = self.test_request.json()
+                yield test_request, analytics_in
+
+    def test_post_returns_saved_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["status"] == "saved"
 
-    def test_post_returns_resource_link(self):
-        resource = self.test_request.json()
+    def test_post_returns_resource_link(self, setup):
+        test_request, analysis_params = setup
+        resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
-    def test_post_202_accepted_response_code(self):
-        response = self.test_request
+    def test_post_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 202
 
 
 class TestNLAnalyticsGetWithNoPreviousRequest:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
-        """Runs before each test in this class"""
-        delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+    @pytest_asyncio.fixture
+    async def setup(self):
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
 
-        self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
+        delete_resource_files(analytics_in.thumbprint())
+
+        test_request = client.get(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
         )
 
-    def test_returns_404_not_found_response_code(self):
-        response = self.test_request
+        yield test_request, analytics_in
+
+    def test_returns_404_not_found_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 404
 
 
 class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
-        """Runs before each test in this class"""
-        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+    @pytest_asyncio.fixture
+    async def setup(self):
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
         )
 
-    def test_returns_pending_status(self):
-        resource = self.test_request.json()
+        yield self.test_request, analytics_in
+
+    def test_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["data"]["status"] == "pending"
 
-    def test_returns_retry_after_message(self):
-        resource = self.test_request.json()
+    def test_returns_retry_after_message(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert (
             resource["data"]["message"]
             == "Resource is still processing, follow Retry-After header."
         )
 
-    def test_returns_200_Ok_response_code(self):
-        response = self.test_request
+    def test_returns_200_Ok_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 200
 
-    def test_has_a_retry_after_header_set_to_1_second(self):
-        headers = self.test_request.headers
+    def test_has_a_retry_after_header_set_to_1_second(self, setup):
+        test_request, _ = setup
+        headers = test_request.headers
         assert headers["Retry-After"] == "1"
 
 
 class TestNLAnalyticsGetWithPreviousRequestComplete:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
+    @pytest_asyncio.fixture
+    def setup(self):
         """Runs before each test in this class"""
-        dir_path = delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -177,15 +290,19 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
             },
         )
 
-        self.test_request = client.get(
-            "/v0/land_change/natural_lands/analytics/8de23ab0-72dd-5692-a643-858dab8c009a"
+        test_request = client.get(
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
         )
 
-    def test_returns_saved_status(self):
-        resource = self.test_request.json()
+        yield test_request, analytics_in
+
+    def test_returns_saved_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
         assert resource["data"]["status"] == "saved"
 
-    def test_returns_results(self):
+    def test_returns_results(self, setup):
+        test_request, _ = setup
         expected_df = pd.DataFrame(
             {
                 "country": ["IDN", "IDN"],
@@ -195,7 +312,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
             }
         )
 
-        actual_df = pd.DataFrame(self.test_request.json()["data"]["result"])
+        actual_df = pd.DataFrame(test_request.json()["data"]["result"])
         pd.testing.assert_frame_equal(
             expected_df,
             actual_df,
@@ -205,182 +322,155 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
             rtol=1e-4,  # Relative tolerance
         )
 
-    def test_returns_200_Ok_response_code(self):
-        response = self.test_request
+    def test_returns_200_Ok_response_code(self, setup):
+        test_request, _ = setup
+        response = test_request
         assert response.status_code == 200
 
 
 class TestNLAnalyticsPostWithMultipleAdminAOIs:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
-        """Runs before each test in this class"""
-        delete_resource_files("f4db2a46-990c-518a-b7ab-3421d85637c9")
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=AdminAreaOfInterest(
+                type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
+            )
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        delete_resource_files(analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 request = await client.post(
-                    "/v0/land_change/natural_lands/analytics",
-                    json={
-                        "aoi": {
-                            "type": "admin",
-                            "ids": ["IDN.24.9", "IDN.14.13", "BRA.1.1"],
-                        },
-                    },
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield (request, client)
+                yield request, client, analytics_in
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         resource = test_request.json()
         assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
+        test_request, _, analysis_param = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/f4db2a46-990c-518a-b7ab-3421d85637c9"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_param.thumbprint()}"
         )
 
     @pytest.mark.asyncio
     async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         assert test_request.status_code == 202
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
-        data = await retry_getting_resource(resource_id, client)
+        test_request, client, analysis_params = setup
+
+        data = await retry_getting_resource(analysis_params.thumbprint(), client)
 
         expected_df = pd.DataFrame(
             {
                 "natural_lands_class": [
-                    "Bare",
-                    "Built-up",
-                    "Cropland",
-                    "Mangroves",
                     "Natural forests",
-                    "Natural peat forests",
-                    "Natural peat short vegetation",
                     "Natural short vegetation",
                     "Natural water",
-                    "Non-natural peat short vegetation",
-                    "Non-natural peat tree cover",
-                    "Non-natural tree cover",
-                    "Non-natural water",
+                    "Bare",
                     "Wetland natural forests",
-                    "Wetland natural short vegetation",
-                    "Wetland non-natural short vegetation",
-                    "Bare",
-                    "Built-up",
-                    "Cropland",
-                    "Mangroves",
-                    "Natural forests",
                     "Natural peat forests",
-                    "Natural peat short vegetation",
-                    "Natural short vegetation",
-                    "Natural water",
-                    "Non-natural peat tree cover",
-                    "Non-natural tree cover",
-                    "Non-natural water",
-                    "Wetland natural forests",
                     "Wetland natural short vegetation",
-                    "Bare",
-                    "Built-up",
-                    "Cropland",
-                    "Natural forests",
-                    "Natural peat forests",
                     "Natural peat short vegetation",
-                    "Natural short vegetation",
-                    "Natural water",
-                    "Non-natural bare",
+                    "Cropland",
+                    "Built-up",
                     "Non-natural hhort vegetation",
                     "Non-natural peat short vegetation",
+                    "Non-natural bare",
+                    "Natural forests",
+                    "Natural short vegetation",
+                    "Natural water",
+                    "Mangroves",
+                    "Bare",
                     "Wetland natural forests",
+                    "Natural peat forests",
                     "Wetland natural short vegetation",
+                    "Natural peat short vegetation",
+                    "Cropland",
+                    "Built-up",
+                    "Non-natural tree cover",
+                    "Non-natural water",
+                    "Non-natural peat tree cover",
+                    "Natural forests",
+                    "Natural short vegetation",
+                    "Natural water",
+                    "Mangroves",
+                    "Bare",
+                    "Wetland natural forests",
+                    "Natural peat forests",
+                    "Wetland natural short vegetation",
+                    "Natural peat short vegetation",
+                    "Cropland",
+                    "Built-up",
+                    "Non-natural tree cover",
+                    "Non-natural water",
+                    "Non-natural peat tree cover",
                 ],
                 "area_ha": [
-                    974.0232931822538,
-                    2090.8876435384154,
-                    254557.86518987268,
-                    4890.2176098152995,
-                    33322.009611584246,
-                    311080.7036027387,
-                    5470.66696318984,
-                    3988.647222325206,
-                    21766.83284316957,
-                    8.920071057975292,
-                    289961.0399727747,
-                    378196.3986384943,
-                    45.92507600784302,
-                    1.0000538378953934,
-                    328.26419872790575,
-                    4.382504217326641,
-                    4855.239171713591,
-                    3353.419971689582,
-                    3509.360902108252,
-                    383.61172857135534,
-                    662841.2583017349,
-                    101020.31605447829,
-                    308265.3662794158,
-                    130481.95425628126,
-                    20561.683858916163,
-                    29011.9291607216,
-                    304339.7195414826,
-                    1497.7652883455157,
-                    0.844839908182621,
-                    93424.85963504761,
-                    0.5305184572935104,
-                    327.9719085916877,
-                    74.59025508910418,
                     52839.245125971735,
-                    994.2030653059483,
-                    4.091887705028057,
                     70.72704165428877,
                     622.9160351082683,
-                    20.08434423059225,
+                    0.5305184572935104,
+                    996.7733733206987,
+                    994.2030653059483,
+                    40.69407768547535,
+                    4.091887705028057,
+                    74.59025508910418,
+                    327.9719085916877,
                     124744.07981751114,
                     133.11662194132805,
-                    996.7733733206987,
-                    40.69407768547535,
+                    20.08434423059225,
+                    662841.2583017349,
+                    130481.95425628126,
+                    20561.683858916163,
+                    383.61172857135534,
+                    4855.239171713591,
+                    0.844839908182621,
+                    101020.31605447829,
+                    93424.85963504761,
+                    308265.3662794158,
+                    3509.360902108252,
+                    3353.419971689582,
+                    304339.7195414826,
+                    1497.7652883455157,
+                    29011.9291607216,
+                    33322.009611584246,
+                    3988.647222325206,
+                    21766.83284316957,
+                    4890.2176098152995,
+                    974.0232931822538,
+                    1.0000538378953934,
+                    311080.7036027387,
+                    328.26419872790575,
+                    5470.66696318984,
+                    254557.86518987268,
+                    2090.8876435384154,
+                    378196.3986384943,
+                    45.92507600784302,
+                    289961.0399727747,
                 ],
                 "aoi_id": [
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.24.9",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
-                    "IDN.14.13",
                     "BRA.1.1",
                     "BRA.1.1",
                     "BRA.1.1",
@@ -394,10 +484,36 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "BRA.1.1",
                     "BRA.1.1",
                     "BRA.1.1",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.14.13",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
+                    "IDN.24.9",
                 ],
                 "aoi_type": [
-                    "admin",
-                    "admin",
                     "admin",
                     "admin",
                     "admin",
@@ -457,52 +573,57 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
 
 class TestNLAnalyticsPostWithMultipleKBAAOIs:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
-        """Runs before each test in this class"""
-        delete_resource_files("d773e92b-1df5-5d80-a3ed-e9ccede683d2")
+        analytics_in = NaturalLandsAnalyticsIn(
+            aoi=KeyBiodiversityAreaOfInterest(
+                type="key_biodiversity_area", ids=["18392", "46942", "18407"]
+            )
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        delete_resource_files(analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 request = await client.post(
-                    "/v0/land_change/natural_lands/analytics",
-                    json={
-                        "aoi": {
-                            "type": "key_biodiversity_area",
-                            "ids": ["18392", "46942", "18407"],
-                        },
-                    },
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
                 )
 
-                yield (request, client)
+                yield request, client, analytics_in
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         resource = test_request.json()
         assert resource["status"] == "pending"
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _ = setup
+        test_request, _, analysis_params = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == "http://testserver/v0/land_change/natural_lands/analytics/d773e92b-1df5-5d80-a3ed-e9ccede683d2"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
         )
 
     @pytest.mark.asyncio
     async def test_post_returns_202_accepted_response_code(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         assert test_request.status_code == 202
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client = setup
-        resource_id = test_request.json()["data"]["link"].split("/")[-1]
-        data = await retry_getting_resource(resource_id, client)
+        test_request, client, analysis_params = setup
+        data = await retry_getting_resource(analysis_params.thumbprint(), client)
         actual_df = pd.DataFrame(data["result"])
 
         # 1. Validate expected columns
@@ -576,64 +697,64 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
 
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
-    delete_resource_files("8de23ab0-72dd-5692-a643-858dab8c009a")
+    analytics_in = NaturalLandsAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/natural_lands/analytics",
-                json={
-                    "aoi": {"type": "admin", "ids": ["IDN.24.9"]},
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-
-            data = await retry_getting_resource(resource_id, client)
+            data = await retry_getting_resource(analytics_in.thumbprint(), client)
 
     expected_df = pd.DataFrame(
         {
             "area_ha": [
-                974.0232931822538,
-                2090.8876435384154,
-                254557.86518987268,
-                4890.2176098152995,
                 33322.009611584246,
-                311080.7036027387,
-                5470.66696318984,
                 3988.647222325206,
                 21766.83284316957,
-                8.920071057975292,
-                289961.0399727747,
+                4890.2176098152995,
+                974.0232931822538,
+                1.0000538378953934,
+                311080.7036027387,
+                328.26419872790575,
+                5470.66696318984,
+                254557.86518987268,
+                2090.8876435384154,
                 378196.3986384943,
                 45.92507600784302,
-                1.0000538378953934,
-                328.26419872790575,
-                4.382504217326641,
+                289961.0399727747,
             ],
             "natural_lands_class": [
-                "Bare",
-                "Built-up",
-                "Cropland",
-                "Mangroves",
                 "Natural forests",
-                "Natural peat forests",
-                "Natural peat short vegetation",
                 "Natural short vegetation",
                 "Natural water",
-                "Non-natural peat short vegetation",
-                "Non-natural peat tree cover",
+                "Mangroves",
+                "Bare",
+                "Wetland natural forests",
+                "Natural peat forests",
+                "Wetland natural short vegetation",
+                "Natural peat short vegetation",
+                "Cropland",
+                "Built-up",
                 "Non-natural tree cover",
                 "Non-natural water",
-                "Wetland natural forests",
-                "Wetland natural short vegetation",
-                "Wetland non-natural short vegetation",
+                "Non-natural peat tree cover",
             ],
             "aoi_id": [
-                "IDN.24.9",
-                "IDN.24.9",
                 "IDN.24.9",
                 "IDN.24.9",
                 "IDN.24.9",
@@ -664,13 +785,12 @@ async def test_gadm_dist_analytics_no_intersection():
                 "admin",
                 "admin",
                 "admin",
-                "admin",
-                "admin",
             ],
         }
     )
 
     actual_df = pd.DataFrame(data["result"])
+    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,
@@ -684,21 +804,28 @@ async def test_gadm_dist_analytics_no_intersection():
 
 @pytest.mark.asyncio
 async def test_kba_dist_analytics_no_intersection():
-    delete_resource_files("c9375b98-042c-581d-a50a-6b5b8a11c8eb")
+    analytics_in = NaturalLandsAnalyticsIn(
+        aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
+    )
+    app.dependency_overrides[
+        create_analysis_service
+    ] = create_analysis_service_for_tests
+    app.dependency_overrides[
+        get_analysis_repository
+    ] = get_file_system_analysis_repository
+
+    delete_resource_files(analytics_in.thumbprint())
 
     async with LifespanManager(app):
         async with AsyncClient(
             transport=ASGITransport(app), base_url="http://test"
         ) as client:
-            resource = await client.post(
-                "/v0/land_change/natural_lands/analytics",
-                json={
-                    "aoi": {"type": "key_biodiversity_area", "ids": ["8111"]},
-                },
+            await client.post(
+                f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                json=analytics_in.model_dump(),
             )
 
-            resource_id = resource.json()["data"]["link"].split("/")[-1]
-            data = await retry_getting_resource(resource_id, client)
+            data = await retry_getting_resource(analytics_in.thumbprint(), client)
 
     expected_df = pd.DataFrame(
         {
@@ -731,7 +858,6 @@ async def test_kba_dist_analytics_no_intersection():
 
     actual_df = pd.DataFrame(data["result"])
     pd.set_option("display.max_columns", 10)
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,

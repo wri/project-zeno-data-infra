@@ -1,9 +1,9 @@
 from functools import partial
-from typing import Tuple
 
 import dask.dataframe as dd
 import duckdb
 import numpy as np
+import pandas as pd
 from app.analysis.common.analysis import (
     get_geojson,
     initialize_duckdb,
@@ -15,37 +15,6 @@ from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
-
-
-def create_gadm_grasslands_query(
-    gadm_id: Tuple[str, int, int], parquet_file: str
-) -> str:
-    # Build up the DuckDB query based on GADM ID and intersection
-    from_clause = f"FROM '{parquet_file}'"
-    select_clause = "SELECT year, country"
-    where_clause = f"WHERE country = '{gadm_id[0]}'"
-    by_clause = "BY year, country"
-
-    # Includes region, so add relevant filters, selects and group bys
-    if len(gadm_id) > 1:
-        select_clause += ", region"
-        where_clause += f" AND region = {gadm_id[1]}"
-        by_clause += ", region"
-
-    # Includes subregion, so add relevant filters, selects and group bys
-    if len(gadm_id) > 2:
-        select_clause += ", subregion"
-        where_clause += f" AND subregion = {gadm_id[2]}"
-        by_clause += ", subregion"
-
-    group_by_clause = f"GROUP {by_clause}"
-    order_by_clause = f"ORDER {by_clause}"
-
-    # Query and make sure output names match the expected schema
-    select_clause += ", SUM(area_ha) AS area_ha"
-    query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
-
-    return query
 
 
 class GrasslandsAnalyzer(Analyzer):
@@ -64,16 +33,8 @@ class GrasslandsAnalyzer(Analyzer):
     async def analyze(self, analysis: Analysis):
         natural_lands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if natural_lands_analytics_in.aoi.type == "admin":
-            analysis_partial = partial(self.analyze_admin_area)
-            dd_df_futures = await self.compute_engine.gather(
-                self.compute_engine.map(
-                    analysis_partial,
-                    natural_lands_analytics_in.aoi.ids,
-                    admin_results_uri,
-                )
-            )
-            dfs = await self.compute_engine.gather(dd_df_futures)
-            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+            gadm_ids = natural_lands_analytics_in.aoi.ids
+            combined_results_df = self.analyze_admin_areas(gadm_ids, admin_results_uri)
         else:
             aois = natural_lands_analytics_in.aoi.model_dump()
             geojsons = await get_geojson(aois)
@@ -105,27 +66,12 @@ class GrasslandsAnalyzer(Analyzer):
         )
 
     @staticmethod
-    def analyze_admin_area(id, parquet_file) -> dd.DataFrame:
-        # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = id.split(".")
-
-        query = create_gadm_grasslands_query(gadm_id, parquet_file)
-
+    def analyze_admin_areas(gadm_ids, parquet_file) -> pd.DataFrame:
+        query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} order by aoi_id, year"
         initialize_duckdb()
         df = duckdb.query(query).df()
-
-        df["aoi_id"] = id
         df["aoi_type"] = "admin"
-
-        columns_to_drop = ["country"]
-        if len(gadm_id) >= 2:
-            columns_to_drop += ["region"]
-            if len(gadm_id) == 3:
-                columns_to_drop += ["subregion"]
-
-        df = df.drop(columns=columns_to_drop, axis=1)
-        ddf: dd.DataFrame = dd.from_pandas(df)
-        return ddf
+        return df
 
     @staticmethod
     def analyze_area(aoi, geojson) -> dd.DataFrame:
