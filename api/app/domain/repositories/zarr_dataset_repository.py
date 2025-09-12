@@ -15,6 +15,7 @@ class ZarrDatasetRepository:
         Dataset.primary_forest: "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",
         Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",
         Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",
+        Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",
     }
 
     def load(self, dataset: Dataset, geometry: Geometry = None) -> xr.DataArray:
@@ -60,6 +61,24 @@ class ZarrDatasetRepository:
             return [val_map[val] for val in value_tuple]
         elif dataset == Dataset.primary_forest:
             return int(value)
+        elif dataset == Dataset.tree_cover_loss_drivers:
+            match value:
+                case "Unknown":
+                    return 0
+                case "Permanent agriculture":
+                    return 1
+                case "Hard commodities":
+                    return 2
+                case "Shifting cultivation":
+                    return 3
+                case "Logging":
+                    return 4
+                case "Wildfire":
+                    return 5
+                case "Settlements & Infrastructure":
+                    return 6
+                case "Other natural disturbances":
+                    return 7
         else:
             raise NotImplementedError()
 
@@ -85,7 +104,19 @@ class ZarrDatasetRepository:
                         return "2015-2020"
 
             return series.map(pixel_to_gain)
+        elif dataset == Dataset.tree_cover_loss_drivers:
+            drivers = {
+                0: "Unknown",
+                1: "Permanent agriculture",
+                2: "Hard commodities",
+                3: "Shifting cultivation",
+                4: "Logging",
+                5: "Wildfire",
+                6: "Settlements & Infrastructure",
+                7: "Other natural disturbances",
+            }
 
+            return series.map(lambda pixel: drivers[pixel])
         else:
             return series
 
