@@ -192,7 +192,7 @@ class TestGrasslandsOTFAnalysis:
             },
         }
 
-        result_df = GrasslandsAnalyzer.analyze_area(aoi, aoi["geometry"])
+        result_df = GrasslandsAnalyzer.analyze_area(aoi, aoi["geometry"], 2000, 2022)
 
         loop = asyncio.get_event_loop()
         computed_df = await loop.run_in_executor(None, result_df.compute)
