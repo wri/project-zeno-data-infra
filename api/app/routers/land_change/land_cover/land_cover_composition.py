@@ -1,6 +1,9 @@
+from app.domain.analyzers.land_cover_composition_analyzer import (
+    LandCoverCompositionAnalyzer,
+)
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.infrastructure.persistence.file_system_analysis_repository import (
-    FileSystemAnalysisRepository,
+from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
+    AwsDynamoDbS3AnalysisRepository,
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
@@ -8,9 +11,6 @@ from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalytics,
     LandCoverCompositionAnalyticsIn,
     LandCoverCompositionAnalyticsResponse,
-)
-from app.domain.analyzers.land_cover_composition_analyzer import (
-    LandCoverCompositionAnalyzer,
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
@@ -24,11 +24,13 @@ router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
 def get_analysis_repository() -> AnalysisRepository:
-    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+    return AwsDynamoDbS3AnalysisRepository(ANALYTICS_NAME)
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
-    analysis_repository = FileSystemAnalysisRepository(ANALYTICS_NAME)
+def create_analysis_service(
+    request: Request,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
+) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandCoverCompositionAnalyzer(
