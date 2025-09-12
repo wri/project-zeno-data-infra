@@ -30,6 +30,7 @@ dependencies = [
     "prefect-coiled>=0.0.4",
     "python-json-logger",
     "aioboto3>=15.1.0",
+    "pyinstrument",
 ]
 
 [tool.uv.workspace]
