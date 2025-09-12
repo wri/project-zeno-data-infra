@@ -68,9 +68,8 @@ class TestGrasslandsPreComputedAnalysis:
         gadm_id = "BRA.1"
 
         result_df = GrasslandsAnalyzer.analyze_admin_areas(
-            [gadm_id], precomputed_gadm_results
+            [gadm_id], precomputed_gadm_results, 2000, 2022
         )
-        print(result_df)
 
         # Aggregated yearly data
         data = [
@@ -192,7 +191,7 @@ class TestGrasslandsOTFAnalysis:
             },
         }
 
-        result_df = GrasslandsAnalyzer.analyze_area(aoi, aoi["geometry"])
+        result_df = GrasslandsAnalyzer.analyze_area(aoi, aoi["geometry"], 2000, 2022)
 
         loop = asyncio.get_event_loop()
         computed_df = await loop.run_in_executor(None, result_df.compute)

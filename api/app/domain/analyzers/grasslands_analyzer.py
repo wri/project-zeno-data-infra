@@ -18,7 +18,7 @@ admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-grasslands.parque
 
 
 class GrasslandsAnalyzer(Analyzer):
-    """Get the natural lands areas by class for the input AOIs"""
+    """Get natural/semi-natural grasslands areas for the input AOIs"""
 
     def __init__(
         self,
@@ -31,12 +31,17 @@ class GrasslandsAnalyzer(Analyzer):
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
     async def analyze(self, analysis: Analysis):
-        natural_lands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
-        if natural_lands_analytics_in.aoi.type == "admin":
-            gadm_ids = natural_lands_analytics_in.aoi.ids
-            combined_results_df = self.analyze_admin_areas(gadm_ids, admin_results_uri)
+        grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
+        if grasslands_analytics_in.aoi.type == "admin":
+            gadm_ids = grasslands_analytics_in.aoi.ids
+            combined_results_df = self.analyze_admin_areas(
+                gadm_ids,
+                admin_results_uri,
+                grasslands_analytics_in.start_year,
+                grasslands_analytics_in.end_year,
+            )
         else:
-            aois = natural_lands_analytics_in.aoi.model_dump()
+            aois = grasslands_analytics_in.aoi.model_dump()
             geojsons = await get_geojson(aois)
             if aois["type"] != "feature_collection":
                 aoi_list = sorted(
@@ -47,7 +52,11 @@ class GrasslandsAnalyzer(Analyzer):
                 aoi_list = aois["feature_collection"]["features"]
                 geojsons = [geojson["geometry"] for geojson in geojsons]
 
-            analysis_partial = partial(self.analyze_area)
+            analysis_partial = partial(
+                self.analyze_area,
+                start_year=grasslands_analytics_in.start_year,
+                end_year=grasslands_analytics_in.end_year,
+            )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
             )
@@ -62,25 +71,31 @@ class GrasslandsAnalyzer(Analyzer):
             AnalysisStatus.saved,
         )
         await self.analysis_repository.store_analysis(
-            natural_lands_analytics_in.thumbprint(), analyzed_analysis
+            grasslands_analytics_in.thumbprint(), analyzed_analysis
         )
 
     @staticmethod
-    def analyze_admin_areas(gadm_ids, parquet_file) -> pd.DataFrame:
-        query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} order by aoi_id, year"
+    def analyze_admin_areas(
+        gadm_ids, parquet_file, start_year, end_year
+    ) -> pd.DataFrame:
+        query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
         initialize_duckdb()
         df = duckdb.query(query).df()
         df["aoi_type"] = "admin"
         return df
 
     @staticmethod
-    def analyze_area(aoi, geojson) -> dd.DataFrame:
+    def analyze_area(aoi, geojson, start_year, end_year) -> dd.DataFrame:
         grasslands_obj_name = (
-            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_2kchunk.zarr"
+            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
         )
         pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
-        grasslands = read_zarr_clipped_to_geojson(grasslands_obj_name, geojson)
-        pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
+        grasslands = read_zarr_clipped_to_geojson(grasslands_obj_name, geojson).sel(
+            year=slice(start_year, end_year)
+        )
+        pixel_area = read_zarr_clipped_to_geojson(
+            pixel_area_obj_name, geojson
+        ).reindex_like(grasslands, method="nearest", tolerance=1e-5)
         grasslands_only = (grasslands == 2).astype(np.uint8)
 
         grasslands_pixel_areas = grasslands_only * pixel_area
