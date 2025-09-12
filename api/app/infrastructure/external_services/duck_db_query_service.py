@@ -29,6 +29,7 @@ class DuckDbPrecalcQueryService:
         self.table_uri = table_uri
 
     async def execute(self, query: str) -> pd.DataFrame:
+        # replace data_source in query FROM with actual table URI
         query = query.replace("data_source", f"'{self.table_uri}'")
         loop = asyncio.get_running_loop()
         df = await loop.run_in_executor(process_pool, run_query_sync, query)
