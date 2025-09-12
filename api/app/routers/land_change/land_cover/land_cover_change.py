@@ -21,8 +21,10 @@ ANALYTICS_NAME = "land_cover_change"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
-def get_analysis_repository() -> AnalysisRepository:
-    return AwsDynamoDbS3AnalysisRepository(ANALYTICS_NAME)
+def get_analysis_repository(request: Request) -> AnalysisRepository:
+    return AwsDynamoDbS3AnalysisRepository(
+        ANALYTICS_NAME, request.app.state.dynamodb_table, request.app.state.s3_client
+    )
 
 
 def create_analysis_service(
