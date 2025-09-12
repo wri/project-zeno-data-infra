@@ -64,7 +64,7 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
                 response = await _retry_on_throttling(
                     table.get_item,
                     Key={"resource_id": str(resource_id)},
-                    ConsistentRead=True,
+                    ConsistentRead=False,
                 )
             except ClientError as e:
                 error_code = e.response["Error"]["Code"]
