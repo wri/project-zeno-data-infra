@@ -19,31 +19,38 @@ class AnalysisStatus(str, Enum):
 class AnalyticsIn(StrictBaseModel):
     def __init__(self, **kwargs):
         kwargs.pop("_version", None)  # remove _version if in serialized data
+        kwargs.pop(
+            "_analytics_name", None
+        )  # remove _analytics_name if in serialized data
         super().__init__(**kwargs)
 
-    aoi: AreaOfInterest
     _version: str = PrivateAttr(default="v0")
+    _analytics_name: str = PrivateAttr(default="analytics")
+
+    aoi: AreaOfInterest
 
     def model_dump(self, **kwargs):
         """Add the _version private attribute"""
         result = super().model_dump(**kwargs)
         result["_version"] = self._version
+        result["_analytics_name"] = self._analytics_name
         return result
 
     def model_dump_json(self, **kwargs):
         """Add the _version private attribute"""
         result = json.loads(super().model_dump_json(**kwargs))
         result["_version"] = self._version
+        result["_analytics_name"] = self._analytics_name
         return json.dumps(result)
 
     def thumbprint(self) -> uuid.UUID:
         """
         Generate a deterministic UUID thumbprint including the version.
         """
-        # Include version in dump for thumbprint consistency
+        # Include version and analytics_name in dump for thumbprint consistency
         dump_dict = self.model_dump(exclude=set())
         dump_dict["_version"] = self._version  # Manually include version
-
+        dump_dict["_analytics_name"] = self._analytics_name  # Manually include version
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
