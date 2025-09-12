@@ -1,6 +1,8 @@
 import uuid
 
+import aioboto3
 import pytest
+import pytest_asyncio
 from app.domain.models.analysis import Analysis
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
@@ -64,19 +66,38 @@ class TestLoadingAnalysis:
 
         s3.create_bucket(Bucket="gnw-analytics-api-analysis-results")
 
+    @pytest_asyncio.fixture(scope="function")
+    async def dynamodb_and_s3(self, moto_server):
+        session = aioboto3.Session()
+        async with session.client(
+            "s3", region_name="us-east-1", endpoint_url=moto_server
+        ) as s3_client:
+            async with session.resource(
+                "dynamodb", region_name="us-east-1", endpoint_url=moto_server
+            ) as dynamo:
+                dynamodb_table = await dynamo.Table("Analyses")
+
+                yield dynamodb_table, s3_client, moto_server
+
     @pytest.mark.asyncio
-    async def test_analysis_is_empty_if_doesnt_exist(self, moto_server):
+    async def test_analysis_is_empty_if_doesnt_exist(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         analysis_result = await analysis_repository.load_analysis(DUMMY_UUID)
         assert analysis_result == Analysis(result=None, metadata=None, status=None)
 
     @pytest.mark.asyncio
-    async def test_store_saved_analysis_for_first_time(self, moto_server):
+    async def test_store_saved_analysis_for_first_time(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         await analysis_repository.store_analysis(
             DUMMY_UUID,
             Analysis(
@@ -95,10 +116,13 @@ class TestLoadingAnalysis:
         )
 
     @pytest.mark.asyncio
-    async def test_store_failed_analysis_persists_failed_status(self, moto_server):
+    async def test_store_failed_analysis_persists_failed_status(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         await analysis_repository.store_analysis(
             DUMMY_UUID,
             Analysis(
@@ -117,10 +141,13 @@ class TestLoadingAnalysis:
         )
 
     @pytest.mark.asyncio
-    async def test_store_initial_analysis_and_load_successfully(self, moto_server):
+    async def test_store_initial_analysis_and_load_successfully(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         await analysis_repository.store_analysis(
             DUMMY_UUID,
             Analysis(
@@ -139,10 +166,13 @@ class TestLoadingAnalysis:
         )
 
     @pytest.mark.asyncio
-    async def test_store_analysis_twice_does_not_append_data(self, moto_server):
+    async def test_store_analysis_twice_does_not_append_data(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         await analysis_repository.store_analysis(
             DUMMY_UUID,
             Analysis(
@@ -170,10 +200,13 @@ class TestLoadingAnalysis:
         )
 
     @pytest.mark.asyncio
-    async def test_update_status_from_pending_to_saved(self, moto_server):
+    async def test_update_status_from_pending_to_saved(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         await analysis_repository.store_analysis(
             DUMMY_UUID,
             Analysis(
@@ -208,10 +241,13 @@ class TestLoadingAnalysis:
         )
 
     @pytest.mark.asyncio
-    async def test_update_status_from_pending_to_failed(self, moto_server):
+    async def test_update_status_from_pending_to_failed(self, dynamodb_and_s3):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
         analysis_repository = AwsDynamoDbS3AnalysisRepository(
-            TEST_CATEGORY, moto_server
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
         )
+
         await analysis_repository.store_analysis(
             DUMMY_UUID,
             Analysis(
