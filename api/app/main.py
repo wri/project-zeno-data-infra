@@ -90,6 +90,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return await request_validation_exception_handler(request, exc)
 
 
+@app.middleware("http")
+async def profile_request(request: Request, call_next):
+    if request.headers.get("X-Profile") == "1":
+        profiler = Profiler(async_mode="enabled")
+        profiler.start()
+        try:
+            response = await call_next(request)
+        finally:
+            profiler.stop()
+        return HTMLResponse(profiler.output_html())
+    return await call_next(request)
+
+
 app.include_router(land_change.router)
 
 
