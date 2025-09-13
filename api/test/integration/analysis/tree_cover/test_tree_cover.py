@@ -29,9 +29,8 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
 )
-from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
+from app.models.land_change.tree_cover import ANALYTICS_NAME, TreeCoverAnalyticsIn
 from app.routers.land_change.tree_cover.tree_cover import (
-    ANALYTICS_NAME,
     create_analysis_service,
     get_analysis_repository,
 )

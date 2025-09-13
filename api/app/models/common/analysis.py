@@ -24,8 +24,8 @@ class AnalyticsIn(StrictBaseModel):
         )  # remove _analytics_name if in serialized data
         super().__init__(**kwargs)
 
-    _version: str = PrivateAttr(default="v0")
     _analytics_name: str = PrivateAttr(default="analytics")
+    _version: str = PrivateAttr(default="v0")
 
     aoi: AreaOfInterest
 
@@ -50,7 +50,9 @@ class AnalyticsIn(StrictBaseModel):
         # Include version and analytics_name in dump for thumbprint consistency
         dump_dict = self.model_dump(exclude=set())
         dump_dict["_version"] = self._version  # Manually include version
-        dump_dict["_analytics_name"] = self._analytics_name  # Manually include version
+        dump_dict[
+            "_analytics_name"
+        ] = self._analytics_name  # Manually include analytics_name
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 

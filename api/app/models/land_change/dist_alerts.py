@@ -12,6 +12,8 @@ from ..common.areas_of_interest import (
 )
 from ..common.base import Response, StrictBaseModel
 
+ANALYTICS_NAME = "dist_alerts"
+
 AoiUnion = Union[
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
@@ -22,6 +24,7 @@ AoiUnion = Union[
 
 
 class DistAlertsAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20250911")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
