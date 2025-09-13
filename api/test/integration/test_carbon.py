@@ -15,9 +15,8 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
 )
-from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
+from app.models.land_change.carbon_flux import ANALYTICS_NAME, CarbonFluxAnalyticsIn
 from app.routers.land_change.carbon_flux.carbon_flux import (
-    ANALYTICS_NAME,
     create_analysis_service,
     get_analysis_repository,
 )

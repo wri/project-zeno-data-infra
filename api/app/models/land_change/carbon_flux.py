@@ -11,6 +11,8 @@ from app.models.common.areas_of_interest import (
 from app.models.common.base import Response, StrictBaseModel
 from pydantic import Field, PrivateAttr
 
+ANALYTICS_NAME = "carbon_flux"
+
 AoiUnion = Union[
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
@@ -23,7 +25,9 @@ AllowedCanopyCover = Literal[30, 50, 75]
 
 
 class CarbonFluxAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20250910")
+
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",

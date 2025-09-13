@@ -11,6 +11,8 @@ from app.models.common.areas_of_interest import (
 from app.models.common.base import Response, StrictBaseModel
 from pydantic import Field, PrivateAttr
 
+ANALYTICS_NAME = "land_cover_composition"
+
 AoiUnion = Union[
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
@@ -21,6 +23,7 @@ AoiUnion = Union[
 
 
 class LandCoverCompositionAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20250911")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,

@@ -8,7 +8,7 @@ from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
 from app.use_cases.analysis.analysis_service import AnalysisService
 
-resource_thumbprint = UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c")
+resource_thumbprint = UUID("fe76241f-63d6-5e3f-8090-e9e8e98ea9aa")
 
 
 @pytest.fixture
@@ -73,20 +73,32 @@ class TestTreeCoverLossServiceCollaborators:
 
         # assert that the new Analysis is stored so it's available to clients immediately
         assert mock_analysis_repository_calls[0] == call(
-            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
-            Analysis(None, {"aoi": {}, "_version": "v0"}, None),
+            stub_analysis_in.thumbprint(),
+            Analysis(
+                None,
+                {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                None,
+            ),
         )
 
         # assert that the new Analysis is stored as pending before analysis starts
         assert mock_analysis_repository_calls[1] == call(
-            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
-            Analysis(None, {"aoi": {}, "_version": "v0"}, AnalysisStatus.pending),
+            stub_analysis_in.thumbprint(),
+            Analysis(
+                None,
+                {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                AnalysisStatus.pending,
+            ),
         )
 
         # assert that the failed Analysis result is stored at the end
         assert mock_analysis_repository_calls[2] == call(
-            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
-            Analysis(None, {"aoi": {}, "_version": "v0"}, AnalysisStatus.failed),
+            stub_analysis_in.thumbprint(),
+            Analysis(
+                None,
+                {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                AnalysisStatus.failed,
+            ),
         )
 
         assert result_thumbprint == resource_thumbprint
@@ -259,9 +271,9 @@ class TestTreeCoverLossServiceCollaborators:
         assert result_thumbprint == resource_thumbprint
         mock_analyzer.analyze.assert_called()
         mock_analysis_repository.store_analysis.assert_called_with(
-            UUID("82defb97-5fc9-5e9b-b22a-d1cc8e14f38c"),
+            stub_analysis_in.thumbprint(),
             Analysis(
-                metadata={"aoi": {}, "_version": "v0"},
+                metadata={"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
                 result=None,
                 status=AnalysisStatus.failed,
             ),

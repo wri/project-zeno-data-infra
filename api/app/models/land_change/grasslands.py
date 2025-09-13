@@ -12,6 +12,8 @@ from ..common.areas_of_interest import (
 )
 from ..common.base import Response, StrictBaseModel
 
+ANALYTICS_NAME = "grasslands"
+
 AoiUnion = Union[
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
@@ -24,6 +26,7 @@ DATE_REGEX = r"^\d{4}$"
 
 
 class GrasslandsAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20250911")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
