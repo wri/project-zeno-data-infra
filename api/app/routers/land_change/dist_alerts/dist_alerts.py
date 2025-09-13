@@ -8,6 +8,7 @@ from app.models.common.base import (
     DataMartResourceLinkResponse,
 )
 from app.models.land_change.dist_alerts import (
+    ANALYTICS_NAME,
     DistAlertsAnalytics,
     DistAlertsAnalyticsIn,
     DistAlertsAnalyticsResponse,
@@ -19,7 +20,6 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-ANALYTICS_NAME = "dist_alerts"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 

@@ -14,6 +14,8 @@ from app.models.land_change.tree_cover_loss import (
 )
 from pydantic import Field, PrivateAttr
 
+ANALYTICS_NAME = "tree_cover"
+
 AoiUnion = Union[
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
@@ -27,6 +29,7 @@ ValidCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 
 
 class TreeCoverAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20250909")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
