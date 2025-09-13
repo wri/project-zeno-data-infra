@@ -199,6 +199,69 @@ class TestTclAnalyticsAdminAOIWithDriver:
         assert df.columns.size == 5
 
 
+class TestTclAnalyticsPostWithKbaWithDriver:
+    @pytest_asyncio.fixture(autouse=True)
+    async def setup(self):
+        """Runs before each test in this class"""
+        delete_resource_files("tree_cover_loss", "7d076b0a-fdde-58df-bbee-4da839fc1119")
+
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                request = await client.post(
+                    "/v0/land_change/tree_cover_loss/analytics",
+                    json={
+                        "aoi": {
+                            "type": "key_biodiversity_area",
+                            "ids": ["20401", "19426"],
+                        },
+                        "start_year": "2020",
+                        "end_year": "2023",
+                        "canopy_cover": 30,
+                        "intersections": ["driver"],
+                    },
+                )
+
+                yield (request, client)
+
+    @pytest.mark.asyncio
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert resource["status"] == "pending"
+
+    @pytest.mark.asyncio
+    async def test_post_returns_resource_link(self, setup):
+        test_request, _ = setup
+        resource = test_request.json()
+        assert (
+            resource["data"]["link"]
+            == "http://testserver/v0/land_change/tree_cover_loss/analytics/7d076b0a-fdde-58df-bbee-4da839fc1119"
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _ = setup
+        assert test_request.status_code == 202
+
+    @pytest.mark.asyncio
+    async def test_resource_calculate_results(self, setup):
+        test_request, client = setup
+        resource_id = test_request.json()["data"]["link"].split("/")[-1]
+        data = await retry_getting_resource("tree_cover_loss", resource_id, client)
+
+        assert data["status"] == "saved"
+
+        df = pd.DataFrame(data["result"])
+        assert "20401" in df["aoi_id"].values
+        assert "19426" in df["aoi_id"].values
+
+        assert "tree_cover_loss_driver" in df.columns
+        assert "tree_cover_loss_year" not in df.columns
+        assert df.columns.size == 5
+
+
 class TestTclAnalyticsWithForestFilters:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
