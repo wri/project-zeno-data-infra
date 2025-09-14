@@ -28,6 +28,7 @@ from app.models.land_change.tree_cover import (
     TreeCoverAnalyticsResponse,
 )
 from app.routers.common_analytics import create_analysis, get_analysis
+from app.routers.common_auth import verify_shared_secret
 from app.use_cases.analysis.analysis_service import AnalysisService
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
@@ -71,6 +72,7 @@ def create_analysis_service(
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
     status_code=202,
+    dependencies=[Depends(verify_shared_secret)],
 )
 async def create(
     *,
