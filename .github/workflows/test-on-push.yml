@@ -73,6 +73,7 @@ jobs:
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
+      ZENO_SECRET: swordfish
       TEST_SUITE: api
     steps:
       - name: Checkout Code
@@ -116,7 +117,7 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            ZENO_SECRET=${{ env.ZENO_SECRET }} API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} pytest test --disable-warnings
 
   test_pipelines:
     needs: build_and_push_image
@@ -129,6 +130,7 @@ jobs:
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      ZENO_SECRET: swordfish
       TEST_SUITE: pipelines
     steps:
       - name: Checkout Code
@@ -172,4 +174,4 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            ZENO_SECRET=${{ env.ZENO_SECRET }} API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings

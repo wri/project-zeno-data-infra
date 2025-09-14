@@ -85,6 +85,10 @@ module "ecs" {
               name  = "ANALYSIS_RESULTS_BUCKET_NAME"
               value = aws_s3_bucket.analysis_results.bucket
             },
+            {
+              name = "ZENO_SECRET"
+              value = var.zeno_secret
+            }
           ]
         }
       }
