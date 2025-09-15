@@ -2,6 +2,7 @@ from functools import partial
 
 import dask.dataframe as dd
 import duckdb
+import newrelic.agent as nr_agent
 import numpy as np
 import pandas as pd
 from app.analysis.common.analysis import (
@@ -30,6 +31,7 @@ class GrasslandsAnalyzer(Analyzer):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
+    @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":
