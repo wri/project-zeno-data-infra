@@ -54,6 +54,9 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2015",
             end_year="2020",
         )
+
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+
         app.dependency_overrides[
             create_analysis_service
         ] = create_analysis_service_for_tests
@@ -61,18 +64,19 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             get_analysis_repository
         ] = get_file_system_analysis_repository
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        try:
+            async with LifespanManager(app):
+                async with AsyncClient(
+                    transport=ASGITransport(app), base_url="http://testserver"
+                ) as client:
+                    request = await client.post(
+                        f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                        json=analytics_in.model_dump(),
+                    )
 
-        async with LifespanManager(app):
-            async with AsyncClient(
-                transport=ASGITransport(app), base_url="http://testserver"
-            ) as client:
-                request = await client.post(
-                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
-                    json=analytics_in.model_dump(),
-                )
-
-                yield request, client, analytics_in
+                    yield request, client, analytics_in
+        finally:
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -121,24 +125,29 @@ class TestGrasslandsAnalyticsPostWithKba:
             start_year="2015",
             end_year="2020",
         )
+
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+
         app.dependency_overrides[
             create_analysis_service
         ] = create_analysis_service_for_tests
         app.dependency_overrides[
             get_analysis_repository
         ] = get_file_system_analysis_repository
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
-        async with LifespanManager(app):
-            async with AsyncClient(
-                transport=ASGITransport(app), base_url="http://testserver"
-            ) as client:
-                request = await client.post(
-                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
-                    json=analytics_in.model_dump(),
-                )
+        try:
+            async with LifespanManager(app):
+                async with AsyncClient(
+                    transport=ASGITransport(app), base_url="http://testserver"
+                ) as client:
+                    request = await client.post(
+                        f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                        json=analytics_in.model_dump(),
+                    )
 
-                yield request, client, analytics_in
+                    yield request, client, analytics_in
+        finally:
+            app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
