@@ -1,11 +1,9 @@
 from functools import partial
 
 import dask.dataframe as dd
-import duckdb
 import numpy as np
 from app.analysis.common.analysis import (
     get_geojson,
-    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from app.domain.analyzers.analyzer import Analyzer
@@ -37,10 +35,12 @@ class LandCoverCompositionAnalyzer(Analyzer):
         analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
+        query_service=None,
     ):
         self.analysis_repository = analysis_repository  # LandCoverChangeRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.query_service = query_service
         self.admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet"
         self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
@@ -51,7 +51,7 @@ class LandCoverCompositionAnalyzer(Analyzer):
         )
         if land_cover_change_analytics_in.aoi.type == "admin":
             gadm_ids = land_cover_change_analytics_in.aoi.ids
-            combined_results_df = self.analyze_admin_areas(gadm_ids)
+            results = await self.analyze_admin_areas(gadm_ids)
 
         else:
             aois = land_cover_change_analytics_in.aoi.model_dump()
@@ -75,10 +75,11 @@ class LandCoverCompositionAnalyzer(Analyzer):
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+            combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
+            results = combined_results_df.to_dict(orient="list")
 
-        combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
         analyzed_analysis = Analysis(
-            combined_results_df.to_dict(orient="list"),
+            results,
             analysis.metadata,
             AnalysisStatus.saved,
         )
@@ -86,11 +87,12 @@ class LandCoverCompositionAnalyzer(Analyzer):
             land_cover_change_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    def analyze_admin_areas(self, gadm_ids):
-        query = f"select * from '{self.admin_results_uri}' where aoi_id in {gadm_ids}"
-        initialize_duckdb()
-        df = duckdb.query(query).df()
-        df["aoi_type"] = "admin"
+    async def analyze_admin_areas(self, gadm_ids):
+        id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
+        query = f"select * from data_source where aoi_id in ({id_str}) and area_ha > 0"
+
+        df = await self.query_service.execute(query)
+        df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
 
