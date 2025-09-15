@@ -1,53 +1,61 @@
-import asyncio
+import time
 import os
-
+import logging
 from dask_cloudprovider.aws import ECSCluster
 from dask.distributed import Client
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-async def main():
-    """Function to create dask cluster on AWS ECS."""
+
+def run_cluster_manager():
     cluster_arn = os.environ["DASK_CLUSTER_ARN"]
     cluster_vpc = os.environ["DASK_VPC"]
     worker_task_definition_arn = os.environ["DASK_WORKER_TASK_DEFINITION_ARN"]
     scheduler_address = os.environ["DASK_SCHEDULER_ADDRESS"]
+    security_group_id = os.environ["DASK_WORKER_SECURITY_GROUP"]
+    minimum = int(os.environ.get("DASK_MIN_WORKERS", "2"))
+    maximum = int(os.environ.get("DASK_MAX_WORKERS", "10"))
+
+    logger.info(f"Starting cluster manager - min: {minimum}, max: {maximum}")
 
     cluster = ECSCluster(
         cluster_arn=cluster_arn,
-        # n_workers=2,
-        worker_cpu=2048,
-        worker_mem=8192,
-        fargate_workers=True,
         vpc=cluster_vpc,
         subnets=["subnet-0f1544432f2a769d2"],
-        asynchronous=True,
-        skip_cleanup=True,
         worker_task_definition_arn=worker_task_definition_arn,
         scheduler_address=scheduler_address,
+        security_groups=[security_group_id],
+        fargate_workers=True,
+        worker_cpu=8192,
+        worker_mem=32768,
+        skip_cleanup=True,
+        shutdown_on_close=False,
     )
 
-    await cluster
-    print(f"New cluster created. Scheduler: {cluster.scheduler_address}")
+    logger.info(f"Cluster ready: {cluster.scheduler_address}")
 
-    client = Client(os.environ["DASK_SCHEDULER_ADDRESS"], asynchronous=True)
-    await client  # connect
-    await client.wait_for_workers(2)  # this one IS awaitable
+    client = Client(cluster.scheduler_address)
 
-    info = client.scheduler_info()  # NOT awaitable
-    workers = list(info["workers"].keys())
+    info = client.scheduler_info()
+    workers = list(info["workers"])
+    if workers:
+        logger.info(f"Retiring {len(workers)} existing workers")
+        client.retire_workers(workers=workers, close_workers=True, remove=True)
 
-    # retire an explicit set (no timeout kwarg here)
-    await asyncio.wait_for(
-        client.retire_workers(workers=workers, close_workers=True, remove=True),
-        timeout=240,
-    )
+    # Enable adaptive scaling
+    cluster.adapt(minimum=minimum, maximum=maximum)
 
-    cluster.adapt(minimum=2, maximum=10)
+    logger.info(f"Adaptive scaling active! Dashboard: {cluster.dashboard_link}")
 
-    print(f"Client connected. Dashboard: {cluster.dashboard_link}")
-
-    return cluster, client
+    while True:
+        time.sleep(60)
+        try:
+            worker_count = len(client.scheduler_info()["workers"])
+            logger.info(f"Manager running - {worker_count} workers")
+        except Exception as e:
+            logger.warning(f"Error checking workers: {e}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run_cluster_manager()

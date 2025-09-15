@@ -10,9 +10,14 @@
 locals {
   name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
   state_bucket = terraform.workspace == "default" ? "production" : "dev"
+  cluster_name = "analytics${local.name_suffix}"
 }
 
-
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+data "aws_vpc" "selected" {
+  id = var.vpc
+}
 
 provider "aws" {
     region = "us-east-1" # Replace with your desired region
@@ -118,8 +123,8 @@ module "ecs" {
       }
     },
     dask_scheduler = {
-      cpu    = 2048
-      memory = 8192
+      cpu    = 4096
+      memory = 16384
       assign_public_ip = true
       name = "dask-scheduler${local.name_suffix}"
 
@@ -139,8 +144,8 @@ module "ecs" {
       }
       container_definitions = {
         scheduler = {
-          cpu       = 2048
-          memory    = 8192
+          cpu       = 4096
+          memory    = 16384
           essential = true
           image     = var.api_image
           
@@ -231,6 +236,85 @@ module "ecs" {
           cidr_blocks = ["0.0.0.0/0"]
         }
       }
+    }
+
+    dask_cluster_manager = {
+      cpu    = 1024
+      memory = 4096
+      assign_public_ip = true
+      name = "dask-manager${local.name_suffix}"
+
+      desired_count = 1
+      min_capacity  = 1
+    
+      default_capacity_provider_strategy = {
+        FARGATE = {
+          weight = 100
+          base   = 1
+        }
+      }
+
+      runtime_platform = {
+        cpu_architecture        = "X86_64"  # or "ARM64"
+        operating_system_family = "LINUX"
+      }
+      container_definitions = {
+        dask_cluster_manager = {
+          cpu       = 1024
+          memory    = 4096
+          essential = true
+          image     = var.api_image
+          
+          command = [
+            "python",
+            "/app/api/dask_cluster/start_cluster.py",
+          ]       
+          environment = [
+            {
+              name  = "PYTHONPATH"
+              value = "/app/api"
+            },
+            {
+              name  = "API_KEY"
+              value = var.api_key
+            },
+            {
+              name  = "AWS_SECRET_ACCESS_KEY"
+              value = var.aws_secret_access_key
+            },
+            {
+              name  = "AWS_ACCESS_KEY_ID"
+              value = var.aws_access_key_id
+            },
+            {
+              name  = "DASK_SCHEDULER_ADDRESS"
+              value = "tcp://${module.dask_nlb.dns_name}:8786"
+            },
+            {
+              name  = "DASK_VPC"
+              value = var.vpc
+            },
+            {
+              name  = "DASK_CLUSTER_ARN"
+              value = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:cluster/${local.cluster_name}"
+            },
+            {
+              name  = "DASK_WORKER_TASK_DEFINITION_ARN"
+              value = aws_ecs_task_definition.dask_worker.arn
+            },
+            {
+              name  = "DASK_WORKER_SECURITY_GROUP"
+              value = aws_security_group.dask_workers.id
+            }
+          ]
+          
+          readonlyRootFilesystem = false
+        }
+      }
+
+      enable_cloudwatch_logging = true
+      subnet_ids = var.subnet_ids
+      security_group_ids = [aws_security_group.dask_workers.id]
     }
   }
 
@@ -345,8 +429,8 @@ resource "aws_ecs_task_definition" "dask_worker" {
   family                   = "dask-worker"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
-  cpu                      = 2048
-  memory                   = 8192
+  cpu                      = 8192
+  memory                   = 32768
   execution_role_arn       = module.ecs.task_exec_iam_role_arn
 
   # Set CPU architecture here
@@ -413,26 +497,49 @@ module "dask_nlb" {
   
   target_groups = {
     dask_scheduler = {
-      backend_protocol = "TCP"
-      backend_port = 8786
+      protocol = "TCP"
+      port = 8786
       target_type = "ip"
       deregistration_delay = 10
       load_balancing_cross_zone_enabled = true
-      
-      # health_check = {
-      #   enabled = true
-      #   healthy_threshold = 2
-      #   interval = 30
-      #   port = 8787  # Health check dashboard
-      #   protocol = "HTTP"
-      #   path = "/status"
-      #   timeout = 10
-      #   unhealthy_threshold = 2
-      #   matcher = "200"
-      # }
-      
+  
       create_attachment = false
     }
+  }
+  security_group_ingress_rules = {
+    alb_ingress_8786_api = {
+      type                     = "ingress"
+      from_port                = 8786
+      to_port                  = 8786
+      protocol                 = "tcp"
+      description              = "Dask Scheduler Port for api"
+      referenced_security_group_id = module.ecs.services["analytics"].security_group_id
+      cidr_blocks                = [data.aws_vpc.selected.cidr_block]
+    }
+  }
+}
+
+
+resource "aws_security_group" "dask_workers" {
+  name_prefix = "dask-workers-${local.name_suffix}"
+  vpc_id      = var.vpc
+
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.selected.cidr_block]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "dask-workers-${local.name_suffix}"
   }
 }
 
@@ -497,7 +604,7 @@ data "aws_iam_policy_document" "ecs_task_analysis_access" {
 }
 
 resource "aws_iam_policy" "ecs_task_analysis" {
-  name   = "ECSTaskAnalysisAccess"
+  name   = "ECSTaskAnalysisAccess${local.name_suffix}"
   path   = "/"
   policy = data.aws_iam_policy_document.ecs_task_analysis_access.json
 }
