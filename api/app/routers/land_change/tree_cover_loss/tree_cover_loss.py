@@ -19,12 +19,13 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
-from app.infrastructure.persistence.file_system_analysis_repository import (
-    FileSystemAnalysisRepository,
+from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
+    AwsDynamoDbS3AnalysisRepository,
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.tree_cover_loss import (
+    ANALYTICS_NAME,
     TreeCoverLossAnalytics,
     TreeCoverLossAnalyticsIn,
     TreeCoverLossAnalyticsResponse,
@@ -36,15 +37,19 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-ANALYTICS_NAME = "tree_cover_loss"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
-def get_analysis_repository() -> AnalysisRepository:
-    return FileSystemAnalysisRepository(ANALYTICS_NAME)
+def get_analysis_repository(request: Request) -> AnalysisRepository:
+    return AwsDynamoDbS3AnalysisRepository(
+        ANALYTICS_NAME, request.app.state.dynamodb_table, request.app.state.s3_client
+    )
 
 
-def create_analysis_service(request: Request) -> AnalysisService:
+def create_analysis_service(
+    request: Request,
+    analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
+) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverLossPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
@@ -60,7 +65,7 @@ def create_analysis_service(request: Request) -> AnalysisService:
     )
 
     return AnalysisService(
-        analysis_repository=get_analysis_repository(),
+        analysis_repository=analysis_repository,
         analyzer=TreeCoverLossAnalyzer(compute_engine),
         event=ANALYTICS_NAME,
     )

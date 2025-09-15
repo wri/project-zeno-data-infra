@@ -16,9 +16,8 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
 )
-from app.models.land_change.natural_lands import NaturalLandsAnalyticsIn
+from app.models.land_change.natural_lands import ANALYTICS_NAME, NaturalLandsAnalyticsIn
 from app.routers.land_change.natural_lands.natural_lands import (
-    ANALYTICS_NAME,
     create_analysis_service,
     get_analysis_repository,
 )
