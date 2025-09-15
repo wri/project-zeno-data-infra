@@ -14,8 +14,8 @@ def run_cluster_manager():
     worker_task_definition_arn = os.environ["DASK_WORKER_TASK_DEFINITION_ARN"]
     scheduler_address = os.environ["DASK_SCHEDULER_ADDRESS"]
     security_group_id = os.environ["DASK_WORKER_SECURITY_GROUP"]
-    minimum = int(os.environ.get("DASK_MIN_WORKERS", "2"))
-    maximum = int(os.environ.get("DASK_MAX_WORKERS", "10"))
+    minimum = int(os.environ.get("DASK_MIN_WORKERS", "5"))
+    maximum = int(os.environ.get("DASK_MAX_WORKERS", "30"))
 
     logger.info(f"Starting cluster manager - min: {minimum}, max: {maximum}")
 
