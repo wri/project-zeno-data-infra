@@ -7,6 +7,16 @@
 #     }
 # }
 
+terraform {
+  backend "s3" {
+    bucket         = "tf-state-zeno-rest-api"
+    key            = "terraform/state/production/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks-production"
+  }
+}
+
 locals {
   name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
   state_bucket = terraform.workspace == "default" ? "production" : "dev"
