@@ -48,6 +48,37 @@ module "ecs" {
         }
       }
 
+      # Enable autoscaling
+      enable_autoscaling = true
+      autoscaling_min_capacity = 1
+      autoscaling_max_capacity = 10
+      
+      autoscaling_policies = {
+        cpu_scaling = {
+          policy_type = "TargetTrackingScaling"
+          target_tracking_scaling_policy_configuration = {
+            target_value = 40.0
+            predefined_metric_specification = {
+              predefined_metric_type = "ECSServiceAverageCPUUtilization"
+            }
+            scale_out_cooldown = 300
+            scale_in_cooldown = 300
+          }
+        }
+        
+        memory_scaling = {
+          policy_type = "TargetTrackingScaling"
+          target_tracking_scaling_policy_configuration = {
+            target_value = 50.0
+            predefined_metric_specification = {
+              predefined_metric_type = "ECSServiceAverageMemoryUtilization"
+            }
+            scale_out_cooldown = 300
+            scale_in_cooldown = 300
+          }
+        }
+      }
+
       # Container definition(s)
       container_definitions = {
         api = {
@@ -90,6 +121,14 @@ module "ecs" {
               name  = "ANALYSIS_RESULTS_BUCKET_NAME"
               value = aws_s3_bucket.analysis_results.bucket
             },
+            {
+              name  = "DASK_SCHEDULER_ADDRESS"
+              value = "tcp://${module.dask_nlb.dns_name}:8786"
+            },
+            {
+              name = "NEW_RELIC_LICENSE_KEY"
+              value = var.new_relic_license_key
+            }
           ]
         }
       }

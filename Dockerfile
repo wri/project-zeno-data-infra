@@ -38,7 +38,6 @@ COPY --chown=appuser . /app
 
 ENV PYTHONPATH=/app/api
 ENV NEW_RELIC_CONFIG_FILE=/app/newrelic.ini
-ENV NEW_RELIC_LICENSE_KEY=<new_relic_license_key>
 ENV NEW_RELIC_ENVIRONMENT=production
 
 # Expose the port the FastAPI app will run on

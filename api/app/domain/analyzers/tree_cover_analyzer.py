@@ -1,5 +1,5 @@
 from typing import List
-from newrelic.agent import nr_agent
+import newrelic.agent as nr_agent
 
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
