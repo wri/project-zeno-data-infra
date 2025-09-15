@@ -1,18 +1,17 @@
 from functools import partial
 
 import dask.dataframe as dd
-import duckdb
 import numpy as np
-import pandas as pd
 from app.analysis.common.analysis import (
     get_geojson,
-    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
+from dask.dataframe import DataFrame
+from xarray import DataArray
 
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
 
@@ -25,16 +24,18 @@ class GrasslandsAnalyzer(Analyzer):
         analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
+        duckdb_query_service=None,
     ):
         self.analysis_repository = analysis_repository  # GrasslandsRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.duckdb_query_service = duckdb_query_service
 
     async def analyze(self, analysis: Analysis):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":
             gadm_ids = grasslands_analytics_in.aoi.ids
-            combined_results_df = self.analyze_admin_areas(
+            combined_results_df: DataFrame = await self.analyze_admin_areas(
                 gadm_ids,
                 admin_results_uri,
                 grasslands_analytics_in.start_year,
@@ -63,10 +64,8 @@ class GrasslandsAnalyzer(Analyzer):
             dfs = await self.compute_engine.gather(dd_df_futures)
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
 
-            pass
-
         analyzed_analysis = Analysis(
-            combined_results_df.to_dict(orient="list"),
+            combined_results_df,
             analysis.metadata,
             AnalysisStatus.saved,
         )
@@ -74,13 +73,11 @@ class GrasslandsAnalyzer(Analyzer):
             grasslands_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    @staticmethod
-    def analyze_admin_areas(
-        gadm_ids, parquet_file, start_year, end_year
-    ) -> pd.DataFrame:
+    async def analyze_admin_areas(
+        self, gadm_ids, parquet_file, start_year, end_year
+    ) -> DataFrame:
         query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
-        initialize_duckdb()
-        df = duckdb.query(query).df()
+        df = await self.duckdb_query_service.execute(query)
         df["aoi_type"] = "admin"
         return df
 
@@ -90,9 +87,9 @@ class GrasslandsAnalyzer(Analyzer):
             "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
         )
         pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
-        grasslands = read_zarr_clipped_to_geojson(grasslands_obj_name, geojson).sel(
-            year=slice(start_year, end_year)
-        )
+        grasslands: DataArray = read_zarr_clipped_to_geojson(
+            grasslands_obj_name, geojson
+        ).sel(year=slice(start_year, end_year))
         pixel_area = read_zarr_clipped_to_geojson(
             pixel_area_obj_name, geojson
         ).reindex_like(grasslands, method="nearest", tolerance=1e-5)
