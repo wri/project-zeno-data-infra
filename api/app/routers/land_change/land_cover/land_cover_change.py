@@ -18,6 +18,10 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
+from api.app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
+
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 
@@ -36,6 +40,9 @@ def create_analysis_service(
         analyzer=LandCoverChangeAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
+            query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-land-cover-change.parquet"
+            ),
         ),
         event=ANALYTICS_NAME,
     )
