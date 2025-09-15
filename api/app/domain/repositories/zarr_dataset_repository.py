@@ -121,13 +121,9 @@ class ZarrDatasetRepository:
             return series
 
     def _clip_xarr_to_geometry(self, xarr, geom):
-        sliced = xarr.sel(
-            x=slice(geom.bounds[0], geom.bounds[2]),
-            y=slice(geom.bounds[3], geom.bounds[1]),
-        )
-        if "band" in sliced.dims:
-            sliced = sliced.squeeze("band")
+        if "band" in xarr.dims:
+            xarr = xarr.squeeze("band")
 
         geojson = mapping(geom)
-        clipped = sliced.rio.clip([geojson])
+        clipped = xarr.rio.clip([geojson])
         return clipped
