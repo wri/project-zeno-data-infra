@@ -95,6 +95,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             objs.append(da)
             expected_groups.append(expected_groups_per_dataset[group_by])
 
+        if len(objs) > 0:
             results = (
                 xarray_reduce(
                     by, *objs, func=func, expected_groups=tuple(expected_groups)
