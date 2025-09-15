@@ -1,6 +1,6 @@
+import os
 from unittest.mock import patch
 
-import duckdb
 import numpy as np
 import pandas as pd
 import pytest
@@ -10,6 +10,9 @@ from app.domain.analyzers.land_cover_composition_analyzer import (
     LandCoverCompositionAnalyzer,
 )
 from app.domain.models.analysis import Analysis
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
@@ -249,12 +252,16 @@ class TestLandCoverChangeAdminAois:
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data, async_dask_client):
         self.analysis_repo = DummyAnalysisRepository()
+        table_name = "/tmp/test.parquet"
+        parquet_mock_data.to_parquet("/tmp/test.parquet", index=False)
+
+        query_service = DuckDbPrecalcQueryService(table_name)
         analyzer = LandCoverCompositionAnalyzer(
-            analysis_repository=self.analysis_repo, compute_engine=async_dask_client
+            analysis_repository=self.analysis_repo,
+            compute_engine=async_dask_client,
+            query_service=query_service,
         )
 
-        table_name = "test_parquet"
-        duckdb.register(table_name, parquet_mock_data)
         analyzer.admin_results_uri = table_name
 
         return analyzer
@@ -345,3 +352,5 @@ class TestLandCoverChangeAdminAois:
             rtol=1e-4,
             atol=1e-4,
         )
+
+        os.remove("/tmp/test.parquet")

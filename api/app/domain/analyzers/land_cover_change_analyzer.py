@@ -88,7 +88,7 @@ class LandCoverChangeAnalyzer(Analyzer):
 
     async def analyze_admin_areas(self, gadm_ids):
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
-        query = f"select * from '{self.admin_results_uri}' where aoi_id in ({id_str}) and land_cover_class_start != land_cover_class_end and area_ha > 0"
+        query = f"select * from data_source where aoi_id in ({id_str}) and land_cover_class_start != land_cover_class_end and area_ha > 0"
 
         df = await self.query_service.execute(query)
         df["aoi_type"] = ["admin"] * len(df["aoi_id"])
