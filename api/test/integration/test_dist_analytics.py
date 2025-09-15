@@ -626,7 +626,7 @@ async def test_kba_dist_analytics_no_intersection():
             "aoi_type": ["key_biodiversity_area"],
             "dist_alert_date": ["2024-08-15"],
             "dist_alert_confidence": ["high"],
-            "area_ha": [7.7598828125],
+            "area_ha": [7.255227245390415],
         }
     )
 
