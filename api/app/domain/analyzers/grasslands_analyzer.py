@@ -13,8 +13,6 @@ from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 from dask.dataframe import DataFrame
 from xarray import DataArray
 
-admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
-
 
 class GrasslandsAnalyzer(Analyzer):
     """Get natural/semi-natural grasslands areas for the input AOIs"""
@@ -35,9 +33,8 @@ class GrasslandsAnalyzer(Analyzer):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":
             gadm_ids = grasslands_analytics_in.aoi.ids
-            combined_results_df: DataFrame = await self.analyze_admin_areas(
+            results: DataFrame = await self.analyze_admin_areas(
                 gadm_ids,
-                admin_results_uri,
                 grasslands_analytics_in.start_year,
                 grasslands_analytics_in.end_year,
             )
@@ -63,9 +60,10 @@ class GrasslandsAnalyzer(Analyzer):
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+            results = combined_results_df.to_dict(orient="list")
 
         analyzed_analysis = Analysis(
-            combined_results_df,
+            results,
             analysis.metadata,
             AnalysisStatus.saved,
         )
@@ -73,10 +71,8 @@ class GrasslandsAnalyzer(Analyzer):
             grasslands_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    async def analyze_admin_areas(
-        self, gadm_ids, parquet_file, start_year, end_year
-    ) -> DataFrame:
-        query = f"select year, area_ha, aoi_id from '{parquet_file}' where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
+    async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> DataFrame:
+        query = f"select year, area_ha, aoi_id from data_source where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
         df = await self.duckdb_query_service.execute(query)
         df["aoi_type"] = "admin"
         return df
