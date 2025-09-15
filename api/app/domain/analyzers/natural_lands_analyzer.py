@@ -1,8 +1,8 @@
 from functools import partial
+from typing import Any, Dict
 
 import dask.dataframe as dd
 import numpy as np
-import pandas as pd
 from app.analysis.common.analysis import (
     get_geojson,
     read_zarr_clipped_to_geojson,
@@ -89,12 +89,12 @@ class NaturalLandsAnalyzer(Analyzer):
             natural_lands_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    async def analyze_admin_areas(self, gadm_ids) -> pd.DataFrame:
+    async def analyze_admin_areas(self, gadm_ids) -> Dict[str, Any]:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
         query = f"select natural_lands_class, area_ha, aoi_id from data_source where aoi_id in ({id_str})"
         query_service = DuckDbPrecalcQueryService(admin_results_uri)
         df = await query_service.execute(query)
-        df["aoi_type"] = "admin"
+        df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
 
