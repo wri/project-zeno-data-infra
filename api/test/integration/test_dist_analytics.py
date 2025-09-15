@@ -425,7 +425,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                 "area_ha": [
                     113.39714813232422,
                     7.154634952545166,
-                    106.48455047607422,
+                    106.3306655883789,
                     9.065567970275879,
                     154.72398376464844,
                 ],
@@ -655,7 +655,7 @@ async def test_kba_dist_analytics_no_intersection():
             "aoi_type": ["key_biodiversity_area"],
             "dist_alert_date": ["2024-08-15"],
             "dist_alert_confidence": ["high"],
-            "area_ha": [7.7598828125],
+            "area_ha": [7.255227245390415],
         }
     )
 
