@@ -284,73 +284,74 @@ class TestLandCoverChangeAdminAois:
         await analyzer_with_test_data.analyze(analysis)
 
     def test_analysis_result(self):
-        expected = pd.DataFrame(
-            {
-                "land_cover_class": [
-                    "Tree cover",
-                    "Cropland",
-                    "Short vegetation",
-                    "Built-up",
-                    "Wetland – short vegetation",
-                    "Tree cover",
-                    "Cropland",
-                    "Short vegetation",
-                    "Wetland – short vegetation",
-                    "Water",
-                    "Built-up",
-                    "Bare and sparse vegetation",
-                ],
-                "area_ha": [
-                    2.15032,
-                    4.89045,
-                    1.78934,
-                    0.85667,
-                    0.34521,
-                    987654.32,
-                    567890.12,
-                    345678.90,
-                    234567.89,
-                    198765.43,
-                    87654.32,
-                    45678.90,
-                ],
-                "aoi_id": [
-                    "BRA.12.1",
-                    "BRA.12.1",
-                    "BRA.12.1",
-                    "BRA.12.1",
-                    "BRA.12.1",
-                    "IDN",
-                    "IDN",
-                    "IDN",
-                    "IDN",
-                    "IDN",
-                    "IDN",
-                    "IDN",
-                ],
-                "aoi_type": [
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                    "admin",
-                ],
-            }
-        )
+        try:
+            expected = pd.DataFrame(
+                {
+                    "land_cover_class": [
+                        "Tree cover",
+                        "Cropland",
+                        "Short vegetation",
+                        "Built-up",
+                        "Wetland – short vegetation",
+                        "Tree cover",
+                        "Cropland",
+                        "Short vegetation",
+                        "Wetland – short vegetation",
+                        "Water",
+                        "Built-up",
+                        "Bare and sparse vegetation",
+                    ],
+                    "area_ha": [
+                        2.15032,
+                        4.89045,
+                        1.78934,
+                        0.85667,
+                        0.34521,
+                        987654.32,
+                        567890.12,
+                        345678.90,
+                        234567.89,
+                        198765.43,
+                        87654.32,
+                        45678.90,
+                    ],
+                    "aoi_id": [
+                        "BRA.12.1",
+                        "BRA.12.1",
+                        "BRA.12.1",
+                        "BRA.12.1",
+                        "BRA.12.1",
+                        "IDN",
+                        "IDN",
+                        "IDN",
+                        "IDN",
+                        "IDN",
+                        "IDN",
+                        "IDN",
+                    ],
+                    "aoi_type": [
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                        "admin",
+                    ],
+                }
+            )
 
-        pd.testing.assert_frame_equal(
-            pd.DataFrame(self.analysis_repo.analysis.result),
-            expected,
-            check_like=True,
-            rtol=1e-4,
-            atol=1e-4,
-        )
-
-        os.remove("/tmp/test.parquet")
+            pd.testing.assert_frame_equal(
+                pd.DataFrame(self.analysis_repo.analysis.result),
+                expected,
+                check_like=True,
+                rtol=1e-4,
+                atol=1e-4,
+            )
+        finally:
+            os.remove("/tmp/test.parquet")
