@@ -108,5 +108,3 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
         assert df.area_ha.any()
         assert df.columns.size == 4  # aoi_id, aoi_type, area_ha, year
-        print(df)
-        assert 1 == 2
