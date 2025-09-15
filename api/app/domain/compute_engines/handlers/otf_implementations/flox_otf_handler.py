@@ -59,7 +59,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
 
         by = xr.Dataset()
         for ds in query.aggregate.datasets:
-            xarr = dataset_repository.load(ds, geometry=aoi_geometry)
+            xarr = dataset_repository.load(ds, geometry=aoi_geometry).reindex_like(
+                by, method="nearest", tolerance=1e-5
+            )
             by[ds.get_field_name()] = xarr
 
         objs = []
@@ -87,7 +89,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 ]
 
         for group_by in query.group_bys:
-            da = dataset_repository.load(group_by, geometry=aoi_geometry)
+            da = dataset_repository.load(group_by, geometry=aoi_geometry).reindex_like(
+                by, method="nearest", tolerance=1e-5
+            )
             objs.append(da)
             expected_groups.append(expected_groups_per_dataset[group_by])
 
