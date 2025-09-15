@@ -2,6 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+import aioboto3
 from dask.distributed import Client, LocalCluster
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import (
@@ -49,7 +50,15 @@ async def lifespan(app: FastAPI):
     # Load the dask cluster
     app.state.dask_cluster = await LocalCluster(processes=True, asynchronous=True)
     app.state.dask_client = await Client(app.state.dask_cluster, asynchronous=True)
-    yield
+
+    # Create an AWS Session and connections to DyamoDb and S3
+    session = aioboto3.Session()
+    async with session.client("s3", region_name="us-east-1") as s3_client:
+        async with session.resource("dynamodb", region_name="us-east-1") as dynamo:
+            app.state.dynamodb_table = await dynamo.Table("Analyses")
+            app.state.s3_client = s3_client
+            yield
+
     # Release the resources
     close_call = app.state.dask_client.shutdown()
     if close_call is not None:

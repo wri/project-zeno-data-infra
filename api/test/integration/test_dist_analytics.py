@@ -18,9 +18,8 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
 )
-from app.models.land_change.dist_alerts import DistAlertsAnalyticsIn
+from app.models.land_change.dist_alerts import ANALYTICS_NAME, DistAlertsAnalyticsIn
 from app.routers.land_change.dist_alerts.dist_alerts import (
-    ANALYTICS_NAME,
     create_analysis_service,
     get_analysis_repository,
 )

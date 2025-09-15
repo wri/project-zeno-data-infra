@@ -8,7 +8,9 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
+
+ANALYTICS_NAME = "tree_cover_loss"
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -24,6 +26,8 @@ AllowedIntersections = List[Literal["driver"]]
 
 
 class TreeCoverLossAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
+    _version: str = PrivateAttr(default="20250912")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
