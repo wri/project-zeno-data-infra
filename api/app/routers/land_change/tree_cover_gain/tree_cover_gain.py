@@ -27,6 +27,7 @@ from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.tree_cover_gain import (
+    ANALYTICS_NAME,
     TreeCoverGainAnalytics,
     TreeCoverGainAnalyticsIn,
     TreeCoverGainAnalyticsResponse,
@@ -38,7 +39,6 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-ANALYTICS_NAME = "tree_cover_gain"
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
 

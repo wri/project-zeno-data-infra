@@ -13,9 +13,11 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
 )
 from app.main import app
 from app.models.common.areas_of_interest import AdminAreaOfInterest
-from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
-from app.routers.land_change.land_cover.land_cover_change import (
+from app.models.land_change.land_cover_change import (
     ANALYTICS_NAME,
+    LandCoverChangeAnalyticsIn,
+)
+from app.routers.land_change.land_cover.land_cover_change import (
     create_analysis_service,
     get_analysis_repository,
 )

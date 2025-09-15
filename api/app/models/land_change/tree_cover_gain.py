@@ -12,6 +12,8 @@ from app.models.common.base import Response, StrictBaseModel
 from app.models.land_change.tree_cover_loss import AllowedForestFilter
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
+ANALYTICS_NAME = "tree_cover_gain"
+
 AoiUnion = Union[
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
@@ -24,6 +26,7 @@ DATE_REGEX = r"^\d{4}$"
 
 
 class TreeCoverGainAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20250912")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
