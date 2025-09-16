@@ -7,6 +7,10 @@ import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
+from dask.dataframe import DataFrame as DaskDataFrame
 
 
 class TestGrasslandsPreComputedAnalysis:
@@ -67,8 +71,13 @@ class TestGrasslandsPreComputedAnalysis:
     async def test_precomputed_zonal_stats_for_region(self, precomputed_gadm_results):
         gadm_id = "BRA.1"
 
-        result_df = GrasslandsAnalyzer.analyze_admin_areas(
-            [gadm_id], precomputed_gadm_results, 2000, 2022
+        grasslands_analyzer = GrasslandsAnalyzer(
+            duckdb_query_service=DuckDbPrecalcQueryService(
+                table_uri=precomputed_gadm_results
+            )
+        )
+        result_df: DaskDataFrame = await grasslands_analyzer.analyze_admin_areas(
+            [gadm_id], 2000, 2022
         )
 
         # Aggregated yearly data
@@ -105,7 +114,7 @@ class TestGrasslandsPreComputedAnalysis:
 
         pd.testing.assert_frame_equal(
             expected_df,
-            result_df,
+            pd.DataFrame(result_df),
             check_like=True,
             check_dtype=False,
             check_exact=False,  # Allow approximate comparison for numbers
