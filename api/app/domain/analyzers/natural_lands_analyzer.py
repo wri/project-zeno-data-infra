@@ -1,17 +1,18 @@
 from functools import partial
+from typing import Any, Dict
 
 import dask.dataframe as dd
-import duckdb
 import newrelic.agent as nr_agent
 import numpy as np
-import pandas as pd
 from app.analysis.common.analysis import (
     get_geojson,
-    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.natural_lands import NaturalLandsAnalyticsIn
 from flox.xarray import xarray_reduce
@@ -60,7 +61,7 @@ class NaturalLandsAnalyzer(Analyzer):
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
         if natural_lands_analytics_in.aoi.type == "admin":
             gadm_ids = natural_lands_analytics_in.aoi.ids
-            combined_results_df = self.analyze_admin_areas(gadm_ids)
+            results = await self.analyze_admin_areas(gadm_ids)
         else:
             aois = natural_lands_analytics_in.aoi.model_dump()
             geojsons = await get_geojson(aois)
@@ -79,11 +80,10 @@ class NaturalLandsAnalyzer(Analyzer):
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
-
-            pass
+            results = combined_results_df.to_dict(orient="list")
 
         analyzed_analysis = Analysis(
-            combined_results_df.to_dict(orient="list"),
+            results,
             analysis.metadata,
             AnalysisStatus.saved,
         )
@@ -91,12 +91,12 @@ class NaturalLandsAnalyzer(Analyzer):
             natural_lands_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    @staticmethod
-    def analyze_admin_areas(gadm_ids) -> pd.DataFrame:
-        query = f"select natural_lands_class, area_ha, aoi_id from '{admin_results_uri}' where aoi_id in {gadm_ids}"
-        initialize_duckdb()
-        df = duckdb.query(query).df()
-        df["aoi_type"] = "admin"
+    async def analyze_admin_areas(self, gadm_ids) -> Dict[str, Any]:
+        id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
+        query = f"select natural_lands_class, area_ha, aoi_id from data_source where aoi_id in ({id_str})"
+        query_service = DuckDbPrecalcQueryService(admin_results_uri)
+        df = await query_service.execute(query)
+        df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
 
