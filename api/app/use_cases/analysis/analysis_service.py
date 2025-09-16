@@ -1,4 +1,5 @@
 import logging
+import newrelic.agent as nr_agent
 import traceback
 import uuid
 
@@ -23,6 +24,7 @@ class AnalysisService:
     def event_name(self) -> str:
         return self.event
 
+    @nr_agent.background_task(name="AnalysisService.do", group="Task")
     async def do(self) -> None:
         try:
             if self.analytics_resource.metadata is None:

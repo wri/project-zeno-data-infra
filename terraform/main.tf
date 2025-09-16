@@ -58,7 +58,7 @@ module "ecs" {
             }
           ]
           image     = var.api_image
-          command   = ["uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          command   = ["newrelic-admin", "run-program", "uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
           readonlyRootFilesystem = false
           environment = [
             {
@@ -85,6 +85,10 @@ module "ecs" {
               name  = "ANALYSIS_RESULTS_BUCKET_NAME"
               value = aws_s3_bucket.analysis_results.bucket
             },
+            {
+              name = "NEW_RELIC_LICENSE_KEY"
+              value = var.new_relic_license_key
+            }
           ]
         }
       }

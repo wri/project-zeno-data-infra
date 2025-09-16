@@ -1,3 +1,4 @@
+import newrelic.agent as nr_agent
 import numpy as np
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
@@ -14,6 +15,7 @@ class TreeCoverLossAnalyzer(Analyzer):
     def __init__(self, compute_engine):
         self.compute_engine = compute_engine
 
+    @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
