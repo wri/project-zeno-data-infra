@@ -1,8 +1,8 @@
 import asyncio
 from concurrent.futures import ProcessPoolExecutor
+from typing import Dict
 
 import duckdb
-import pandas as pd
 
 process_pool = ProcessPoolExecutor(max_workers=2)
 
@@ -28,7 +28,7 @@ class DuckDbPrecalcQueryService:
     def __init__(self, table_uri):
         self.table_uri = table_uri
 
-    async def execute(self, query: str) -> pd.DataFrame:
+    async def execute(self, query: str) -> Dict:
         # replace data_source in query FROM with actual table URI
         query = query.replace("data_source", f"'{self.table_uri}'")
         loop = asyncio.get_running_loop()

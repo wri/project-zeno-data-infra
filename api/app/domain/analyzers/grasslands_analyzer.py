@@ -1,6 +1,6 @@
 from functools import partial
+from typing import Dict, List
 
-import dask.dataframe as dd
 import numpy as np
 from app.analysis.common.analysis import (
     get_geojson,
@@ -10,7 +10,7 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
-from dask.dataframe import DataFrame
+from dask.dataframe import DataFrame, concat
 from xarray import DataArray
 
 
@@ -32,12 +32,13 @@ class GrasslandsAnalyzer(Analyzer):
     async def analyze(self, analysis: Analysis):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":
-            gadm_ids = grasslands_analytics_in.aoi.ids
-            results: DataFrame = await self.analyze_admin_areas(
+            gadm_ids: List = grasslands_analytics_in.aoi.ids
+            result_df: DataFrame = await self.analyze_admin_areas(
                 gadm_ids,
                 grasslands_analytics_in.start_year,
                 grasslands_analytics_in.end_year,
             )
+            results = result_df.to_dict(orient="list")
         else:
             aois = grasslands_analytics_in.aoi.model_dump()
             geojsons = await get_geojson(aois)
@@ -59,7 +60,7 @@ class GrasslandsAnalyzer(Analyzer):
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
-            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+            combined_results_df = await self.compute_engine.compute(concat(dfs))
             results = combined_results_df.to_dict(orient="list")
 
         analyzed_analysis = Analysis(
@@ -73,12 +74,14 @@ class GrasslandsAnalyzer(Analyzer):
 
     async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> DataFrame:
         query = f"select year, area_ha, aoi_id from data_source where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
-        df = await self.duckdb_query_service.execute(query)
-        df["aoi_type"] = "admin"
-        return df
+
+        data: Dict = await self.duckdb_query_service.execute(query)
+        data["aoi_type"] = "admin" * len(gadm_ids)
+
+        return DataFrame(**data)
 
     @staticmethod
-    def analyze_area(aoi, geojson, start_year, end_year) -> dd.DataFrame:
+    def analyze_area(aoi, geojson, start_year, end_year) -> DataFrame:
         grasslands_obj_name = (
             "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
         )
