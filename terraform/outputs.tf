@@ -21,6 +21,6 @@ output "dask_scheduler_endpoint" {
 
 output "dask_dashboard_url" {
   description = "HTTP dashboard URL"
-  value = "http://${module.api_alb.dns_name}:8787"
+  value = "http://${module.alb.dns_name}:8787"
 }
 

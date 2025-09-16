@@ -145,7 +145,7 @@ module "ecs" {
 
       load_balancer = {
         service = {
-          target_group_arn = module.api_alb.target_groups["ex_ecs"].arn
+          target_group_arn = module.alb.target_groups["ex_ecs"].arn
           container_name   = "api"
           container_port   = 8000
         }
@@ -254,7 +254,7 @@ module "ecs" {
           container_port = 8786
         }
         dashboard = {
-          target_group_arn = module.api_alb.target_groups["dask_dashboard"].arn
+          target_group_arn = module.alb.target_groups["dask_dashboard"].arn
           container_name = "scheduler"
           container_port = 8787
         }
@@ -373,7 +373,7 @@ module "ecs" {
   }
 }
 
-module "api_alb" {
+module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
 
