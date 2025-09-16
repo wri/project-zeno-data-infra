@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Dict, List
 
+import newrelic.agent as nr_agent
 import numpy as np
 from app.analysis.common.analysis import (
     get_geojson,
@@ -29,6 +30,7 @@ class GrasslandsAnalyzer(Analyzer):
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.duckdb_query_service = duckdb_query_service
 
+    @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":

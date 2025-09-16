@@ -183,6 +183,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -205,7 +206,7 @@ jobs:
           IMAGE_PATH=${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
           cd terraform
           terraform init
-          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" -var="aws_secret_access_key=${{env.AWS_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ACCESS_KEY_ID}}" --out=tf.plan
+          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" -var="aws_secret_access_key=${{env.AWS_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{env.NEW_RELIC_LICENSE_KEY}}" --out=tf.plan
 
       - name: Terraform Apply
         if: success()

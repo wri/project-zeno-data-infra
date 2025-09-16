@@ -2,6 +2,7 @@ from functools import partial
 from typing import Any, Dict
 
 import dask.dataframe as dd
+import newrelic.agent as nr_agent
 import numpy as np
 from app.analysis.common.analysis import (
     get_geojson,
@@ -55,6 +56,7 @@ class NaturalLandsAnalyzer(Analyzer):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
+    @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
         if natural_lands_analytics_in.aoi.type == "admin":

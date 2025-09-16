@@ -12,6 +12,7 @@ dependencies = [
     "flox",
     "fsspec",
     "geopandas",
+    "newrelic",
     "numba>=0.61.2",
     "numbagg",
     "numpy",

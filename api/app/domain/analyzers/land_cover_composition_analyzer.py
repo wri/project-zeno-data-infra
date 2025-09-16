@@ -1,6 +1,7 @@
 from functools import partial
 
 import dask.dataframe as dd
+import newrelic.agent as nr_agent
 import numpy as np
 from app.analysis.common.analysis import (
     get_geojson,
@@ -45,6 +46,7 @@ class LandCoverCompositionAnalyzer(Analyzer):
         self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
         self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
 
+    @nr_agent.function_trace(name="LandCoverCompositionAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverCompositionAnalyticsIn(
             **analysis.metadata
@@ -130,10 +132,10 @@ class LandCoverCompositionAnalyzer(Analyzer):
             .drop("spatial_ref", axis=1)
             .reset_index(drop=True)
         )
-        land_cover_composition_ddf[
-            "land_cover_class"
-        ] = land_cover_composition_ddf.land_cover_class.apply(
-            lambda x: LandCoverCompositionAnalyzer.land_cover_mapping[x]
+        land_cover_composition_ddf["land_cover_class"] = (
+            land_cover_composition_ddf.land_cover_class.apply(
+                lambda x: LandCoverCompositionAnalyzer.land_cover_mapping[x]
+            )
         )
         land_cover_composition_ddf["area_ha"] = land_cover_composition_ddf.pop(
             "band_data"

@@ -1,4 +1,5 @@
 import logging
+import newrelic.agent as nr_agent
 import traceback
 import uuid
 
@@ -23,6 +24,7 @@ class AnalysisService:
     def event_name(self) -> str:
         return self.event
 
+    @nr_agent.background_task(name="AnalysisService.do", group="Task")
     async def do(self) -> None:
         try:
             if self.analytics_resource.metadata is None:
@@ -31,6 +33,24 @@ class AnalysisService:
             if self.analytics_resource.status is not None:
                 return  # analysis is in progress, complete, or failed
 
+            aoi = self.analytics_resource.metadata["aoi"]
+            nr_agent.add_custom_attributes(
+                {
+                    "arg.aoi_type": aoi.get("type"),
+                    **(
+                        {
+                            "args.aoi_count": len(
+                                aoi.get("feature_collection", {}).get("features", [])
+                            )
+                        }
+                        if aoi.get("type") == "feature_collection"
+                        else {
+                            "arg.aoi_ids": aoi.get("ids", None),
+                            "args.aoi_count": len(aoi.get("ids", [])),
+                        }
+                    ),
+                }.items()
+            )
             self.analytics_resource.status = AnalysisStatus.pending
             analysis = Analysis(
                 metadata=self.analytics_resource.metadata,

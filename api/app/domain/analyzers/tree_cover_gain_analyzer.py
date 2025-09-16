@@ -1,4 +1,5 @@
 from typing import List
+import newrelic.agent as nr_agent
 
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
@@ -16,6 +17,7 @@ class TreeCoverGainAnalyzer(Analyzer):
     def __init__(self, compute_engine: ComputeEngine):
         self.compute_engine = compute_engine
 
+    @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
 
