@@ -75,6 +75,7 @@ jobs:
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
       TEST_SUITE: api
+      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }} 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -117,7 +118,7 @@ jobs:
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             cd ${{ env.TEST_SUITE }}
-            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} pytest test --disable-warnings
+            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ env.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
 
   test_pipelines:
     needs: build_and_push_image
@@ -183,6 +184,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -205,7 +207,7 @@ jobs:
           IMAGE_PATH=${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
           cd terraform
           terraform init
-          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" -var="aws_secret_access_key=${{env.AWS_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ACCESS_KEY_ID}}" --out=tf.plan
+          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" -var="aws_secret_access_key=${{env.AWS_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ env.NEW_RELIC_LICENSE_KEY }}" --out=tf.plan
 
       - name: Terraform Apply
         if: success()
