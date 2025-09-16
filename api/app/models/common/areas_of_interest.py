@@ -19,7 +19,8 @@ class AdminAreaOfInterest(AreaOfInterest):
     type: Literal["admin"] = "admin"
     ids: List[AdminStr] = Field(
         ...,
-        title="Dot-delimited identifier",
+        min_length=1,
+        title="List of Dot-delimited identifiers",
         examples=[["BRA.12.3"], ["BRA.12.3", "IND", "IDN.12"]],
     )
     provider: str = Field("gadm", title="Administrative Boundary Provider")
@@ -65,7 +66,10 @@ class AdminAreaOfInterest(AreaOfInterest):
 class KeyBiodiversityAreaOfInterest(AreaOfInterest):
     type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
     ids: List[str] = Field(
-        ..., title="Key Biodiversity Area site codes", examples=[["36"], ["18", "8111"]]
+        ...,
+        min_length=1,
+        title="List of Key Biodiversity Area site codes",
+        examples=[["36"], ["18", "8111"]],
     )
 
 
@@ -73,7 +77,8 @@ class ProtectedAreaOfInterest(AreaOfInterest):
     type: Literal["protected_area"] = "protected_area"
     ids: List[str] = Field(
         ...,
-        title="WDPA protected area IDs",
+        min_length=1,
+        title="List of WDPA protected area IDs",
         examples=[["555625448"], ["148322", "555737674"]],
     )
 
@@ -82,7 +87,8 @@ class IndigenousAreaOfInterest(AreaOfInterest):
     type: Literal["indigenous_land"] = "indigenous_land"
     ids: List[str] = Field(
         ...,
-        title="Landmark Indigenous lands object ID",
+        min_length=1,
+        title="List of Landmark Indigenous lands object ID",
         examples=[["MEX11287"], ["CAN1", "CAN2"]],
     )
 
