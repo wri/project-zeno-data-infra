@@ -1,5 +1,8 @@
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
@@ -36,6 +39,9 @@ def create_analysis_service(
         analyzer=GrasslandsAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
+            duckdb_query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
+            ),
         ),
         event=ANALYTICS_NAME,
     )
@@ -46,6 +52,7 @@ def create_analysis_service(
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
     status_code=202,
+    summary="Create Grasslands Analysis Task",
 )
 async def create(
     *,

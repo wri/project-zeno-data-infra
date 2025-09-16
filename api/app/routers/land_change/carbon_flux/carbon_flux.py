@@ -45,6 +45,7 @@ def create_analysis_service(
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
     status_code=202,
+    summary="Create Carbon Flux Analysis Task",
 )
 async def create(
     *,

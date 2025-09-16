@@ -86,7 +86,7 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
 async def zonal_statistics(
     aoi, geojson, intersection: Optional[str] = None
 ) -> DaskDataFrame:
-    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250510/raster/epsg-4326/zarr/date_conf.zarr"
+    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250913/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
