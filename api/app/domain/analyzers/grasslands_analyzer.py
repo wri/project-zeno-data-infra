@@ -73,7 +73,8 @@ class GrasslandsAnalyzer(Analyzer):
         )
 
     async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> DataFrame:
-        query = f"select year, area_ha, aoi_id from data_source where aoi_id in {gadm_ids} and year >= {start_year} and year <= {end_year} order by aoi_id, year"
+        id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
+        query = f"select year, area_ha, aoi_id from data_source where aoi_id in ({id_str}) and year >= {start_year} and year <= {end_year} order by aoi_id, year"
 
         data: Dict = await self.duckdb_query_service.execute(query)
         data["aoi_type"] = "admin" * len(gadm_ids)
