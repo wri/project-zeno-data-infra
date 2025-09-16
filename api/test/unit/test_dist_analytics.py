@@ -201,7 +201,7 @@ def test_get_geojson_request_for_data_api_protected_areas():
         == "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
     )
     assert params == {
-        "sql": "select gfw_geojson from data where wdpaid in ('555625448') order by wdpaid"
+        "sql": "select gfw_geojson from data where wdpa_pid in ('555625448') order by wdpa_pid"
     }
 
 
