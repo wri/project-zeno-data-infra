@@ -33,12 +33,11 @@ class GrasslandsAnalyzer(Analyzer):
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if grasslands_analytics_in.aoi.type == "admin":
             gadm_ids: List = grasslands_analytics_in.aoi.ids
-            result_df: DataFrame = await self.analyze_admin_areas(
+            results: Dict = await self.analyze_admin_areas(
                 gadm_ids,
                 grasslands_analytics_in.start_year,
                 grasslands_analytics_in.end_year,
             )
-            results = result_df.to_dict(orient="list")
         else:
             aois = grasslands_analytics_in.aoi.model_dump()
             geojsons = await get_geojson(aois)
@@ -72,14 +71,14 @@ class GrasslandsAnalyzer(Analyzer):
             grasslands_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> DataFrame:
+    async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> Dict:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
         query = f"select year, area_ha, aoi_id from data_source where aoi_id in ({id_str}) and year >= {start_year} and year <= {end_year} order by aoi_id, year"
 
         data: Dict = await self.duckdb_query_service.execute(query)
         data["aoi_type"] = "admin" * len(gadm_ids)
 
-        return DataFrame(**data)
+        return data
 
     @staticmethod
     def analyze_area(aoi, geojson, start_year, end_year) -> DataFrame:
