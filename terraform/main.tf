@@ -153,21 +153,23 @@ module "ecs" {
     
       enable_cloudwatch_logging = true
       subnet_ids = var.subnet_ids
-      security_group_rules = {
+      security_group_ingress_rules = {
         alb_ingress_8000 = {
           type                     = "ingress"
           from_port                = 8000
           to_port                  = 8000
           protocol                 = "tcp"
           description              = "Service port"
-          source_security_group_id = "sg-080c4a3dcb3b8052b"
+          referenced_security_group_id = module.alb.security_group_id
         }
+      }
+      security_group_egress_rules = {
         egress_all = {
           type        = "egress"
           from_port   = 0
-          to_port     = 0
+          to_port     = 65535
           protocol    = "-1"
-          cidr_blocks = ["0.0.0.0/0"]
+          cidr_ipv4 = "0.0.0.0/0"
         }
       }
     },
@@ -260,14 +262,14 @@ module "ecs" {
         }
       }
       
-      security_group_rules = {
+      security_group_ingress_rules = {
         alb_ingress_8786 = {
           type                     = "ingress"
           from_port                = 8786
           to_port                  = 8786
           protocol                 = "tcp"
           description              = "Dask Scheduler Port"
-          source_security_group_id = "sg-080c4a3dcb3b8052b"
+          referenced_security_group_id = module.dask_nlb.security_group_id
         }
         alb_ingress_8787 = {
           type                     = "ingress"
@@ -275,14 +277,16 @@ module "ecs" {
           to_port                  = 8787
           protocol                 = "tcp"
           description              = "Dask Scheduler Web UI Port"
-          source_security_group_id = "sg-080c4a3dcb3b8052b"
+          referenced_security_group_id = module.alb.security_group_id
         }
+      }
+      security_group_egress_rules = {
         egress_all = {
           type        = "egress"
           from_port   = 0
-          to_port     = 0
+          to_port     = 65535
           protocol    = "-1"
-          cidr_blocks = ["0.0.0.0/0"]
+          cidr_ipv4 = "0.0.0.0/0"
         }
       }
     }
@@ -363,7 +367,24 @@ module "ecs" {
 
       enable_cloudwatch_logging = true
       subnet_ids = var.subnet_ids
-      security_group_ids = [aws_security_group.dask_workers.id]
+      security_group_ingress_rules = {
+        allow_all_tcp_from_vpc = {
+          from_port   = 0
+          to_port     = 65535
+          protocol    = "tcp"
+          description = "Allow all TCP traffic from within the VPC for scheduler communication"
+          cidr_ipv4   = data.aws_vpc.selected.cidr_block
+        }
+      }
+      security_group_egress_rules = {
+        egress_all = {
+          type        = "egress"
+          from_port   = 0
+          to_port     = 65535
+          protocol    = "-1"
+          cidr_ipv4 = "0.0.0.0/0"
+        }
+      }
     }
   }
 
@@ -549,7 +570,7 @@ module "dask_nlb" {
       protocol = "TCP"
       port = 8786
       target_type = "ip"
-      deregistration_delay = 10
+      deregistration_delay = 150
       load_balancing_cross_zone_enabled = true
   
       create_attachment = false
@@ -562,8 +583,14 @@ module "dask_nlb" {
       to_port                  = 8786
       protocol                 = "tcp"
       description              = "Dask Scheduler Port for api"
-      referenced_security_group_id = module.ecs.services["analytics"].security_group_id
-      cidr_blocks                = [data.aws_vpc.selected.cidr_block]
+      cidr_ipv4 = "0.0.0.0/0" #TODO: Lock this down further, analytics services security group or vpc cidr not working
+    }
+  }
+
+  security_group_egress_rules = {
+    all_traffic = {
+      ip_protocol = "-1"
+      cidr_ipv4   = "0.0.0.0/0"
     }
   }
 }
