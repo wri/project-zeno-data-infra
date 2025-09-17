@@ -56,6 +56,7 @@ def _datamart_resource_link_response(request, service) -> str:
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
     status_code=202,
+    summary="Create Disturbance Alerts Analysis Task",
 )
 async def create(
     *,

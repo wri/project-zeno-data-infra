@@ -39,9 +39,7 @@ def get_geojson_request_for_data_api(aoi):
         sql = f"select gfw_geojson from data where sitrecid in {value_list} order by sitrecid"
     elif aoi["type"] == "protected_area":
         url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-        sql = (
-            f"select gfw_geojson from data where wdpaid in {value_list} order by wdpaid"
-        )
+        sql = f"select gfw_geojson from data where wdpa_pid in {value_list} order by wdpa_pid"
     elif aoi["type"] == "indigenous_land":
         url = "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
         sql = f"select gfw_geojson from data where landmark_id in {value_list} order by landmark_id"

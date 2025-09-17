@@ -33,11 +33,22 @@ class AnalysisService:
             if self.analytics_resource.status is not None:
                 return  # analysis is in progress, complete, or failed
 
-            logging.info("metadatas: %s", self.analytics_resource.metadata)
+            aoi = self.analytics_resource.metadata["aoi"]
             nr_agent.add_custom_attributes(
                 {
-                    "arg.aoi_type": self.analytics_resource.metadata["aoi"]["type"],
-                    "arg.aoi_ids": self.analytics_resource.metadata["aoi"]["ids"],
+                    "arg.aoi_type": aoi.get("type"),
+                    **(
+                        {
+                            "args.aoi_count": len(
+                                aoi.get("feature_collection", {}).get("features", [])
+                            )
+                        }
+                        if aoi.get("type") == "feature_collection"
+                        else {
+                            "arg.aoi_ids": aoi.get("ids", None),
+                            "args.aoi_count": len(aoi.get("ids", [])),
+                        }
+                    ),
                 }.items()
             )
             self.analytics_resource.status = AnalysisStatus.pending

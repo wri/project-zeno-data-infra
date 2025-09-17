@@ -47,14 +47,6 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         return f"{self.analytics_category}/{resource_id}.json"
 
     async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
-        logging.info(
-            {
-                "event": "aws_dynamodb_s3_analysis_repository",
-                "message": "loading analysis resource",
-                "resource_id": resource_id,
-            }
-        )
-
         try:
             # Use consistent read for strong consistency
             response = await _retry_on_throttling(
@@ -96,6 +88,16 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
                     # NoSuchKey is handled silently (result remains None)
                     # Re-raise other errors (e.g., AccessDenied)
                     raise e
+
+        logging.info(
+            {
+                "event": "aws_dynamodb_s3_analysis_repository",
+                "message": "loaded analysis resource",
+                "resource_id": resource_id,
+                "metadata": metadata,
+                "status": status,
+            }
+        )
 
         return Analysis(result=result_payload, metadata=metadata, status=status)
 

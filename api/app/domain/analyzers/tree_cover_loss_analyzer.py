@@ -1,3 +1,4 @@
+import newrelic.agent as nr_agent
 import numpy as np
 import newrelic.agent as nr_agent
 
