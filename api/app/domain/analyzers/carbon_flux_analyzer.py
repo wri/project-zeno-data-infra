@@ -34,25 +34,21 @@ tree_cover_loss_zarr_uri = (
 )
 # Parquet location
 # admin_results_uri = "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/tabular/zonal_stats/gadm/gadm_adm2.parquet"
-admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon.parquet"
+
+# This is a simpler parquet with just country, region, subregion, tree_cover_density,
+# carbontype, value columns. Use equality on the tree_cover_density column, which has
+# values 30/50/75..
+admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet"
 
 
 def create_gadm_carbon_query(type, gadm_list, threshold):
-    query = f"(select sum(value) from '{admin_results_uri}' where carbontype == '{type}' and country = '{gadm_list[0]}'"
+    query = f"(select sum(value) from '{admin_results_uri}' where carbontype = '{type}' and country = '{gadm_list[0]}'"
     if len(gadm_list) > 1:
         query += f" AND region = {gadm_list[1]}"
     if len(gadm_list) > 2:
         query += f" AND subregion = {gadm_list[2]}"
 
-    # emissions should filter by just TCD, but net flux/removals should filter by
-    # TCD, gain and mangroves
-    threshold_pixel_value = ZarrDatasetRepository().translate(
-        Dataset.canopy_cover, threshold
-    )
-    if type == "carbon_gross_emissions":
-        query += f"AND tree_cover_density >= {threshold_pixel_value}) AS {type}"
-    else:
-        query += f" AND (tree_cover_density >= {threshold_pixel_value} or mangrove_stock_2000 > 0 OR tree_cover_gain_from_height > 0)) AS {type}"
+    query += f"AND tree_cover_density = {threshold}) AS {type}"
     return query
 
 
