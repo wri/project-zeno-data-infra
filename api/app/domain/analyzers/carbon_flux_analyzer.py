@@ -42,13 +42,13 @@ admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet"
 
 
 def create_gadm_carbon_query(type, gadm_list, threshold):
-    query = f"(select sum(value) from '{admin_results_uri}' where carbontype == '{type}' and country = '{gadm_list[0]}'"
+    query = f"(select sum(value) from '{admin_results_uri}' where carbontype = '{type}' and country = '{gadm_list[0]}'"
     if len(gadm_list) > 1:
         query += f" AND region = {gadm_list[1]}"
     if len(gadm_list) > 2:
         query += f" AND subregion = {gadm_list[2]}"
 
-    query += f"AND tree_cover_density == {threshold}) AS {type}"
+    query += f"AND tree_cover_density = {threshold}) AS {type}"
     return query
 
 
