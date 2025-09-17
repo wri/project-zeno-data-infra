@@ -554,6 +554,8 @@ module "dask_nlb" {
   vpc_id             = var.vpc
   subnets            = var.subnet_ids
   enable_deletion_protection = false
+
+  internal = true
   
   listeners = {
     dask_scheduler = {
@@ -570,7 +572,7 @@ module "dask_nlb" {
       protocol = "TCP"
       port = 8786
       target_type = "ip"
-      deregistration_delay = 150
+      deregistration_delay = 300
       load_balancing_cross_zone_enabled = true
   
       create_attachment = false
@@ -582,8 +584,16 @@ module "dask_nlb" {
       from_port                = 8786
       to_port                  = 8786
       protocol                 = "tcp"
-      description              = "Dask Scheduler Port for api"
-      cidr_ipv4 = "0.0.0.0/0" #TODO: Lock this down further, analytics services security group or vpc cidr not working
+      description              = "Dask Scheduler Port for api and workers"
+      cidr_ipv4 = data.aws_vpc.selected.cidr_block
+    }
+    alb_ingress_8787_api = {
+      type                     = "ingress"
+      from_port                = 8787
+      to_port                  = 8787
+      protocol                 = "tcp"
+      description              = "Dask Scheduler Port for api and workers"
+      cidr_ipv4 = data.aws_vpc.selected.cidr_block
     }
   }
 
