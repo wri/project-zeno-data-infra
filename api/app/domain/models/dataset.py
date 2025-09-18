@@ -49,6 +49,20 @@ class DatasetAggregate(StrictBaseModel):
     datasets: List[Dataset]
     func: Literal["sum", "count"]
 
+    def __repr__(self):
+        clauses: List[str] = [
+            "".join(
+                [
+                    self.func.upper(),
+                    f"({ds.get_field_name()})",
+                    f" AS {ds.get_field_name()}",
+                ]
+            )
+            for ds in self.datasets
+        ]
+
+        return " ".join([clause for clause in clauses])
+
 
 class DatasetQuery(StrictBaseModel):
     aggregate: DatasetAggregate

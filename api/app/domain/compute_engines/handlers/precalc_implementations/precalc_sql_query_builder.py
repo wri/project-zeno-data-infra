@@ -14,12 +14,7 @@ class PrecalcSqlQueryBuilder:
     }
 
     def build(self, aoi_ids, query: DatasetQuery) -> str:
-        aggs = []
-        for ds in query.aggregate.datasets:
-            aggs.append(
-                f"{query.aggregate.func.upper()}({self.FIELDS[ds]}) AS {self.FIELDS[ds]}"
-            )
-        agg = ", ".join(aggs)
+        agg = repr(query.aggregate)
 
         groupby_fields = (
             ", ".join([self.FIELDS[dataset] for dataset in query.group_bys])
