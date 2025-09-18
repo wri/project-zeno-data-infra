@@ -1,6 +1,6 @@
 from typing import List
-import newrelic.agent as nr_agent
 
+import newrelic.agent as nr_agent
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
@@ -51,17 +51,18 @@ class TreeCoverGainAnalyzer(Analyzer):
 
     def _build_years(self, start_year: str, end_year: str):
         """
-        Builds a string tuple of five-year ranges between start_year and end_year.
+        Builds a tuple of strings representing five-year ranges between start_year and end_year.
 
         Args:
             start_year: Start year as string (multiple of five, >= "2000").
             end_year: End year as string (multiple of five, > start_year).
 
         Returns:
-            String representation of a tuple of year ranges, e.g., "('2000-2005', '2005-2010')".
+            A tuple of year ranges, e.g. ('2000-2005', '2005-2010')
         """
         start = int(start_year)
         end = int(end_year)
 
-        year_ranges = [f"'{year}-{year + 5}'" for year in range(start, end, 5)]
-        return f"({', '.join(year_ranges)})"
+        year_ranges = [f"{year}-{year + 5}" for year in range(start, end, 5)]
+
+        return tuple(year_ranges)

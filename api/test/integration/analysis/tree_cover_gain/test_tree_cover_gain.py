@@ -138,7 +138,7 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
 
 
 class TestGainAnalyticsPostWithKba:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
         """Runs before each test in this class"""
         analytics_in = TreeCoverGainAnalyticsIn(
@@ -201,4 +201,71 @@ class TestGainAnalyticsPostWithKba:
         assert "19426" in df["aoi_id"].values
 
         assert ~(df.tree_cover_gain_period == "2000-2005").any()
+        assert df.columns.size == 4
+
+
+class TestGainAnalyticsPostWithKbaKeyErrorFix:
+    @pytest_asyncio.fixture
+    async def setup(self):
+        """Runs before each test in this class"""
+        analytics_in = TreeCoverGainAnalyticsIn(
+            aoi=KeyBiodiversityAreaOfInterest(
+                type="key_biodiversity_area", ids=["20401", "19426"]
+            ),
+            start_year="2015",
+            end_year="2020",
+        )
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                request = await client.post(
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
+                )
+
+                yield request, client, analytics_in
+
+    @pytest.mark.asyncio
+    async def test_post_returns_pending_status(self, setup):
+        test_request, _, _ = setup
+        resource = test_request.json()
+        assert resource["status"] == "pending"
+
+    @pytest.mark.asyncio
+    async def test_post_returns_resource_link(self, setup):
+        test_request, _, analysis_params = setup
+        resource = test_request.json()
+        assert (
+            resource["data"]["link"]
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_returns_202_accepted_response_code(self, setup):
+        test_request, _, _ = setup
+        assert test_request.status_code == 202
+
+    @pytest.mark.asyncio
+    async def test_resource_calculate_results(self, setup):
+        test_request, client, analysis_params = setup
+        data = await retry_getting_resource(
+            ANALYTICS_NAME, analysis_params.thumbprint(), client
+        )
+
+        assert data["status"] == "saved"
+
+        df = pd.DataFrame(data["result"])
+        assert "20401" in df["aoi_id"].values
+        assert "19426" in df["aoi_id"].values
+
+        assert (df.tree_cover_gain_period == "2015-2020").any()
         assert df.columns.size == 4

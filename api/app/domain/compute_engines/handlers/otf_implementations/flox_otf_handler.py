@@ -111,7 +111,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         agg_col_names = [ds.get_field_name() for ds in query.aggregate.datasets]
         filtered_results = results[~results[agg_col_names].isna().all(axis=1)]
 
-        # TODO remove band, spatial_ref, x, y from zarrs
+        # TODO remove band and spatial_ref from zarrs
         return filtered_results.reset_index().drop(
             columns=["index", "band", "spatial_ref"], errors="ignore"
         )
