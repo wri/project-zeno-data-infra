@@ -16,10 +16,4 @@ def dask_local_cluster():
     os.environ["DASK_SCHEDULER_ADDRESS"] = cluster.scheduler_address
     yield cluster
 
-    # Cleanup - use synchronous methods to avoid event loop issues
-    try:
-        # await dask_client.close()
-        cluster.close()
-    except Exception as e:
-        # Ignore cleanup errors as they're often related to event loop closure
-        pass
+    cluster.close()
