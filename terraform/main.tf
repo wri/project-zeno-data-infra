@@ -51,7 +51,7 @@ module "ecs" {
       default_capacity_provider_strategy = {
         FARGATE = {
           weight = 50
-          base   = 20
+          base   = 30
         }
         FARGATE_SPOT = {
           weight = 50
@@ -61,7 +61,7 @@ module "ecs" {
       # Enable autoscaling
       enable_autoscaling = true
       autoscaling_min_capacity = 1
-      autoscaling_max_capacity = 10
+      autoscaling_max_capacity = 30
       
       autoscaling_policies = {
         cpu_scaling = {
