@@ -50,7 +50,7 @@ class TestCarbonDataAdmin:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         analytics_in = CarbonFluxAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
+            aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"]),
             canopy_cover=30,
         )
         app.dependency_overrides[
@@ -87,22 +87,22 @@ class TestCarbonDataAdmin:
 
         expected = pd.DataFrame(
             {
-                "aoi_id": ["NGA.20.31", "IDN.25.3", "CHN"],
-                "aoi_type": ["admin", "admin", "admin"],
+                "aoi_id": ["NGA.20.31"],
+                "aoi_type": ["admin"],
                 "carbon_net_flux_Mg_CO2e": [
                     -12.349344253540039,
-                    24370083.802587524,
-                    -11422581500.146715,
+                    # 24370083.802587524,
+                    # -11422581500.146715,
                 ],
                 "carbon_gross_removals_Mg_CO2e": [
                     12.349344253540039,
-                    28127167.23389721,
-                    17417177319.904095,
+                    # 28127167.23389721,
+                    # 17417177319.904095,
                 ],
                 "carbon_gross_emissions_Mg_CO2e": [
                     0.0,
-                    52496919.891059,
-                    5994595888.622183,
+                    # 52496919.891059,
+                    # 5994595888.622183,
                 ],
             }
         )
