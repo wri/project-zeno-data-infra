@@ -71,7 +71,7 @@ module "ecs" {
             predefined_metric_specification = {
               predefined_metric_type = "ECSServiceAverageCPUUtilization"
             }
-            scale_out_cooldown = 300
+            scale_out_cooldown = 10
             scale_in_cooldown = 300
           }
         }
@@ -83,7 +83,7 @@ module "ecs" {
             predefined_metric_specification = {
               predefined_metric_type = "ECSServiceAverageMemoryUtilization"
             }
-            scale_out_cooldown = 300
+            scale_out_cooldown = 60
             scale_in_cooldown = 300
           }
         }
@@ -179,8 +179,8 @@ module "ecs" {
       assign_public_ip = true
       name = "dask-scheduler${local.name_suffix}"
 
+      enable_autoscaling = false
       desired_count = 1
-      min_capacity  = 1
     
       default_capacity_provider_strategy = {
         FARGATE = {
@@ -297,9 +297,8 @@ module "ecs" {
       assign_public_ip = true
       name = "dask-manager${local.name_suffix}"
 
+      enable_autoscaling = false
       desired_count = 1
-      min_capacity  = 1
-    
       default_capacity_provider_strategy = {
         FARGATE = {
           weight = 100
