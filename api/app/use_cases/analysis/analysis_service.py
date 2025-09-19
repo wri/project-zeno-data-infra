@@ -33,9 +33,12 @@ class AnalysisService:
             if self.analytics_resource.status is not None:
                 return  # analysis is in progress, complete, or failed
 
-            aoi = self.analytics_resource.metadata["aoi"]
+            metadata = self.analytics_resource.metadata.copy()
+            aoi = metadata.pop("aoi")
+
             nr_agent.add_custom_attributes(
                 {
+                    **metadata,
                     "arg.aoi_type": aoi.get("type"),
                     **(
                         {
