@@ -1,4 +1,5 @@
 from test.integration import delete_resource_files, retry_getting_resource
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -420,3 +421,74 @@ class TestTclAnalyticsWithForestFilters:
         assert ~(df.tree_cover_loss_year > 2023).any()
 
         assert df.columns.size == 5
+
+
+class TestTreeCoverLossPrecalcHandler:
+    @pytest_asyncio.fixture
+    async def setup(self):
+        query_service = MagicMock(spec=DuckDbPrecalcQueryService)
+
+        def create_analysis_service_for_tests(
+            request: Request,
+            analysis_repository: AnalysisRepository = Depends(
+                get_file_system_analysis_repository
+            ),
+        ) -> AnalysisService:
+            compute_engine = ComputeEngine(
+                handler=TreeCoverLossPrecalcHandler(
+                    precalc_query_builder=PrecalcSqlQueryBuilder(),
+                    precalc_query_service=query_service,
+                    next_handler=FloxOTFHandler(
+                        dataset_repository=ZarrDatasetRepository(),
+                        aoi_geometry_repository=DataApiAoiGeometryRepository(),
+                        dask_client=request.app.state.dask_client,
+                    ),
+                )
+            )
+
+            return AnalysisService(
+                analysis_repository=analysis_repository,
+                analyzer=TreeCoverLossAnalyzer(compute_engine),
+                event=ANALYTICS_NAME,
+            )
+
+        app.dependency_overrides[
+            create_analysis_service
+        ] = create_analysis_service_for_tests
+        app.dependency_overrides[
+            get_analysis_repository
+        ] = get_file_system_analysis_repository
+
+        yield query_service, create_analysis_service_for_tests
+
+        app.dependency_overrides.clear()
+
+    @pytest.mark.asyncio
+    async def test_one_range(self, setup):
+        query_service, create_analysis_service_for_tests = setup
+
+        analytics_in = TreeCoverLossAnalyticsIn(
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "IDN.14", "BRA"]),
+            start_year="2015",
+            end_year="2022",
+            canopy_cover=30,
+            intersections=[],
+        )
+
+        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                _ = await client.post(
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json=analytics_in.model_dump(),
+                )
+
+        query_service.execute.assert_called_once_with(
+            "SELECT aoi_id, aoi_type, tree_cover_loss_year, SUM(area_ha) AS area_ha, SUM(carbon_emissions_MgCO2e) AS carbon_emissions_MgCO2e "
+            "FROM data_source "
+            "WHERE canopy_cover >= 30 AND tree_cover_loss_year >= 2015 AND tree_cover_loss_year <= 2022 AND aoi_id in ('IDN.24.9', 'IDN.14', 'BRA') "
+            "GROUP BY aoi_id, aoi_type, tree_cover_loss_year"
+        )

@@ -14,7 +14,7 @@ class PrecalcSqlQueryBuilder:
     }
 
     def build(self, aoi_ids, query: DatasetQuery) -> str:
-        agg = repr(query.aggregate)
+        agg = str(query.aggregate)
 
         groupby_fields = (
             ", ".join([self.FIELDS[dataset] for dataset in query.group_bys])
@@ -23,8 +23,7 @@ class PrecalcSqlQueryBuilder:
         )
         groupby_fields = f", {groupby_fields}" if groupby_fields else ""
 
-        filters = " AND ".join([repr(filt) for filt in query.filters])
-
+        filters = " AND ".join([str(filt) for filt in query.filters])
         filters += (
             f" AND aoi_id in ({', '.join([f"'{aoi_id}'" for aoi_id in aoi_ids])})"
         )
