@@ -50,7 +50,7 @@ class TestCarbonDataAdmin:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
         analytics_in = CarbonFluxAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"]),
+            aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
             canopy_cover=30,
         )
         app.dependency_overrides[
