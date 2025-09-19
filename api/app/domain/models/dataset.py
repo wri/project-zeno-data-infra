@@ -34,13 +34,49 @@ class DatasetFilter(StrictBaseModel):
     op: Literal["=", "<", ">", "<=", ">=", "!=", "in"]
     value: Any
 
+    def __str__(self):
+        field = self.dataset.get_field_name()
+        # Suppress trailing commas of monotuples and surround non-numeric strings with single quotes
+        x = self.value
+        if isinstance(x, tuple):
+            value_repr = ", ".join(quote_strings(i) for i in x)
+            value_repr = f"({value_repr})"
+        else:
+            value_repr = quote_strings(x)
+
+        return " ".join([field, self.op, value_repr])
+
 
 class DatasetAggregate(StrictBaseModel):
     datasets: List[Dataset]
     func: Literal["sum", "count"]
+
+    def __str__(self):
+        clauses: List[str] = [
+            "".join(
+                [
+                    self.func.upper(),
+                    f"({ds.get_field_name()})",
+                    f" AS {ds.get_field_name()}",
+                ]
+            )
+            for ds in self.datasets
+        ]
+
+        return ", ".join([clause for clause in clauses])
 
 
 class DatasetQuery(StrictBaseModel):
     aggregate: DatasetAggregate
     group_bys: List[Dataset]
     filters: List[DatasetFilter]
+
+
+def quote_strings(value):
+    try:
+        float(value)
+        int(value)
+        value_repr = str(value)
+    except (TypeError, ValueError):
+        value_repr = f"'{value}'"
+    return value_repr

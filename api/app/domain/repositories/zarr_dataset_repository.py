@@ -1,4 +1,4 @@
-import ast
+from typing import Optional
 
 import xarray as xr
 from app.domain.models.dataset import Dataset
@@ -18,7 +18,9 @@ class ZarrDatasetRepository:
         Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",
     }
 
-    def load(self, dataset: Dataset, geometry: Geometry = None) -> xr.DataArray:
+    def load(
+        self, dataset: Dataset, geometry: Optional[Geometry] = None
+    ) -> xr.DataArray:
         xarr = xr.open_zarr(
             self.ZARR_LOCATIONS[dataset],
             storage_options={"requester_pays": True},
@@ -55,10 +57,8 @@ class ZarrDatasetRepository:
         elif dataset == Dataset.tree_cover_loss:
             return int(value) - 2000
         elif dataset == Dataset.tree_cover_gain:
-            value_tuple = ast.literal_eval(value)
             val_map = {"2000-2005": 1, "2005-2010": 2, "2010-2015": 3, "2015-2020": 4}
-
-            return [val_map[val] for val in value_tuple]
+            return [val_map[val] for val in value]
         elif dataset == Dataset.primary_forest:
             return int(value)
         elif dataset == Dataset.tree_cover_loss_drivers:
