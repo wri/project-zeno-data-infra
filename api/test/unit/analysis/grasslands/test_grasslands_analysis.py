@@ -1,6 +1,7 @@
 import asyncio
 from unittest.mock import patch
 
+import dask
 import numpy as np
 import pandas as pd
 import pytest
@@ -200,10 +201,11 @@ class TestGrasslandsOTFAnalysis:
             },
         }
 
-        result_df = GrasslandsAnalyzer.analyze_area(aoi, aoi["geometry"], 2000, 2022)
-
-        loop = asyncio.get_event_loop()
-        computed_df = await loop.run_in_executor(None, result_df.compute)
+        with dask.config.set(scheduler="synchronous"):
+            result_df = GrasslandsAnalyzer.analyze_area(
+                aoi, aoi["geometry"], 2000, 2022
+            )
+            computed_df = result_df.compute()
 
         years = np.arange(2000, 2023)
         expected_df = pd.DataFrame(

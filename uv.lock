@@ -877,6 +877,27 @@ distributed = [
 ]
 
 [[package]]
+name = "dask-cloudprovider"
+version = "2025.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "dask" },
+    { name = "distributed" },
+    { name = "jinja2" },
+    { name = "tornado" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d5/b7/20607f0fddc2fda4549d205bf807d40fef4adc2bb2555feac462292ba530/dask_cloudprovider-2025.9.0.tar.gz", hash = "sha256:0026c5ab15ff37411b852804ed5c5bc651bed78b34fb517a9f056bdcf5bc5253", size = 95559, upload-time = "2025-09-05T09:05:40.437Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/74/9f45d1dabe57c2508527fb9e5adf1ada22685daa442ca49eac87979df782/dask_cloudprovider-2025.9.0-py3-none-any.whl", hash = "sha256:2cb31e13707487592387a347e66eaf2dc89b93837925f80613c3ad07ef1294fe", size = 95472, upload-time = "2025-09-05T09:05:39.142Z" },
+]
+
+[package.optional-dependencies]
+aws = [
+    { name = "aiobotocore" },
+]
+
+[[package]]
 name = "dateparser"
 version = "1.2.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4249,6 +4270,7 @@ dependencies = [
     { name = "boto3" },
     { name = "coiled" },
     { name = "dask", extra = ["array", "dataframe", "diagnostics", "distributed"] },
+    { name = "dask-cloudprovider", extra = ["aws"] },
     { name = "duckdb" },
     { name = "fastparquet" },
     { name = "flox" },
@@ -4288,6 +4310,7 @@ requires-dist = [
     { name = "boto3" },
     { name = "coiled" },
     { name = "dask", extras = ["array", "dataframe", "distributed", "diagnostics"] },
+    { name = "dask-cloudprovider", extras = ["aws"] },
     { name = "duckdb" },
     { name = "duckdb", specifier = ">=1.3.2" },
     { name = "fastparquet" },

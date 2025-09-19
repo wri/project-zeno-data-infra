@@ -1,6 +1,7 @@
 import os
 from unittest.mock import patch
 
+import dask
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,6 +17,14 @@ from app.models.land_change.land_cover_change import (
     LandCoverChangeAnalyticsIn,
 )
 from dask.distributed import Client
+
+
+# Add this fixture to override the config
+@pytest.fixture(autouse=True)
+def clear_dask_scheduler_config():
+    """Clear Dask scheduler config to force local cluster creation."""
+    with dask.config.set({"scheduler-address": None}):
+        yield
 
 
 @pytest_asyncio.fixture

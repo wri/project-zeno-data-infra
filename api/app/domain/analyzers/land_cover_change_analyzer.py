@@ -140,19 +140,19 @@ class LandCoverChangeAnalyzer(Analyzer):
             .reset_index(drop=True)
         )
 
-        land_cover_change_ddf[
-            "land_cover_class_start"
-        ] = land_cover_change_ddf.class_change.apply(
-            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
-                x // LandCoverChangeAnalyzer.number_of_classes
-            ]
+        land_cover_change_ddf["land_cover_class_start"] = (
+            land_cover_change_ddf.class_change.apply(
+                lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
+                    x // LandCoverChangeAnalyzer.number_of_classes
+                ]
+            )
         )
-        land_cover_change_ddf[
-            "land_cover_class_end"
-        ] = land_cover_change_ddf.class_change.apply(
-            lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
-                x % LandCoverChangeAnalyzer.number_of_classes
-            ]
+        land_cover_change_ddf["land_cover_class_end"] = (
+            land_cover_change_ddf.class_change.apply(
+                lambda x: LandCoverChangeAnalyzer.land_cover_mapping[
+                    x % LandCoverChangeAnalyzer.number_of_classes
+                ]
+            )
         )
 
         land_cover_change_ddf = land_cover_change_ddf.drop(

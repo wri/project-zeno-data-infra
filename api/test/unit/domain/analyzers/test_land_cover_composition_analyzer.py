@@ -17,7 +17,17 @@ from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
+
+import dask
 from dask.distributed import Client
+
+
+# Add this fixture to override the config
+@pytest.fixture(autouse=True)
+def clear_dask_scheduler_config():
+    """Clear Dask scheduler config to force local cluster creation."""
+    with dask.config.set({"scheduler-address": None}):
+        yield
 
 
 @pytest_asyncio.fixture
