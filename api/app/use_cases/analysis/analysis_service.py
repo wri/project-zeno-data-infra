@@ -51,7 +51,7 @@ class AnalysisService:
                             }
                             if aoi.get("type") == "feature_collection"
                             else {
-                                "aoi_ids": aoi.get("ids", [])[:10],
+                                "aoi_ids_sample": aoi.get("ids", [])[:10],
                                 "aoi_count": len(aoi.get("ids", [])),
                             }
                         ),
