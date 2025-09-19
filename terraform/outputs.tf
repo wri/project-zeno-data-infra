@@ -1,6 +1,6 @@
 output "ecs_cluster_arn" {
   description = "ARN of the ECS cluster"
-  value       = module.ecs.cluster_arn
+  value       = module.gfw_ecs_cluster.cluster_arn
 }
 
 output "vpc_id" {

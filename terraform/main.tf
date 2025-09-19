@@ -10,7 +10,7 @@
 terraform {
   backend "s3" {
     bucket         = "tf-state-zeno-rest-api"
-    key            = "terraform/state/production/terraform.tfstate"
+    # key            = "terraform/state/production/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks-production"
@@ -33,166 +33,189 @@ provider "aws" {
     region = "us-east-1" # Replace with your desired region
 }
 
+resource "terraform_data" "wait_for_scheduler_health" {
+  depends_on = [module.gfw_ecs_cluster]
 
-module "ecs" {
+  provisioner "local-exec" {
+    command = <<-EOF
+      echo "Waiting for dask scheduler to be stable..."
+      aws ecs wait services-stable \
+        --cluster ${module.gfw_ecs_cluster.cluster_name} \
+        --services dask-scheduler${local.name_suffix} \
+        --region ${data.aws_region.current.name}
+      
+      echo "Waiting for load balancer target to be healthy..."
+      aws elbv2 wait target-in-service \
+        --target-group-arn ${module.dask_nlb.target_groups["dask_scheduler"].arn} \
+        --region ${data.aws_region.current.name}
+      
+      echo "Scheduler is ready!"
+    EOF
+  }
+  triggers_replace = {
+    always_run = timestamp()
+  }
+}
+
+module "analytics" {
+  source = "terraform-aws-modules/ecs/aws//modules/service"
+  version = "6.3.0"
+
+  cluster_arn = module.gfw_ecs_cluster.cluster_arn
+  name = "analytics${local.name_suffix}"
+
+  health_check_grace_period_seconds = 300
+
+  depends_on = [ terraform_data.wait_for_scheduler_health ]
+
+  cpu    = 8192
+  memory = 32768
+  assign_public_ip = true
+
+  # default_capacity_provider_strategy = {
+  #   FARGATE = {
+  #     weight = 50
+  #     base   = 30
+  #   }
+  #   FARGATE_SPOT = {
+  #     weight = 50
+  #   }
+  # }
+
+  # Enable autoscaling
+  enable_autoscaling = true
+  autoscaling_min_capacity = 1
+  autoscaling_max_capacity = 30
+  
+  autoscaling_policies = {
+    cpu_scaling = {
+      policy_type = "TargetTrackingScaling"
+      target_tracking_scaling_policy_configuration = {
+        target_value = 40.0
+        predefined_metric_specification = {
+          predefined_metric_type = "ECSServiceAverageCPUUtilization"
+        }
+        scale_out_cooldown = 10
+        scale_in_cooldown = 300
+      }
+    }
+    
+    memory_scaling = {
+      policy_type = "TargetTrackingScaling"
+      target_tracking_scaling_policy_configuration = {
+        target_value = 50.0
+        predefined_metric_specification = {
+          predefined_metric_type = "ECSServiceAverageMemoryUtilization"
+        }
+        scale_out_cooldown = 60
+        scale_in_cooldown = 300
+      }
+    }
+  }
+
+  # Container definition(s)
+  container_definitions = {
+    api = {
+      cpu       = 8192
+      memory    = 32768
+      essential = true
+      portMappings = [
+        {
+            name          = "api"
+            containerPort = 8000
+            hostPort      = 8000
+            protocol      = "tcp"
+        }
+      ]
+      image     = var.api_image
+      command   = ["newrelic-admin", "run-program", "uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+      readonlyRootFilesystem = false
+      environment = [
+        {
+          name = "PYTHONPATH"
+          value = "/app/api"
+        },
+        {
+          name = "API_KEY"
+          value = var.api_key
+        },
+        {
+          name = "AWS_SECRET_ACCESS_KEY"
+          value = var.aws_secret_access_key
+        },
+        {
+          name = "AWS_ACCESS_KEY_ID"
+          value = var.aws_access_key_id
+        },
+        {
+          name  = "ANALYSES_TABLE_NAME"
+          value = aws_dynamodb_table.analyses.name
+        },
+        {
+          name  = "ANALYSIS_RESULTS_BUCKET_NAME"
+          value = aws_s3_bucket.analysis_results.bucket
+        },
+        {
+          name  = "DASK_SCHEDULER_ADDRESS"
+          value = "tcp://${module.dask_nlb.dns_name}:8786"
+        },
+        {
+          name = "NEW_RELIC_LICENSE_KEY"
+          value = var.new_relic_license_key
+        }
+      ]
+    }
+  }
+
+  load_balancer = {
+    service = {
+      target_group_arn = module.alb.target_groups["ex_ecs"].arn
+      container_name   = "api"
+      container_port   = 8000
+    }
+  }
+
+  # enable_cloudwatch_logging = true
+  subnet_ids = var.subnet_ids
+  security_group_ingress_rules = {
+    alb_ingress_8000 = {
+      type                     = "ingress"
+      from_port                = 8000
+      to_port                  = 8000
+      protocol                 = "tcp"
+      description              = "Service port"
+      referenced_security_group_id = module.alb.security_group_id
+    }
+  }
+  security_group_egress_rules = {
+    egress_all = {
+      type        = "egress"
+      from_port   = 0
+      to_port     = 65535
+      protocol    = "-1"
+      cidr_ipv4 = "0.0.0.0/0"
+    }
+  }
+}
+
+
+module "gfw_ecs_cluster" {
   source = "terraform-aws-modules/ecs/aws"
+  version = "6.3.0"
 
   cluster_name = "analytics${local.name_suffix}"
   create_task_exec_iam_role = true
 
   services = {
-    analytics = {
-      cpu    = 8192
-      memory = 32768
-      assign_public_ip = true
-
-      name = "analytics${local.name_suffix}"
-    
-      default_capacity_provider_strategy = {
-        FARGATE = {
-          weight = 50
-          base   = 30
-        }
-        FARGATE_SPOT = {
-          weight = 50
-        }
-      }
-
-      # Enable autoscaling
-      enable_autoscaling = true
-      autoscaling_min_capacity = 1
-      autoscaling_max_capacity = 30
-      
-      autoscaling_policies = {
-        cpu_scaling = {
-          policy_type = "TargetTrackingScaling"
-          target_tracking_scaling_policy_configuration = {
-            target_value = 40.0
-            predefined_metric_specification = {
-              predefined_metric_type = "ECSServiceAverageCPUUtilization"
-            }
-            scale_out_cooldown = 10
-            scale_in_cooldown = 300
-          }
-        }
-        
-        memory_scaling = {
-          policy_type = "TargetTrackingScaling"
-          target_tracking_scaling_policy_configuration = {
-            target_value = 50.0
-            predefined_metric_specification = {
-              predefined_metric_type = "ECSServiceAverageMemoryUtilization"
-            }
-            scale_out_cooldown = 60
-            scale_in_cooldown = 300
-          }
-        }
-      }
-
-      # Container definition(s)
-      container_definitions = {
-        api = {
-          cpu       = 8192
-          memory    = 32768
-          essential = true
-          portMappings = [
-            {
-                name          = "api"
-                containerPort = 8000
-                hostPort      = 8000
-                protocol      = "tcp"
-            }
-          ]
-          image     = var.api_image
-          command   = ["newrelic-admin", "run-program", "uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-          readonlyRootFilesystem = false
-          environment = [
-            {
-              name = "PYTHONPATH"
-              value = "/app/api"
-            },
-            {
-              name = "API_KEY"
-              value = var.api_key
-            },
-            {
-              name = "AWS_SECRET_ACCESS_KEY"
-              value = var.aws_secret_access_key
-            },
-            {
-              name = "AWS_ACCESS_KEY_ID"
-              value = var.aws_access_key_id
-            },
-            {
-              name  = "ANALYSES_TABLE_NAME"
-              value = aws_dynamodb_table.analyses.name
-            },
-            {
-              name  = "ANALYSIS_RESULTS_BUCKET_NAME"
-              value = aws_s3_bucket.analysis_results.bucket
-            },
-            {
-              name  = "DASK_SCHEDULER_ADDRESS"
-              value = "tcp://${module.dask_nlb.dns_name}:8786"
-            },
-            {
-              name = "NEW_RELIC_LICENSE_KEY"
-              value = var.new_relic_license_key
-            }
-          ]
-        }
-      }
-
-      load_balancer = {
-        service = {
-          target_group_arn = module.alb.target_groups["ex_ecs"].arn
-          container_name   = "api"
-          container_port   = 8000
-        }
-      }
-    
-      enable_cloudwatch_logging = true
-      subnet_ids = var.subnet_ids
-      security_group_ingress_rules = {
-        alb_ingress_8000 = {
-          type                     = "ingress"
-          from_port                = 8000
-          to_port                  = 8000
-          protocol                 = "tcp"
-          description              = "Service port"
-          referenced_security_group_id = module.alb.security_group_id
-        }
-      }
-      security_group_egress_rules = {
-        egress_all = {
-          type        = "egress"
-          from_port   = 0
-          to_port     = 65535
-          protocol    = "-1"
-          cidr_ipv4 = "0.0.0.0/0"
-        }
-      }
-    },
     dask_scheduler = {
       cpu    = 4096
       memory = 16384
       assign_public_ip = true
       name = "dask-scheduler${local.name_suffix}"
-
-      enable_autoscaling = false
       desired_count = 1
-    
-      default_capacity_provider_strategy = {
-        FARGATE = {
-          weight = 100
-          base   = 1
-        }
-      }
 
-      runtime_platform = {
-        cpu_architecture        = "X86_64"  # or "ARM64"
-        operating_system_family = "LINUX"
-      }
+      health_check_grace_period_seconds = 300
+
       container_definitions = {
         scheduler = {
           cpu       = 4096
@@ -246,9 +269,6 @@ module "ecs" {
         }
       }
 
-      enable_cloudwatch_logging = true
-      subnet_ids = var.subnet_ids
-
       load_balancer = {
         scheduler = {
           target_group_arn = module.dask_nlb.target_groups["dask_scheduler"].arn
@@ -262,6 +282,8 @@ module "ecs" {
         }
       }
       
+      enable_cloudwatch_logging = true
+      subnet_ids = var.subnet_ids
       security_group_ingress_rules = {
         alb_ingress_8786 = {
           type                     = "ingress"
@@ -290,109 +312,111 @@ module "ecs" {
         }
       }
     }
-
-    dask_cluster_manager = {
-      cpu    = 1024
-      memory = 4096
-      assign_public_ip = true
-      name = "dask-manager${local.name_suffix}"
-
-      enable_autoscaling = false
-      desired_count = 1
-      default_capacity_provider_strategy = {
-        FARGATE = {
-          weight = 100
-          base   = 1
-        }
-      }
-
-      runtime_platform = {
-        cpu_architecture        = "X86_64"  # or "ARM64"
-        operating_system_family = "LINUX"
-      }
-      container_definitions = {
-        dask_cluster_manager = {
-          cpu       = 1024
-          memory    = 4096
-          essential = true
-          image     = var.api_image
-          
-          command = [
-            "python",
-            "/app/api/dask_cluster/start_cluster.py",
-          ]       
-          environment = [
-            {
-              name  = "PYTHONPATH"
-              value = "/app/api"
-            },
-            {
-              name  = "API_KEY"
-              value = var.api_key
-            },
-            {
-              name  = "AWS_SECRET_ACCESS_KEY"
-              value = var.aws_secret_access_key
-            },
-            {
-              name  = "AWS_ACCESS_KEY_ID"
-              value = var.aws_access_key_id
-            },
-            {
-              name  = "DASK_SCHEDULER_ADDRESS"
-              value = "tcp://${module.dask_nlb.dns_name}:8786"
-            },
-            {
-              name  = "DASK_VPC"
-              value = var.vpc
-            },
-            {
-              name  = "DASK_CLUSTER_ARN"
-              value = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:cluster/${local.cluster_name}"
-            },
-            {
-              name  = "DASK_WORKER_TASK_DEFINITION_ARN"
-              value = aws_ecs_task_definition.dask_worker.arn
-            },
-            {
-              name  = "DASK_WORKER_SECURITY_GROUP"
-              value = aws_security_group.dask_workers.id
-            }
-          ]
-          
-          readonlyRootFilesystem = false
-        }
-      }
-
-      enable_cloudwatch_logging = true
-      subnet_ids = var.subnet_ids
-      security_group_ingress_rules = {
-        allow_all_tcp_from_vpc = {
-          from_port   = 0
-          to_port     = 65535
-          protocol    = "tcp"
-          description = "Allow all TCP traffic from within the VPC for scheduler communication"
-          cidr_ipv4   = data.aws_vpc.selected.cidr_block
-        }
-      }
-      security_group_egress_rules = {
-        egress_all = {
-          type        = "egress"
-          from_port   = 0
-          to_port     = 65535
-          protocol    = "-1"
-          cidr_ipv4 = "0.0.0.0/0"
-        }
-      }
-    }
-  }
-
-  tags = {
-    Environment = "Staging"
-    Project     = "Zeno"
   }
 }
 
+module "dask_cluster_manager" {
+  source = "terraform-aws-modules/ecs/aws//modules/service"
+  version = "6.3.0"
+
+  cpu    = 1024
+  memory = 4096
+  assign_public_ip = true
+  name = "dask-manager${local.name_suffix}"
+  cluster_arn = module.gfw_ecs_cluster.cluster_arn
+
+  depends_on = [ terraform_data.wait_for_scheduler_health ]
+  
+  health_check_grace_period_seconds = 300
+
+  enable_autoscaling = false
+  # desired_count = 1
+  # default_capacity_provider_strategy = {
+  #   FARGATE = {
+  #     weight = 100
+  #     base   = 1
+  #   }
+  # }
+
+  runtime_platform = {
+    cpu_architecture        = "X86_64"  # or "ARM64"
+    operating_system_family = "LINUX"
+  }
+  container_definitions = {
+    dask_cluster_manager = {
+      cpu       = 1024
+      memory    = 4096
+      essential = true
+      image     = var.api_image
+      
+      command = [
+        "python",
+        "/app/api/dask_cluster/start_cluster.py",
+      ]       
+      environment = [
+        {
+          name  = "PYTHONPATH"
+          value = "/app/api"
+        },
+        {
+          name  = "API_KEY"
+          value = var.api_key
+        },
+        {
+          name  = "AWS_SECRET_ACCESS_KEY"
+          value = var.aws_secret_access_key
+        },
+        {
+          name  = "AWS_ACCESS_KEY_ID"
+          value = var.aws_access_key_id
+        },
+        {
+          name  = "DASK_SCHEDULER_ADDRESS"
+          value = "tcp://${module.dask_nlb.dns_name}:8786"
+        },
+        {
+          name  = "DASK_VPC"
+          value = var.vpc
+        },
+        {
+          name  = "DASK_CLUSTER_ARN"
+          value = "arn:aws:ecs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:cluster/${local.cluster_name}"
+        },
+        {
+          name  = "DASK_WORKER_TASK_DEFINITION_ARN"
+          value = aws_ecs_task_definition.dask_worker.arn
+        },
+        {
+          name  = "DASK_WORKER_SECURITY_GROUP"
+          value = aws_security_group.dask_workers.id
+        }
+      ]
+      
+      readonlyRootFilesystem = false
+    }
+  }
+
+  # enable_cloudwatch_logging = true
+  subnet_ids = var.subnet_ids
+  security_group_ingress_rules = {
+    allow_all_tcp_from_vpc = {
+      from_port   = 0
+      to_port     = 65535
+      protocol    = "tcp"
+      description = "Allow all TCP traffic from within the VPC for scheduler communication"
+      cidr_ipv4   = data.aws_vpc.selected.cidr_block
+    }
+  }
+  security_group_egress_rules = {
+    egress_all = {
+      type        = "egress"
+      from_port   = 0
+      to_port     = 65535
+      protocol    = "-1"
+      cidr_ipv4 = "0.0.0.0/0"
+    }
+  }
+}
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
@@ -452,7 +476,7 @@ module "alb" {
       backend_protocol                  = "HTTP"
       backend_port                      = 8000
       target_type                       = "ip"
-      deregistration_delay              = 5
+      deregistration_delay              = 30
       load_balancing_cross_zone_enabled = true
 
       health_check = {
@@ -476,7 +500,7 @@ module "alb" {
       backend_protocol = "HTTP"
       backend_port = 8787
       target_type = "ip"
-      deregistration_delay = 5
+      deregistration_delay = 300
       load_balancing_cross_zone_enabled = true
       health_check = {
         enabled = true
@@ -500,7 +524,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
   memory                   = 32768
-  execution_role_arn       = module.ecs.task_exec_iam_role_arn
+  execution_role_arn       = module.gfw_ecs_cluster.task_exec_iam_role_arn
 
   # Set CPU architecture here
   runtime_platform {
@@ -696,6 +720,6 @@ resource "aws_iam_policy" "ecs_task_analysis" {
 
 # Attach the new policy to the ECS Task Execution Role created by the module
 resource "aws_iam_role_policy_attachment" "ecs_task_analysis" {
-  role       = module.ecs.task_exec_iam_role_name # This references the role created by the ECS module
+  role       = module.gfw_ecs_cluster.task_exec_iam_role_name # This references the role created by the ECS module
   policy_arn = aws_iam_policy.ecs_task_analysis.arn
 }
