@@ -34,6 +34,16 @@ class DatasetFilter(StrictBaseModel):
     op: Literal["=", "<", ">", "<=", ">=", "!=", "in"]
     value: Any
 
+    def __str__(self):
+        field = self.dataset.get_field_name()
+        # Supress trailing commas of monotuples
+        match self.value:
+            case (x,):
+                value_repr: str = f"('{x}')"
+            case x:
+                value_repr = str(x)
+        return " ".join([field, self.op, value_repr])
+
 
 class DatasetAggregate(StrictBaseModel):
     datasets: List[Dataset]
