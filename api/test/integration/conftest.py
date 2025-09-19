@@ -9,7 +9,6 @@ def dask_local_cluster():
         n_workers=8,
         threads_per_worker=2,
         dashboard_address=None,
-        processes=False,
         silence_logs=True,
     )
 
