@@ -38,20 +38,24 @@ class AnalysisService:
 
             nr_agent.add_custom_attributes(
                 {
-                    **metadata,
-                    "arg.aoi_type": aoi.get("type"),
-                    **(
-                        {
-                            "args.aoi_count": len(
-                                aoi.get("feature_collection", {}).get("features", [])
-                            )
-                        }
-                        if aoi.get("type") == "feature_collection"
-                        else {
-                            "arg.aoi_ids": aoi.get("ids", None),
-                            "args.aoi_count": len(aoi.get("ids", [])),
-                        }
-                    ),
+                    "args.metadata": {
+                        **metadata,
+                        "aoi_type": aoi.get("type"),
+                        **(
+                            {
+                                "aoi_count": len(
+                                    aoi.get("feature_collection", {}).get(
+                                        "features", []
+                                    )
+                                )
+                            }
+                            if aoi.get("type") == "feature_collection"
+                            else {
+                                "aoi_ids": aoi.get("ids", [])[:10],
+                                "aoi_count": len(aoi.get("ids", [])),
+                            }
+                        ),
+                    }
                 }.items()
             )
             self.analytics_resource.status = AnalysisStatus.pending
