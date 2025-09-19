@@ -464,7 +464,7 @@ class TestTreeCoverLossPrecalcHandler:
         app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
-    async def test_one_range(self, setup):
+    async def test_tcl_calc_string(self, setup):
         query_service, create_analysis_service_for_tests = setup
 
         analytics_in = TreeCoverLossAnalyticsIn(

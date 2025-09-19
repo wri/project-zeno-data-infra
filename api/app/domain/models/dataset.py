@@ -36,22 +36,13 @@ class DatasetFilter(StrictBaseModel):
 
     def __str__(self):
         field = self.dataset.get_field_name()
-        # Supress trailing commas of monotuples and surround (only) strings with single quotes
-        match self.value:
-            case (x,):
-                try:
-                    float(x)
-                    int(x)
-                    value_repr = f"({x})"
-                except ValueError:
-                    value_repr = f"('{x}')"
-            case x:
-                try:
-                    float(x)
-                    int(x)
-                    value_repr = f"{x}"
-                except ValueError:
-                    value_repr = f"'{x}'"
+        # Suppress trailing commas of monotuples and surround non-numeric strings with single quotes
+        x = self.value
+        if isinstance(x, tuple):
+            value_repr = ", ".join(quote_strings(i) for i in x)
+            value_repr = f"({value_repr})"
+        else:
+            value_repr = quote_strings(x)
 
         return " ".join([field, self.op, value_repr])
 
@@ -79,3 +70,13 @@ class DatasetQuery(StrictBaseModel):
     aggregate: DatasetAggregate
     group_bys: List[Dataset]
     filters: List[DatasetFilter]
+
+
+def quote_strings(value):
+    try:
+        float(value)
+        int(value)
+        value_repr = str(value)
+    except (TypeError, ValueError):
+        value_repr = f"'{value}'"
+    return value_repr
