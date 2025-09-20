@@ -29,6 +29,7 @@ data "aws_vpc" "selected" {
   id = var.vpc
 }
 
+
 provider "aws" {
     region = "us-east-1" # Replace with your desired region
 }
@@ -43,12 +44,10 @@ resource "terraform_data" "wait_for_scheduler_health" {
         --cluster ${module.gfw_ecs_cluster.cluster_name} \
         --services dask-scheduler${local.name_suffix} \
         --region ${data.aws_region.current.name}
-      
-      echo "Waiting for load balancer target to be healthy..."
+  
       aws elbv2 wait target-in-service \
         --target-group-arn ${module.dask_nlb.target_groups["dask_scheduler"].arn} \
         --region ${data.aws_region.current.name}
-      
       echo "Scheduler is ready!"
     EOF
   }
@@ -57,6 +56,107 @@ resource "terraform_data" "wait_for_scheduler_health" {
   }
 }
 
+# Create dedicated security groups separately
+resource "aws_security_group" "analytics_api" {
+  name_prefix = "analytics-api${local.name_suffix}-"
+  vpc_id      = var.vpc
+  description = "Security group for analytics API service"
+
+  ingress {
+    from_port       = 8000
+    to_port         = 8000
+    protocol        = "tcp"
+    security_groups = [module.alb.security_group_id]
+    description     = "Allow ALB to reach API service"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+  }
+
+  tags = {
+    Name = "analytics-api${local.name_suffix}"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group" "dask_scheduler" {
+  name_prefix = "dask-scheduler${local.name_suffix}-"
+  vpc_id      = var.vpc
+  description = "Security group for Dask scheduler"
+
+  # Allow scheduler port from NLB
+  ingress {
+    from_port       = 8786
+    to_port         = 8786
+    protocol        = "tcp"
+    security_groups = [module.dask_nlb.security_group_id]
+    description     = "Allow NLB to reach Dask scheduler"
+  }
+
+  # Allow dashboard port from ALB
+  ingress {
+    from_port       = 8787
+    to_port         = 8787
+    protocol        = "tcp"
+    security_groups = [module.alb.security_group_id]
+    description     = "Allow ALB to reach Dask dashboard"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "dask-scheduler${local.name_suffix}"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_security_group" "dask_manager" {
+  name_prefix = "dask-manager${local.name_suffix}-"
+  vpc_id      = var.vpc
+  description = "Security group for Dask cluster manager"
+
+  # Allow all TCP from VPC for scheduler communication
+  ingress {
+      from_port   = 0
+      to_port     = 65535
+      protocol    = "tcp"
+      description = "Allow all TCP traffic from within the VPC for scheduler communication"
+      cidr_blocks   = [data.aws_vpc.selected.cidr_block]
+      # vpc_id = var.vpc  
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    # vpc_id = var.vpc
+  }
+
+
+  tags = {
+    Name = "dask-manager${local.name_suffix}"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
 module "analytics" {
   source = "terraform-aws-modules/ecs/aws//modules/service"
   version = "6.3.0"
@@ -66,7 +166,7 @@ module "analytics" {
 
   health_check_grace_period_seconds = 300
 
-  depends_on = [ terraform_data.wait_for_scheduler_health ]
+  depends_on = [ terraform_data.wait_for_scheduler_health, aws_security_group.analytics_api ]
 
   cpu    = 8192
   memory = 32768
@@ -177,25 +277,7 @@ module "analytics" {
 
   # enable_cloudwatch_logging = true
   subnet_ids = var.subnet_ids
-  security_group_ingress_rules = {
-    alb_ingress_8000 = {
-      type                     = "ingress"
-      from_port                = 8000
-      to_port                  = 8000
-      protocol                 = "tcp"
-      description              = "Service port"
-      referenced_security_group_id = module.alb.security_group_id
-    }
-  }
-  security_group_egress_rules = {
-    egress_all = {
-      type        = "egress"
-      from_port   = 0
-      to_port     = 65535
-      protocol    = "-1"
-      cidr_ipv4 = "0.0.0.0/0"
-    }
-  }
+  security_group_ids = [aws_security_group.analytics_api.id]
 }
 
 
@@ -284,33 +366,7 @@ module "gfw_ecs_cluster" {
       
       enable_cloudwatch_logging = true
       subnet_ids = var.subnet_ids
-      security_group_ingress_rules = {
-        alb_ingress_8786 = {
-          type                     = "ingress"
-          from_port                = 8786
-          to_port                  = 8786
-          protocol                 = "tcp"
-          description              = "Dask Scheduler Port"
-          referenced_security_group_id = module.dask_nlb.security_group_id
-        }
-        alb_ingress_8787 = {
-          type                     = "ingress"
-          from_port                = 8787
-          to_port                  = 8787
-          protocol                 = "tcp"
-          description              = "Dask Scheduler Web UI Port"
-          referenced_security_group_id = module.alb.security_group_id
-        }
-      }
-      security_group_egress_rules = {
-        egress_all = {
-          type        = "egress"
-          from_port   = 0
-          to_port     = 65535
-          protocol    = "-1"
-          cidr_ipv4 = "0.0.0.0/0"
-        }
-      }
+      security_group_ids = [aws_security_group.dask_scheduler.id]
     }
   }
 }
@@ -398,24 +454,7 @@ module "dask_cluster_manager" {
 
   # enable_cloudwatch_logging = true
   subnet_ids = var.subnet_ids
-  security_group_ingress_rules = {
-    allow_all_tcp_from_vpc = {
-      from_port   = 0
-      to_port     = 65535
-      protocol    = "tcp"
-      description = "Allow all TCP traffic from within the VPC for scheduler communication"
-      cidr_ipv4   = data.aws_vpc.selected.cidr_block
-    }
-  }
-  security_group_egress_rules = {
-    egress_all = {
-      type        = "egress"
-      from_port   = 0
-      to_port     = 65535
-      protocol    = "-1"
-      cidr_ipv4 = "0.0.0.0/0"
-    }
-  }
+  security_group_ids = [aws_security_group.dask_manager.id]
 }
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
@@ -500,7 +539,7 @@ module "alb" {
       backend_protocol = "HTTP"
       backend_port = 8787
       target_type = "ip"
-      deregistration_delay = 300
+      deregistration_delay = 5
       load_balancing_cross_zone_enabled = true
       health_check = {
         enabled = true
@@ -595,11 +634,23 @@ module "dask_nlb" {
       protocol = "TCP"
       port = 8786
       target_type = "ip"
-      deregistration_delay = 300
+      deregistration_delay = 5
       load_balancing_cross_zone_enabled = true
   
       create_attachment = false
+      health_check = {
+        enabled = true
+        healthy_threshold = 2
+        interval = 30
+        # matcher = "200"
+        port = "traffic-port"
+        protocol = "TCP"
+        timeout = 5
+        unhealthy_threshold = 2
+      }
     }
+
+
   }
   security_group_ingress_rules = {
     alb_ingress_8786_api = {
