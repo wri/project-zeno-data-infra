@@ -109,9 +109,9 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         ddb_item = {
             "resource_id": resource_id_str,
             "metadata": analytics.metadata,
-            "status": analytics.status.value
-            if analytics.status
-            else None,  # Store the enum's value (string)
+            "status": (
+                analytics.status.value if analytics.status else None
+            ),  # Store the enum's value (string)
             "s3_result_key": s3_key,  # Always store the pointer, even if result is None
         }
 
