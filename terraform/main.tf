@@ -246,9 +246,8 @@ module "analytics" {
           value = var.new_relic_license_key
         }
       ]
-      create_cloudwatch_log_group = false
+      create_cloudwatch_log_group = true
       enable_cloudwatch_logging = true
-
     }
   }
 
