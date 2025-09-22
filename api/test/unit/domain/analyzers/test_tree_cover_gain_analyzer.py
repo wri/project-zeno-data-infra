@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+import pytest_asyncio
 from app.domain.analyzers.tree_cover_gain_analyzer import TreeCoverGainAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
@@ -16,6 +17,25 @@ from app.infrastructure.external_services.duck_db_query_service import (
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
+
+
+class TestBuildYearsHelper:
+    @pytest_asyncio.fixture
+    def setup_tcga(self):
+        tcga = TreeCoverGainAnalyzer(compute_engine=MagicMock(spec=ComputeEngine))
+        yield tcga
+
+    def test_build_years_one_period(self, setup_tcga):
+        tcga = setup_tcga
+        expected = ("2000-2005",)
+        actual = tcga._build_years(start_year="2000", end_year="2005")
+        assert actual == expected
+
+    def test_build_years_multiple_periods(self, setup_tcga):
+        tcga = setup_tcga
+        expected = ("2000-2005", "2005-2010")
+        actual = tcga._build_years(start_year="2000", end_year="2010")
+        assert actual == expected
 
 
 class TestTreeCoverGainAnalyzerAdminAOIs:
