@@ -34,7 +34,7 @@ provider "aws" {
     region = "us-east-1" # Replace with your desired region
 }
 
-module "gfw_ecs_cluster" {
+module "gnw_ecs_cluster" {
   source = "terraform-aws-modules/ecs/aws"
   version = "6.3.0"
 
@@ -128,13 +128,13 @@ module "gfw_ecs_cluster" {
 }
 
 resource "terraform_data" "wait_for_scheduler_health" {
-  depends_on = [module.gfw_ecs_cluster]
+  depends_on = [module.gnw_ecs_cluster]
 
   provisioner "local-exec" {
     command = <<-EOF
       echo "Waiting for dask scheduler to be stable..."
       aws ecs wait services-stable \
-        --cluster ${module.gfw_ecs_cluster.cluster_name} \
+        --cluster ${module.gnw_ecs_cluster.cluster_name} \
         --services dask-scheduler${local.name_suffix} \
         --region ${data.aws_region.current.name}
   
@@ -153,7 +153,7 @@ module "analytics" {
   source = "terraform-aws-modules/ecs/aws//modules/service"
   version = "6.3.0"
 
-  cluster_arn = module.gfw_ecs_cluster.cluster_arn
+  cluster_arn = module.gnw_ecs_cluster.cluster_arn
   name = "analytics${local.name_suffix}"
 
   health_check_grace_period_seconds = 300
@@ -269,7 +269,7 @@ module "dask_cluster_manager" {
   memory = 4096
   assign_public_ip = true
   name = "dask-manager${local.name_suffix}"
-  cluster_arn = module.gfw_ecs_cluster.cluster_arn
+  cluster_arn = module.gnw_ecs_cluster.cluster_arn
 
   depends_on = [ terraform_data.wait_for_scheduler_health ]
   
@@ -445,7 +445,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
   memory                   = 32768
-  execution_role_arn       = module.gfw_ecs_cluster.task_exec_iam_role_arn
+  execution_role_arn       = module.gnw_ecs_cluster.task_exec_iam_role_arn
 
   # Set CPU architecture here
   runtime_platform {
@@ -752,6 +752,6 @@ resource "aws_iam_policy" "ecs_task_analysis" {
 
 # Attach the new policy to the ECS Task Execution Role created by the module
 resource "aws_iam_role_policy_attachment" "ecs_task_analysis" {
-  role       = module.gfw_ecs_cluster.task_exec_iam_role_name # This references the role created by the ECS module
+  role       = module.gnw_ecs_cluster.task_exec_iam_role_name # This references the role created by the ECS module
   policy_arn = aws_iam_policy.ecs_task_analysis.arn
 }
