@@ -137,7 +137,6 @@ resource "aws_security_group" "dask_manager" {
       protocol    = "tcp"
       description = "Allow all TCP traffic from within the VPC for scheduler communication"
       cidr_blocks   = [data.aws_vpc.selected.cidr_block]
-      # vpc_id = var.vpc  
   }
 
   egress {
@@ -145,7 +144,6 @@ resource "aws_security_group" "dask_manager" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
-    # vpc_id = var.vpc
   }
 
 
@@ -275,7 +273,6 @@ module "analytics" {
     }
   }
 
-  # enable_cloudwatch_logging = true
   subnet_ids = var.subnet_ids
   security_group_ids = [aws_security_group.analytics_api.id]
 }
@@ -295,9 +292,9 @@ module "gfw_ecs_cluster" {
       assign_public_ip = true
       name = "dask-scheduler${local.name_suffix}"
       desired_count = 1
+      enable_autoscaling = false
 
       health_check_grace_period_seconds = 300
-
       container_definitions = {
         scheduler = {
           cpu       = 4096
@@ -384,15 +381,8 @@ module "dask_cluster_manager" {
   depends_on = [ terraform_data.wait_for_scheduler_health ]
   
   health_check_grace_period_seconds = 300
-
+  desired_count = 1
   enable_autoscaling = false
-  # desired_count = 1
-  # default_capacity_provider_strategy = {
-  #   FARGATE = {
-  #     weight = 100
-  #     base   = 1
-  #   }
-  # }
 
   runtime_platform = {
     cpu_architecture        = "X86_64"  # or "ARM64"
@@ -452,7 +442,6 @@ module "dask_cluster_manager" {
     }
   }
 
-  # enable_cloudwatch_logging = true
   subnet_ids = var.subnet_ids
   security_group_ids = [aws_security_group.dask_manager.id]
 }
