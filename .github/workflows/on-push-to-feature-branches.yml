@@ -10,25 +10,25 @@ env:
 
 jobs:
   build_api_image:
-    uses: ./.github/workflows/common/build.yml
+    uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
       project_dir: 'api'
 
   run_api_tests:
-    uses: ./.github/workflows/common/test.yml
+    uses: ./.github/workflows/test.yml
     secrets: inherit
     with:
       project_dir: 'api'
 
   build_pipelines_image:
-    uses: ./.github/workflows/common/build.yml
+    uses: ./.github/workflows/build.yml
     secrets: inherit
     with:
       project_dir: 'pipelines'
 
   run_pipelines_tests:
-    uses: ./.github/workflows/common/test.yml
+    uses: ./.github/workflows/test.yml
     secrets: inherit
     with:
       project_dir: 'pipelines'
