@@ -16,6 +16,7 @@ jobs:
       project_dir: 'api'
 
   run_api_tests:
+    needs: build_api_image
     uses: ./.github/workflows/test.yml
     secrets: inherit
     with:
@@ -28,6 +29,7 @@ jobs:
       project_dir: 'pipelines'
 
   run_pipelines_tests:
+    needs: build_pipelines_image
     uses: ./.github/workflows/test.yml
     secrets: inherit
     with:
