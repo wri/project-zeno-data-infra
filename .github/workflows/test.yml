@@ -60,7 +60,7 @@ jobs:
         if: success()
         uses: addnab/docker-run-action@v3
         with:
-          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_TAG }}
+          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ env.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
