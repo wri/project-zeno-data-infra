@@ -54,7 +54,7 @@ jobs:
       - name: Explicitly pull image
         if: success()
         run: |
-          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
+          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}_${{ inputs.project_dir }}
 
       - name: Run tests
         if: success()
