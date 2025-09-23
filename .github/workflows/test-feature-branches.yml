@@ -9,61 +9,11 @@ env:
   CONTAINER_REPO_NAME: analytics-api
 
 jobs:
-  build_and_push_image:
-    runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-    steps:
-      - name: Install needed packages if running under ACT
-        if: ${{ env.ACT }}
-        run: |
-          apt-get update
-          apt-get install sudo nodejs iptables docker.io -y
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
-          unzip -q /tmp/awscliv2.zip -d /tmp
-          rm /tmp/awscliv2.zip
-          /tmp/aws/install --update
-          rm -rf /tmp/aws/
-
-      - name: Checkout Code
-        if: success()
-        uses: actions/checkout@v4
-
-      - name: Set short SHA
-        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Configure AWS credentials
-        if: success()
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to ECR
-        if: success()
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS \
-          --password-stdin ${{ env.CONTAINER_REGISTRY }}
-
-      - name: Build Docker image
-        if: success()
-        run: |
-          cd api
-          docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }} .
-
-      - name: Push Docker image to container registry
-        if: success()
-        run: |
-          docker push ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
+  build_images:
+    uses: ./.github/workflows/build.yml
 
   test_api:
-    needs: build_and_push_image
+    needs: build_images
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -121,7 +71,7 @@ jobs:
             API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ env.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
 
   test_pipelines:
-    needs: build_and_push_image
+    needs: build_images
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
