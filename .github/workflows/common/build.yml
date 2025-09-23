@@ -1,4 +1,4 @@
-# Description
+# Build image of the specified type and push to registry
 on:
   workflow_call:
     inputs:
