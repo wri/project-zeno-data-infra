@@ -1,13 +1,10 @@
 # Description
 on:
   workflow_call:
-    strategy:
-      matrix:
-        project_dir: [api, pipelines]
-#    inputs:
-#      project_dir:
-#        required: true
-#        type: string
+    inputs:
+      project_dir:
+        required: true
+        type: string
 
 env:
   CONTAINER_REPO_NAME: analytics-api
@@ -21,7 +18,6 @@ jobs:
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      PROJECT_DIR: ${{ matrix.project_dir }}
     steps:
       - name: Install needed packages if running under ACT
         if: ${{ env.ACT }}
@@ -59,10 +55,10 @@ jobs:
       - name: Build Docker image
         if: success()
         run: |
-          cd ${{ PROJECT_DIR }}
-          docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}_${{ env.PROJECT_DIR }} .
+          cd ${{ inputs.project_dir }}
+          docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}_${{ inputs.project_dir }} .
 
       - name: Push Docker image to container registry
         if: success()
         run: |
-          docker push ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}_${{ env.PROJECT_DIR }}
+          docker push ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}_${{ inputs.project_dir }}

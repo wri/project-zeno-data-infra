@@ -9,11 +9,18 @@ env:
   CONTAINER_REPO_NAME: analytics-api
 
 jobs:
-  build_images:
+  build_api_image:
     uses: ./.github/workflows/build.yml
+    with:
+      project_dir: 'api'
+
+  build_pipelines_image:
+    uses: ./.github/workflows/build.yml
+    with:
+      project_dir: 'pipelines'
 
   test_api:
-    needs: build_images
+    needs: build_api_image
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -24,7 +31,6 @@ jobs:
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
-      TEST_SUITE: api
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
     steps:
       - name: Checkout Code
@@ -67,11 +73,10 @@ jobs:
           image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
-            cd ${{ env.TEST_SUITE }}
             API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ env.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
 
   test_pipelines:
-    needs: build_images
+    needs: build_pipelines_image
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -81,7 +86,6 @@ jobs:
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      TEST_SUITE: pipelines
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -123,5 +127,4 @@ jobs:
           image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
-            cd ${{ env.TEST_SUITE }}
             API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
