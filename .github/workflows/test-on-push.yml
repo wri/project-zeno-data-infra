@@ -54,6 +54,7 @@ jobs:
       - name: Build Docker image
         if: success()
         run: |
+          cd api
           docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }} .
 
       - name: Push Docker image to container registry

@@ -36,7 +36,7 @@ ENV VIRTUAL_ENV=/app/.venv
 
 COPY --chown=appuser . /app
 
-ENV PYTHONPATH=/app/api
+ENV PYTHONPATH=/app
 ENV NEW_RELIC_CONFIG_FILE=/app/newrelic.ini
 ENV NEW_RELIC_ENVIRONMENT=production
 
