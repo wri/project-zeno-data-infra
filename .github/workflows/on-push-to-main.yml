@@ -9,212 +9,59 @@ env:
   CONTAINER_REPO_NAME: analytics-api
 
 jobs:
-  build_and_push_image:
-    runs-on: ubuntu-latest
-    env:
+  build_api_image:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      project_dir: 'api'
+
+  run_api_tests:
+    needs: build_api_image
+    uses: ./.github/workflows/test.yml
+    secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-    steps:
-      - name: Install needed packages if running under ACT
-        if: ${{ env.ACT }}
-        run: |
-          apt-get update
-          apt-get install sudo nodejs iptables docker.io -y
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
-          unzip -q /tmp/awscliv2.zip -d /tmp
-          rm /tmp/awscliv2.zip
-          /tmp/aws/install --update
-          rm -rf /tmp/aws/
-
-      - name: Checkout Code
-        if: success()
-        uses: actions/checkout@v4
-
-      - name: Set short SHA
-        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Configure AWS credentials
-        if: success()
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to ECR
-        if: success()
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS \
-          --password-stdin ${{ env.CONTAINER_REGISTRY }}
-
-      - name: Build Docker image
-        if: success()
-        run: |
-          docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }} .
-
-      - name: Push Docker image to container registry
-        if: success()
-        run: |
-          docker push ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-
-
-  test_api:
-    needs: build_and_push_image
-    runs-on: ubuntu-latest-4-cores
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
-      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
       AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
-      TEST_SUITE: api
-      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }} 
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
+      AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use Zeno prod key for api tests
+      AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
+    with:
+      project_dir: 'api'
 
-      - name: Set short SHA
-        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+  build_pipelines_image:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      project_dir: 'pipelines'
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install AWS CLI if running under ACT
-        if: ${{ env.ACT }}
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
-          unzip -q /tmp/awscliv2.zip -d /tmp
-          rm /tmp/awscliv2.zip
-          /tmp/aws/install --update
-          rm -rf /tmp/aws/
-
-      - name: Login to container registry
-        if: success()
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
-
-      - name: Explicitly pull image
-        if: success()
-        run: |
-          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-
-      - name: Run tests
-        if: success()
-        uses: addnab/docker-run-action@v3
-        with:
-          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-          run: |
-            uv sync --locked --no-install-project --dev -p 3.13.5
-            cd ${{ env.TEST_SUITE }}
-            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ env.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
-
-  test_pipelines:
-    needs: build_and_push_image
-    runs-on: ubuntu-latest
-    env:
+  run_pipelines_tests:
+    needs: build_pipelines_image
+    uses: ./.github/workflows/test.yml
+    secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
-      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
       AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      TEST_SUITE: pipelines
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      GFW_API_KEY: ${{ secrets.API_KEY }}
+      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
+      AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}  # Use GFW prod key for pipelines tests
+      AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}  # Use GFW prod key for pipelines tests
+    with:
+      project_dir: 'pipelines'
 
-      - name: Set short SHA
-        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install AWS CLI if running under ACT
-        if: ${{ env.ACT }}
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
-          unzip -q /tmp/awscliv2.zip -d /tmp
-          rm /tmp/awscliv2.zip
-          /tmp/aws/install --update
-          rm -rf /tmp/aws/
-
-      - name: Login to container registry
-        if: success()
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
-
-      - name: Explicitly pull image
-        if: success()
-        run: |
-          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-
-      - name: Run tests
-        if: success()
-        uses: addnab/docker-run-action@v3
-        with:
-          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-          run: |
-            uv sync --locked --no-install-project --dev -p 3.13.5
-            cd ${{ env.TEST_SUITE }}
-            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_GFW_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_GFW_SECRET_ACCESS_KEY }} pytest test --disable-warnings
-
-  deploy:
-    needs: [test_api, test_pipelines]
-    runs-on: ubuntu-latest
-    env:
+  deploy_to_production:
+    needs: [run_api_tests, run_pipelines_tests]
+    uses: ./.github/workflows/deploy.yml
+    secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      GFW_API_KEY: ${{ secrets.API_KEY }}
+      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set short SHA
-        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.8.0
-
-      - name: Terraform Plan
-        if: success()
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        run: |
-          IMAGE_PATH=${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.SHORT_SHA }}
-          cd terraform
-          terraform init
-          terraform plan -var="api_key=${{ env.API_KEY }}" -var="api_image=$IMAGE_PATH" -var="aws_secret_access_key=${{env.AWS_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ env.NEW_RELIC_LICENSE_KEY }}" --out=tf.plan
-
-      - name: Terraform Apply
-        if: success()
-        env:
-          API_KEY: ${{ secrets.API_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        run: |
-          cd terraform
-          terraform apply -auto-approve tf.plan
