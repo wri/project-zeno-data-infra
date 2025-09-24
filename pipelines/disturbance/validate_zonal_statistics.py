@@ -11,6 +11,7 @@ from pandera.typing.pandas import Series
 from prefect import task
 from prefect.logging import get_run_logger
 from rasterio.features import geometry_mask
+from rasterio.windows import from_bounds
 
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
@@ -682,10 +683,24 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
 
     # reorder columns to country, region, subregion, dist_alert_date, confidence, value
     high_conf_results = high_conf_results[
-        ["country", "region", "subregion", "dist_alert_date", "confidence", "area_ha"]
+        [
+            "country",
+            "region",
+            "subregion",
+            "dist_alert_date",
+            "dist_alert_confidence",
+            "area_ha",
+        ]
     ]
     low_conf_results = low_conf_results[
-        ["country", "region", "subregion", "dist_alert_date", "confidence", "area_ha"]
+        [
+            "country",
+            "region",
+            "subregion",
+            "dist_alert_date",
+            "dist_alert_confidence",
+            "area_ha",
+        ]
     ]
 
     # concatenate dist_alert_confidence dfs into one validation df

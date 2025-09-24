@@ -246,7 +246,6 @@ module "analytics" {
           value = var.new_relic_license_key
         }
       ]
-      create_cloudwatch_log_group = false
       enable_cloudwatch_logging = true
 
     }

@@ -3,6 +3,9 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.carbon_flux import (
@@ -35,6 +38,9 @@ def create_analysis_service(
         analyzer=CarbonFluxAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
+            query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-carbon-flux.parquet"
+            ),
         ),
         event=ANALYTICS_NAME,
     )
