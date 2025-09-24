@@ -67,7 +67,12 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
             # Item doesn't exist -> return empty analysis
             return Analysis(result=None, metadata=None, status=None)
 
-        metadata = item.get("metadata")
+        metadata_value = item.get("metadata")
+        metadata = (
+            json.loads(metadata_value)
+            if isinstance(metadata_value, str)
+            else metadata_value
+        )
         status_value = item.get("status")
         status = AnalysisStatus(status_value) if status_value else None
         s3_key = item.get("s3_result_key")  # This is the pointer to the result in S3
@@ -106,9 +111,11 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         resource_id_str = str(resource_id)
 
         # Prepare the item for DynamoDB
+        # DynamoDB does not allow floats like coordinates found in CustomAOIs.
+        # Therefore, 'metadata' is stored as a JSON string.
         ddb_item = {
             "resource_id": resource_id_str,
-            "metadata": analytics.metadata,
+            "metadata": json.dumps(analytics.metadata),
             "status": (
                 analytics.status.value if analytics.status else None
             ),  # Store the enum's value (string)
