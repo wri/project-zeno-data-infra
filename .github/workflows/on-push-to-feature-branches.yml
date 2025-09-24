@@ -9,27 +9,29 @@ env:
   CONTAINER_REPO_NAME: analytics-api
 
 jobs:
-#  build_api_image:
-#    uses: ./.github/workflows/build.yml
-#    secrets: inherit
-#    with:
-#      project_dir: 'api'
-#
-#  run_api_tests:
-#    needs: build_api_image
-#    uses: ./.github/workflows/test.yml
-#    secrets:
-#      AWS_REGION: ${{ secrets.AWS_REGION }}
-#      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
-#      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
-#      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-#      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-#      GFW_API_KEY: ${{ secrets.API_KEY }}
-#      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
-#    with:
-#      project_dir: 'api'
+  build_api_image:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      project_dir: 'api'
+
+  run_api_tests:
+    needs: build_api_image
+    uses: ./.github/workflows/test.yml
+    secrets:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
+      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      GFW_API_KEY: ${{ secrets.API_KEY }}
+      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
+      AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use Zeno prod key for api tests
+      AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
+    with:
+      project_dir: 'api'
 
   build_pipelines_image:
     uses: ./.github/workflows/build.yml
@@ -50,5 +52,7 @@ jobs:
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
+      AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}  # Use GFW prod key for pipelines tests
+      AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}  # Use GFW prod key for pipelines tests
     with:
       project_dir: 'pipelines'
