@@ -91,6 +91,38 @@ class TestLoadingAnalysis:
         assert analysis_result == Analysis(result=None, metadata=None, status=None)
 
     @pytest.mark.asyncio
+    async def test_analysis_loads_a_dict_metadata_value_that_is_not_a_string(
+        self, dynamodb_and_s3
+    ):
+        """This is for legacy compatibility.
+        Originally, the metadata values stored in dynamodb were python dicts converted to json.
+        DynamoDb does not support storing float values. CustomAOIs use geojson and therefore
+        have coordinates that are floats and started causing errors.
+        This test makes sure that we can still load older Analytics Resources that were saved as json
+        """
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
+        analysis_repository = AwsDynamoDbS3AnalysisRepository(
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
+        )
+
+        ddb_item = {
+            "resource_id": str(DUMMY_UUID),
+            "metadata": {"val1": 12, "val2": "test", "val3": {"key": "value"}},
+            "status": "pending",
+            "s3_result_key": None,
+        }
+
+        await dynamodb_table.put_item(Item=ddb_item)
+
+        analysis_result = await analysis_repository.load_analysis(DUMMY_UUID)
+        assert analysis_result == Analysis(
+            result=None,
+            metadata={"val1": 12, "val2": "test", "val3": {"key": "value"}},
+            status=AnalysisStatus.pending,
+        )
+
+    @pytest.mark.asyncio
     async def test_store_saved_analysis_for_first_time(self, dynamodb_and_s3):
         dynamodb_table, s3_client, moto_server = dynamodb_and_s3
 
@@ -162,6 +194,33 @@ class TestLoadingAnalysis:
         assert analysis_result == Analysis(
             result=None,
             metadata={"val1": 12, "val2": "test", "val3": {"key": "value"}},
+            status=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_store_initial_analysis_and_load_successfully_with_floats(
+        self, dynamodb_and_s3
+    ):
+        dynamodb_table, s3_client, moto_server = dynamodb_and_s3
+
+        analysis_repository = AwsDynamoDbS3AnalysisRepository(
+            TEST_CATEGORY, dynamodb_table, s3_client, moto_server
+        )
+
+        await analysis_repository.store_analysis(
+            DUMMY_UUID,
+            Analysis(
+                result=None,
+                metadata={"val1": 12.23, "val2": "test", "val3": {"key": "value"}},
+                status=None,
+            ),
+        )
+
+        analysis_result = await analysis_repository.load_analysis(DUMMY_UUID)
+
+        assert analysis_result == Analysis(
+            result=None,
+            metadata={"val1": 12.23, "val2": "test", "val3": {"key": "value"}},
             status=None,
         )
 
