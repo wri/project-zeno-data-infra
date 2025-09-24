@@ -84,9 +84,8 @@ class CarbonFluxAnalyzer(Analyzer):
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
-            results = await self.compute_engine.compute(dd.concat(dfs)).to_dict(
-                orient="list"
-            )
+            results = await self.compute_engine.compute(dd.concat(dfs))
+            results = results.to_dict(orient="list")
 
         analyzed_analysis = Analysis(
             results,
