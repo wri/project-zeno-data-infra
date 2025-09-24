@@ -1,12 +1,12 @@
 from functools import partial
+from typing import Dict
 
 import dask.dataframe as dd
-import duckdb
 import newrelic.agent as nr_agent
 import xarray as xr
+
 from app.analysis.common.analysis import (
     get_geojson,
-    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from app.domain.analyzers.analyzer import Analyzer
@@ -41,17 +41,6 @@ tree_cover_loss_zarr_uri = (
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet"
 
 
-def create_gadm_carbon_query(type, gadm_list, threshold):
-    query = f"(select sum(value) from '{admin_results_uri}' where carbontype = '{type}' and country = '{gadm_list[0]}'"
-    if len(gadm_list) > 1:
-        query += f" AND region = {gadm_list[1]}"
-    if len(gadm_list) > 2:
-        query += f" AND subregion = {gadm_list[2]}"
-
-    query += f"AND tree_cover_density = {threshold}) AS {type}"
-    return query
-
-
 class CarbonFluxAnalyzer(Analyzer):
     """Get the carbon emissions, removal, flux for 2000-2024 for different canopy densitys"""
 
@@ -60,25 +49,21 @@ class CarbonFluxAnalyzer(Analyzer):
         analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
+        query_service=None,
     ):
         self.analysis_repository = analysis_repository  # CarbonFluxRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.query_service = query_service
 
     @nr_agent.function_trace(name="CarbonFluxAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         carbon_flux_analytics_in = CarbonFluxAnalyticsIn(**analysis.metadata)
         if carbon_flux_analytics_in.aoi.type == "admin":
-            analysis_partial = partial(
-                self.analyze_admin_area, threshold=carbon_flux_analytics_in.canopy_cover
+            gadm_ids = carbon_flux_analytics_in.aoi.ids
+            results = await self.analyze_admin_areas(
+                gadm_ids, carbon_flux_analytics_in.canopy_cover
             )
-            dd_df_futures = await self.compute_engine.gather(
-                self.compute_engine.map(
-                    analysis_partial, carbon_flux_analytics_in.aoi.ids
-                )
-            )
-            dfs = await self.compute_engine.gather(dd_df_futures)
-            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
 
         else:
             aois = carbon_flux_analytics_in.aoi.model_dump()
@@ -99,10 +84,12 @@ class CarbonFluxAnalyzer(Analyzer):
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
             )
             dfs = await self.compute_engine.gather(dd_df_futures)
-            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+            results = await self.compute_engine.compute(dd.concat(dfs)).to_dict(
+                orient="list"
+            )
 
         analyzed_analysis = Analysis(
-            combined_results_df.to_dict(orient="list"),
+            results,
             analysis.metadata,
             AnalysisStatus.saved,
         )
@@ -110,37 +97,14 @@ class CarbonFluxAnalyzer(Analyzer):
             carbon_flux_analytics_in.thumbprint(), analyzed_analysis
         )
 
-    @staticmethod
-    def analyze_admin_area(gadm_id, threshold=30) -> dd.DataFrame:
-        gadm_list = gadm_id.split(".")
-        query = "select "
-        query += (
-            create_gadm_carbon_query("carbon_net_flux", gadm_list, threshold) + ", "
-        )
-        query += (
-            create_gadm_carbon_query("carbon_gross_removals", gadm_list, threshold)
-            + ", "
-        )
-        query += create_gadm_carbon_query(
-            "carbon_gross_emissions", gadm_list, threshold
-        )
+    async def analyze_admin_areas(self, gadm_ids, threshold=30) -> Dict:
+        id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
+        query = f"select aoi_id, carbon_net_flux_Mg_CO2e, carbon_gross_removals_Mg_CO2e, carbon_gross_emissions_Mg_CO2e from data_source where aoi_id in ({id_str}) and tree_cover_density = {threshold}"
 
-        initialize_duckdb()
-        df = duckdb.query(query).df()
-        df["aoi_id"] = gadm_id
-        df["aoi_type"] = "admin"
-        df.rename(
-            columns={
-                "carbon_net_flux": "carbon_net_flux_Mg_CO2e",
-                "carbon_gross_removals": "carbon_gross_removals_Mg_CO2e",
-                "carbon_gross_emissions": "carbon_gross_emissions_Mg_CO2e",
-            },
-            inplace=True,
-        )
+        results_dict = await self.query_service.execute(query)
+        results_dict["aoi_type"] = ["admin"] * len(results_dict["aoi_id"])
 
-        # Return a dask data frame, so the future gather code works.
-        ddf: dd.DataFrame = dd.from_pandas(df)
-        return ddf
+        return results_dict
 
     @staticmethod
     def analyze_area(aoi, geojson, threshold=30) -> dd.DataFrame:
