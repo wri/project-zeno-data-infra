@@ -274,7 +274,7 @@ isos = [
     "ZMB",
     "ZWE",
 ]
-
+ 
 numeric_to_alpha3 = {
     4: "AFG",
     248: "ALA",
@@ -720,11 +720,33 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     return pd.DataFrame(results)
 
 
+""" 
+GREAT EXPECTATIONS VALIDATION WORKFLOW
+    - Load ground truth as a data batch
+    - Load zeno results parquet as a data asset
+    - Define expectations (schema, value ranges, etc.)
+    - Run expectations on a zeno results
+    - Define comparison validation suit
+    - Run comparison suite on ground truth df and zeno results for admin AOI
+
+"""
+
 @task
 def validate(parquet_uri: str) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
 
     logger = get_run_logger()
+    context = gx.get_context()
+    version = get_latest_version("umd_glad_dist_alerts")
+
+    # set up gx data sources
+    zeno_source = context.data_sources.add_pandas_filesystem(
+        name="zeno_results"
+    )
+    zeno_asset = zeno_source.add_csv_asset(
+        name="zeno_parquet",
+        s3_prefix=f"umd_glad_dist_alerts/{version}/tabular/zonal_stats/gadm/gadm_adm2_dist_alerts.parquet"
+    )
 
     # load local results
     version = get_latest_version("umd_glad_dist_alerts")
