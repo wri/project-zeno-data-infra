@@ -5,6 +5,26 @@ on:
       project_dir:
         required: true
         type: string
+    secrets:
+      AWS_REGION:
+        required: true
+      AWS_GFW_ACCESS_KEY_ID:
+        required: true
+      AWS_GFW_SECRET_ACCESS_KEY:
+        required: true
+      AWS_ZENO_ACCOUNT_ID:
+        required: true
+      AWS_ZENO_ACCESS_KEY_ID:
+        required: true
+      AWS_ZENO_SECRET_ACCESS_KEY:
+        required: true
+      CONTAINER_REGISTRY:
+        required: true
+      GFW_API_KEY:
+        required: true
+      DASK_SCHEDULER_ADDRESS:
+        required: true
+
 
 env:
   CONTAINER_REPO_NAME: analytics-api
@@ -12,16 +32,6 @@ env:
 jobs:
   run_tests:
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
-      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      GFW_API_KEY: ${{ secrets.API_KEY }}
-      DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -32,9 +42,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Install AWS CLI if running under ACT
         if: ${{ env.ACT }}
@@ -49,18 +59,18 @@ jobs:
         if: success()
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
+          docker login --username AWS --password-stdin ${{ secrets.CONTAINER_REGISTRY }}
 
       - name: Explicitly pull image
         if: success()
         run: |
-          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+          docker pull ${{ secrets.CONTAINER_REGISTRY }}/${{ secrets.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
 
       - name: Run tests
         if: success()
         uses: addnab/docker-run-action@v3
         with:
-          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+          image: ${{ secrets.CONTAINER_REGISTRY }}/${{ secrets.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
-            API_KEY=${{ env.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ env.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ env.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
+            API_KEY=${{ secrets.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ secrets.AWS_ZENO_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }} DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
