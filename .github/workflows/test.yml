@@ -8,10 +8,6 @@ on:
     secrets:
       AWS_REGION:
         required: true
-      AWS_GFW_ACCESS_KEY_ID:
-        required: true
-      AWS_GFW_SECRET_ACCESS_KEY:
-        required: true
       AWS_ZENO_ACCOUNT_ID:
         required: true
       AWS_ZENO_ACCESS_KEY_ID:
