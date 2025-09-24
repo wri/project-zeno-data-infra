@@ -3,7 +3,6 @@ from typing import Annotated, List, Literal, Optional, Union
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
-    CustomAreaOfInterest,
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
@@ -21,7 +20,7 @@ AoiUnion = Union[
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,
-    CustomAreaOfInterest,
+    # TODO add CustomAreaOfInterest,
 ]
 
 
