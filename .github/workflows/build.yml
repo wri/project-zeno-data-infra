@@ -5,6 +5,18 @@ on:
       project_dir:
         required: true
         type: string
+    secrets:
+      AWS_REGION:
+        required: true
+      AWS_ZENO_ACCOUNT_ID:
+        required: true
+      AWS_ZENO_ACCESS_KEY_ID:
+        required: true
+      AWS_ZENO_SECRET_ACCESS_KEY:
+        required: true
+      CONTAINER_REGISTRY:
+        required: true
+
 
 env:
   CONTAINER_REPO_NAME: analytics-api
@@ -13,11 +25,7 @@ jobs:
   build_and_push_image:
     runs-on: ubuntu-latest
     env:
-      AWS_REGION: us-east-1
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-      AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+      CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     steps:
       - name: Install needed packages if running under ACT
         if: ${{ env.ACT }}
@@ -41,14 +49,14 @@ jobs:
         if: success()
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ZENO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_ZENO_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to ECR
         if: success()
         run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS \
           --password-stdin ${{ env.CONTAINER_REGISTRY }}
 
