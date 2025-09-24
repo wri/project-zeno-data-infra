@@ -17,6 +17,7 @@ AoiUnion = Union[
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,
+    # TODO add CustomAreaOfInterest,
 ]
 
 DATE_REGEX = r"^\d{4}$"
