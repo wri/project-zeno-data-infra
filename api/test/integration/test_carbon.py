@@ -21,6 +21,9 @@ from app.routers.land_change.carbon_flux.carbon_flux import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from fastapi.testclient import TestClient
@@ -41,6 +44,9 @@ def create_analysis_service_for_tests(
         analyzer=CarbonFluxAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
+            query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-carbon-flux.parquet"
+            ),
         ),
         event=ANALYTICS_NAME,
     )
@@ -53,12 +59,12 @@ class TestCarbonDataAdmin:
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
             canopy_cover=30,
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
@@ -87,22 +93,22 @@ class TestCarbonDataAdmin:
 
         expected = pd.DataFrame(
             {
-                "aoi_id": ["NGA.20.31", "IDN.25.3", "CHN"],
+                "aoi_id": ["CHN", "IDN.25.3", "NGA.20.31"],
                 "aoi_type": ["admin", "admin", "admin"],
                 "carbon_net_flux_Mg_CO2e": [
-                    -12.349344253540039,
-                    24370083.802587524,
                     -11422581500.146715,
+                    24370083.802587524,
+                    -12.349344253540039,
                 ],
                 "carbon_gross_removals_Mg_CO2e": [
-                    12.349344253540039,
-                    28127167.23389721,
                     17417177319.904095,
+                    28127167.23389721,
+                    12.349344253540039,
                 ],
                 "carbon_gross_emissions_Mg_CO2e": [
-                    0.0,
-                    52496919.891059,
                     5994595888.622183,
+                    52496919.891059,
+                    0.0,
                 ],
             }
         )
@@ -147,12 +153,12 @@ class TestCarbonDataFeature:
             ),
             canopy_cover=50,
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
