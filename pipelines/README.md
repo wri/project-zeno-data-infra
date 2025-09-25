@@ -2,8 +2,6 @@
 
 To run tests:
 
-If you want to run the prefect server and worker tasks locally (but xarray.reduce
-tasks still in coiled), from the top level of the repo do:
   `cd pipelines`
   `uv sync`  [if not already done]
   `source .venv/bin/activate` [if not already activated]
@@ -11,8 +9,8 @@ tasks still in coiled), from the top level of the repo do:
 
 ===================================================
 
-If you want to run the prefect server and worker tasks locally (but xarray.reduce
-tasks still in coiled), from the top level of the repo do:
+If you want to run the prefect server and worker tasks locally (but with
+xarray.reduce tasks still in coiled), from the top level of the repo do:
   `cd pipelines`
   `uv sync`  [if not already done]
   `source .venv/bin/activate` [if not already activated]
@@ -21,8 +19,8 @@ tasks still in coiled), from the top level of the repo do:
   `prefect server start` (in a separate window, also activated)
   `AWS_PROFILE=gfw-production python -m pipelines.dist_flow`
 
-If you want to run the prefect server in Prefect cloud, and the worker tasks and
-xarray.reduce tasks in coiled, from the top level of the repo do:
+If you want to run the prefect server in Prefect cloud, and the worker tasks
+and xarray.reduce tasks in coiled, from the top level of the repo do:
   `cd pipelines`
   `uv sync`  [if not already done]
   `source .venv/bin/activate` [if not already activated]
