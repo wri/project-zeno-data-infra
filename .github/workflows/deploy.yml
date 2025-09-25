@@ -44,7 +44,7 @@ jobs:
           IMAGE_PATH=${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
           cd terraform
           terraform init
-          terraform plan -var="api_key=${{ secrets.GFW_API_KEY }}" -var="api_image=$IMAGE_TAG" -var="aws_secret_access_key=${{secrets.AWS_ZENO_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ZENO_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" --out=tf.plan
+          terraform plan -var="api_key=${{ secrets.GFW_API_KEY }}" -var="api_image=$IMAGE_TAG" -var="aws_secret_access_key=${{secrets.AWS_ZENO_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{secrets.AWS_ZENO_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" --out=tf.plan
 
       - name: Terraform Apply
         if: success()
