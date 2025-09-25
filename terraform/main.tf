@@ -87,7 +87,7 @@ module "gnw_ecs_cluster" {
           environment = [
             {
               name  = "PYTHONPATH"
-              value = "/app/api"
+              value = "/app"
             },
             {
               name  = "API_KEY"
@@ -210,12 +210,12 @@ module "analytics" {
         }
       ]
       image     = var.api_image
-      command   = ["newrelic-admin", "run-program", "uvicorn", "api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+      command   = ["newrelic-admin", "run-program", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
       readonlyRootFilesystem = false
       environment = [
         {
           name = "PYTHONPATH"
-          value = "/app/api"
+          value = "/app"
         },
         {
           name = "API_KEY"
@@ -247,7 +247,6 @@ module "analytics" {
         }
       ]
       enable_cloudwatch_logging = true
-
     }
   }
 
@@ -292,12 +291,12 @@ module "dask_cluster_manager" {
       
       command = [
         "python",
-        "/app/api/dask_cluster/start_cluster.py",
+        "/app/dask_cluster/start_cluster.py",
       ]       
       environment = [
         {
           name  = "PYTHONPATH"
-          value = "/app/api"
+          value = "/app"
         },
         {
           name  = "API_KEY"
@@ -463,7 +462,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
       environment = [
         {
           name  = "PYTHONPATH"
-          value = "/app/api"
+          value = "/app"
         },
         {
           name  = "API_KEY"
