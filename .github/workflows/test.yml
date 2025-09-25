@@ -33,13 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set image tag
         run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)_${{ inputs.project_dir }}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
