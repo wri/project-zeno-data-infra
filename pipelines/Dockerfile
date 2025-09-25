@@ -37,5 +37,3 @@ ENV VIRTUAL_ENV=/pipelines/.venv
 COPY --chown=appuser . /pipelines
 
 ENV PYTHONPATH=/pipelines
-ENV NEW_RELIC_CONFIG_FILE=/pipelines/newrelic.ini
-ENV NEW_RELIC_ENVIRONMENT=production
