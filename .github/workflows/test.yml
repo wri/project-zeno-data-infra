@@ -1,0 +1,75 @@
+# Run tests in specified project directory
+on:
+  workflow_call:
+    inputs:
+      project_dir:
+        required: true
+        type: string
+    secrets:
+      AWS_REGION:
+        required: true
+      AWS_ZENO_ACCOUNT_ID:
+        required: true
+      AWS_ZENO_ACCESS_KEY_ID:
+        required: true
+      AWS_ZENO_SECRET_ACCESS_KEY:
+        required: true
+      CONTAINER_REGISTRY:
+        required: true
+      GFW_API_KEY:
+        required: true
+      DASK_SCHEDULER_ADDRESS:
+        required: true
+      AWS_ACCESS_KEY_ID_FOR_TESTS:
+        required: true
+      AWS_SECRET_ACCESS_KEY_FOR_TESTS:
+        required: true
+
+env:
+  CONTAINER_REPO_NAME: analytics-api
+
+jobs:
+  run_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)_${{ inputs.project_dir }}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Install AWS CLI if running under ACT
+        if: ${{ env.ACT }}
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+          unzip -q /tmp/awscliv2.zip -d /tmp
+          rm /tmp/awscliv2.zip
+          /tmp/aws/install --update
+          rm -rf /tmp/aws/
+
+      - name: Login to container registry
+        if: success()
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ secrets.CONTAINER_REGISTRY }}
+
+      - name: Explicitly pull image
+        if: success()
+        run: |
+          docker pull ${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+
+      - name: Run tests
+        if: success()
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+          run: |
+            uv sync --locked --no-install-project --dev -p 3.13.5
+            API_KEY=${{ secrets.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings

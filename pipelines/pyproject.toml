@@ -1,0 +1,46 @@
+[project]
+name = "zeno-data-analytics-pipelines"
+version = "0.1.0"
+description = "Data analytics pipelines for Zeno"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3",
+    "coiled",
+    "dask[array,dataframe,distributed,diagnostics]",
+    "duckdb>=1.3.1",
+    "fastparquet",
+    "flox",
+    "fsspec",
+    "geopandas",
+    "numba>=0.61.2",
+    "numbagg",
+    "numpy",
+    "pandas",
+    "pandera[pandas]",
+    "prefect",
+    "prefect-coiled>=0.0.4",
+    "python-json-logger",
+    "rasterio==1.4.3",
+    "rioxarray",
+    "s3fs",
+    "shapely>=2.1.1",
+    "sparse",
+    "xarray",
+    "zarr",
+]
+
+[dependency-groups]
+dev = [
+    "pandera>=0.24.0",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration"
+]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,56 @@
+# Deploy the API
+on:
+  workflow_call:
+    secrets:
+      AWS_REGION:
+        required: true
+      AWS_ZENO_ACCESS_KEY_ID:
+        required: true
+      AWS_ZENO_SECRET_ACCESS_KEY:
+        required: true
+      CONTAINER_REGISTRY:
+        required: true
+      GFW_API_KEY:
+        required: true
+      DASK_SCHEDULER_ADDRESS:
+        required: true
+      NEW_RELIC_LICENSE_KEY:
+        required: true
+
+env:
+  CONTAINER_REPO_NAME: analytics-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=$(git rev-parse --short HEAD)_api" >> $GITHUB_ENV
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+
+      - name: Terraform Plan
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+        run: |
+          IMAGE_PATH=${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+          cd terraform
+          terraform init
+          terraform plan -var="api_key=${{ secrets.GFW_API_KEY }}" -var="api_image=$IMAGE_TAG" -var="aws_secret_access_key=${{secrets.AWS_ZENO_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{env.AWS_ZENO_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" --out=tf.plan
+
+      - name: Terraform Apply
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+        run: |
+          cd terraform
+          terraform apply -auto-approve tf.plan
