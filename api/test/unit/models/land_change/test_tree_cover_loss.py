@@ -1,4 +1,5 @@
 import pytest
+
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 

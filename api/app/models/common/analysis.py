@@ -3,9 +3,10 @@ import uuid
 from enum import Enum
 from typing import Optional
 
+from pydantic import PrivateAttr
+
 from app.models.common.areas_of_interest import AreaOfInterest
 from app.models.common.base import StrictBaseModel
-from pydantic import PrivateAttr
 
 DATE_REGEX = r"^\d{4}(\-(0?[1-9]|1[012])\-(0?[1-9]|[12][0-9]|3[01]))?$"
 
@@ -50,9 +51,9 @@ class AnalyticsIn(StrictBaseModel):
         # Include version and analytics_name in dump for thumbprint consistency
         dump_dict = self.model_dump(exclude=set())
         dump_dict["_version"] = self._version  # Manually include version
-        dump_dict[
-            "_analytics_name"
-        ] = self._analytics_name  # Manually include analytics_name
+        dump_dict["_analytics_name"] = (
+            self._analytics_name
+        )  # Manually include analytics_name
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 

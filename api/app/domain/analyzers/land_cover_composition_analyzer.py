@@ -3,17 +3,15 @@ from functools import partial
 import dask.dataframe as dd
 import newrelic.agent as nr_agent
 import numpy as np
-from app.analysis.common.analysis import (
-    get_geojson,
-    read_zarr_clipped_to_geojson,
-)
+from flox.xarray import xarray_reduce
+
+from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
-from flox.xarray import xarray_reduce
 
 
 class LandCoverCompositionAnalyzer(Analyzer):

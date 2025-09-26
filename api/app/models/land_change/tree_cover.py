@@ -1,5 +1,7 @@
 from typing import Annotated, List, Literal, Optional, Union
 
+from pydantic import Field, PrivateAttr
+
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
@@ -11,7 +13,6 @@ from app.models.common.base import Response, StrictBaseModel
 from app.models.land_change.tree_cover_loss import (
     AllowedForestFilter,
 )
-from pydantic import Field, PrivateAttr
 
 ANALYTICS_NAME = "tree_cover"
 
