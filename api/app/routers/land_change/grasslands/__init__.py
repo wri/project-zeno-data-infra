@@ -1,6 +1,6 @@
 from .grasslands import create
 
-
+# fmt: off
 create.__doc__ = """
     # Primary Dataset
     | Dataset Key Aspects | Detailed Description |
@@ -30,4 +30,4 @@ create.__doc__ = """
     2. Generates UUID based on payload content
     3. Stores payload as JSON file
     4. Returns resource URL for status checking
-    """
+    """  # noqa: E501
