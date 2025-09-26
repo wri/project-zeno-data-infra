@@ -8,6 +8,11 @@ from test.integration import (
 import pandas as pd
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
+from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
+
 from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -24,10 +29,6 @@ from app.routers.land_change.dist_alerts.dist_alerts import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
-from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
@@ -59,12 +60,12 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
@@ -109,12 +110,12 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
 
@@ -155,12 +156,12 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -203,12 +204,12 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -234,12 +235,12 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -284,12 +285,12 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -360,12 +361,12 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             end_date="2024-08-16",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -429,12 +430,12 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
             end_date="2025-04-30",
             intersections=[],
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -537,12 +538,12 @@ async def test_gadm_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    app.dependency_overrides[
-        create_analysis_service
-    ] = create_analysis_service_for_tests
-    app.dependency_overrides[
-        get_analysis_repository
-    ] = get_file_system_analysis_repository
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -598,12 +599,12 @@ async def test_kba_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    app.dependency_overrides[
-        create_analysis_service
-    ] = create_analysis_service_for_tests
-    app.dependency_overrides[
-        get_analysis_repository
-    ] = get_file_system_analysis_repository
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -652,12 +653,12 @@ async def test_admin_dist_analytics_by_grasslands():
         end_date="2024-08-16",
         intersections=["grasslands"],
     )
-    app.dependency_overrides[
-        create_analysis_service
-    ] = create_analysis_service_for_tests
-    app.dependency_overrides[
-        get_analysis_repository
-    ] = get_file_system_analysis_repository
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -709,12 +710,12 @@ async def test_admin_dist_analytics_by_land_cover():
         end_date="2024-08-16",
         intersections=["land_cover"],
     )
-    app.dependency_overrides[
-        create_analysis_service
-    ] = create_analysis_service_for_tests
-    app.dependency_overrides[
-        get_analysis_repository
-    ] = get_file_system_analysis_repository
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 

@@ -1,11 +1,14 @@
 import os
 from unittest.mock import patch
 
+import dask
 import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
 import xarray as xr
+from dask.distributed import Client
+
 from app.domain.analyzers.land_cover_composition_analyzer import (
     LandCoverCompositionAnalyzer,
 )
@@ -17,9 +20,6 @@ from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
-
-import dask
-from dask.distributed import Client
 
 
 # Add this fixture to override the config

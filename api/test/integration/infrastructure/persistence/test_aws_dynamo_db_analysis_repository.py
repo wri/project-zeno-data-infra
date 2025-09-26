@@ -3,12 +3,13 @@ import uuid
 import aioboto3
 import pytest
 import pytest_asyncio
+from moto.server import ThreadedMotoServer
+
 from app.domain.models.analysis import Analysis
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
 from app.models.common.analysis import AnalysisStatus
-from moto.server import ThreadedMotoServer
 
 TEST_CATEGORY = "integration_tests"
 DUMMY_UUID = uuid.UUID("c9787f41-b194-4589-ae53-f45ef290ce6f")

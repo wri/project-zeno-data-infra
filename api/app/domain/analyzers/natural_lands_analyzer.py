@@ -4,10 +4,9 @@ from typing import Any, Dict
 import dask.dataframe as dd
 import newrelic.agent as nr_agent
 import numpy as np
-from app.analysis.common.analysis import (
-    get_geojson,
-    read_zarr_clipped_to_geojson,
-)
+from flox.xarray import xarray_reduce
+
+from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -15,7 +14,6 @@ from app.infrastructure.external_services.duck_db_query_service import (
 )
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.natural_lands import NaturalLandsAnalyticsIn
-from flox.xarray import xarray_reduce
 
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet"
 

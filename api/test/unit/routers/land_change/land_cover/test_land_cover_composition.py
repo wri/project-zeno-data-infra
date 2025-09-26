@@ -2,9 +2,8 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
-from app.models.land_change.land_cover_composition import (
-    LandCoverCompositionAnalyticsIn,
-)
+from fastapi.testclient import TestClient
+
 from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
@@ -14,7 +13,6 @@ from app.routers.land_change.land_cover.land_cover_composition import (
     create_analysis_service,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

@@ -1,4 +1,5 @@
 from typing import List
+
 import newrelic.agent as nr_agent
 
 from app.domain.analyzers.analyzer import Analyzer

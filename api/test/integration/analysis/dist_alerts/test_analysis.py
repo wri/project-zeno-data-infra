@@ -3,8 +3,9 @@ import asyncio
 import numpy as np
 import pandas as pd
 import pytest
-from app.analysis.dist_alerts.analysis import zonal_statistics
 from dask.dataframe import DataFrame as DaskDataFrame
+
+from app.analysis.dist_alerts.analysis import zonal_statistics
 
 
 class TestDistAlertsZonalStats:

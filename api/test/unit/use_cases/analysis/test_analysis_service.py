@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, call
 from uuid import UUID
 
 import pytest
+
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn

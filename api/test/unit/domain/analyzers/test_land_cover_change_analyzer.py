@@ -7,6 +7,8 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 import xarray as xr
+from dask.distributed import Client
+
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -16,7 +18,6 @@ from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_change import (
     LandCoverChangeAnalyticsIn,
 )
-from dask.distributed import Client
 
 
 # Add this fixture to override the config

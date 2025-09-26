@@ -2,6 +2,7 @@ import shutil
 import uuid
 
 import pytest
+
 from app.domain.models.analysis import Analysis
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,

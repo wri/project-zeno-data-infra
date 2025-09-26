@@ -1,8 +1,9 @@
-import time
-import os
 import logging
-from dask_cloudprovider.aws import ECSCluster
+import os
+import time
+
 from dask.distributed import Client
+from dask_cloudprovider.aws import ECSCluster
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

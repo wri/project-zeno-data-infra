@@ -1,6 +1,7 @@
+import os
+
 import pytest
 from dask.distributed import LocalCluster
-import os
 
 
 @pytest.fixture(scope="session", autouse=True)

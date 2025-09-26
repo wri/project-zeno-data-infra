@@ -1,7 +1,8 @@
 import logging
-import newrelic.agent as nr_agent
 import traceback
 import uuid
+
+import newrelic.agent as nr_agent
 
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis

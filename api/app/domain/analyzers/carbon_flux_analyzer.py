@@ -5,10 +5,7 @@ import dask.dataframe as dd
 import newrelic.agent as nr_agent
 import xarray as xr
 
-from app.analysis.common.analysis import (
-    get_geojson,
-    read_zarr_clipped_to_geojson,
-)
+from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset

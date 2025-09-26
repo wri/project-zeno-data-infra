@@ -1,4 +1,5 @@
 import pytest
+
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
 

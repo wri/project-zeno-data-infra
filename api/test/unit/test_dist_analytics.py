@@ -1,6 +1,7 @@
 import re
 
 import pytest
+
 from app.analysis.common.analysis import (
     get_geojson_request_for_data_api,
     get_geojsons_from_data_api,

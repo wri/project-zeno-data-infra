@@ -6,6 +6,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
+from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
+
 from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -22,10 +27,6 @@ from app.routers.land_change.natural_lands.natural_lands import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
-from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
@@ -56,12 +57,12 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(analytics_in.thumbprint())
 
         async with LifespanManager(app):
@@ -103,12 +104,12 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -149,12 +150,12 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -196,12 +197,12 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         delete_resource_files(analytics_in.thumbprint())
 
@@ -223,12 +224,12 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -270,12 +271,12 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -335,12 +336,12 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                 type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
             )
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         delete_resource_files(analytics_in.thumbprint())
 
@@ -579,12 +580,12 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                 type="key_biodiversity_area", ids=["18392", "46942", "18407"]
             )
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         delete_resource_files(analytics_in.thumbprint())
 
@@ -699,12 +700,12 @@ async def test_gadm_dist_analytics_no_intersection():
     analytics_in = NaturalLandsAnalyticsIn(
         aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
     )
-    app.dependency_overrides[
-        create_analysis_service
-    ] = create_analysis_service_for_tests
-    app.dependency_overrides[
-        get_analysis_repository
-    ] = get_file_system_analysis_repository
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
 
     delete_resource_files(analytics_in.thumbprint())
 
@@ -806,12 +807,12 @@ async def test_kba_dist_analytics_no_intersection():
     analytics_in = NaturalLandsAnalyticsIn(
         aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
     )
-    app.dependency_overrides[
-        create_analysis_service
-    ] = create_analysis_service_for_tests
-    app.dependency_overrides[
-        get_analysis_repository
-    ] = get_file_system_analysis_repository
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
 
     delete_resource_files(analytics_in.thumbprint())
 

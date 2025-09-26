@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import pytest_asyncio
+
 from app.domain.analyzers.tree_cover_gain_analyzer import TreeCoverGainAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (

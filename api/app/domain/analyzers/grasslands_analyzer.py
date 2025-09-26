@@ -3,16 +3,14 @@ from typing import Dict, List
 
 import newrelic.agent as nr_agent
 import numpy as np
-from app.analysis.common.analysis import (
-    get_geojson,
-    read_zarr_clipped_to_geojson,
-)
+from dask.dataframe import DataFrame, concat
+from xarray import DataArray
+
+from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
-from dask.dataframe import DataFrame, concat
-from xarray import DataArray
 
 
 class GrasslandsAnalyzer(Analyzer):

@@ -6,6 +6,11 @@ from test.integration import (  # write_data_file,; write_metadata_file,
 import pandas as pd
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
+from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
+
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -25,10 +30,6 @@ from app.routers.land_change.land_cover.land_cover_change import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
-from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
@@ -63,12 +64,12 @@ class TestLandCoverChangeData:
         analytics_in = LandCoverChangeAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):

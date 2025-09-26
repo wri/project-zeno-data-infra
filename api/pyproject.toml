@@ -33,6 +33,9 @@ dependencies = [
     "zarr"
 ]
 
+[tool.isort]
+profile = "black"
+
 [tool.uv.workspace]
 members = [
     "project-zeno-data-infra",

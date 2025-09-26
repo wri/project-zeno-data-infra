@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
     TreeCoverGainPrecalcHandler,
 )

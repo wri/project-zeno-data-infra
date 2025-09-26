@@ -3,6 +3,10 @@ from test.integration import delete_resource_files, retry_getting_resource
 import pandas as pd
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
+from httpx import ASGITransport, AsyncClient
+
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -21,9 +25,6 @@ from app.routers.land_change.grasslands.grasslands import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
-from httpx import ASGITransport, AsyncClient
 
 
 def get_file_system_analysis_repository():
@@ -57,12 +58,12 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         try:
             async with LifespanManager(app):
@@ -128,12 +129,12 @@ class TestGrasslandsAnalyticsPostWithKba:
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
 
         try:
             async with LifespanManager(app):

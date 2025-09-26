@@ -3,6 +3,8 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import xarray as xr
+from flox.xarray import xarray_reduce
+
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
 )
@@ -11,7 +13,6 @@ from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
-from flox.xarray import xarray_reduce
 
 
 class FloxOTFHandler(AnalyticsOTFHandler):
