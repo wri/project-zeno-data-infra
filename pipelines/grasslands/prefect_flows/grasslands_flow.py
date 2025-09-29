@@ -13,7 +13,7 @@ from pipelines.utils import s3_uri_exists
 
 
 @flow(name="Natural grasslands area")
-def gadm_grasslands_area(overwrite: bool = False):
+def gadm_grasslands_area(overwrite: bool = False) -> str:
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
     base_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
@@ -21,7 +21,7 @@ def gadm_grasslands_area(overwrite: bool = False):
         "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
     )
     contextual_column_name = "grasslands"
-    result_uri = (
+    result_uri: str = (
         "s3://gfw-data-lake/gfw_grasslands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
     )
     funcname = "sum"
