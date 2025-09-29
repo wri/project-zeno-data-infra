@@ -1,19 +1,17 @@
 import logging
+from typing import Optional, Tuple
 
 import coiled
+from distributed import Client
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.disturbance.create_zarr import (
-    create_zarr as create_zarr_func,
-)
-from pipelines.disturbance.check_for_new_alerts import get_latest_version
-from pipelines.disturbance import validate_zonal_statistics
-
-from pipelines.disturbance import prefect_flows
-from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
-from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
+from pipelines.disturbance import prefect_flows, validate_zonal_statistics
+from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.disturbance.create_zarr import create_zarr as create_zarr_func
+from pipelines.grasslands.prefect_flows import grasslands_flow
+from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -24,7 +22,7 @@ def get_new_dist_version() -> str:
 
 
 @task
-def create_cluster():
+def create_cluster() -> Tuple[Client, coiled.Cluster]:
     cluster = coiled.Cluster(
         name="dist_alerts_zonal_stat_count",
         region="us-east-1",
@@ -56,7 +54,7 @@ def run_validation_suite(gadm_dist_result):
 @flow(name="dist_alerts_flow", log_prints=True)
 def dist_alerts_flow(overwrite=False) -> list[str]:
     logger = get_run_logger()
-    dask_client = None
+    dask_client: Optional[Client] = None
     result_uris = []
     try:
         dist_version = get_new_dist_version()
@@ -87,10 +85,8 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         )
         result_uris.append(gadm_dist_by_drivers_result)
 
-        gadm_dist_by_grasslands_result = (
-            prefect_flows.dist_alerts_by_grasslands_area(
-                dist_zarr_uri, dist_version, overwrite=overwrite
-            )
+        gadm_dist_by_grasslands_result = prefect_flows.dist_alerts_by_grasslands_area(
+            dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_by_grasslands_result)
 

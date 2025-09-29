@@ -1,8 +1,11 @@
 import logging
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from grasslands.stages import ExpectedGroupsType
 from prefect import flow
+from xarray import DataArray, Dataset
 
 from pipelines.grasslands.prefect_flows import grasslands_tasks
 from pipelines.prefect_flows import common_tasks
@@ -26,21 +29,27 @@ def gadm_grasslands_area(overwrite: bool = False):
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
+    # fmt: off
     expected_groups = (
         np.arange(999),  # country iso codes
-        np.arange(86),  # region codes
+        np.arange(86),   # region codes
         np.arange(854),  # subregion codes
     )
+    # fmt: on
 
-    datasets = grasslands_tasks.load_data.with_options(
+    datasets: Tuple[DataArray, ...] = grasslands_tasks.load_data.with_options(
         name="area-by-grasslands-load-data"
     )(base_uri, contextual_uri=contextual_uri)
 
-    compute_input = grasslands_tasks.setup_compute.with_options(
+    compute_input: Tuple[
+        DataArray, Tuple[DataArray, DataArray, DataArray], ExpectedGroupsType | None
+    ] = grasslands_tasks.setup_compute.with_options(
         name="set-up-area-by-grasslands-compute"
-    )(datasets, expected_groups, contextual_name=contextual_column_name)
+    )(
+        datasets, expected_groups, contextual_name=contextual_column_name
+    )
 
-    result_dataset = common_tasks.compute_zonal_stat.with_options(
+    result_dataset: Dataset = common_tasks.compute_zonal_stat.with_options(
         name="area-by-grasslands-compute-zonal-stats"
     )(*compute_input, funcname=funcname)
 
@@ -53,6 +62,7 @@ def gadm_grasslands_area(overwrite: bool = False):
 
     print("result_df")
     print(result_df)
+
     result_df.rename(columns={"value": "area_ha"}, inplace=True)
     result_df["area_ha"] = result_df["area_ha"] / 1e4
 
