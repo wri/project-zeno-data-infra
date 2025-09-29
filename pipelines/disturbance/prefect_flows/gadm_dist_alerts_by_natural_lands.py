@@ -56,21 +56,25 @@ def dist_alerts_by_natural_lands_area(
 
     contextual_uri = f"s3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
 
-    datasets: Tuple[xr.DataArray, ...] = dist_common_tasks.load_data.with_options(
+    datasets: Tuple[
+        xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset | None
+    ] = dist_common_tasks.load_data.with_options(
         name="dist-alerts-by-natural-lands-load-data"
-    )(dist_zarr_uri, contextual_uri=contextual_uri)
+    )(
+        dist_zarr_uri, contextual_uri=contextual_uri
+    )
 
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-by-natural-lands-compute"
     )(datasets, expected_groups, contextual_name="natural_land_class")
 
-    result_dataset = common_tasks.compute_zonal_stat.with_options(
+    result_dataarray: xr.DataArray = common_tasks.compute_zonal_stat.with_options(
         name="dist-alerts-by-natural-lands-compute-zonal-stats"
     )(*compute_input, funcname="sum")
 
     result_df: pd.DataFrame = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-by-natural-lands-postprocess-result"
-    )(result_dataset)
+    )(result_dataarray)
 
     # natural_land_class
     result_df["natural_land_class"] = result_df["natural_land_class"].apply(

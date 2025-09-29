@@ -1,6 +1,8 @@
 import logging
+from typing import Tuple
 
 import numpy as np
+import xarray as xr
 from prefect import flow
 
 from pipelines.globals import DATA_LAKE_BUCKET
@@ -24,14 +26,16 @@ def gadm_natural_lands_area(overwrite: bool = False) -> str:
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
+    # fmt: off
     expected_groups = (
-        np.arange(999),  # country iso codes
-        np.arange(1, 86),  # region codes
+        np.arange(999),     # country iso codes
+        np.arange(1, 86),   # region codes
         np.arange(1, 854),  # subregion codes
-        np.arange(1, 22),  # natural lands categories
+        np.arange(1, 22),   # natural lands categories
     )
+    # fmt: on
 
-    datasets = common_tasks.load_data.with_options(
+    datasets: Tuple[xr.Dataset, ...] = common_tasks.load_data.with_options(
         name="area-by-natural-lands-load-data"
     )(base_uri, contextual_uri=contextual_uri)
 

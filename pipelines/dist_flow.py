@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import coiled
 from distributed import Client
@@ -55,7 +55,7 @@ def run_validation_suite(gadm_dist_result):
 def dist_alerts_flow(overwrite=False) -> list[str]:
     logger = get_run_logger()
     dask_client: Optional[Client] = None
-    result_uris = []
+    result_uris: List[str] = []
     try:
         dist_version: str = get_new_dist_version()
         logger.info(f"Latest dist version: {dist_version}")

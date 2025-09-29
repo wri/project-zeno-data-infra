@@ -3,8 +3,8 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+import xarray as xr
 from prefect import flow
-from xarray import DataArray, Dataset
 
 from pipelines.grasslands.prefect_flows import grasslands_tasks
 from pipelines.grasslands.stages import ExpectedGroupsType
@@ -37,19 +37,21 @@ def gadm_grasslands_area(overwrite: bool = False) -> str:
     )
     # fmt: on
 
-    datasets: Tuple[DataArray, ...] = grasslands_tasks.load_data.with_options(
+    datasets: Tuple[xr.DataArray, ...] = grasslands_tasks.load_data.with_options(
         name="area-by-grasslands-load-data"
     )(base_uri, contextual_uri=contextual_uri)
 
     compute_input: Tuple[
-        DataArray, Tuple[DataArray, DataArray, DataArray], ExpectedGroupsType | None
+        xr.DataArray,
+        Tuple[xr.DataArray, xr.DataArray, xr.DataArray],
+        ExpectedGroupsType | None,
     ] = grasslands_tasks.setup_compute.with_options(
         name="set-up-area-by-grasslands-compute"
     )(
         datasets, expected_groups, contextual_name=contextual_column_name
     )
 
-    result_dataset: Dataset = common_tasks.compute_zonal_stat.with_options(
+    result_dataset: xr.DataArray = common_tasks.compute_zonal_stat.with_options(
         name="area-by-grasslands-compute-zonal-stats"
     )(*compute_input, funcname=funcname)
 
