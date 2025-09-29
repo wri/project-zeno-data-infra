@@ -77,7 +77,7 @@ def setup_compute(
     Tuple[xr.DataArray, xr.DataArray, xr.DataArray],
     ExpectedGroupsType | None,
 ]:
-    """Setup the arguments for the xrarray reduce on grasslands by area"""
+    """Set up the arguments for the xrarray reduce on grasslands by area"""
     base_zarr, country, region, subregion = datasets
 
     mask: xr.DataArray = base_zarr

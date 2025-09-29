@@ -3,11 +3,11 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from grasslands.stages import ExpectedGroupsType
 from prefect import flow
 from xarray import DataArray, Dataset
 
 from pipelines.grasslands.prefect_flows import grasslands_tasks
+from pipelines.grasslands.stages import ExpectedGroupsType
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 

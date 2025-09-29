@@ -1,10 +1,10 @@
 from typing import Optional, Tuple
 
 import xarray as xr
-from grasslands.stages import ExpectedGroupsType
 from prefect import task
 
 from pipelines.grasslands import stages
+from pipelines.grasslands.stages import ExpectedGroupsType
 
 
 @task
