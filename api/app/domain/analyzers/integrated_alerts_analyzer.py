@@ -45,7 +45,7 @@ class IntegratedAlertsAnalyzer(Analyzer):
             gadm_ids = integrated_alerts_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)
         else:
-            results = await self.dask_map_client.map(
+            results = await self.dask_map_service.map(
                 integrated_alerts_analytics_in.aoi.ids,
                 integrated_alerts_analytics_in.aoi.type,
                 self.analyze_aoi,
