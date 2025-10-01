@@ -13,6 +13,7 @@ class Dataset(Enum):
     primary_forest = "primary_forest"
     carbon_emissions = "carbon_emissions"
     tree_cover_loss_drivers = "tree_cover_loss_driver"
+    integrated_alerts = "integrated_alerts"
 
     def get_field_name(self):
         DATASET_TO_NAMES = {

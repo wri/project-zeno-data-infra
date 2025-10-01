@@ -1,0 +1,72 @@
+from typing import Annotated, Optional, Union
+
+from pydantic import Field, PrivateAttr
+
+from ..common.analysis import DATE_REGEX, AnalysisStatus, AnalyticsIn
+from ..common.areas_of_interest import (
+    AdminAreaOfInterest,
+    CustomAreaOfInterest,
+    IndigenousAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
+    ProtectedAreaOfInterest,
+)
+from ..common.base import Response, StrictBaseModel
+
+ANALYTICS_NAME = "integrated_alerts"
+
+AoiUnion = Union[
+    AdminAreaOfInterest,
+    KeyBiodiversityAreaOfInterest,
+    ProtectedAreaOfInterest,
+    IndigenousAreaOfInterest,
+    CustomAreaOfInterest,
+]
+
+
+class IntegratedAlertsAnalyticsIn(AnalyticsIn):
+    _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
+    _version: str = PrivateAttr(default="v20250911")
+    aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
+        ...,
+        title="AOI",
+        description="AOI to calculate in.",
+    )
+    start_date: str = Field(
+        ...,
+        title="Start Date",
+        description="Must be either year or YYYY-MM-DD date format.",
+        pattern=DATE_REGEX,
+        examples=["2020", "2020-01-01"],
+    )
+    end_date: str = Field(
+        ...,
+        title="End Date",
+        description="Must be either year or YYYY-MM-DD date format.",
+        pattern=DATE_REGEX,
+        examples=["2023", "2023-12-31"],
+    )
+    # intersections: List[
+    #     Literal["driver", "natural_lands", "grasslands", "land_cover"]
+    # ] = Field(..., min_length=0, max_length=1, description="List of intersection types")
+
+
+class IntegratedAlertsAnalytics(StrictBaseModel):
+    result: Optional[dict] = {  # column oriented for loading into a dataframe
+        "aoi_id": ["BRA.12.1", "BRA.12.1", "BRA.12.1"],
+        "aoi_type": ["admin", "admin", "admin"],
+        "integrated_alert_date": [731, 733, 733],
+        "integrated_alert_confidence": [2, 2, 3],
+        "integrated_alert_count": [38, 5, 3],
+    }
+    metadata: Optional[dict] = None
+    message: Optional[str] = None
+    status: AnalysisStatus
+
+    model_config = {
+        "from_attributes": True,
+        "validate_by_name": True,
+    }
+
+
+class IntegratedAlertsAnalyticsResponse(Response):
+    data: IntegratedAlertsAnalytics
