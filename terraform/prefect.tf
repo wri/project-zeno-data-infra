@@ -35,6 +35,18 @@ module "prefect_ecs_worker" {
   worker_log_retention_in_days = 7
 }
 
+
+resource "prefect_block" "aws_credentials" {
+  name     = "aws-credentials-us-east-1"
+  type_slug    = "aws-credentials"
+  
+  data = jsonencode({
+    aws_access_key_id = var.aws_access_key_id
+    aws_secret_access_key = var.aws_secret_access_key
+    region_name = "us-east-1"
+  })
+}
+
 resource "prefect_work_pool" "ecs_pool" {
   name = var.work_pool_name
   type = "ecs"
@@ -110,7 +122,7 @@ resource "prefect_deployment" "dist_alerts" {
   flow_id = prefect_flow.dist_alerts_update.id
   path = "/app"
   entrypoint = "pipelines/dist_flow.py:main"
-    
+  
   job_variables = jsonencode({
     cpu    = 2048
     memory = 4096
@@ -118,8 +130,8 @@ resource "prefect_deployment" "dist_alerts" {
     env = {
       API_KEY = var.api_key
       DASK_COILED__TOKEN = var.coiled_token
-      AWS_ACCESS_KEY_ID = var.aws_access_key_id
-      AWS_SECRET_ACCESS_KEY = var.aws_secret_access_key
+      AWS_ACCESS_KEY_ID = var.gfw_aws_access_key_id
+      AWS_SECRET_ACCESS_KEY = var.gfw_aws_secret_access_key
     }
   })
 }
@@ -131,7 +143,7 @@ resource "prefect_deployment_schedule" "dist_update_schedule" {
   timezone = "America/New_York"
 
   # RRule-specific fields
-  rrule = "FREQ=DAILY;INTERVAL=1"
+  rrule = "FREQ=DAILY;BYHOUR=9;BYMINUTE=0"
 }
 
 
