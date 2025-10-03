@@ -28,6 +28,15 @@ variable "aws_access_key_id" {
   type = string
 }
 
+variable "gfw_aws_secret_access_key" {
+  type = string
+}
+
+variable "gfw_aws_access_key_id" {
+  type = string
+}
+
+
 variable "new_relic_license_key" {
   type        = string
   description = "New Relic License Key"
