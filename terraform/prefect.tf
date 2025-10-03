@@ -82,6 +82,7 @@ resource "prefect_work_pool" "ecs_pool" {
           }]
         }
       }
+      configure_cloudwatch_logs = "True"
     }
     
     variables = {
