@@ -66,6 +66,10 @@ resource "prefect_work_pool" "ecs_pool" {
         memory = "{{ memory }}"
         networkMode = "awsvpc"
         requiresCompatibilities = ["FARGATE"]
+        runtimePlatform = {
+          cpuArchitecture        = "ARM64"
+          operatingSystemFamily = "LINUX"
+        }
       }
 
       vpc_configuration = {
