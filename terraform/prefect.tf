@@ -129,7 +129,7 @@ resource "prefect_deployment" "dist_alerts" {
   entrypoint = "pipelines/dist_flow.py:main"
   
   job_variables = jsonencode({
-    image  = var.pipeline_image
+    image  = var.pipelines_image
     env = {
       API_KEY = var.api_key
       DASK_COILED__TOKEN = var.coiled_token

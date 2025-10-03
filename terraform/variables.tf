@@ -16,8 +16,8 @@ variable "api_image" {
   type        = string
 }
 
-variable "pipeline_image" {
-  description = "Data update pipeline image URI"
+variable "pipelines_image" {
+  description = "Data update pipelines image URI"
   type        = string
 }
 
