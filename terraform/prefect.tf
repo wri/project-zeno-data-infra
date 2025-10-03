@@ -124,8 +124,6 @@ resource "prefect_deployment" "dist_alerts" {
   entrypoint = "pipelines/dist_flow.py:main"
   
   job_variables = jsonencode({
-    cpu    = 2048
-    memory = 4096
     image  = "084375562450.dkr.ecr.us-east-1.amazonaws.com/analytics-api:d133d86" # replace with var.pipeline_image
     env = {
       API_KEY = var.api_key
