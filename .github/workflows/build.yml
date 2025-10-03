@@ -5,6 +5,9 @@ on:
       project_dir:
         required: true
         type: string
+      run_platform:
+        required: true
+        type: string
     secrets:
       AWS_REGION:
         required: true
@@ -23,7 +26,7 @@ env:
 
 jobs:
   build_and_push_image:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.run_platform }}
     env:
       CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     steps:
