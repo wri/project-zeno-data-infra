@@ -113,11 +113,11 @@ resource "prefect_work_pool" "ecs_pool" {
 }
 
 resource "prefect_flow" "dist_alerts_update" {
-  name = "Dist Alerts"
+  name = "DIST alerts"
 }
 
 resource "prefect_deployment" "dist_alerts" {
-  name         = "DIST-data-update"
+  name         = "dist-alerts-data-update"
   work_pool_name = prefect_work_pool.ecs_pool.name
   flow_id = prefect_flow.dist_alerts_update.id
   path = "/app"
