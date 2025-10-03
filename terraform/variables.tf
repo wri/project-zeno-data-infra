@@ -16,6 +16,11 @@ variable "api_image" {
   type        = string
 }
 
+variable "pipeline_image" {
+  description = "Data update pipeline image URI"
+  type        = string
+}
+
 variable "api_key" {
   type        = string
 }

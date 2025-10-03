@@ -129,7 +129,7 @@ resource "prefect_deployment" "dist_alerts" {
   entrypoint = "pipelines/dist_flow.py:main"
   
   job_variables = jsonencode({
-    image  = "084375562450.dkr.ecr.us-east-1.amazonaws.com/analytics-api:d133d86" # replace with var.pipeline_image
+    image  = var.pipeline_image
     env = {
       API_KEY = var.api_key
       DASK_COILED__TOKEN = var.coiled_token
@@ -146,7 +146,7 @@ resource "prefect_deployment_schedule" "dist_update_schedule" {
   timezone = "America/New_York"
 
   # RRule-specific fields
-  rrule = "FREQ=DAILY;BYHOUR=9;BYMINUTE=0"
+  rrule = "FREQ=DAILY;BYHOUR=1;BYMINUTE=0"
 }
 
 
