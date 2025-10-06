@@ -43,6 +43,15 @@ def create_analysis_service(
     )
 
 
+async def get_latest_dist_version(request: Request) -> str:
+    response = await request.app.state.s3_client.get_object(
+        Bucket="lcl-analytics", Key="dist-alerts/latest"
+    )
+    async with response["Body"] as stream:
+        content = await stream.read()
+    return content.decode("utf-8")
+
+
 def _datamart_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
@@ -64,10 +73,13 @@ async def create(
     data: DistAlertsAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
+    latest_version: str = Depends(get_latest_dist_version),
     service: AnalysisService = Depends(create_analysis_service),
 ):
+    versioned_data = data.model_copy(update={"_version": latest_version})
+
     return await create_analysis(
-        data=data,
+        data=versioned_data,
         service=service,
         request=request,
         background_tasks=background_tasks,

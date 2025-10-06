@@ -240,7 +240,7 @@ def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
     else:
         raise ValueError(f"No way to calculate aoi type {aoi_type}")
 
-    return f"s3://lcl-analytics/zonal-statistics/{table}.parquet"
+    return f"s3://lcl-analytics/zonal-statistics/dist-alerts/{table}.parquet"
 
 
 async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
