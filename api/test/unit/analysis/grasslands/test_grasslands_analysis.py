@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import patch
 
 import dask
@@ -7,11 +6,12 @@ import pandas as pd
 import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
+from dask.dataframe import DataFrame as DaskDataFrame
+
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
-from dask.dataframe import DataFrame as DaskDataFrame
 
 
 class TestGrasslandsPreComputedAnalysis:

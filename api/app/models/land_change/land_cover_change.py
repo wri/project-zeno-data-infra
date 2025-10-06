@@ -1,5 +1,7 @@
 from typing import Annotated, List, Optional, Union
 
+from pydantic import Field, PrivateAttr
+
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
@@ -9,7 +11,6 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from pydantic import Field, PrivateAttr
 
 ANALYTICS_NAME = "land_cover_change"
 
