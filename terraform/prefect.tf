@@ -106,12 +106,6 @@ resource "prefect_work_pool" "ecs_pool" {
           type   = "object"
           additionalProperties = { type = "string" }
         }
-        command = {
-          type = "array"
-          items = {
-            type = "string"
-          }
-        }
       }
     }
   })
