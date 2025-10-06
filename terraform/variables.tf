@@ -96,13 +96,13 @@ variable "worker_memory" {
 variable "flow_cpu" {
   description = "Default CPU units for flow run tasks"
   type        = number
-  default     = 4096 # 4 vCPU
+  default     = 8192 # 8 vCPU
 }
 
 variable "flow_memory" {
   description = "Default memory for flow run tasks in MB"
   type        = number
-  default     = 16384 # 16 GB
+  default     = 61440 # 60 GB
 }
 
 variable "coiled_token" {
