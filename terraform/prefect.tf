@@ -32,7 +32,7 @@ module "prefect_ecs_worker" {
   worker_cpu           = var.worker_cpu
   worker_memory        = var.worker_memory
 
-  worker_log_retention_in_days = 7
+  worker_log_retention_in_days = 30
 }
 
 
