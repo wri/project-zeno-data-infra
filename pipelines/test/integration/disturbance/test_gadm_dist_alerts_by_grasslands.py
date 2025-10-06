@@ -41,7 +41,7 @@ def test_gadm_dist_alerts_happy_path(
 
     assert (
         result_uri
-        == "s3://gfw-data-lake/umd_glad_dist_alerts/test_v1/tabular/zonal_stats/gadm/gadm_adm2_dist_alerts_by_grasslands.parquet"
+        == "s3://lcl-analytics/dist-alerts/test_v1/admin-dist-alerts-by-grassland-class.parquet"
     )
 
 
