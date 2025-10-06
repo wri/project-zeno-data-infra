@@ -78,7 +78,7 @@ variable "work_pool_name" {
 variable "worker_count" {
   description = "Number of Prefect workers to run"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "worker_cpu" {
