@@ -21,7 +21,7 @@ LAND_COVER_MAPPING = {
 }
 
 
-@flow(name="DIST alerts count by land cover")
+@flow(name="DIST alerts area by land cover")
 def dist_alerts_by_land_cover_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_filename = "dist_alerts_by_land_cover"
     result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
