@@ -135,6 +135,7 @@ resource "prefect_deployment" "dist_alerts" {
       DASK_COILED__TOKEN = var.coiled_token
       AWS_ACCESS_KEY_ID = var.gfw_aws_access_key_id
       AWS_SECRET_ACCESS_KEY = var.gfw_aws_secret_access_key
+      PIPELINES_IMAGE = var.pipelines_image
     }
   })
 }
