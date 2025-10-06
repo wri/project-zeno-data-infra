@@ -74,6 +74,8 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
+      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
