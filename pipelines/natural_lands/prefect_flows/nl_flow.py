@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from prefect import flow
 
-from pipelines.globals import DATA_LAKE_BUCKET
+from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
 from pipelines.natural_lands.prefect_flows import nl_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
@@ -18,7 +18,7 @@ def gadm_natural_lands_area(overwrite: bool = False):
         "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
     )
     contextual_column_name = "natural_lands"
-    result_uri = f"s3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
+    result_uri = f"s3://{ANALYTICS_BUCKET}/admin-natural-lands.parquet"
     funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):
