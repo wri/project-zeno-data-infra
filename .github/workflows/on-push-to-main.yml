@@ -78,3 +78,7 @@ jobs:
       GFW_API_KEY: ${{ secrets.API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+      DASK_COILED_TOKEN: ${{ secrets.DASK_COILED_TOKEN }}
+      PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
+      PREFECT_ACCOUNT_ID: ${{ secrets.PREFECT_ACCOUNT_ID }}
+      PREFECT_WORKSPACE_ID: ${{ secrets.PREFECT_WORKSPACE_ID }}
