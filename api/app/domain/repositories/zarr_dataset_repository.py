@@ -16,15 +16,20 @@ class ZarrDatasetRepository:
         Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",
         Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",
         Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",
+        Dataset.integrated_alerts_date: "",
+        Dataset.integrated_alerts_confidence: "",
     }
 
     def load(
-        self, dataset: Dataset, geometry: Optional[Geometry] = None
+        self,
+        dataset: Dataset,
+        geometry: Optional[Geometry] = None,
+        data_var_name="band_data",
     ) -> xr.DataArray:
         xarr = xr.open_zarr(
             self.ZARR_LOCATIONS[dataset],
             storage_options={"requester_pays": True},
-        ).band_data
+        )[data_var_name]
         xarr.rio.write_crs("EPSG:4326", inplace=True)
         xarr.name = dataset.get_field_name()
 

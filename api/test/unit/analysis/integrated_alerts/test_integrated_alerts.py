@@ -11,6 +11,14 @@ from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from dask.dataframe import DataFrame as DaskDataFrame
+from distributed import Client, LocalCluster
+from shapely import box
+
+from api.app.domain.models.dataset import Dataset
+from api.app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
+from api.app.infrastructure.external_services.dask_aoi_map_service import (
+    DaskAoiMapService,
+)
 
 
 class TestIntegratedAlertsPreComputedAnalysis:
@@ -135,30 +143,42 @@ class TestIntegratedAlertsOTFAnalysis:
     async def test_integrated_alerts_otf_analysis(
         self, mock_read_zarr, integrated_alerts_datacube, pixel_area
     ):
-        mock_read_zarr.side_effect = [integrated_alerts_datacube, pixel_area]
+        class TestDatasetRepository(ZarrDatasetRepository):
+            def load(self, dataset, geometry=None):
+                if dataset == Dataset.integrated_alerts_date:
+                    # all values are 0.5
+                    data = np.full((10, 10), 1)
+                    coords = {"x": np.arange(10), "y": np.arange(10)}
+                    xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                    xarr.name = "integrated_alerts_date"
+                elif dataset == Dataset.integrated_alerts_date:
+                    # left half is 2s, right half is 3s
+                    data = np.hstack([np.ones((10, 5)) + 1, np.ones((10, 5) + 2)])
+                    coords = {"x": np.arange(10), "y": np.arange(10)}
+                    xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                    xarr.name = "integrated_alerts_confidence"
+                else:
+                    raise ValueError("Not a valid dataset for this test")
 
-        aoi = {
-            "type": "Feature",
-            "properties": {"id": "test_aoi"},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [
-                    [
-                        [105.0006, 47.9987],
-                        [105.0016, 47.9987],
-                        [105.0016, 47.9978],
-                        [105.0006, 47.9978],
-                        [105.0006, 47.9987],
-                    ]
-                ],
-            },
-        }
+                return xarr
 
-        with dask.config.set(scheduler="synchronous"):
-            result_df = IntegratedAlertsAnalyzer.analyze_area(
-                aoi, aoi["geometry"], 2000, 2022
-            )
-            computed_df = result_df.compute()
+        class TestAoiGeometryRepository:
+            async def load(self, aoi_type, aoi_ids):
+                return [box(10, 0, 0, 10)]
+
+        with LocalCluster(n_workers=1, threads_per_worker=1) as cluster:
+            with Client(cluster) as client:
+                analyzer = IntegratedAlertsAnalyzer(
+                    dataset_repository=TestDatasetRepository(),
+                    aoi_geometry_repository=TestAoiGeometryRepository(),
+                    dask_client=client,
+                    dask_map_service=DaskAoiMapService(
+                        client, TestAoiGeometryRepository(), TestDatasetRepository()
+                    ),
+                )
+
+                result_df = analyzer.analyze(aoi, aoi["geometry"])
+                computed_df = result_df.compute()
 
         years = np.arange(2000, 2023)
         expected_df = pd.DataFrame(

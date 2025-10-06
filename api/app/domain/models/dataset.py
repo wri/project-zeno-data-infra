@@ -13,7 +13,8 @@ class Dataset(Enum):
     primary_forest = "primary_forest"
     carbon_emissions = "carbon_emissions"
     tree_cover_loss_drivers = "tree_cover_loss_driver"
-    integrated_alerts = "integrated_alerts"
+    integrated_alerts_date = "integrated_alerts_date"
+    integrated_alerts_confidence = ("integrated_alerts_confidence",)
 
     def get_field_name(self):
         DATASET_TO_NAMES = {
@@ -25,6 +26,8 @@ class Dataset(Enum):
             Dataset.primary_forest: "is_primary_forest",
             Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
             Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
+            Dataset.integrated_alerts_date: "integrated_alerts_date",
+            Dataset.integrated_alerts_confidence: "integrated_alerts_confidence",
         }
 
         return DATASET_TO_NAMES[self]

@@ -63,15 +63,19 @@ class IntegratedAlertsAnalyzer(Analyzer):
     @staticmethod
     def analyze_aoi(aoi, geojson, dataset_repository):
         aoi_id, aoi_geometry = aoi
-        integrated_alerts = dataset_repository.load(
-            Dataset.integrated_alerts, geometry=aoi_geometry
+        integrated_alerts_date = dataset_repository.load(
+            Dataset.integrated_alerts, geometry=aoi_geometry, data_var_name="alert_date"
         )
 
-        groupby_layers = [integrated_alerts.alert_date, integrated_alerts.confidence]
+        integrated_alerts_confidence = dataset_repository.load(
+            Dataset.integrated_alerts, geometry=aoi_geometry, data_var_name="confidence"
+        )
+
+        groupby_layers = [integrated_alerts_date, integrated_alerts_confidence]
         expected_groups = [np.arange(731, 2000), [1, 2, 3]]
 
         counts = xarray_reduce(
-            integrated_alerts.alert_date,
+            integrated_alerts_date,
             *tuple(groupby_layers),
             func="count",
             expected_groups=tuple(expected_groups),
