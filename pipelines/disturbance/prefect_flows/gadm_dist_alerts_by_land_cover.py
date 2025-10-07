@@ -3,7 +3,6 @@ import pandas as pd
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
@@ -20,7 +19,7 @@ LAND_COVER_MAPPING = {
 }
 
 
-@flow(name="DIST alerts count by land cover")
+@flow(name="DIST alerts area by land cover")
 def dist_alerts_by_land_cover_area(
     dist_zarr_uri: str, dist_version: str, overwrite=False
 ):

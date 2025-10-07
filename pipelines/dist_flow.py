@@ -1,4 +1,5 @@
 import logging
+import os
 
 import boto3
 import coiled
@@ -32,7 +33,7 @@ def create_cluster():
         worker_vm_types=["r7g.2xlarge"],
         compute_purchase_option="spot_with_fallback",
         no_client_timeout="5 seconds",
-        container="globalforestwatch/zeno:2",
+        container=os.getenv("PIPELINES_IMAGE"),
     )
     cluster.adapt(minimum=10, maximum=50)
 

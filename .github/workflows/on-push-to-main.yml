@@ -19,6 +19,7 @@ jobs:
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     with:
       project_dir: 'api'
+      run_platform: 'ubuntu-latest'
 
   run_api_tests:
     needs: build_api_image
@@ -35,6 +36,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
     with:
       project_dir: 'api'
+      run_platform: 'ubuntu-latest'
 
   build_pipelines_image:
     uses: ./.github/workflows/build.yml
@@ -46,6 +48,7 @@ jobs:
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     with:
       project_dir: 'pipelines'
+      run_platform: 'ubuntu-24.04-arm'
 
   run_pipelines_tests:
     needs: build_pipelines_image
@@ -62,6 +65,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use GFW prod key for pipelines tests
     with:
       project_dir: 'pipelines'
+      run_platform: 'ubuntu-24.04-arm'
 
   deploy_to_production:
     needs: [run_api_tests, run_pipelines_tests]
@@ -70,7 +74,13 @@ jobs:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
+      AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       GFW_API_KEY: ${{ secrets.API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+      DASK_COILED_TOKEN: ${{ secrets.DASK_COILED_TOKEN }}
+      PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
+      PREFECT_ACCOUNT_ID: ${{ secrets.PREFECT_ACCOUNT_ID }}
+      PREFECT_WORKSPACE_ID: ${{ secrets.PREFECT_WORKSPACE_ID }}
