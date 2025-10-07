@@ -199,7 +199,9 @@ async def zonal_statistics(
     return alerts_df
 
 
-async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_client):
+async def get_precomputed_statistics(
+    aoi, intersection: Optional[str], dask_client, version: str
+):
     if aoi["type"] != "admin" or intersection not in [
         None,
         "natural_lands",
@@ -211,7 +213,7 @@ async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_clie
             f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
         )
 
-    table = get_precomputed_table(aoi["type"], intersection)
+    table = get_precomputed_table(aoi["type"], intersection, version)
     precompute_partial = partial(
         get_precomputed_statistic_on_gadm_aoi, table=table, intersection=intersection
     )
@@ -222,7 +224,9 @@ async def get_precomputed_statistics(aoi, intersection: Optional[str], dask_clie
     return alerts_df
 
 
-def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
+def get_precomputed_table(
+    aoi_type: str, intersection: Optional[str], version: str
+) -> str:
     if aoi_type == "admin":
         # Each intersection will be in a different parquet file
         if intersection is None:
@@ -240,7 +244,7 @@ def get_precomputed_table(aoi_type: str, intersection: Optional[str]) -> str:
     else:
         raise ValueError(f"No way to calculate aoi type {aoi_type}")
 
-    return f"s3://lcl-analytics/zonal-statistics/dist-alerts/{table}.parquet"
+    return f"s3://lcl-analytics/zonal-statistics/dist-alerts/{version}/{table}.parquet"
 
 
 async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):

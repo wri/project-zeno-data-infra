@@ -45,11 +45,22 @@ def create_analysis_service(
 
 async def get_latest_dist_version(request: Request) -> str:
     response = await request.app.state.s3_client.get_object(
-        Bucket="lcl-analytics", Key="dist-alerts/latest"
+        Bucket="lcl-analytics", Key="zonal-statistics/dist-alerts/latest"
     )
     async with response["Body"] as stream:
         content = await stream.read()
-    return content.decode("utf-8")
+    return content.decode("utf-8").strip()
+
+
+async def create_versioned_dist_alerts_data(
+    request: Request,
+    latest_version: str = Depends(get_latest_dist_version),
+) -> DistAlertsAnalyticsIn:
+    """Dependency to create DistAlertsAnalyticsIn with version included."""
+    body_data = await request.json()
+    data = DistAlertsAnalyticsIn(**body_data)
+    data._version = latest_version  # Direct assignment to PrivateAttr
+    return data
 
 
 def _datamart_resource_link_response(request, service) -> str:
@@ -70,16 +81,13 @@ def _datamart_resource_link_response(request, service) -> str:
 )
 async def create(
     *,
-    data: DistAlertsAnalyticsIn,
+    data: DistAlertsAnalyticsIn = Depends(create_versioned_dist_alerts_data),
     request: Request,
     background_tasks: BackgroundTasks,
-    latest_version: str = Depends(get_latest_dist_version),
     service: AnalysisService = Depends(create_analysis_service),
 ):
-    versioned_data = data.model_copy(update={"_version": latest_version})
-
     return await create_analysis(
-        data=versioned_data,
+        data=data,
         service=service,
         request=request,
         background_tasks=background_tasks,
