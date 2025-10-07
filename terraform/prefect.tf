@@ -66,6 +66,9 @@ resource "prefect_work_pool" "ecs_pool" {
         memory = "{{ memory }}"
         networkMode = "awsvpc"
         requiresCompatibilities = ["FARGATE"]
+        # Our dask workers use ARM instances that are more cost effective for our workloads
+        # https://docs.coiled.io/blog/coiled-xarray.html and get less SPOT recalls. 
+        # The prefect task runners/dask clients need to run in the same environment as the cluster.
         runtimePlatform = {
           cpuArchitecture        = "ARM64"
           operatingSystemFamily = "LINUX"
@@ -140,7 +143,7 @@ resource "prefect_deployment_schedule" "dist_update_schedule" {
   active   = true
   timezone = "America/New_York"
 
-  # RRule-specific fields
+  # Runs nightly at 1am ET
   rrule = "FREQ=DAILY;BYHOUR=1;BYMINUTE=0"
 }
 
