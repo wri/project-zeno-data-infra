@@ -51,16 +51,6 @@ class AdminAreaOfInterest(AreaOfInterest):
                 raise ValueError("Maximum admin level allowed is 2")
         return values
 
-    @model_validator(mode="after")
-    def check_region_subregion(cls, values):
-        # id = values.get("id")
-        # parse id to get region and subregion (if they exist)
-        subregion = None
-        region = None
-        if subregion is not None and region is None:
-            raise ValueError("region must be specified if subregion is provided")
-        return values
-
     @field_validator("provider", mode="before")
     def set_provider_default(cls, v):
         return v or "gadm"
