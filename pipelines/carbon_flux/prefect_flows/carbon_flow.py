@@ -8,7 +8,7 @@ from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
 
-@flow(name="Natural lands area")
+@flow(name="Carbon flux")
 def gadm_carbon_flux(overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
