@@ -44,12 +44,15 @@ def create_analysis_service(
 
 
 async def get_latest_dist_version(request: Request) -> str:
-    response = await request.app.state.s3_client.get_object(
-        Bucket="lcl-analytics", Key="zonal-statistics/dist-alerts/latest"
-    )
-    async with response["Body"] as stream:
-        content = await stream.read()
-    return content.decode("utf-8").strip()
+    try:
+        response = await request.app.state.s3_client.get_object(
+            Bucket="lcl-analytics", Key="zonal-statistics/dist-alerts/latest"
+        )
+        async with response["Body"] as stream:
+            content = await stream.read()
+        return content.decode("utf-8").strip()
+    except request.app.state.s3_client.exceptions.NoSuchKey:
+        return "v20251004"
 
 
 async def create_versioned_dist_alerts_data(
