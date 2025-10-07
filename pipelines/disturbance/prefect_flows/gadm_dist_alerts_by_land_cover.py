@@ -3,7 +3,7 @@ import pandas as pd
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
+from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 

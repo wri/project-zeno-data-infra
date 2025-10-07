@@ -18,7 +18,7 @@ def gadm_natural_lands_area(overwrite: bool = False):
         "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
     )
     contextual_column_name = "natural_lands"
-    result_uri = f"s3://{ANALYTICS_BUCKET}/admin-natural-lands.parquet"
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-natural-lands.parquet"
     funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):

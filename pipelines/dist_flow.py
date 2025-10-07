@@ -56,7 +56,7 @@ def write_dist_latest_version(dist_version) -> None:
     s3_client = boto3.client("s3")
     s3_client.put_object(
         Bucket=ANALYTICS_BUCKET,
-        Key="dist-alerts/latest",
+        Key="zonal-statistics/dist-alerts/latest",
         Body=dist_version.encode("utf-8"),
         ContentType="text/plain",
     )

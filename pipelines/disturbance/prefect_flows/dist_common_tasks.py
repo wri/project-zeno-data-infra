@@ -6,7 +6,7 @@ from prefect import task
 from pipelines.disturbance import stages
 from pipelines.globals import ANALYTICS_BUCKET
 
-DIST_PREFIX = f"s3://{ANALYTICS_BUCKET}/dist-alerts"
+DIST_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/dist-alerts"
 
 
 @task

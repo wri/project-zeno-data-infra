@@ -19,7 +19,7 @@ def gadm_grasslands_area(overwrite: bool = False):
         "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
     )
     contextual_column_name = "grasslands"
-    result_uri = f"s3://{ANALYTICS_BUCKET}/admin-grasslands.parquet"
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-grasslands.parquet"
     funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):
