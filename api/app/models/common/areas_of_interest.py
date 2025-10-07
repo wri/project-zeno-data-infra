@@ -45,6 +45,13 @@ class AdminAreaOfInterest(AreaOfInterest):
         return ids
 
     @model_validator(mode="after")
+    def check_max_admin_level_2(cls, values):
+        for i in values.ids:
+            if len(i.split(".")) > 3:
+                raise ValueError("Maximum admin level allowed is 2")
+        return values
+
+    @model_validator(mode="after")
     def check_region_subregion(cls, values):
         # id = values.get("id")
         # parse id to get region and subregion (if they exist)
