@@ -1,7 +1,7 @@
 from typing import Annotated, Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import Field, StringConstraints, field_validator
 
 from .base import StrictBaseModel
 
@@ -44,12 +44,12 @@ class AdminAreaOfInterest(AreaOfInterest):
 
         return ids
 
-    @model_validator(mode="after")
-    def check_max_admin_level_2(cls, values):
-        for i in values.ids:
+    @field_validator("ids", mode="after")
+    def check_max_admin_level_2(cls, v):
+        for i in v:
             if len(i.split(".")) > 3:
                 raise ValueError("Maximum admin level allowed is 2")
-        return values
+        return v
 
     @field_validator("provider", mode="before")
     def set_provider_default(cls, v):
