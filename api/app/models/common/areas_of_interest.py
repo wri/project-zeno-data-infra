@@ -1,7 +1,7 @@
 from typing import Annotated, Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import Field, StringConstraints, field_validator, model_validator
+from pydantic import Field, StringConstraints, field_validator
 
 from .base import StrictBaseModel
 
@@ -44,15 +44,12 @@ class AdminAreaOfInterest(AreaOfInterest):
 
         return ids
 
-    @model_validator(mode="after")
-    def check_region_subregion(cls, values):
-        # id = values.get("id")
-        # parse id to get region and subregion (if they exist)
-        subregion = None
-        region = None
-        if subregion is not None and region is None:
-            raise ValueError("region must be specified if subregion is provided")
-        return values
+    @field_validator("ids", mode="after")
+    def check_max_admin_level_2(cls, v):
+        for i in v:
+            if len(i.split(".")) > 3:
+                raise ValueError("Maximum admin level allowed is 2")
+        return v
 
     @field_validator("provider", mode="before")
     def set_provider_default(cls, v):
