@@ -61,7 +61,7 @@ LAND_COVER_MAPPING = {
 }
 
 
-async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
+async def zonal_statistics_on_aois(aois, dask_client, version, intersection=None):
     geojsons = await get_geojson(aois)
 
     if aois["type"] != "feature_collection":
@@ -73,7 +73,9 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
         aois = aois["feature_collection"]["features"]
         geojsons = [geojson["geometry"] for geojson in geojsons]
 
-    precompute_partial = partial(zonal_statistics, intersection=intersection)
+    precompute_partial = partial(
+        zonal_statistics, version=version, intersection=intersection
+    )
     futures = dask_client.map(precompute_partial, aois, geojsons)
     dd_df_futures = await dask_client.gather(futures)
     dfs = await dask_client.gather(dd_df_futures)
@@ -83,9 +85,11 @@ async def zonal_statistics_on_aois(aois, dask_client, intersection=None):
 
 
 async def zonal_statistics(
-    aoi, geojson, intersection: Optional[str] = None
+    aoi, geojson, version: Optional[str] = None, intersection: Optional[str] = None
 ) -> DaskDataFrame:
-    dist_obj_name = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250913/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+    dist_obj_name = (
+        f"s3://lcl-analytics/zarr/dist-alerts/{version}/umd_glad_dist_alerts.zarr"
+    )
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     pixel_area_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"

@@ -28,16 +28,17 @@ class DistAlertsAnalyzer(Analyzer):
             intersection = None
 
         aoi_dict = dist_analytics_in.model_dump()["aoi"]
+        version = analysis.metadata["_version"]
         if dist_analytics_in.aoi.type == "admin":
             alerts_df = await get_precomputed_statistics(
                 aoi_dict,
                 intersection,
                 self.compute_engine,
-                analysis.metadata["_version"],
+                version,
             )
         else:
             alerts_df = await zonal_statistics_on_aois(
-                aoi_dict, self.compute_engine, intersection
+                aoi_dict, self.compute_engine, version, intersection
             )
 
         if dist_analytics_in.start_date is not None:
