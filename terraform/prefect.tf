@@ -114,14 +114,14 @@ resource "prefect_work_pool" "ecs_pool" {
   })
 }
 
-resource "prefect_flow" "dist_alerts_update" {
-  name = "DIST alerts"
+resource "prefect_flow" "gnw_zonal_stats_update" {
+  name = "GNW zonal stats update"
 }
 
 resource "prefect_deployment" "gnw_zonal_stats_update" {
   name         = "gnw-zonal-stats-update"
   work_pool_name = prefect_work_pool.ecs_pool.name
-  flow_id = prefect_flow.dist_alerts_update.id
+  flow_id = prefect_flow.gnw_zonal_stats_update.id
   path = "/app"
   entrypoint = "pipelines/run_updates.py:main"
   
@@ -137,8 +137,8 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
   })
 }
 
-resource "prefect_deployment_schedule" "dist_update_schedule" {
-  deployment_id = prefect_deployment.dist_alerts.id
+resource "prefect_deployment_schedule" "gnw_zonal_stats_update_schedule" {
+  deployment_id = prefect_deployment.gnw_zonal_stats_update.id
 
   active   = true
   timezone = "America/New_York"
