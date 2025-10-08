@@ -118,12 +118,12 @@ resource "prefect_flow" "dist_alerts_update" {
   name = "DIST alerts"
 }
 
-resource "prefect_deployment" "dist_alerts" {
-  name         = "dist-alerts-data-update"
+resource "prefect_deployment" "gnw_zonal_stats_update" {
+  name         = "gnw-zonal-stats-update"
   work_pool_name = prefect_work_pool.ecs_pool.name
   flow_id = prefect_flow.dist_alerts_update.id
   path = "/app"
-  entrypoint = "pipelines/dist_flow.py:main"
+  entrypoint = "pipelines/run_updates.py:main"
   
   job_variables = jsonencode({
     image  = var.pipelines_image
