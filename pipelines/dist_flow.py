@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List, Optional, Tuple
 
 import coiled
@@ -32,7 +33,7 @@ def create_cluster() -> Tuple[Client, coiled.Cluster]:
         worker_vm_types=["r7g.2xlarge"],
         compute_purchase_option="spot_with_fallback",
         no_client_timeout="5 seconds",
-        container="globalforestwatch/zeno:2",
+        container=os.getenv("PIPELINES_IMAGE"),
     )
     cluster.adapt(minimum=10, maximum=50)
 
@@ -89,6 +90,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
             prefect_flows.dist_alerts_by_grasslands_area(
                 dist_zarr_uri, dist_version, overwrite=overwrite
             )
+
         )
         result_uris.append(gadm_dist_by_grasslands_result)
 

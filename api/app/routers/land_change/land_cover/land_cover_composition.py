@@ -1,3 +1,8 @@
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import Response as FastAPIResponse
+from fastapi.responses import ORJSONResponse
+from pydantic import UUID5
+
 from app.domain.analyzers.land_cover_composition_analyzer import (
     LandCoverCompositionAnalyzer,
 )
@@ -18,10 +23,6 @@ from app.models.land_change.land_cover_composition import (
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
-from fastapi import Response as FastAPIResponse
-from fastapi.responses import ORJSONResponse
-from pydantic import UUID5
 
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 

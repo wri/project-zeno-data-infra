@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
+from distributed import Client, LocalCluster
+from shapely.geometry import box
+
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
 )
@@ -22,8 +25,6 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
-from distributed import Client, LocalCluster
-from shapely.geometry import box
 
 
 @pytest.mark.asyncio

@@ -3,6 +3,10 @@ from test.integration import delete_resource_files, retry_getting_resource
 import pandas as pd
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
+from httpx import ASGITransport, AsyncClient
+
 from app.domain.analyzers.tree_cover_gain_analyzer import TreeCoverGainAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
@@ -37,9 +41,6 @@ from app.routers.land_change.tree_cover_gain.tree_cover_gain import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
-from httpx import ASGITransport, AsyncClient
 
 
 def get_file_system_analysis_repository() -> AnalysisRepository:
@@ -80,12 +81,12 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
             start_year="2005",
             end_year="2020",
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
@@ -148,12 +149,12 @@ class TestGainAnalyticsPostWithKba:
             start_year="2005",
             end_year="2020",
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
@@ -217,12 +218,12 @@ class TestGainAnalyticsKeyErrorFix:
             start_year="2015",
             end_year="2020",
         )
-        app.dependency_overrides[
-            create_analysis_service
-        ] = create_analysis_service_for_tests
-        app.dependency_overrides[
-            get_analysis_repository
-        ] = get_file_system_analysis_repository
+        app.dependency_overrides[create_analysis_service] = (
+            create_analysis_service_for_tests
+        )
+        app.dependency_overrides[get_analysis_repository] = (
+            get_file_system_analysis_repository
+        )
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):

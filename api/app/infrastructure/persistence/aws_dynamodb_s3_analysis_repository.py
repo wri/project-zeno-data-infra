@@ -3,10 +3,11 @@ import json
 import logging
 import uuid
 
+from botocore.exceptions import ClientError
+
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
-from botocore.exceptions import ClientError
 
 
 # Helper function for retrying on throttling

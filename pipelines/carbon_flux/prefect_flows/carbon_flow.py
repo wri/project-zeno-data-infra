@@ -8,8 +8,9 @@ from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
 
-@flow(name="Natural lands area")
+@flow(name="Carbon flux")
 def gadm_carbon_flux(overwrite: bool = False) -> str:
+
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
     carbon_net_flux_zarr_uri = "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/"

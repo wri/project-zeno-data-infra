@@ -1,7 +1,8 @@
 import pytest
+from pydantic_core import ValidationError
+
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
-from pydantic_core import ValidationError
 
 
 @pytest.fixture()

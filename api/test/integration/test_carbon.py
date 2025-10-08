@@ -6,7 +6,15 @@ from test.integration import (  # write_data_file,; write_metadata_file,
 import pandas as pd
 import pytest
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
+from fastapi import Depends, Request
+from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
+
 from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -21,13 +29,6 @@ from app.routers.land_change.carbon_flux.carbon_flux import (
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
-from app.infrastructure.external_services.duck_db_query_service import (
-    DuckDbPrecalcQueryService,
-)
-from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
-from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
 
 client = TestClient(app)
 
