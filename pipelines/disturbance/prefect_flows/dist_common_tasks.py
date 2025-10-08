@@ -1,10 +1,10 @@
 from typing import Optional, Tuple
 
 import xarray as xr
-from disturbance.stages import ExpectedGroupsType
 from prefect import task
 
 from pipelines.disturbance import stages
+from pipelines.disturbance.stages import ExpectedGroupsType
 
 
 @task
