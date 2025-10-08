@@ -1,20 +1,28 @@
 from typing import Optional, Tuple
-import xarray as xr
-import pandas as pd
 
+import pandas as pd
+import xarray as xr
 from prefect import task
 
 from pipelines.prefect_flows import common_stages
 
+
 @task
-def load_data(base_zarr_uri: str, contextual_uri: Optional[str] = None) -> Tuple[xr.DataArray, ...]:
+def load_data(
+    base_zarr_uri: str, contextual_uri: Optional[str] = None
+) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset | None]:
     return common_stages.load_data(base_zarr_uri, contextual_uri)
 
 
 @task
-def compute_zonal_stat(dataset: xr.DataArray, groupbys: Tuple[xr.DataArray, ...], expected_groups: Tuple, funcname: str) -> xr.DataArray:
-    '''Do the reduction with the specified groupbys. funcname is the name of the
-    reduction function'''
+def compute_zonal_stat(
+    dataset: xr.DataArray,
+    groupbys: Tuple[xr.DataArray, ...],
+    expected_groups: Tuple,
+    funcname: str,
+) -> xr.DataArray:
+    """Do the reduction with the specified groupbys. funcname is the name of the
+    reduction function"""
     return common_stages.compute(dataset, groupbys, expected_groups, funcname)
 
 

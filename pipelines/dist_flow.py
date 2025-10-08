@@ -1,7 +1,9 @@
 import logging
 import os
+from typing import List, Optional, Tuple
 
 import coiled
+from distributed import Client
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
@@ -21,7 +23,7 @@ def get_new_dist_version() -> str:
 
 
 @task
-def create_cluster():
+def create_cluster() -> Tuple[Client, coiled.Cluster]:
     cluster = coiled.Cluster(
         name="dist_alerts_zonal_stat_count",
         region="us-east-1",
@@ -53,50 +55,55 @@ def run_validation_suite(gadm_dist_result):
 @flow(name="dist_alerts_flow", log_prints=True)
 def dist_alerts_flow(overwrite=False) -> list[str]:
     logger = get_run_logger()
-    dask_client = None
-    result_uris = []
+    dask_client: Optional[Client] = None
+    result_uris: List[str] = []
     try:
-        dist_version = get_new_dist_version()
+        dist_version: str = get_new_dist_version()
         logger.info(f"Latest dist version: {dist_version}")
         dask_client, _ = create_cluster()
 
-        gl_result = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
+        gl_result: str = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
         result_uris.append(gl_result)
 
-        nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
+        nl_result: str = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
         result_uris.append(nl_result)
 
-        dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
-        gadm_dist_result = prefect_flows.dist_alerts_area(
+        dist_zarr_uri: str = create_zarr(dist_version, overwrite=overwrite)
+        gadm_dist_result: str = prefect_flows.dist_alerts_area(
             dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_result)
 
-        gadm_dist_by_natural_lands_result = (
+        gadm_dist_by_natural_lands_result: str = (
             prefect_flows.dist_alerts_by_natural_lands_area(
                 dist_zarr_uri, dist_version, overwrite=overwrite
             )
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
-        gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_area(
+        gadm_dist_by_drivers_result: str = prefect_flows.dist_alerts_by_drivers_area(
             dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_by_drivers_result)
 
-        gadm_dist_by_grasslands_result = prefect_flows.dist_alerts_by_grasslands_area(
-            dist_zarr_uri, dist_version, overwrite=overwrite
+        gadm_dist_by_grasslands_result: str = (
+            prefect_flows.dist_alerts_by_grasslands_area(
+                dist_zarr_uri, dist_version, overwrite=overwrite
+            )
+
         )
         result_uris.append(gadm_dist_by_grasslands_result)
 
-        gadm_dist_by_land_cover_result = prefect_flows.dist_alerts_by_land_cover_area(
-            dist_zarr_uri, dist_version, overwrite=overwrite
+        gadm_dist_by_land_cover_result: str = (
+            prefect_flows.dist_alerts_by_land_cover_area(
+                dist_zarr_uri, dist_version, overwrite=overwrite
+            )
         )
         result_uris.append(gadm_dist_by_land_cover_result)
 
-        validate_result = run_validation_suite(gadm_dist_result)
+        _ = run_validation_suite(gadm_dist_result)
 
-        carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
+        carbon_result: str = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
         result_uris.append(carbon_result)
 
     except Exception:

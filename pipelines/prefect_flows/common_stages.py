@@ -1,4 +1,5 @@
-from typing import Tuple, Optional
+from typing import Optional, Tuple
+
 import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
@@ -10,6 +11,7 @@ from pipelines.globals import (
     subregion_zarr_uri,
 )
 
+# fmt: off
 numeric_to_alpha3 = {
     4: 'AFG', 248: 'ALA', 8: 'ALB', 12: 'DZA', 16: 'ASM', 20: 'AND', 24: 'AGO', 660: 'AIA',
     10: 'ATA', 28: 'ATG', 32: 'ARG', 51: 'ARM', 533: 'ABW', 36: 'AUS', 40: 'AUT', 31: 'AZE',
@@ -44,38 +46,46 @@ numeric_to_alpha3 = {
     862: 'VEN', 704: 'VNM', 92: 'VGB', 850: 'VIR', 876: 'WLF', 732: 'ESH', 887: 'YEM', 894: 'ZMB',
     716: 'ZWE'
 }
+# fmt: on
+
 
 def load_data(
     base_zarr_uri: str,
     contextual_uri: Optional[str] = None,
-) -> Tuple[xr.DataArray, ...]:
+) -> Tuple[xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset, xr.Dataset | None]:
     """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
-    base_layer = _load_zarr(base_zarr_uri)
+    base_layer: xr.Dataset = _load_zarr(base_zarr_uri)
 
     # reindex to dist alerts to avoid floating point precision issues
     # when aligning the datasets
     # https://github.com/pydata/xarray/issues/2217
-    country = _load_zarr(country_zarr_uri).reindex_like(
+    country: xr.Dataset = _load_zarr(country_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
     )
-    country_aligned = xr.align(base_layer, country, join="left")[1].band_data
-    region = _load_zarr(region_zarr_uri).reindex_like(
+    country_aligned: xr.Dataset = xr.align(base_layer, country, join="left")[
+        1
+    ].band_data
+
+    region: xr.Dataset = _load_zarr(region_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
     )
-    region_aligned = xr.align(base_layer, region, join="left")[1].band_data
-    subregion = _load_zarr(subregion_zarr_uri).reindex_like(
+    region_aligned: xr.Dataset = xr.align(base_layer, region, join="left")[1].band_data
+
+    subregion: xr.Dataset = _load_zarr(subregion_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
     )
-    subregion_aligned = xr.align(base_layer, subregion, join="left")[1].band_data
+    subregion_aligned: xr.Dataset = xr.align(base_layer, subregion, join="left")[
+        1
+    ].band_data
 
     if contextual_uri is not None:
-        contextual_layer = _load_zarr(contextual_uri).reindex_like(
+        contextual_layer: xr.Dataset = _load_zarr(contextual_uri).reindex_like(
             base_layer, method="nearest", tolerance=1e-5
         )
-        contextual_layer_aligned = xr.align(base_layer, contextual_layer, join="left")[
-            1
-        ].band_data
+        contextual_layer_aligned: Optional[xr.Dataset] = xr.align(
+            base_layer, contextual_layer, join="left"
+        )[1].band_data
     else:
         contextual_layer_aligned = None
 
@@ -87,7 +97,13 @@ def load_data(
         contextual_layer_aligned,
     )
 
-def compute(reduce_mask: xr.DataArray, reduce_groupbys: Tuple, expected_groups: Tuple, funcname: str) -> xr.DataArray:
+
+def compute(
+    reduce_mask: xr.DataArray,
+    reduce_groupbys: Tuple,
+    expected_groups: Tuple,
+    funcname: str,
+) -> xr.DataArray:
     print("Starting reduce")
     result = xarray_reduce(
         reduce_mask,
@@ -121,9 +137,7 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     return df
 
 
-def save_results(
-    df: pd.DataFrame, results_uri: str
-) -> str:
+def save_results(df: pd.DataFrame, results_uri: str) -> str:
     print("Starting parquet")
 
     _save_parquet(df, results_uri)
@@ -136,5 +150,5 @@ def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
     df.to_parquet(results_uri, index=False)
 
 
-def _load_zarr(zarr_uri):
+def _load_zarr(zarr_uri) -> xr.Dataset:
     return xr.open_zarr(zarr_uri)

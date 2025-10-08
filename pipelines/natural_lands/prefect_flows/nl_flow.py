@@ -1,6 +1,8 @@
 import logging
+from typing import Tuple
 
 import numpy as np
+import xarray as xr
 from prefect import flow
 
 from pipelines.globals import DATA_LAKE_BUCKET
@@ -10,7 +12,7 @@ from pipelines.utils import s3_uri_exists
 
 
 @flow(name="Natural lands area")
-def gadm_natural_lands_area(overwrite: bool = False):
+def gadm_natural_lands_area(overwrite: bool = False) -> str:
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
     base_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
@@ -24,14 +26,16 @@ def gadm_natural_lands_area(overwrite: bool = False):
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
+    # fmt: off
     expected_groups = (
-        np.arange(999),  # country iso codes
-        np.arange(1, 86),  # region codes
+        np.arange(999),     # country iso codes
+        np.arange(1, 86),   # region codes
         np.arange(1, 854),  # subregion codes
-        np.arange(1, 22),  # natural lands categories
+        np.arange(1, 22),   # natural lands categories
     )
+    # fmt: on
 
-    datasets = common_tasks.load_data.with_options(
+    datasets: Tuple[xr.Dataset, ...] = common_tasks.load_data.with_options(
         name="area-by-natural-lands-load-data"
     )(base_uri, contextual_uri=contextual_uri)
 
@@ -48,4 +52,5 @@ def gadm_natural_lands_area(overwrite: bool = False):
     result_uri = common_tasks.save_result.with_options(
         name="area-by-natural-lands-save-result"
     )(result_df, result_uri)
+
     return result_uri
