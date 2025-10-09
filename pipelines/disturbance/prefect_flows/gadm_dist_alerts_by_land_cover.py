@@ -1,12 +1,10 @@
 import numpy as np
 import pandas as pd
-
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import DATA_LAKE_BUCKET
-from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
+from pipelines.utils import s3_uri_exists
 
 LAND_COVER_MAPPING = {
     0: "Bare and sparse vegetation",
@@ -22,9 +20,10 @@ LAND_COVER_MAPPING = {
 
 
 @flow(name="DIST alerts area by land cover")
-def dist_alerts_by_land_cover_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
-    result_filename = "dist_alerts_by_land_cover"
-    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
+def dist_alerts_by_land_cover_area(
+    dist_zarr_uri: str, dist_version: str, overwrite=False
+):
+    result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-land-cover-class.parquet"
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
@@ -42,7 +41,7 @@ def dist_alerts_by_land_cover_area(dist_zarr_uri: str, dist_version: str, overwr
     )(dist_zarr_uri, contextual_uri=contextual_uri)
     # We only need year 2024 of the land cover contextual layer. We can fix later to
     # put this in a land-cover-specific setup_compute() task.
-    datasets = datasets[:5] + (datasets[5].sel(year=2024), )
+    datasets = datasets[:5] + (datasets[5].sel(year=2024),)
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-by-land-cover-compute"
     )(datasets, expected_groups, contextual_name="land_cover")
@@ -54,7 +53,9 @@ def dist_alerts_by_land_cover_area(dist_zarr_uri: str, dist_version: str, overwr
         name="dist-alerts-by-land-cover-postprocess-result"
     )(result_dataset)
 
-    result_df["land_cover"] = result_df["land_cover"].apply(lambda x: LAND_COVER_MAPPING.get(x, "Unclassified"))
+    result_df["land_cover"] = result_df["land_cover"].apply(
+        lambda x: LAND_COVER_MAPPING.get(x, "Unclassified")
+    )
 
     result_uri = common_tasks.save_result.with_options(
         name="dist-alerts-by-land-cover-save-result"

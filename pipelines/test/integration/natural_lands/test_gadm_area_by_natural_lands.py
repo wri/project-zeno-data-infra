@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import patch
 
-from pandera.pandas import DataFrameSchema, Column, Check, dtypes
+import pytest
+from pandera.pandas import Check, Column, DataFrameSchema, dtypes
 from prefect.testing.utilities import prefect_test_harness
 
 from pipelines.natural_lands.prefect_flows.nl_flow import gadm_natural_lands_area
@@ -23,7 +23,7 @@ def test_gadm_area_by_natural_lands_result(
     alert_schema = DataFrameSchema(
         name="GADM Natural lands",
         columns={
-            "country": Column(str, Check.ne('')),
+            "country": Column(str, Check.ne("")),
             "region": Column(int, Check.ge(0)),
             "subregion": Column(int, Check.ge(0)),
             "natural_lands_category": Column(str, Check.ne("")),
@@ -64,8 +64,7 @@ def test_gadm_area_by_natural_lands_result(
         )
 
     assert (
-        result_uri
-        == "s3://gfw-data-lake/sbtn_natural_lands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
+        result_uri == "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet"
     )
 
     # Verify

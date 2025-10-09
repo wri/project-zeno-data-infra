@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
-
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
 from pipelines.globals import DATA_LAKE_BUCKET
-from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
+from pipelines.utils import s3_uri_exists
 
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
@@ -33,9 +32,10 @@ NATURAL_LANDS_CLASSES = {
 
 
 @flow(name="DIST alerts area by natural lands")
-def dist_alerts_by_natural_lands_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
-    result_filename = "dist_alerts_by_natural_lands"
-    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
+def dist_alerts_by_natural_lands_area(
+    dist_zarr_uri: str, dist_version: str, overwrite=False
+):
+    result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-natural-land-class.parquet"
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 

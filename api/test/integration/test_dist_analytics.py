@@ -26,15 +26,28 @@ from app.models.common.areas_of_interest import (
 from app.models.land_change.dist_alerts import ANALYTICS_NAME, DistAlertsAnalyticsIn
 from app.routers.land_change.dist_alerts.dist_alerts import (
     create_analysis_service,
+    create_versioned_dist_alerts_data,
     get_analysis_repository,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
+
+TEST_VERSION = "v20251004"
 
 client = TestClient(app)
 
 
 def get_file_system_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
+
+
+async def create_test_version_dist_alerts_data(
+    request: Request,
+    latest_version: str = TEST_VERSION,
+) -> DistAlertsAnalyticsIn:
+    body_data = await request.json()
+    data = DistAlertsAnalyticsIn(**body_data)
+    data._version = latest_version
+    return data
 
 
 def create_analysis_service_for_tests(
@@ -60,12 +73,17 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
+        )
+
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
@@ -110,12 +128,17 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
+        )
+
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
 
@@ -156,11 +179,16 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
         )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -204,6 +232,8 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -235,11 +265,16 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
         )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -285,11 +320,16 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
         )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -361,11 +401,16 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
+        analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
         )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -430,11 +475,15 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
             end_date="2025-04-30",
             intersections=[],
         )
+        analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[create_versioned_dist_alerts_data] = (
+            create_test_version_dist_alerts_data
         )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -538,11 +587,15 @@ async def test_gadm_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
+    analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
+    )
+    app.dependency_overrides[create_versioned_dist_alerts_data] = (
+        create_test_version_dist_alerts_data
     )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -599,11 +652,15 @@ async def test_kba_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
+    analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
+    )
+    app.dependency_overrides[create_versioned_dist_alerts_data] = (
+        create_test_version_dist_alerts_data
     )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -653,11 +710,15 @@ async def test_admin_dist_analytics_by_grasslands():
         end_date="2024-08-16",
         intersections=["grasslands"],
     )
+    analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
+    )
+    app.dependency_overrides[create_versioned_dist_alerts_data] = (
+        create_test_version_dist_alerts_data
     )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -710,11 +771,15 @@ async def test_admin_dist_analytics_by_land_cover():
         end_date="2024-08-16",
         intersections=["land_cover"],
     )
+    analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
+    )
+    app.dependency_overrides[create_versioned_dist_alerts_data] = (
+        create_test_version_dist_alerts_data
     )
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
