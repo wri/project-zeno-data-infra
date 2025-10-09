@@ -81,8 +81,6 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
             "s3://lcl-analytics/zarr/dist-alerts/v20250102/umd_glad_dist_alerts.zarr/zarr.json",
         )
 
-        mock_open_dataset.assert_called_once_with(
-            cog_uri, chunks="auto", storage_options={"requester_pays": True}
-        )
+        mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
 
         mock_to_zarr.assert_called_once_with(expected_uri, mode="w")
