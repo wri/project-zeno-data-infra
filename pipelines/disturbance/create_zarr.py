@@ -1,4 +1,5 @@
 import numpy as np
+import rasterio
 import xarray as xr
 
 from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
@@ -25,9 +26,10 @@ def create_zarr(version, overwrite=False) -> str:
     if s3_uri_exists(f"{zarr_uri}/zarr.json") and not overwrite:
         return zarr_uri
 
-    dataset = xr.open_dataset(
-        cog_uri, chunks="auto", storage_options={"requester_pays": True}
-    ).band_data.chunk({"x": 10000, "y": 10000})
+    with rasterio.Env(AWS_REQUEST_PAYER="requester"):
+        dataset = xr.open_dataset(cog_uri, chunks="auto").band_data.chunk(
+            {"x": 10000, "y": 10000}
+        )
 
     decoded_alert_data = decode_alert_data(dataset)
     decoded_alert_data.to_zarr(zarr_uri, mode="w")
