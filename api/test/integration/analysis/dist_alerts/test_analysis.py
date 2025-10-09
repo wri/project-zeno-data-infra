@@ -27,6 +27,7 @@ class TestDistAlertsZonalStats:
         _: DaskDataFrame = await zonal_statistics(
             aoi={"type": "indigenous_land", "id": "1918"},
             geojson=geojson,
+            version="v20251004",
             intersection="driver",
         )
 
@@ -53,7 +54,7 @@ class TestDistAlertsZonalStats:
             "geometry": geojson,
         }
         result_df: DaskDataFrame = await zonal_statistics(
-            aoi, aoi["geometry"], intersection="grasslands"
+            aoi, aoi["geometry"], version="v20251004", intersection="grasslands"
         )
 
         loop = asyncio.get_event_loop()
@@ -218,7 +219,7 @@ class TestDistAlertsZonalStats:
             "geometry": geojson,
         }
         result_df: DaskDataFrame = await zonal_statistics(
-            aoi, aoi["geometry"], intersection="land_cover"
+            aoi, aoi["geometry"], version="v20251004", intersection="land_cover"
         )
 
         loop = asyncio.get_event_loop()
