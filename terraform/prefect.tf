@@ -11,7 +11,8 @@ locals {
     "us-east-1c",
   ]
 
-  vpc_name                = "prefect-ecs-vpc"
+  # Suffix the VPC name so each TF workspace has its own networking
+  vpc_name                = "prefect-ecs-vpc${local.name_suffix}"
   base_vpc_cidr           = "10.0.0.0/16"
   flow_log_retention_days = 7
 }
@@ -20,13 +21,16 @@ module "prefect_ecs_worker" {
   source  = "PrefectHQ/ecs-worker/prefect"
   version = "~> 0.0.3"
 
-  name                  = var.project_name
-  vpc_id                = module.prefect_vpc.vpc_id
-  worker_subnets        = module.prefect_vpc.private_subnets
-  prefect_api_key       = var.prefect_api_key
-  prefect_account_id    = var.prefect_account_id
-  prefect_workspace_id  = var.prefect_workspace_id
-  worker_work_pool_name = var.work_pool_name
+  # Suffix all names to keep resources isolated by TF workspace
+  name                 = "${var.project_name}${local.name_suffix}"
+  vpc_id               = module.prefect_vpc.vpc_id
+  worker_subnets       = module.prefect_vpc.private_subnets
+  prefect_api_key      = var.prefect_api_key
+  prefect_account_id   = var.prefect_account_id
+  prefect_workspace_id = var.prefect_workspace_id
+
+  # Work pool must match the suffixed pool you create below
+  worker_work_pool_name = "${var.work_pool_name}${local.name_suffix}"
 
   worker_desired_count = var.worker_count
   worker_cpu           = var.worker_cpu
@@ -35,118 +39,103 @@ module "prefect_ecs_worker" {
   worker_log_retention_in_days = 30
 }
 
-
 resource "prefect_block" "aws_credentials" {
-  name     = "aws-credentials-us-east-1"
-  type_slug    = "aws-credentials"
-  
+  # Suffix the block name to avoid collisions across TF workspaces
+  name      = "aws-credentials-us-east-1${local.name_suffix}"
+  type_slug = "aws-credentials"
+
   data = jsonencode({
-    aws_access_key_id = var.aws_access_key_id
+    aws_access_key_id     = var.aws_access_key_id
     aws_secret_access_key = var.aws_secret_access_key
-    region_name = "us-east-1"
+    region_name           = "us-east-1"
   })
 }
 
 resource "prefect_work_pool" "ecs_pool" {
-  name = var.work_pool_name
+  # Suffix so each TF workspace has its own pool
+  name = "${var.work_pool_name}${local.name_suffix}"
   type = "ecs"
 
   base_job_template = jsonencode({
     job_configuration = {
-      env     = "{{ env }}"
+      env    = "{{ env }}"
       vpc_id = module.prefect_vpc.vpc_id
-      
       task_definition = {
         executionRoleArn = module.prefect_ecs_worker.prefect_worker_execution_role_arn
         containerDefinitions = [{
-          image = "{{ image }}"
+          image = "{{ image }}",
           name  = "prefect"
         }]
-        cpu    = "{{ cpu }}"
-        memory = "{{ memory }}"
-        networkMode = "awsvpc"
+        cpu                     = "{{ cpu }}"
+        memory                  = "{{ memory }}"
+        networkMode             = "awsvpc"
         requiresCompatibilities = ["FARGATE"]
-        # Our dask workers use ARM instances that are more cost effective for our workloads
-        # https://docs.coiled.io/blog/coiled-xarray.html and get less SPOT recalls. 
-        # The prefect task runners/dask clients need to run in the same environment as the cluster.
         runtimePlatform = {
-          cpuArchitecture        = "ARM64"
+          cpuArchitecture       = "ARM64"
           operatingSystemFamily = "LINUX"
         }
       }
-
       vpc_configuration = {
-        subnets = module.prefect_vpc.private_subnets
+        subnets            = module.prefect_vpc.private_subnets
         security_group_ids = [module.prefect_ecs_worker.prefect_worker_security_group]
       }
       task_run_request = {
-        cluster = module.prefect_ecs_worker.prefect_worker_cluster_name
+        cluster    = module.prefect_ecs_worker.prefect_worker_cluster_name
         launchType = "FARGATE"
         overrides = {
           containerOverrides = [{
-            cpu         = "{{ cpu }}"
-            memory      = "{{ memory }}"
+            cpu    = "{{ cpu }}",
+            memory = "{{ memory }}"
           }]
         }
       }
       configure_cloudwatch_logs = "True"
     }
-    
     variables = {
       properties = {
-        image = {
-          type    = "string"
-        }
-        cpu = {
-          type    = "integer"
-          default = var.flow_cpu
-        }
-        memory = {
-          type    = "integer"
-          default = var.flow_memory
-        }
-        env = {
-          type   = "object"
-          additionalProperties = { type = "string" }
-        }
+        image  = { type = "string" }
+        cpu    = { type = "integer", default = var.flow_cpu }
+        memory = { type = "integer", default = var.flow_memory }
+        env    = { type = "object", additionalProperties = { type = "string" } }
       }
     }
   })
 }
 
 resource "prefect_flow" "gnw_zonal_stats_update" {
-  name = "GNW zonal stats update"
+  # Suffix flow names too; Prefect treats names as workspace-unique
+  name = "GNW zonal stats update${local.name_suffix}"
 }
 
 resource "prefect_deployment" "gnw_zonal_stats_update" {
-  name         = "gnw-zonal-stats-update"
+  # Suffix the deployment name and point to the suffixed work pool
+  name           = "gnw-zonal-stats-update${local.name_suffix}"
   work_pool_name = prefect_work_pool.ecs_pool.name
-  flow_id = prefect_flow.gnw_zonal_stats_update.id
-  path = "/app"
-  entrypoint = "pipelines/run_updates.py:main"
-  
+  flow_id        = prefect_flow.gnw_zonal_stats_update.id
+  path           = "/app"
+  entrypoint     = "pipelines/run_updates.py:main"
+
   job_variables = jsonencode({
-    image  = var.pipelines_image
+    image = var.pipelines_image
     env = {
-      API_KEY = var.api_key
-      DASK_COILED__TOKEN = var.coiled_token
-      AWS_ACCESS_KEY_ID = var.gfw_aws_access_key_id
+      API_KEY               = var.api_key
+      DASK_COILED__TOKEN    = var.coiled_token
+      AWS_ACCESS_KEY_ID     = var.gfw_aws_access_key_id
       AWS_SECRET_ACCESS_KEY = var.gfw_aws_secret_access_key
-      PIPELINES_IMAGE = var.pipelines_image
+      PIPELINES_IMAGE       = var.pipelines_image
+      TF_WORKSPACE          = terraform.workspace
     }
   })
 }
 
 resource "prefect_deployment_schedule" "gnw_zonal_stats_update_schedule" {
   deployment_id = prefect_deployment.gnw_zonal_stats_update.id
-
-  active   = true
-  timezone = "America/New_York"
+  active        = true
+  timezone      = "America/New_York"
 
   # Runs nightly at 1am ET
   rrule = "FREQ=DAILY;BYHOUR=1;BYMINUTE=0"
 }
-
 
 # taken from https://github.com/PrefectHQ/terraform-prefect-ecs-worker/tree/main/examples/ecs-worker
 module "prefect_vpc" {
@@ -174,7 +163,7 @@ module "prefect_vpc" {
   # The private subnets are used to run the Prefect Server in Fargate.
   private_subnets = concat(
     # Assign primary VPC CIDR blocks to the private subnets
-    [for k, v in local.azs : cidrsubnet(local.base_vpc_cidr, 4, k + 3)],
+    [for k, v in local.azs : cidrsubnet(local.base_vpc_cidr, 4, k + 3)]
   )
 
   private_subnet_names = [for k, v in local.azs : "${local.vpc_name}-private-${local.azs[k]}"]
@@ -194,6 +183,9 @@ module "prefect_vpc" {
   manage_default_route_table = false
 
   tags = {
-    Name = local.vpc_name
+    Name      = local.vpc_name
+    Workspace = terraform.workspace
+    Project   = var.project_name
+    ManagedBy = "terraform"
   }
 }
