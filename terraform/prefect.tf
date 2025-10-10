@@ -5,8 +5,6 @@ provider "prefect" {
 }
 
 locals {
-  name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
-
   azs = [
     "us-east-1a",
     "us-east-1b",
