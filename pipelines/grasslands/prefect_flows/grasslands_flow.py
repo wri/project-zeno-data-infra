@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from prefect import flow
 
+from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.grasslands.prefect_flows import grasslands_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
@@ -18,9 +19,7 @@ def gadm_grasslands_area(overwrite: bool = False):
         "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
     )
     contextual_column_name = "grasslands"
-    result_uri = (
-        "s3://gfw-data-lake/gfw_grasslands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
-    )
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-grasslands.parquet"
     funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):

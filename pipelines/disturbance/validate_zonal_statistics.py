@@ -616,19 +616,23 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
 
     # read dist alerts for AOI
     bounds = aoi.geometry.bounds
-    with rio.open(
-        f"s3://gfw-data-lake/umd_glad_dist_alerts/{version}/raster/epsg-4326/10/40000/default/gdal-geotiff/{aoi_tile}.tif"
-    ) as src:
-        window = from_bounds(bounds[0], bounds[1], bounds[2], bounds[3], src.transform)
-        dist_alerts = src.read(1, window=window)
-        win_affine = src.window_transform(window)
+    with rio.Env(AWS_REQUEST_PAYER="requester"):
+        with rio.open(
+            f"s3://gfw-data-lake/umd_glad_dist_alerts/{version}/raster/epsg-4326/10/40000/default/gdal-geotiff/{aoi_tile}.tif"
+        ) as src:
+            window = from_bounds(
+                bounds[0], bounds[1], bounds[2], bounds[3], src.transform
+            )
+            dist_alerts = src.read(1, window=window)
+            win_affine = src.window_transform(window)
 
     # read area for AOI
-    with rio.open(
-        f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/area_m/gdal-geotiff/{aoi_tile}.tif"
-    ) as src:
-        pixel_area__m = src.read(1, window=window)
-        pixel_area_ha = pixel_area__m / 10000
+    with rio.Env(AWS_REQUEST_PAYER="requester"):
+        with rio.open(
+            f"s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/10/40000/area_m/gdal-geotiff/{aoi_tile}.tif"
+        ) as src:
+            pixel_area__m = src.read(1, window=window)
+            pixel_area_ha = pixel_area__m / 10000
 
     # Extract confidence level (first digit)
     dist_confidence_levels = dist_alerts // 10000
@@ -667,15 +671,15 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     high_conf_results["dist_alert_confidence"] = "high"
     high_conf_results["country"] = 76
     high_conf_results["region"] = 20
-    high_conf_results[
-        "subregion"
-    ] = 150  # placeholder for subregion (adm2) since we are running on an adm1 AOI
+    high_conf_results["subregion"] = (
+        150  # placeholder for subregion (adm2) since we are running on an adm1 AOI
+    )
     low_conf_results["dist_alert_confidence"] = "low"
     low_conf_results["country"] = 76
     low_conf_results["region"] = 20
-    low_conf_results[
-        "subregion"
-    ] = 150  # placeholder for subregion (adm2) since we are running on an adm1 AOI
+    low_conf_results["subregion"] = (
+        150  # placeholder for subregion (adm2) since we are running on an adm1 AOI
+    )
 
     # rename high_conf to value
     high_conf_results.rename(columns={"high_conf": "area_ha"}, inplace=True)

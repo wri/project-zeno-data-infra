@@ -1,7 +1,8 @@
-import pytest
-import numpy as np
-import xarray as xr
 from unittest.mock import patch
+
+import numpy as np
+import pytest
+import xarray as xr
 
 from pipelines.disturbance.create_zarr import create_zarr, decode_alert_data
 
@@ -70,12 +71,14 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     with patch.object(xr.Dataset, "to_zarr") as mock_to_zarr:
         result = create_zarr(version, overwrite=False)
 
-        expected_uri = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr"
+        expected_uri = (
+            "s3://lcl-analytics/zarr/dist-alerts/v20250102/umd_glad_dist_alerts.zarr"
+        )
 
         assert result == expected_uri
 
         mock_s3_exists.assert_called_once_with(
-            "s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/zarr/umd_glad_dist_alerts.zarr/zarr.json",
+            "s3://lcl-analytics/zarr/dist-alerts/v20250102/umd_glad_dist_alerts.zarr/zarr.json",
         )
 
         mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")

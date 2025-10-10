@@ -3,17 +3,7 @@ from typing import Optional, Tuple
 import xarray as xr
 from prefect import task
 
-from pipelines.disturbance import stages
-from pipelines.globals import ANALYTICS_BUCKET
-
-DIST_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/dist-alerts"
-
-
-@task
-def load_data(
-    dist_zarr_uri: str, contextual_uri: Optional[str] = None
-) -> Tuple[xr.DataArray, ...]:
-    return stages.load_data(dist_zarr_uri, contextual_uri)
+from pipelines.integrated_alerts import stages
 
 
 @task

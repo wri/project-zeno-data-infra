@@ -1,17 +1,16 @@
 import numpy as np
-
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import DATA_LAKE_BUCKET
-from pipelines.utils import s3_uri_exists
 from pipelines.prefect_flows import common_tasks
+from pipelines.utils import s3_uri_exists
+
 
 @flow(name="DIST alerts area")
 def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
-
-    result_filename = "dist_alerts"
-    result_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts/{dist_version}/tabular/zonal_stats/gadm/gadm_adm2_{result_filename}.parquet"
+    result_uri = (
+        f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts.parquet"
+    )
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
@@ -39,8 +38,8 @@ def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_df = dist_common_tasks.postprocess_result.with_options(
         name="dist-alerts-postprocess-result"
     )(result_dataset)
-    common_tasks.save_result.with_options(
-        name="dist-alerts-save-result"
-    )(result_df, result_uri)
+    common_tasks.save_result.with_options(name="dist-alerts-save-result")(
+        result_df, result_uri
+    )
 
     return result_uri
