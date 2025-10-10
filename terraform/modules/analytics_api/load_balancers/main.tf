@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "5.99.1"
+    }
+  }
+}
 ############################
 # Security groups
 ############################
@@ -6,31 +14,23 @@ resource "aws_security_group" "alb" {
   name        = "analytics-alb-sg"
   description = "ALB for analytics API"
   vpc_id      = var.vpc_id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  # 443 will be added in Phase 2
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
-# Allow ALB -> service on container port (tight, SG-to-SG)
-resource "aws_security_group_rule" "svc_from_alb" {
-  type                     = "ingress"
-  from_port                = 8000
-  to_port                  = 8000
-  protocol                 = "tcp"
-  security_group_id        = var.service_sg_id
-  source_security_group_id = aws_security_group.alb.id
+# 443 will be added in Phase 2
+resource "aws_vpc_security_group_ingress_rule" "api_ingress" {
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = ["0.0.0.0/0"]
+  from_port         = 80
+  ip_protocol       = "tcp"
+  to_port           = 8000
+}
+
+resource "aws_vpc_security_group_egress_rule" "all_egress" {
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = ["0.0.0.0/0"]
+  from_port         = 0
+  ip_protocol       = "-1"
+  to_port           = 0
 }
 
 ############################
