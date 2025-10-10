@@ -130,8 +130,8 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
     env = {
       API_KEY = var.api_key
       DASK_COILED__TOKEN = var.coiled_token
-      AWS_ACCESS_KEY_ID = var.gfw_aws_access_key_id
-      AWS_SECRET_ACCESS_KEY = var.gfw_aws_secret_access_key
+      AWS_ACCESS_KEY_ID = var.aws_access_key_id
+      AWS_SECRET_ACCESS_KEY = var.aws_secret_access_key
       PIPELINES_IMAGE = var.pipelines_image
     }
   })
