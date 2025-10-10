@@ -17,4 +17,3 @@ output "dask_dashboard_url" {
   description = "HTTP dashboard URL"
   value = "http://${module.alb.dns_name}:8787"
 }
-

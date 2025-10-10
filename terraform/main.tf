@@ -345,6 +345,7 @@ module "dask_cluster_manager" {
   subnet_ids = var.subnet_ids
   security_group_ids = [aws_security_group.dask_manager.id]
 }
+
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
@@ -761,4 +762,12 @@ resource "aws_iam_policy" "ecs_task_analysis" {
 resource "aws_iam_role_policy_attachment" "ecs_task_analysis" {
   role       = module.gnw_ecs_cluster.task_exec_iam_role_name # This references the role created by the ECS module
   policy_arn = aws_iam_policy.ecs_task_analysis.arn
+}
+
+module "analytics_api" {
+  source = "./modules/analytics_api/load_balancers"
+
+  public_subnet_ids = var.subnet_ids
+  service_sg_id = aws_security_group.analytics_api.id
+  vpc_id        = var.vpc
 }
