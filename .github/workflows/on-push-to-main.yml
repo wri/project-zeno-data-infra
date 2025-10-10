@@ -19,7 +19,7 @@ jobs:
       CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     with:
       project_dir: 'api'
-      run_platform: 'ubuntu-latest'
+      run_platform: 'ubuntu-24.04'
 
   run_api_tests:
     needs: build_api_image
@@ -36,7 +36,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
     with:
       project_dir: 'api'
-      run_platform: 'ubuntu-latest'
+      run_platform: 'ubuntu-24.04'
 
   build_pipelines_image:
     uses: ./.github/workflows/build.yml
@@ -70,6 +70,8 @@ jobs:
   deploy_to_production:
     needs: [run_api_tests, run_pipelines_tests]
     uses: ./.github/workflows/deploy.yml
+    with:
+      dry_run: false
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
