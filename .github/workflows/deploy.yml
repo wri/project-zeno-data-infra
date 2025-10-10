@@ -1,6 +1,11 @@
 # Deploy the API
 on:
   workflow_call:
+    inputs:
+      dry_run:
+        default: true
+        required: false
+        type: boolean
     secrets:
       AWS_REGION:
         required: true
@@ -65,7 +70,7 @@ jobs:
           terraform plan -var="api_key=${{ secrets.GFW_API_KEY }}" -var="api_image=$API_IMAGE" -var="pipelines_image=$PIPELINES_IMAGE" -var="aws_secret_access_key=${{secrets.AWS_ZENO_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{secrets.AWS_ZENO_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" -var="coiled_token=${{ secrets.DASK_COILED_TOKEN }}" -var="prefect_api_key=${{ secrets.PREFECT_API_KEY }}" -var="prefect_account_id=${{ secrets.PREFECT_ACCOUNT_ID }}" -var="prefect_workspace_id=${{ secrets.PREFECT_WORKSPACE_ID }}" -var="gfw_aws_access_key_id=${{ secrets.AWS_GFW_ACCESS_KEY_ID }}" -var="gfw_aws_secret_access_key=${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}" --out=tf.plan
 
       - name: Terraform Apply
-        if: success()
+        if: success() && (inputs.dry_run == false)
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
