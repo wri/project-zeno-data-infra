@@ -19,7 +19,7 @@ on:
   workflow_call:
     inputs:
       commit_hash:
-        default: ${{ GITHUB_SHA }}
+        default: ${{ github.sha }}
         required: true
         type: string
       dry_run:
