@@ -1,11 +1,35 @@
 # Deploy the API
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
+      commit_hash:
+        required: true
+        type: string
+        description: The commit hash to deploy (currently the same hash is used for both code and images)
       dry_run:
         default: true
         required: false
         type: boolean
+        description: When set to true only generates a plan, does not apply it
+      workspace:
+        default: "pre-prod"
+        required: true
+        type: string
+        description: The TF workspace to deploy to. Set to/leave as "default" for production
+  workflow_call:
+    inputs:
+      commit_hash:
+        default: ${{ GITHUB_SHA }}
+        required: true
+        type: string
+      dry_run:
+        default: true
+        required: false
+        type: boolean
+      workspace:
+        default: "default"
+        required: false
+        type: string
     secrets:
       AWS_REGION:
         required: true
@@ -44,6 +68,8 @@ jobs:
       - name: Checkout Code
         if: success()
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.commit_hash }}
 
       - name: Set image tags
         if: success()
@@ -57,6 +83,20 @@ jobs:
         with:
           terraform_version: 1.8.0
 
+      - name: Terraform Init, Select Workspace
+        if: success()
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+        run: |
+          cd terraform
+          if [[ "${{ inputs.workspace }}" == "default" ]]; then
+            terraform init -backend-config=vars/backend-production.tfvars
+          else
+            terraform init -backend-config=vars/backend-dev.tfvars
+          fi
+          terraform workspace select ${{ inputs.workspace }} -or-create=true
+
       - name: Terraform Plan
         if: success()
         env:
@@ -66,8 +106,20 @@ jobs:
           API_IMAGE=${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.API_IMAGE_TAG }}
           PIPELINES_IMAGE=${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.PIPELINES_IMAGE_TAG }}
           cd terraform
-          terraform init
-          terraform plan -var="api_key=${{ secrets.GFW_API_KEY }}" -var="api_image=$API_IMAGE" -var="pipelines_image=$PIPELINES_IMAGE" -var="aws_secret_access_key=${{secrets.AWS_ZENO_SECRET_ACCESS_KEY}}" -var="aws_access_key_id=${{secrets.AWS_ZENO_ACCESS_KEY_ID}}" -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" -var="coiled_token=${{ secrets.DASK_COILED_TOKEN }}" -var="prefect_api_key=${{ secrets.PREFECT_API_KEY }}" -var="prefect_account_id=${{ secrets.PREFECT_ACCOUNT_ID }}" -var="prefect_workspace_id=${{ secrets.PREFECT_WORKSPACE_ID }}" -var="gfw_aws_access_key_id=${{ secrets.AWS_GFW_ACCESS_KEY_ID }}" -var="gfw_aws_secret_access_key=${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}" --out=tf.plan
+          terraform plan \
+            -var="api_key=${{ secrets.GFW_API_KEY }}" \
+            -var="api_image=$API_IMAGE" \
+            -var="pipelines_image=$PIPELINES_IMAGE" \
+            -var="aws_secret_access_key=${{secrets.AWS_ZENO_SECRET_ACCESS_KEY}}" \
+            -var="aws_access_key_id=${{secrets.AWS_ZENO_ACCESS_KEY_ID}}" \
+            -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
+            -var="coiled_token=${{ secrets.DASK_COILED_TOKEN }}" \
+            -var="prefect_api_key=${{ secrets.PREFECT_API_KEY }}" \
+            -var="prefect_account_id=${{ secrets.PREFECT_ACCOUNT_ID }}" \
+            -var="prefect_workspace_id=${{ secrets.PREFECT_WORKSPACE_ID }}" \
+            -var="gfw_aws_access_key_id=${{ secrets.AWS_GFW_ACCESS_KEY_ID }}" \
+            -var="gfw_aws_secret_access_key=${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}" \
+            --out=tf.plan
 
       - name: Terraform Apply
         if: success() && (inputs.dry_run == false)
