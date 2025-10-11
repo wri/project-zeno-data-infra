@@ -20,7 +20,7 @@ on:
     inputs:
       commit_hash:
         default: ${{ github.sha }}
-        required: true
+        required: false
         type: string
       dry_run:
         default: true
