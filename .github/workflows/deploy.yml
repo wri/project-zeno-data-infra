@@ -95,7 +95,7 @@ jobs:
           else
             terraform init -backend-config=vars/backend-dev.tfvars
           fi
-          terraform workspace select ${{ inputs.workspace }} -or-create=true
+          terraform workspace select -or-create=true ${{ inputs.workspace }}
 
       - name: Terraform Plan
         if: success()
