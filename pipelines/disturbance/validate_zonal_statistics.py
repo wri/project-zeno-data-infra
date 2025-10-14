@@ -12,6 +12,8 @@ from prefect import task
 from prefect.logging import get_run_logger
 from rasterio.features import geometry_mask
 from rasterio.windows import from_bounds
+from pydantic import BaseModel
+from typing import Dict, Optional, Literal
 
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
@@ -527,29 +529,6 @@ numeric_to_alpha3 = {
     716: "ZWE",
 }
 
-sbtn_natural_lands_classes = [
-    "Forest",
-    "Short vegetation",
-    "Water",
-    "Mangroves",
-    "Bare",
-    "Snow/Ice",
-    "Wetland forest",
-    "Peat forest",
-    "Wetland short vegetation",
-    "Peat short vegetation",
-    "Cropland",
-    "Built-up",
-    "Tree cover",
-    "Short vegetation",
-    "Water",
-    "Wetland tree cover",
-    "Peat tree cover",
-    "Wetland short vegetation",
-    "Peat short vegetation",
-    "Bare",
-]
-
 
 class DistZonalStats(pa.DataFrameModel):
     country: Series[str] = pa.Field(eq="BRA")
@@ -605,8 +584,43 @@ class NaturalLandsZonalStats(pa.DataFrameModel):
     natural_lands: Series[str] = pa.Field(isin=sbtn_natural_lands_classes)
     area_ha: Series[float] = pa.Field(ge=0)
 
+class ContextualLayer(BaseModel):
+    name: Literal["sbtn_natural_lands", "grasslands", "drivers", "land_cover"]
+    source_uri: str
+    classes: Dict[int, str]
 
-def generate_validation_statistics(version: str) -> pd.DataFrame:
+SBTN_NATURAL_LANDS = ContextualLayer(
+    name="sbtn_natural_lands",
+    source_uri="s3://gfw-data-lake/sbtn_natural_lands_classification/v1.1/raster/epsg-4326/10/40000/class/geotiff/00N_040W.tif",
+    classes= {
+      1: "Forest",
+      2: "Short vegetation",
+      3: "Water",
+      4: "Mangroves",
+      5: "Bare",
+      6: "Snow/Ice",
+      7: "Wetland forest",
+      8: "Peat forest",
+      9: "Wetland short vegetation",
+      10: "Peat short vegetation",
+      11: "Cropland",
+      12: "Built-up",
+      13: "Tree cover",
+      14: "Short vegetation",
+      15: "Water",
+      16: "Wetland tree cover",
+      17: "Peat tree cover",
+      18: "Wetland short vegetation",
+      19: "Peat short vegetation",
+      20: "Bare"
+  }
+)
+
+def generate_validation_statistics(
+        version: str,
+        contextual_layer: Optional[ContextualLayer] = None
+    ) -> pd.DataFrame:
+    
     """Generate zonal statistics for the admin area AOI."""
     gdf = gpd.read_file(
         "pipelines/validation_statistics/br_rn.json"
@@ -657,15 +671,37 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     high_conf_flat = dist_high_conf_aoi.flatten()
     low_conf_flat = dist_low_conf_aoi.flatten()
     julian_date_flat = dist_julian_date_aoi.flatten()
-    df = pd.DataFrame(
-        {
+
+    # read and process contextual layer
+    if contextual_layer:
+        with rio.Env(AWS_REQUEST_PAYER="requester"):
+            with rio.open(contextual_layer.source_uri) as src:
+                contextual_data = src.read(1, window=window)
+        contextual_data_aoi = aoi_mask * contextual_data
+        contextual_flat = contextual_data_aoi.flatten()
+
+        df = pd.DataFrame({
             "dist_alert_date": julian_date_flat,
+            contextual_layer.name: contextual_flat,
             "high_conf": high_conf_flat,
             "low_conf": low_conf_flat,
-        }
-    )
-    high_conf_results = df.groupby("dist_alert_date")["high_conf"].sum().reset_index()
-    low_conf_results = df.groupby("dist_alert_date")["low_conf"].sum().reset_index()
+        })
+        high_conf_results = df.groupby([contextual_layer.name, "dist_alert_date"])["high_conf"].sum().reset_index()
+        low_conf_results = df.groupby([contextual_layer.name, "dist_alert_date"])["low_conf"].sum().reset_index()
+
+        # map contextual layer names
+        high_conf_results[f"{contextual_layer.name}_class"] = high_conf_results[contextual_layer.name].map(contextual_layer.classes)
+        low_conf_results[f"{contextual_layer.name}_class"] = low_conf_results[contextual_layer.name].map(contextual_layer.classes)
+    else:
+        df = pd.DataFrame(
+            {
+                "dist_alert_date": julian_date_flat,
+                "high_conf": high_conf_flat,
+                "low_conf": low_conf_flat,
+            }
+        )
+        high_conf_results = df.groupby("dist_alert_date")["high_conf"].sum().reset_index()
+        low_conf_results = df.groupby("dist_alert_date")["low_conf"].sum().reset_index()
 
     # set dist_alert_confidence levels and GADM IDs
     high_conf_results["dist_alert_confidence"] = "high"
@@ -685,27 +721,14 @@ def generate_validation_statistics(version: str) -> pd.DataFrame:
     high_conf_results.rename(columns={"high_conf": "area_ha"}, inplace=True)
     low_conf_results.rename(columns={"low_conf": "area_ha"}, inplace=True)
 
-    # reorder columns to country, region, subregion, dist_alert_date, confidence, value
-    high_conf_results = high_conf_results[
-        [
-            "country",
-            "region",
-            "subregion",
-            "dist_alert_date",
-            "dist_alert_confidence",
-            "area_ha",
-        ]
-    ]
-    low_conf_results = low_conf_results[
-        [
-            "country",
-            "region",
-            "subregion",
-            "dist_alert_date",
-            "dist_alert_confidence",
-            "area_ha",
-        ]
-    ]
+
+    # reorder columns to country, region, subregion, contextual layer, dist_alert_date, confidence, value
+    if contextual_layer:
+        column_order = ["country", "region", "subregion", contextual_layer.name, "dist_alert_date", "dist_alert_confidence", "area_ha"]        
+    else:
+        column_order = ["country", "region", "subregion", "dist_alert_date", "dist_alert_confidence", "area_ha"]
+    high_conf_results = high_conf_results[column_order]
+    low_conf_results = low_conf_results[column_order]
 
     # concatenate dist_alert_confidence dfs into one validation df
     results = pd.concat([high_conf_results, low_conf_results], ignore_index=True)
