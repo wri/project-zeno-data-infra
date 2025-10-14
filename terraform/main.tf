@@ -15,9 +15,9 @@ terraform {
 
 terraform {
   backend "s3" {
-    bucket         = "tf-state-zeno-rest-api"
-    key            = "terraform/state/production/terraform.tfstate"
-    region         = "us-east-1"
+    bucket         = var.bucket
+    key            = var.key
+    region         = var.region
     encrypt        = true
     dynamodb_table = "terraform-locks-production"
   }
@@ -25,7 +25,6 @@ terraform {
 
 locals {
   name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
-  state_bucket = terraform.workspace == "default" ? "production" : "dev"
   cluster_name = "analytics${local.name_suffix}"
 }
 
@@ -35,9 +34,8 @@ data "aws_vpc" "selected" {
   id = var.vpc
 }
 
-
 provider "aws" {
-    region = "us-east-1" # Replace with your desired region
+    region = var.region
 }
 
 module "gnw_ecs_cluster" {
