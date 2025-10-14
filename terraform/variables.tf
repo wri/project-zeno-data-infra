@@ -115,12 +115,8 @@ variable "bucket" {
   type = string
 }
 
-variable "key" {
-  description = "Key in state_bucket in which to find the TF state"
-  type = string
-}
-
 variable "region" {
   description = "AWS region"
   type = string
+  default = "us-east-1"
 }
