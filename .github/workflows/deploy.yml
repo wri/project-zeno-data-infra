@@ -83,21 +83,28 @@ jobs:
         with:
           terraform_version: 1.8.0
 
-      - name: Terraform Init, Select Workspace
-        if: success()
+      # Manually triggered run, plan against staging and workspace state
+      - name: Terraform init and workspace select with staging state file
+        if: success() && (github.event_name == 'workflow_dispatch')
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
         run: |
           cd terraform
-          if [[ "${{ inputs.workspace }}" == "default" ]]; then
-            terraform init -backend-config=vars/backend-production.tfvars
-          else
-            terraform init -backend-config=vars/backend-staging.tfvars
-          fi
+          terraform init -backend-config=vars/backend-staging.tfvars
           terraform workspace select -or-create=true ${{ inputs.workspace }}
 
-      - name: Terraform Plan
+      # Automated run, plan against production
+      - name: Terraform init with production state file
+        if: success() && (github.event_name == 'push')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
+        run: |
+          cd terraform
+          terraform init -backend-config=vars/backend-production.tfvars
+
+      - name: Terraform plan
         if: success()
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
