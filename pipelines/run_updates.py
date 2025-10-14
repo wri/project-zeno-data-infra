@@ -29,7 +29,7 @@ def create_cluster():
     cluster.adapt(minimum=10, maximum=50)
 
     client = cluster.get_client()
-    return client, cluster
+    return client
 
 
 @flow(
@@ -46,13 +46,14 @@ def run_updates(overwrite=False) -> list[str]:
     dask_client = None
     result_uris = []
     try:
+        # dask_client = create_cluster()
         gl_result = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
         result_uris.append(gl_result)
 
         nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
         result_uris.append(nl_result)
 
-        dist_result = dist_flow.dist_alerts_flow(overwrite=overwrite)
+        dist_result = dist_flow.dist_alerts_flow(overwrite=True)
         result_uris.append(dist_result)
 
         carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
