@@ -67,7 +67,7 @@ jobs:
         if: success()
         run: |
           cd ${{ inputs.project_dir }}
-          docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }} .
+          docker build -t ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }} --build-arg AWS_ACCESS_KEY_ID=${{ secrets.AWS_ZENO_ACCESS_KEY_ID }} --build-arg AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }} .
 
       - name: Push Docker image to container registry
         if: success()
