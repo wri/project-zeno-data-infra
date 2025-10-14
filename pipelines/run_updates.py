@@ -25,6 +25,9 @@ def create_cluster():
         compute_purchase_option="spot_with_fallback",
         no_client_timeout="5 seconds",
         container=os.getenv("PIPELINES_IMAGE"),
+        environ={
+            "AWS_REQUEST_PAYER": "requester",
+        },
     )
     cluster.adapt(minimum=10, maximum=50)
 
