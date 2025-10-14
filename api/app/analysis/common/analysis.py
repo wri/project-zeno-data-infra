@@ -89,9 +89,6 @@ def read_zarr(uri):
     )
 
 
-os.environ["API_KEY"] = "cfb38b37-045a-4157-b96b-aa27c8c700e2"
-
-
 def _get_api_key():
     return os.environ["API_KEY"]
 
