@@ -96,6 +96,10 @@ def setup_compute(
 
 def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_area)
+    return postprocess_result_dataframe(df)
+
+
+def postprocess_result_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df.rename(columns={"value": "area_ha"}, inplace=True)
     df.rename(columns={"confidence": "dist_alert_confidence"}, inplace=True)
     df.rename(columns={"alert_date": "dist_alert_date"}, inplace=True)
@@ -105,6 +109,37 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df["dist_alert_confidence"] = df.dist_alert_confidence.apply(
         lambda x: alerts_confidence[x]
     )
+
+    # convert country/region/subregion to just AOI ID
+    adm1_df = (
+        df.drop(columns=["subregion"])
+        .groupby(list(set(df.columns) - {"subregion", "area_ha"}))
+        .sum()
+        .reset_index()
+    )
+    iso_df = (
+        adm1_df.drop(columns=["region"])
+        .groupby(list(set(adm1_df.columns) - {"region", "area_ha"}))
+        .sum()
+        .reset_index()
+    )
+
+    # need to make copy to make these types of changes without warnings
+    df = df.copy()
+    adm1_df = adm1_df.copy()
+    iso_df = iso_df.copy()
+
+    df["aoi_id"] = (
+        df[["country", "region", "subregion"]].astype(str).agg(".".join, axis=1)
+    )
+    adm1_df["aoi_id"] = adm1_df[["country", "region"]].astype(str).agg(".".join, axis=1)
+    iso_df["aoi_id"] = iso_df["country"]
+
+    adm2_df = df.drop(columns=["country", "region", "subregion"])
+    adm1_df = adm1_df.drop(columns=["country", "region"])
+    iso_df = iso_df.drop(columns=["country"])
+
+    df = pd.concat([iso_df, adm1_df, adm2_df])
     return df
 
 
