@@ -93,7 +93,7 @@ jobs:
           if [[ "${{ inputs.workspace }}" == "default" ]]; then
             terraform init -backend-config=vars/backend-production.tfvars
           else
-            terraform init -backend-config=vars/backend-dev.tfvars
+            terraform init -backend-config=vars/backend-staging.tfvars
           fi
           terraform workspace select -or-create=true ${{ inputs.workspace }}
 

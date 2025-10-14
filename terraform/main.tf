@@ -691,7 +691,7 @@ resource "aws_security_group" "dask_workers" {
 ###############################################################
 
 resource "aws_s3_bucket" "analysis_results" {
-  bucket = "gnw-analytics-api-analysis-results"
+  bucket = "gnw-analytics-api-analysis-results${local.name_suffix}"
 
   tags = {
     Environment = "Staging"
@@ -700,7 +700,7 @@ resource "aws_s3_bucket" "analysis_results" {
 }
 
 resource "aws_dynamodb_table" "analyses" {
-  name         = "Analyses"
+  name         = "Analyses${local.name_suffix}"
   billing_mode = "PAY_PER_REQUEST" # On-demand, scales automatically. Suitable for variable workloads.
   hash_key     = "resource_id"
 

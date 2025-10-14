@@ -110,11 +110,6 @@ variable "coiled_token" {
   type = string
 }
 
-variable "bucket" {
-  description = "Bucket in which to find the TF state"
-  type = string
-}
-
 variable "region" {
   description = "AWS region"
   type = string
