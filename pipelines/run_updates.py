@@ -46,7 +46,7 @@ def run_updates(overwrite=False) -> list[str]:
     dask_client = None
     result_uris = []
     try:
-        # dask_client = create_cluster()
+        dask_client = create_cluster()
         gl_result = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
         result_uris.append(gl_result)
 
