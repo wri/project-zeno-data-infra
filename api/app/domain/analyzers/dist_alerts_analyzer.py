@@ -1,10 +1,8 @@
 from functools import partial
-from typing import Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import dask.dataframe as dd
-import duckdb
 import numpy as np
-import pandas as pd
 import xarray as xr
 from dask.dataframe import DataFrame as DaskDataFrame
 from flox.xarray import xarray_reduce
@@ -12,7 +10,6 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import (
     JULIAN_DATE_2021,
     get_geojson,
-    initialize_duckdb,
     read_zarr_clipped_to_geojson,
 )
 from app.domain.analyzers.analyzer import Analyzer
@@ -69,10 +66,12 @@ class DistAlertsAnalyzer(Analyzer):
         analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
+        duckdb_query_service=None,
     ):
         self.analysis_repository = analysis_repository
-        self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.compute_engine = compute_engine
+        self.dataset_repository = dataset_repository
+        self.duckdb_query_service = duckdb_query_service
 
     async def analyze(self, analysis: Analysis):
         dist_analytics_in = DistAlertsAnalyticsIn(**analysis.metadata)
@@ -83,31 +82,87 @@ class DistAlertsAnalyzer(Analyzer):
         else:
             intersection = None
 
-        aoi_dict = dist_analytics_in.model_dump()["aoi"]
         version = analysis.metadata["_version"]
         if dist_analytics_in.aoi.type == "admin":
-            alerts_df = await self.get_precomputed_statistics(
-                aoi_dict,
-                intersection,
-                self.compute_engine,
+            alerts_dict = await self.analyze_admin_areas(
+                dist_analytics_in.aoi.ids,
                 version,
+                dist_analytics_in.start_date,
+                dist_analytics_in.end_date,
+                intersection,
             )
         else:
             alerts_df = await self.zonal_statistics_on_aois(
-                aoi_dict, self.compute_engine, version, intersection
+                dist_analytics_in.model_dump()["aoi"],
+                self.compute_engine,
+                version,
+                intersection,
             )
 
-        if dist_analytics_in.start_date is not None:
-            alerts_df = alerts_df[
-                alerts_df.dist_alert_date >= dist_analytics_in.start_date
-            ]
-        if dist_analytics_in.end_date is not None:
-            alerts_df = alerts_df[
-                alerts_df.dist_alert_date <= dist_analytics_in.end_date
-            ]
-        alerts_dict = alerts_df.to_dict(orient="list")
+            if dist_analytics_in.start_date is not None:
+                alerts_df = alerts_df[
+                    alerts_df.dist_alert_date >= dist_analytics_in.start_date
+                ]
+            if dist_analytics_in.end_date is not None:
+                alerts_df = alerts_df[
+                    alerts_df.dist_alert_date <= dist_analytics_in.end_date
+                ]
+            alerts_dict = alerts_df.to_dict(orient="list")
 
         return alerts_dict
+
+    async def analyze_admin_areas(
+        self,
+        aoi_ids: List[str],
+        version: str,
+        start_date: str,
+        end_date: str,
+        intersection: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if intersection is None:
+            table = "admin-dist-alerts"
+        elif intersection == "driver":
+            table = "admin-dist-alerts-by-driver"
+            intersection_col = "driver"
+        elif intersection == "natural_lands":
+            table = "admin-dist-alerts-by-natural-land-class"
+            intersection_col = "natural_land_class"
+        elif intersection == "grasslands":
+            table = "admin-dist-alerts-by-grassland-class"
+            intersection_col = "grasslands"
+        elif intersection == "land_cover":
+            table = "admin-dist-alerts-by-land-cover-class"
+            intersection_col = "land_cover"
+        else:
+            raise ValueError(f"No way to calculate intersection {intersection}")
+
+        table_uri = (
+            f"s3://lcl-analytics/zonal-statistics/dist-alerts/{version}/{table}.parquet"
+        )
+
+        id_str = (", ").join([f"'{aoi_id}'" for aoi_id in aoi_ids])
+
+        from_clause = f"FROM '{table_uri}'"
+        select_clause = "SELECT aoi_id"
+        where_clause = f"WHERE aoi_id in ({id_str}) AND dist_alert_date >= '{start_date}' AND dist_alert_date <= '{end_date}'"
+        by_clause = "BY aoi_id, dist_alert_date, dist_alert_confidence"
+
+        # Includes an intersection, so group by the appropriate column
+        if intersection:
+            select_clause += f", {intersection_col}"
+            by_clause += f", {intersection_col}"
+
+        by_clause += ", dist_alert_date, dist_alert_confidence"
+        order_by_clause = f"ORDER {by_clause}"
+
+        # Query and make sure output names match the expected schema
+        select_clause += ", STRFTIME(dist_alert_date, '%Y-%m-%d') AS dist_alert_date, dist_alert_confidence, area_ha"
+        query = f"{select_clause} {from_clause} {where_clause} {order_by_clause}"
+
+        data: Dict = await self.duckdb_query_service.execute(query)
+        data["aoi_type"] = "admin" * len(aoi_ids)
+
+        return data
 
     async def zonal_statistics_on_aois(
         self, aois, dask_client, version, intersection=None
@@ -251,119 +306,3 @@ class DistAlertsAnalyzer(Analyzer):
 
         alerts_df = alerts_df[alerts_df.area_ha > 0]
         return alerts_df
-
-    async def get_precomputed_statistics(
-        self, aoi, intersection: Optional[str], dask_client, version: str
-    ):
-        if aoi["type"] != "admin" or intersection not in [
-            None,
-            "natural_lands",
-            "driver",
-            "grasslands",
-            "land_cover",
-        ]:
-            raise ValueError(
-                f"No precomputed statistics available for AOI type {aoi['type']} and intersection {intersection}"
-            )
-
-        table = self.get_precomputed_table(aoi["type"], intersection, version)
-        precompute_partial = partial(
-            self.get_precomputed_statistic_on_gadm_aoi,
-            table=table,
-            intersection=intersection,
-        )
-        futures = dask_client.map(precompute_partial, aoi["ids"])
-        results = await dask_client.gather(futures)
-        alerts_df = pd.concat(results)
-
-        return alerts_df
-
-    def get_precomputed_table(
-        self, aoi_type: str, intersection: Optional[str], version: str
-    ) -> str:
-        if aoi_type == "admin":
-            # Each intersection will be in a different parquet file
-            if intersection is None:
-                table = "admin-dist-alerts"
-            elif intersection == "driver":
-                table = "admin-dist-alerts-by-driver"
-            elif intersection == "natural_lands":
-                table = "admin-dist-alerts-by-natural-land-class"
-            elif intersection == "grasslands":
-                table = "admin-dist-alerts-by-grassland-class"
-            elif intersection == "land_cover":
-                table = "admin-dist-alerts-by-land-cover-class"
-            else:
-                raise ValueError(f"No way to calculate intersection {intersection}")
-        else:
-            raise ValueError(f"No way to calculate aoi type {aoi_type}")
-
-        return (
-            f"s3://lcl-analytics/zonal-statistics/dist-alerts/{version}/{table}.parquet"
-        )
-
-    @staticmethod
-    async def get_precomputed_statistic_on_gadm_aoi(id, table, intersection):
-        # GADM IDs are coming joined by '.', e.g. IDN.24.9
-        gadm_id = id.split(".")
-
-        initialize_duckdb()
-        query = DistAlertsAnalyzer.create_gadm_dist_query(gadm_id, table, intersection)
-        alerts_df = duckdb.query(query).df()
-
-        alerts_df["aoi_id"] = id
-        alerts_df["aoi_type"] = "admin"
-
-        return alerts_df
-
-    @staticmethod
-    def create_gadm_dist_query(
-        gadm_id: Tuple[str, int, int], table: str, intersection: Optional[str] = None
-    ) -> str:
-        # TODO use some better pattern here is so it doesn't become spaghetti once we have more datasets. ORM?
-        # TODO use final pipeline locations and schema for parquet files
-        # TODO this should be done in a background task and written to file
-        # Build up the DuckDB query based on GADM ID and intersection
-
-        intersection_col = None
-        if intersection is not None:
-            if intersection == "driver":
-                intersection_col = "driver"
-            elif intersection == "natural_lands":
-                intersection_col = "natural_land_class"
-            elif intersection == "grasslands":
-                intersection_col = "grasslands"
-            elif intersection == "land_cover":
-                intersection_col = "land_cover"
-
-        from_clause = f"FROM '{table}'"
-        select_clause = "SELECT country"
-        where_clause = f"WHERE country = '{gadm_id[0]}'"
-        by_clause = "BY country"
-
-        # Includes region, so add relevant filters, selects and group bys
-        if len(gadm_id) > 1:
-            select_clause += ", region"
-            where_clause += f" AND region = {gadm_id[1]}"
-            by_clause += ", region"
-
-        # Includes subregion, so add relevant filters, selects and group bys
-        if len(gadm_id) > 2:
-            select_clause += ", subregion"
-            where_clause += f" AND subregion = {gadm_id[2]}"
-            by_clause += ", subregion"
-
-        # Includes an intersection, so group by the appropriate column
-        if intersection:
-            select_clause += f", {intersection_col}"
-            by_clause += f", {intersection_col}"
-
-        by_clause += ", dist_alert_date, dist_alert_confidence"
-        group_by_clause = f"GROUP {by_clause}"
-        order_by_clause = f"ORDER {by_clause}"
-
-        # Query and make sure output names match the expected schema
-        select_clause += ", STRFTIME(dist_alert_date, '%Y-%m-%d') AS dist_alert_date, dist_alert_confidence, SUM(area_ha)::FLOAT AS area_ha"
-        query = f"{select_clause} {from_clause} {where_clause} {group_by_clause} {order_by_clause}"
-
-        return query

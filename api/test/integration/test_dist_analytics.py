@@ -13,6 +13,9 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
+from api.app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -31,7 +34,7 @@ from app.routers.land_change.dist_alerts.dist_alerts import (
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
 
-TEST_VERSION = "v20251004"
+TEST_VERSION = "v20251011newschema"
 
 client = TestClient(app)
 
@@ -58,6 +61,9 @@ def create_analysis_service_for_tests(
         analyzer=DistAlertsAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=getattr(request.app.state, "dask_client", None),
+            duckdb_query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/dist-alerts/v20251011newschema/admin-dist-alerts.parquet"
+            ),
         ),
         event=ANALYTICS_NAME,
     )
@@ -587,7 +593,7 @@ async def test_gadm_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    analytics_in._version = TEST_VERSION
+    analytics_in._version = "v20251011newschema"  # TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -615,9 +621,6 @@ async def test_gadm_dist_analytics_no_intersection():
 
     expected_df = pd.DataFrame(
         {
-            "country": ["IDN", "IDN"],
-            "region": [24, 24],
-            "subregion": [9, 9],
             "aoi_id": ["IDN.24.9", "IDN.24.9"],
             "aoi_type": ["admin"] * 2,
             "dist_alert_date": [
@@ -625,7 +628,7 @@ async def test_gadm_dist_analytics_no_intersection():
                 "2024-08-15",
             ],
             "dist_alert_confidence": ["high", "low"],
-            "area_ha": [113.3972, 7.154635],
+            "area_ha": [111.9355, 7.154635],
         }
     )
 
