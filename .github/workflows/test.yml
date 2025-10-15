@@ -80,5 +80,5 @@ jobs:
               AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
               DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} \
               ANALYSES_TABLE_NAME=Analyses-test \
-              ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test
+              ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
               pytest test --disable-warnings
