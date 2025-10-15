@@ -442,7 +442,7 @@ module "alb" {
 }
 
 resource "aws_ecs_task_definition" "dask_worker" {
-  family                   = "dask-worker"
+  family                   = "dask-worker${local.name_suffix}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
@@ -457,7 +457,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
 
   container_definitions = jsonencode([
     {
-      name  = "dask-worker"
+      name  = "dask-worker${local.name_suffix}"
       image = var.api_image
       
       environment = [
@@ -664,7 +664,7 @@ resource "aws_security_group" "dask_manager" {
   }
 }
 resource "aws_security_group" "dask_workers" {
-  name_prefix = "dask-workers-${local.name_suffix}"
+  name_prefix = "dask-workers${local.name_suffix}"
   vpc_id      = var.vpc
 
   ingress {
@@ -682,7 +682,7 @@ resource "aws_security_group" "dask_workers" {
   }
 
   tags = {
-    Name = "dask-workers-${local.name_suffix}"
+    Name = "dask-workers${local.name_suffix}"
   }
 }
 
