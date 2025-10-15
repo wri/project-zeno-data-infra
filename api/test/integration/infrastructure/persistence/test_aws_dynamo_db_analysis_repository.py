@@ -18,6 +18,7 @@ DUMMY_UUID = uuid.UUID("c9787f41-b194-4589-ae53-f45ef290ce6f")
 
 class TestLoadingAnalysis:
     TEST_ANALYSES_TABLE_NAME = os.getenv("ANALYSES_TABLE_NAME")
+    TEST_ANALYSIS_RESULTS_BUCKET_NAME = os.getenv("ANALYSIS_RESULTS_BUCKET_NAME")
 
     @pytest.fixture(scope="class")
     def moto_server(self):
@@ -68,7 +69,7 @@ class TestLoadingAnalysis:
             BillingMode="PAY_PER_REQUEST",
         )
 
-        s3.create_bucket(Bucket="gnw-analytics-api-analysis-results")
+        s3.create_bucket(Bucket=self.TEST_ANALYSIS_RESULTS_BUCKET_NAME)
 
     @pytest_asyncio.fixture(scope="function")
     async def dynamodb_and_s3(self, moto_server):
