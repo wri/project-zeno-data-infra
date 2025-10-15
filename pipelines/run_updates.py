@@ -26,7 +26,7 @@ def create_cluster():
         no_client_timeout="5 seconds",
         container=os.getenv("PIPELINES_IMAGE"),
         environ={
-            "AWS_REQUEST_PAYER": "requester",
+            "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
         },
     )
     cluster.adapt(minimum=10, maximum=50)
