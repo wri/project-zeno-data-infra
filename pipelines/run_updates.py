@@ -56,7 +56,7 @@ def run_updates(overwrite=False) -> list[str]:
         nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
         result_uris.append(nl_result)
 
-        dist_result = dist_flow.dist_alerts_flow(overwrite=True)
+        dist_result = dist_flow.dist_alerts_flow(overwrite=overwrite)
         result_uris.append(dist_result)
 
         carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
