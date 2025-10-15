@@ -52,6 +52,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         gadm_dist_result = prefect_flows.dist_alerts_area(
             dist_zarr_uri, dist_version, overwrite=overwrite
         )
+        validate_result = run_validation_suite(gadm_dist_result)
         result_uris.append(gadm_dist_result)
 
         gadm_dist_by_natural_lands_result = (
@@ -76,7 +77,6 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         )
         result_uris.append(gadm_dist_by_land_cover_result)
 
-        validate_result = run_validation_suite(gadm_dist_result)
         if validate_result:
             write_dist_latest_version(dist_version)
 

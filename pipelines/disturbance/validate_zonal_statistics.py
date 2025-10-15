@@ -576,43 +576,37 @@ class DistZonalStats(pa.DataFrameModel):
             ["dist_alert_date", "dist_alert_confidence", "area_ha"]
         ]
 
-
-class NaturalLandsZonalStats(pa.DataFrameModel):
-    countries: Series[str] = pa.Field(isin=isos)
-    regions: Series[int] = pa.Field()
-    subregions: Series[int] = pa.Field()
-    natural_lands: Series[str] = pa.Field(isin=sbtn_natural_lands_classes)
-    area_ha: Series[float] = pa.Field(ge=0)
-
 class ContextualLayer(BaseModel):
     name: Literal["sbtn_natural_lands", "grasslands", "drivers", "land_cover"]
     source_uri: str
+    column_name: str
     classes: Dict[int, str]
 
 SBTN_NATURAL_LANDS = ContextualLayer(
     name="sbtn_natural_lands",
     source_uri="s3://gfw-data-lake/sbtn_natural_lands_classification/v1.1/raster/epsg-4326/10/40000/class/geotiff/00N_040W.tif",
+    column_name="natural_land_class",
     classes= {
-      1: "Forest",
-      2: "Short vegetation",
-      3: "Water",
-      4: "Mangroves",
-      5: "Bare",
-      6: "Snow/Ice",
-      7: "Wetland forest",
-      8: "Peat forest",
-      9: "Wetland short vegetation",
-      10: "Peat short vegetation",
-      11: "Cropland",
-      12: "Built-up",
-      13: "Tree cover",
-      14: "Short vegetation",
-      15: "Water",
-      16: "Wetland tree cover",
-      17: "Peat tree cover",
-      18: "Wetland short vegetation",
-      19: "Peat short vegetation",
-      20: "Bare"
+      2: "Natural forests",
+      3: "Natural short vegetation",
+      4: "Natural water",
+      5: "Mangroves",
+      6: "Bare",
+      7: "Snow",
+      8: "Wetland natural forests",
+      9: "Natural peat forests",
+      10: "Wetland natural short vegetation",
+      11: "Natural peat short vegetation",
+      12: "Cropland",
+      13: "Built-up",
+      14: "Non-natural tree cover",
+      15: "Non-natural short vegetation",
+      16: "Non-natural water",
+      17: "Wetland non-natural tree cover",
+      18: "Non-natural peat tree cover",
+      19: "Wetland non-natural short vegetation",
+      20: "Non-natural peat short vegetation",
+      21: "Non-natural bare",
   }
 )
 
@@ -673,7 +667,7 @@ def generate_validation_statistics(
     julian_date_flat = dist_julian_date_aoi.flatten()
 
     # read and process contextual layer
-    if contextual_layer:
+    if contextual_layer is not None:
         with rio.Env(AWS_REQUEST_PAYER="requester"):
             with rio.open(contextual_layer.source_uri) as src:
                 contextual_data = src.read(1, window=window)
@@ -690,8 +684,8 @@ def generate_validation_statistics(
         low_conf_results = df.groupby([contextual_layer.name, "dist_alert_date"])["low_conf"].sum().reset_index()
 
         # map contextual layer names
-        high_conf_results[f"{contextual_layer.name}_class"] = high_conf_results[contextual_layer.name].map(contextual_layer.classes)
-        low_conf_results[f"{contextual_layer.name}_class"] = low_conf_results[contextual_layer.name].map(contextual_layer.classes)
+        high_conf_results[contextual_layer.column_name] = high_conf_results[contextual_layer.name].map(contextual_layer.classes)
+        low_conf_results[contextual_layer.column_name] = low_conf_results[contextual_layer.name].map(contextual_layer.classes)
     else:
         df = pd.DataFrame(
             {
