@@ -782,20 +782,21 @@ def generate_validation_statistics(
 
 
 @task
-def validate(parquet_uri: str) -> bool:
+def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = None) -> bool:
     """Validate Zarr to confirm there's no issues with the input transformation."""
 
     logger = get_run_logger()
 
     # load local results
     version = get_latest_version("umd_glad_dist_alerts")
-    logger.info(f"Generating validation stats for version {version}.")
-    validation_df = generate_validation_statistics(version)
+    layer_name = contextual_layer.name if contextual_layer else "base"
+    logger.info(f"Generating validation stats for version {version} with layer {layer_name}.")
+    validation_df = generate_validation_statistics(version, contextual_layer=contextual_layer)
 
     # load zeno stats for aoi
     zeno_df = pd.read_parquet(parquet_uri)  # assumes parquet refers to latest version
     zeno_aoi_df = zeno_df[(zeno_df["country"] == "BRA") & (zeno_df["region"] == 20)]
-    logger.info("Loaded Zeno stats for admin area.")
+    logger.info(f"Loaded Zeno stats for admin area with layer {layer_name}.")
 
     # validate zonal stats schema
     try:
@@ -837,8 +838,13 @@ def validate(parquet_uri: str) -> bool:
     )
 
     # Group zeno results by dist_alert_date and dist_alert_confidence to aggregate subregions (since AOI is an adm1)
+    # Include contextual layer column if present
+    group_cols = ["dist_alert_date", "dist_alert_confidence"]
+    if contextual_layer:
+        group_cols.insert(1, contextual_layer.name)
+
     zeno_spot_check = (
-        zeno_spot_check_raw.groupby(["dist_alert_date", "dist_alert_confidence"])[
+        zeno_spot_check_raw.groupby(group_cols)[
             "area_ha"
         ]
         .sum()
