@@ -577,7 +577,7 @@ class DistZonalStats(pa.DataFrameModel):
         ]
 
 class ContextualLayer(BaseModel):
-    name: Literal["sbtn_natural_lands", "grasslands", "drivers", "land_cover"]
+    name: Literal["sbtn_natural_lands", "gfw_grasslands", "umd_drivers", "umd_land_cover"]
     source_uri: str
     column_name: str
     classes: Dict[int, str]
@@ -608,6 +608,46 @@ SBTN_NATURAL_LANDS = ContextualLayer(
       20: "Non-natural peat short vegetation",
       21: "Non-natural bare",
   }
+)
+
+DIST_DRIVERS = ContextualLayer(
+    name="umd_drivers",
+    source_uri="s3://gfw-data-lake/umd_glad_dist_alerts_driver/umd_dist_alerts_driver.tif",
+    column_name="driver",
+    classes={
+        1: "Wildfire",
+        2: "Flooding",
+        3: "Crop management",
+        4: "Potential conversion",
+        5: "Unclassified",
+    }
+)
+
+GRASSLANDS = ContextualLayer(
+    name="gfw_grasslands",
+    source_uri="s3://gfw-data-lake/gfw_grasslands/v1/geotiff/grasslands_2022.tif",
+    column_name="grasslands",
+    classes={
+        0: "non-grasslands",
+        1: "grasslands"
+    }
+)
+
+LAND_COVER = ContextualLayer(
+    name="umd_land_cover",
+    source_uri="",
+    column_name="land_cover",
+    classes={
+        0: "Bare and sparse vegetation",
+        1: "Short vegetation",
+        2: "Tree cover",
+        3: "Wetland – short vegetation",
+        4: "Water",
+        5: "Snow/ice",
+        6: "Cropland",
+        7: "Built-up",
+        8: "Cultivated grasslands",
+    }
 )
 
 def generate_validation_statistics(
