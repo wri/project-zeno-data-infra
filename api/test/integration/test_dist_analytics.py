@@ -408,7 +408,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             intersections=[],
         )
         analytics_in._version = TEST_VERSION
-        analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -593,7 +593,7 @@ async def test_gadm_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    analytics_in._version = "v20251011newschema"  # TEST_VERSION
+    analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )

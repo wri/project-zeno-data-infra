@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from dask.dataframe import DataFrame as DaskDataFrame
 
-from app.analysis.dist_alerts.analysis import zonal_statistics
+from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
 
 
 class TestDistAlertsZonalStats:
@@ -24,7 +24,7 @@ class TestDistAlertsZonalStats:
             ],
         }
 
-        _: DaskDataFrame = await zonal_statistics(
+        _: DaskDataFrame = await DistAlertsAnalyzer.zonal_statistics(
             aoi={"type": "indigenous_land", "id": "1918"},
             geojson=geojson,
             version="v20251004",
@@ -53,7 +53,7 @@ class TestDistAlertsZonalStats:
             "end_date": "2024-08-17",
             "geometry": geojson,
         }
-        result_df: DaskDataFrame = await zonal_statistics(
+        result_df: DaskDataFrame = await DistAlertsAnalyzer.zonal_statistics(
             aoi, aoi["geometry"], version="v20251004", intersection="grasslands"
         )
 
@@ -218,7 +218,7 @@ class TestDistAlertsZonalStats:
             "properties": {"id": "test_aoi"},
             "geometry": geojson,
         }
-        result_df: DaskDataFrame = await zonal_statistics(
+        result_df: DaskDataFrame = await DistAlertsAnalyzer.zonal_statistics(
             aoi, aoi["geometry"], version="v20251004", intersection="land_cover"
         )
 
