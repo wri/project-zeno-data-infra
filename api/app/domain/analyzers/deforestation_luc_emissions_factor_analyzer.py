@@ -4,12 +4,12 @@ from app.analysis.common.analysis import get_sql_in_list
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.deforestation_emissions_by_crop import (
-    DeforestationEmissionsByCropAnalyticsIn,
+from app.models.land_change.deforestation_luc_emissions_factor import (
+    DeforestationLUCEmissionsFactorAnalyticsIn,
 )
 
 
-class DeforestationEmissionsByCropAnalyzer(Analyzer):
+class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
     """Get the total area (in hectares) of each land class composition for 2024."""
 
     def __init__(
@@ -24,14 +24,14 @@ class DeforestationEmissionsByCropAnalyzer(Analyzer):
         self.dataset_repository = dataset_repository
         self.query_service = query_service
 
-    @nr_agent.function_trace(name="DeforestationEmissionsByCropAnalyzer.analyze")
+    @nr_agent.function_trace(name="DeforestationLUCEmissionsFactorAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
-        deforestation_emissions_by_crop_analytics_in = (
-            DeforestationEmissionsByCropAnalyticsIn(**analysis.metadata)
+        deforestation_luc_emissions_factor_analytics_in = (
+            DeforestationLUCEmissionsFactorAnalyticsIn(**analysis.metadata)
         )
-        if deforestation_emissions_by_crop_analytics_in.aoi.type == "admin":
+        if deforestation_luc_emissions_factor_analytics_in.aoi.type == "admin":
             results = await self.analyze_admin_areas(
-                deforestation_emissions_by_crop_analytics_in
+                deforestation_luc_emissions_factor_analytics_in
             )
 
         else:
@@ -43,7 +43,8 @@ class DeforestationEmissionsByCropAnalyzer(Analyzer):
             AnalysisStatus.saved,
         )
         await self.analysis_repository.store_analysis(
-            deforestation_emissions_by_crop_analytics_in.thumbprint(), analyzed_analysis
+            deforestation_luc_emissions_factor_analytics_in.thumbprint(),
+            analyzed_analysis,
         )
 
     async def analyze_admin_areas(self, analytics_in):

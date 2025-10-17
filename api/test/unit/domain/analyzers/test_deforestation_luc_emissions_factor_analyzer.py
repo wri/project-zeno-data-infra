@@ -4,16 +4,16 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 
-from app.domain.analyzers.deforestation_emissions_by_crop import (
-    DeforestationEmissionsByCropAnalyzer,
+from api.app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+    DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.common.analysis import AnalysisStatus
-from app.models.land_change.deforestation_emissions_by_crop import (
-    DeforestationEmissionsByCropAnalyticsIn,
+from app.models.land_change.deforestation_luc_emissions_factor import (
+    DeforestationLUCEmissionsFactorAnalyticsIn,
 )
 
 
@@ -93,26 +93,26 @@ class TestLandCoverChangeAdminAois:
                 "IDN.24.9",
             ],
             "crop_type": [
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
                 "Yams",
                 "Yams",
                 "Yams",
@@ -133,26 +133,26 @@ class TestLandCoverChangeAdminAois:
                 "Yams",
                 "Yams",
                 "Yams",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
-                "Bananas",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
+                "Banana",
             ],
             "gas_type": [
                 "CH4",
@@ -278,7 +278,7 @@ class TestLandCoverChangeAdminAois:
                 2023,
                 2024,
             ],
-            "emissions_factor": [
+            "emissions_factor_tCO2e_per_tonne_production": [
                 0.001568,
                 0.001589,
                 0.001571,
@@ -340,7 +340,7 @@ class TestLandCoverChangeAdminAois:
                 0.001802,
                 0.001428,
             ],
-            "emissions_tonnes": [
+            "emissions_tCO2e": [
                 0.3461130844816348,
                 0.361776450588094,
                 0.3640167538779352,
@@ -537,7 +537,7 @@ class TestLandCoverChangeAdminAois:
         parquet_mock_data.to_parquet("/tmp/test.parquet", index=False)
 
         query_service = DuckDbPrecalcQueryService(table_name)
-        analyzer = DeforestationEmissionsByCropAnalyzer(
+        analyzer = DeforestationLUCEmissionsFactorAnalyzer(
             analysis_repository=self.analysis_repo,
             compute_engine=None,
             query_service=query_service,
@@ -550,10 +550,10 @@ class TestLandCoverChangeAdminAois:
         self,
         analyzer_with_test_data,
     ):
-        analytics_in = DeforestationEmissionsByCropAnalyticsIn(
+        analytics_in = DeforestationLUCEmissionsFactorAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
             gas_types=["CO2e", "CH4"],
-            crop_types=["Bananas"],
+            crop_types=["Banana"],
             start_year="2021",
             end_year="2023",
         )

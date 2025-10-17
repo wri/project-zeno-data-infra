@@ -3,8 +3,8 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.domain.analyzers.deforestation_emissions_by_crop import (
-    DeforestationEmissionsByCropAnalyzer,
+from api.app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+    DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -15,11 +15,11 @@ from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
-from app.models.land_change.deforestation_emissions_by_crop import (
+from app.models.land_change.deforestation_luc_emissions_factor import (
     ANALYTICS_NAME,
-    DeforestationEmissionsByCropAnalytics,
-    DeforestationEmissionsByCropAnalyticsIn,
-    DeforestationEmissionsByCropAnalyticsResponse,
+    DeforestationLUCEmissionsFactorAnalytics,
+    DeforestationLUCEmissionsFactorAnalyticsIn,
+    DeforestationLUCEmissionsFactorAnalyticsResponse,
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
@@ -39,12 +39,12 @@ def create_analysis_service(
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=DeforestationEmissionsByCropAnalyzer(
+        analyzer=DeforestationLUCEmissionsFactorAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
         ),
         query_service=DuckDbPrecalcQueryService(
-            table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-emissions-by-crop.parquet"
+            table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
         ),
         event=ANALYTICS_NAME,
     )
@@ -55,11 +55,11 @@ def create_analysis_service(
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
     status_code=202,
-    summary="Create Natural Lands Analysis Task",
+    summary="Start analysis tasks for deforestation-related statistical land use change (sLUC) emissions factors.",
 )
 async def create(
     *,
-    data: DeforestationEmissionsByCropAnalyticsIn,
+    data: DeforestationLUCEmissionsFactorAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
@@ -76,7 +76,7 @@ async def create(
 def _datamart_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
-            "get_deforestation_emissions_by_crop_analytics_result",
+            "get_deforestation_luc_emissions_factor_analytics_result",
             resource_id=service.resource_thumbprint(),
         )
     )
@@ -85,10 +85,10 @@ def _datamart_resource_link_response(request, service) -> str:
 @router.get(
     "/analytics/{resource_id}",
     response_class=ORJSONResponse,
-    response_model=DeforestationEmissionsByCropAnalyticsResponse,
+    response_model=DeforestationLUCEmissionsFactorAnalyticsResponse,
     status_code=200,
 )
-async def get_deforestation_emissions_by_crop_analytics_result(
+async def get_deforestation_luc_emissions_factor_analytics_result(
     resource_id: UUID5,
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
@@ -99,7 +99,7 @@ async def get_deforestation_emissions_by_crop_analytics_result(
         response=response,
     )
 
-    return DeforestationEmissionsByCropAnalyticsResponse(
-        data=DeforestationEmissionsByCropAnalytics(**analytics_out.model_dump()),
+    return DeforestationLUCEmissionsFactorAnalyticsResponse(
+        data=DeforestationLUCEmissionsFactorAnalytics(**analytics_out.model_dump()),
         status="success",
     )

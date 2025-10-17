@@ -7,8 +7,8 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.deforestation_emissions_by_crop import (
-    DeforestationEmissionsByCropAnalyzer,
+from api.app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+    DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -17,11 +17,11 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
 from app.main import app
-from app.models.land_change.deforestation_emissions_by_crop import (
+from app.models.land_change.deforestation_luc_emissions_factor import (
     ANALYTICS_NAME,
-    DeforestationEmissionsByCropAnalyticsIn,
+    DeforestationLUCEmissionsFactorAnalyticsIn,
 )
-from app.routers.land_change.deforestation_emissions_by_crop.deforestation_emissions_by_crop import (
+from app.routers.land_change.deforestation_luc_emissions_factor.deforestation_luc_emissions_factor import (
     create_analysis_service,
     get_analysis_repository,
 )
@@ -37,11 +37,11 @@ def create_analysis_service_for_tests(
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=DeforestationEmissionsByCropAnalyzer(
+        analyzer=DeforestationLUCEmissionsFactorAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-emissions-by-crop.parquet"
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
             ),
         ),
         event=ANALYTICS_NAME,
@@ -51,10 +51,10 @@ def create_analysis_service_for_tests(
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
     async def setup(self):
-        analytics_in = DeforestationEmissionsByCropAnalyticsIn(
+        analytics_in = DeforestationLUCEmissionsFactorAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.14", "IDN.24.9"]},
             gas_types=["CO2e", "CH4"],
-            crop_types=["Bananas"],
+            crop_types=["Banana"],
             start_year="2021",
             end_year="2023",
         )

@@ -9,7 +9,7 @@ from app.models.common.areas_of_interest import (
 )
 from app.models.common.base import Response, StrictBaseModel
 
-ANALYTICS_NAME = "deforestation_emissions_by_crop"
+ANALYTICS_NAME = "deforestation_luc_emissions_factor"
 
 AoiUnion = Union[AdminAreaOfInterest,]
 DATE_REGEX = r"^\d{4}$"
@@ -73,7 +73,7 @@ class GasType(Enum):
         return self.value
 
 
-class DeforestationEmissionsByCropAnalyticsIn(AnalyticsIn):
+class DeforestationLUCEmissionsFactorAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v0")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
@@ -114,19 +114,19 @@ class DeforestationEmissionsByCropAnalyticsIn(AnalyticsIn):
         return self
 
 
-class DeforestationEmissionsByCropResult(StrictBaseModel):
+class DeforestationLUCEmissionsFactorResult(StrictBaseModel):
     aoi_id: List[str]
     aoi_type: List[str]
     crop_type: List[str]
     gas_type: List[str]
     year: List[int]
-    emissions_factor: List[float]
-    emissions_tonnes: List[float]
+    emissions_factor_tCO2e_per_tonne_production: List[float]
+    emissions_tCO2e: List[float]
     production_tonnes: List[float]
 
 
-class DeforestationEmissionsByCropAnalytics(StrictBaseModel):
-    result: Optional[DeforestationEmissionsByCropResult] = None
+class DeforestationLUCEmissionsFactorAnalytics(StrictBaseModel):
+    result: Optional[DeforestationLUCEmissionsFactorResult] = None
     metadata: Optional[dict] = None
     message: Optional[str] = None
     status: Optional[AnalysisStatus] = None
@@ -137,5 +137,5 @@ class DeforestationEmissionsByCropAnalytics(StrictBaseModel):
     }
 
 
-class DeforestationEmissionsByCropAnalyticsResponse(Response):
-    data: DeforestationEmissionsByCropAnalytics
+class DeforestationLUCEmissionsFactorAnalyticsResponse(Response):
+    data: DeforestationLUCEmissionsFactorAnalytics
