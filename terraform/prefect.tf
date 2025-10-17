@@ -124,6 +124,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       AWS_SECRET_ACCESS_KEY = var.aws_secret_access_key
       PIPELINES_IMAGE       = var.pipelines_image
       TF_WORKSPACE          = terraform.workspace
+      AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
     }
   })
 }

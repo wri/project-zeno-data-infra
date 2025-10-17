@@ -3,7 +3,7 @@ import pandas as pd
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import DATA_LAKE_BUCKET
+from pipelines.globals import grasslands_zarr_uri
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
@@ -24,10 +24,9 @@ def dist_alerts_by_grasslands_area(
         np.arange(731, 2000),  # dates values
         [1, 2, 3],  # confidence values
     )
-    contextual_uri = f"s3://{DATA_LAKE_BUCKET}/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
     datasets = dist_common_tasks.load_data.with_options(
         name="dist-alerts-by-grasslands-load-data"
-    )(dist_zarr_uri, contextual_uri=contextual_uri)
+    )(dist_zarr_uri, contextual_uri=grasslands_zarr_uri)
     # We only need year 2022 of the grasslands contextual layer. We can fix later to
     # put this in a grasslands-specific setup_compute() task.
     datasets = datasets[:5] + (datasets[5].sel(year=2022),)
