@@ -3,6 +3,7 @@ import pandas as pd
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
+from pipelines.globals import land_cover_zarr_uri
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
@@ -35,10 +36,9 @@ def dist_alerts_by_land_cover_area(
         np.arange(731, 2000),  # dates values
         [1, 2, 3],  # confidence values
     )
-    contextual_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr"
     datasets = dist_common_tasks.load_data.with_options(
         name="dist-alerts-by-land-cover-load-data"
-    )(dist_zarr_uri, contextual_uri=contextual_uri)
+    )(dist_zarr_uri, contextual_uri=land_cover_zarr_uri)
     # We only need year 2024 of the land cover contextual layer. We can fix later to
     # put this in a land-cover-specific setup_compute() task.
     datasets = datasets[:5] + (datasets[5].sel(year=2024),)

@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 from pipelines.globals import (
     country_zarr_uri,
-    pixel_area_uri,
+    pixel_area_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
 )
@@ -43,7 +43,7 @@ def load_data(
         dist_alerts, method="nearest", tolerance=1e-5
     )
     subregion_aligned = xr.align(dist_alerts, subregion, join="left")[1].band_data
-    pixel_area = _load_zarr(pixel_area_uri).reindex_like(
+    pixel_area = _load_zarr(pixel_area_zarr_uri).reindex_like(
         dist_alerts, method="nearest", tolerance=1e-5
     )
     pixel_area_aligned = xr.align(dist_alerts, pixel_area, join="left")[1].band_data
