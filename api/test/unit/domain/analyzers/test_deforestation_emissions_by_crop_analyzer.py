@@ -4,17 +4,17 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 
-from api.app.domain.analyzers.deforestation_emissions_by_crop import (
+from app.domain.analyzers.deforestation_emissions_by_crop import (
     DeforestationEmissionsByCropAnalyzer,
-)
-from api.app.models.land_change.deforestation_emissions_by_crop import (
-    DeforestationEmissionsByCropAnalyticsIn,
 )
 from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.common.analysis import AnalysisStatus
+from app.models.land_change.deforestation_emissions_by_crop import (
+    DeforestationEmissionsByCropAnalyticsIn,
+)
 
 
 class DummyAnalysisRepository:

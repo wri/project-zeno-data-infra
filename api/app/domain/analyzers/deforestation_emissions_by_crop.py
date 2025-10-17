@@ -1,6 +1,6 @@
 import newrelic.agent as nr_agent
 
-from api.app.analysis.common.analysis import get_sql_in_list
+from app.analysis.common.analysis import get_sql_in_list
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus

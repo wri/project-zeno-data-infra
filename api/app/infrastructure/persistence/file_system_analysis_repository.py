@@ -4,19 +4,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Tuple
 
+from app.analysis.common.analysis import EnumEncoder
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
 
 PAYLOAD_STORE_DIR = Path("/tmp")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-class EnumEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, Enum):
-            return obj.value
-        return super().default(obj)
 
 
 class FileSystemAnalysisRepository(AnalysisRepository):
