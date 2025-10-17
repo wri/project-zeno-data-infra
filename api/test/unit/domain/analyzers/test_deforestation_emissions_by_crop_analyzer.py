@@ -8,7 +8,6 @@ from api.app.domain.analyzers.deforestation_emissions_by_crop import (
     DeforestationEmissionsByCropAnalyzer,
 )
 from api.app.models.land_change.deforestation_emissions_by_crop import (
-    CropType,
     DeforestationEmissionsByCropAnalyticsIn,
 )
 from app.domain.models.analysis import Analysis
@@ -554,7 +553,7 @@ class TestLandCoverChangeAdminAois:
         analytics_in = DeforestationEmissionsByCropAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
             gas_types=["CO2e", "CH4"],
-            crop_types=[CropType.BANA],
+            crop_types=["Bananas"],
             start_year="2021",
             end_year="2023",
         )

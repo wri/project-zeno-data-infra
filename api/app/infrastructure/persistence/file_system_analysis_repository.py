@@ -1,5 +1,6 @@
 import json
 import uuid
+from enum import Enum
 from pathlib import Path
 from typing import Tuple
 
@@ -9,6 +10,13 @@ from app.models.common.analysis import AnalysisStatus
 
 PAYLOAD_STORE_DIR = Path("/tmp")
 PAYLOAD_STORE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return obj.value
+        return super().default(obj)
 
 
 class FileSystemAnalysisRepository(AnalysisRepository):
@@ -47,7 +55,9 @@ class FileSystemAnalysisRepository(AnalysisRepository):
         )
 
         if analytics.metadata is not None:
-            analytics_metadata.write_text(json.dumps(analytics.metadata))
+            analytics_metadata.write_text(
+                json.dumps(analytics.metadata, cls=EnumEncoder)
+            )
 
         if analytics.result is not None:
             analytics_data.write_text(json.dumps(analytics.result))

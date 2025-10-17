@@ -73,12 +73,18 @@ class CropType(Enum):
     WHEA = "Wheat"
     YAMS = "Yams"
 
+    def __str__(self):
+        return self.value
+
 
 class GasType(Enum):
     co2e = "CO2e"
     co2 = "CO2"
     ch4 = "CH4"
     n2o = "N20"
+
+    def __str__(self):
+        return self.value
 
 
 class DeforestationEmissionsByCropAnalyticsIn(AnalyticsIn):
