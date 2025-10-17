@@ -3,13 +3,13 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from api.app.infrastructure.external_services.duck_db_query_service import (
-    DuckDbPrecalcQueryService,
-)
 from app.domain.analyzers.deforestation_emissions_by_crop import (
     DeforestationEmissionsByCropAnalyzer,
 )
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
