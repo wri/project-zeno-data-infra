@@ -151,8 +151,9 @@ module "prefect_vpc" {
   enable_nat_gateway = true
   enable_vpn_gateway = false
 
-  # So as to not waste IP addresses, we only create one NAT gateway per AZ.
-  one_nat_gateway_per_az = true
+  # So as to not waste IP addresses, we only create one NAT gateway across all AZs.
+  one_nat_gateway_per_az = false
+  single_nat_gateway     = true
 
   # Create an internet gateway to allow public subnets to route traffic to the internet.
   create_igw = true
