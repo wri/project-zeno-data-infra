@@ -75,4 +75,10 @@ jobs:
           image: ${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
-            API_KEY=${{ secrets.GFW_API_KEY }} AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} pytest test --disable-warnings
+            API_KEY=${{ secrets.GFW_API_KEY }} \
+              AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} \
+              AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
+              DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} \
+              ANALYSES_TABLE_NAME=Analyses-test \
+              ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
+              pytest test --disable-warnings

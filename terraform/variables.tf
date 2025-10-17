@@ -109,3 +109,9 @@ variable "coiled_token" {
   description = "Access token to write dask on Coiled"
   type = string
 }
+
+variable "region" {
+  description = "AWS region"
+  type = string
+  default = "us-east-1"
+}
