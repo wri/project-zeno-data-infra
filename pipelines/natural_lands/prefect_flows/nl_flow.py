@@ -3,7 +3,11 @@ import logging
 import numpy as np
 from prefect import flow
 
-from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
+from pipelines.globals import (
+    ANALYTICS_BUCKET,
+    pixel_area_zarr_uri,
+    sbtn_natural_lands_zarr_uri,
+)
 from pipelines.natural_lands.prefect_flows import nl_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
@@ -13,10 +17,6 @@ from pipelines.utils import s3_uri_exists
 def gadm_natural_lands_area(overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
-    base_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
-    contextual_uri = (
-        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-    )
     contextual_column_name = "natural_lands"
     result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-natural-lands.parquet"
     funcname = "sum"
@@ -33,7 +33,7 @@ def gadm_natural_lands_area(overwrite: bool = False):
 
     datasets = common_tasks.load_data.with_options(
         name="area-by-natural-lands-load-data"
-    )(base_uri, contextual_uri=contextual_uri)
+    )(pixel_area_zarr_uri, contextual_uri=sbtn_natural_lands_zarr_uri)
 
     compute_input = nl_tasks.setup_compute.with_options(
         name="set-up-area-by-natural-lands-compute"

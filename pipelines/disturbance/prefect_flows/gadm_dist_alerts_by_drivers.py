@@ -3,7 +3,7 @@ import pandas as pd
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import DATA_LAKE_BUCKET
+from pipelines.globals import dist_driver_zarr_uri
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
@@ -30,10 +30,9 @@ def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite
         np.arange(731, 2000),  # dates values
         [1, 2, 3],  # confidence values
     )
-    contextual_uri = f"s3://{DATA_LAKE_BUCKET}/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr"
     datasets = dist_common_tasks.load_data.with_options(
         name="dist-alerts-by-natural-lands-load-data"
-    )(dist_zarr_uri, contextual_uri=contextual_uri)
+    )(dist_zarr_uri, contextual_uri=dist_driver_zarr_uri)
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-by-drivers-compute"
     )(datasets, expected_groups, contextual_name="driver")

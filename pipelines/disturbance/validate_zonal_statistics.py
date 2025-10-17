@@ -751,7 +751,6 @@ def validate(parquet_uri: str) -> bool:
     # validate alert area sums with 0.1% tolerance
     validation_areas = DistZonalStats.calculate_area_sums_by_confidence(validation_df)
     zeno_areas = DistZonalStats.calculate_area_sums_by_confidence(zeno_aoi_df)
-    zeno_aoi_df["area_ha"] = zeno_aoi_df["area_ha"] / 10000
     tolerance_pct = 0.001  # 0.1% tolerance
 
     low_conf_tolerance = validation_areas["low_confidence"] * tolerance_pct
