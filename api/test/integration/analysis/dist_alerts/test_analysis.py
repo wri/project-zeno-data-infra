@@ -1,5 +1,3 @@
-import asyncio
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -57,8 +55,7 @@ class TestDistAlertsZonalStats:
             aoi, aoi["geometry"], version="v20251004", intersection="grasslands"
         )
 
-        loop = asyncio.get_event_loop()
-        computed_df = await loop.run_in_executor(None, result_df.compute)
+        computed_df = result_df.compute()
         expected_df = pd.DataFrame(
             {
                 "dist_alert_date": [
@@ -222,8 +219,7 @@ class TestDistAlertsZonalStats:
             aoi, aoi["geometry"], version="v20251004", intersection="land_cover"
         )
 
-        loop = asyncio.get_event_loop()
-        computed_df = await loop.run_in_executor(None, result_df.compute)
+        computed_df = result_df.compute()
         expected_df = pd.DataFrame(
             {
                 "dist_alert_date": [
