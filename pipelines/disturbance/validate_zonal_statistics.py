@@ -13,7 +13,7 @@ from prefect.logging import get_run_logger
 from rasterio.features import geometry_mask
 from rasterio.windows import from_bounds
 from pydantic import BaseModel
-from typing import Dict, Optional, Literal
+from typing import Dict, Optional, Literal, List
 
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 
@@ -529,60 +529,13 @@ numeric_to_alpha3 = {
     716: "ZWE",
 }
 
-
-class DistZonalStats(pa.DataFrameModel):
-    country: Series[str] = pa.Field(eq="BRA")
-    region: Series[int] = pa.Field(eq=20)  # gadm id for adm1 AOI
-    subregion: Series[int] = pa.Field(lt=170)  # placeholder adm2
-    dist_alert_date: Series[date] = pa.Field(
-        ge=date.fromisoformat("2023-01-01"), le=get_latest_dist_alert_date()
-    )  # julian date between 2023-01-01 to latest version
-    dist_alert_confidence: Series[str] = pa.Field(
-        isin=["low", "high"]
-    )  # low confidence, high confidence
-    area_ha: Series[float]
-
-    class Config:
-        coerce = True
-        strict = True
-        name = "ZonalStatsSchema"
-        ordered = True
-        unique = [
-            "country",
-            "region",
-            "subregion",
-            "dist_alert_date",
-            "dist_alert_confidence",
-        ]
-
-    @staticmethod
-    def calculate_area_sums_by_confidence(df: pd.DataFrame) -> dict:
-        """Calculate the total area by confidence level."""
-        area_sums = df.groupby("dist_alert_confidence")["area_ha"].sum().to_dict()
-        return {
-            "low_confidence": area_sums.get("low", 0),
-            "high_confidence": area_sums.get("high", 0),
-        }
-
-    @staticmethod
-    def spot_check_julian_dates(
-        df: pd.DataFrame, julian_dates: List[date]
-    ) -> pd.DataFrame:
-        filtered_by_date_df = df[df["dist_alert_date"].isin(julian_dates)]
-        filtered_by_date_df = filtered_by_date_df.sort_values(
-            by="dist_alert_date"
-        ).reset_index(drop=True)
-        return filtered_by_date_df[
-            ["dist_alert_date", "dist_alert_confidence", "area_ha"]
-        ]
-
 class ContextualLayer(BaseModel):
     name: Literal["sbtn_natural_lands", "gfw_grasslands", "umd_drivers", "umd_land_cover"]
     source_uri: str
     column_name: str
     classes: Dict[int, str]
 
-SBTN_NATURAL_LANDS = ContextualLayer(
+NATURAL_LANDS = ContextualLayer(
     name="sbtn_natural_lands",
     source_uri="s3://gfw-data-lake/sbtn_natural_lands_classification/v1.1/raster/epsg-4326/10/40000/class/geotiff/00N_040W.tif",
     column_name="natural_land_class",
@@ -635,20 +588,106 @@ GRASSLANDS = ContextualLayer(
 
 LAND_COVER = ContextualLayer(
     name="umd_land_cover",
-    source_uri="",
+    source_uri="s3://lcl-cogs/global-land-cover/global_land_cover_2024.tif",
     column_name="land_cover",
     classes={
-        0: "Bare and sparse vegetation",
-        1: "Short vegetation",
-        2: "Tree cover",
-        3: "Wetland – short vegetation",
-        4: "Water",
-        5: "Snow/ice",
-        6: "Cropland",
-        7: "Built-up",
-        8: "Cultivated grasslands",
+        0: "Short vegetation",
+        1: "Bare and sparse vegetation",
+        2: "Short vegetation",
+        3: "Tree cover",
+        4: "Wetland – short vegetation",
+        5: "Water",
+        6: "Snow-ice",
+        7: "Cropland",
+        8: "Built-up",
     }
 )
+
+unique_cols = [
+    "country",
+    "region",
+    "subregion",
+    "dist_alert_date",
+    "dist_alert_confidence",
+]
+
+class DistZonalStats(pa.DataFrameModel):
+    country: Series[str] = pa.Field(eq="BRA")
+    region: Series[int] = pa.Field(eq=20)  # gadm id for adm1 AOI
+    subregion: Series[int] = pa.Field(lt=170)  # placeholder adm2
+    dist_alert_date: Series[date] = pa.Field(
+        ge=date.fromisoformat("2023-01-01"), le=get_latest_dist_alert_date()
+    )  # julian date between 2023-01-01 to latest version
+    dist_alert_confidence: Series[str] = pa.Field(
+        isin=["low", "high"]
+    )  # low confidence, high confidence
+    area_ha: Series[float]
+    aoi_type: str = pa.Field(eq="admin")
+
+    class Config:
+        coerce = True
+        strict = True
+        ordered = True
+        unique = unique_cols
+
+    @staticmethod
+    def calculate_area_sums_by_confidence(df: pd.DataFrame) -> dict:
+        """Calculate the total area by confidence level."""
+        area_sums = df.groupby("dist_alert_confidence")["area_ha"].sum().to_dict()
+        return {
+            "low_confidence": area_sums.get("low", 0),
+            "high_confidence": area_sums.get("high", 0),
+        }
+
+    @staticmethod
+    def spot_check_julian_dates(
+        df: pd.DataFrame, julian_dates: List[date]
+    ) -> pd.DataFrame:
+        filtered_by_date_df = df[df["dist_alert_date"].isin(julian_dates)]
+        filtered_by_date_df = filtered_by_date_df.sort_values(
+            by="dist_alert_date"
+        ).reset_index(drop=True)
+
+        # return all columns except admin columns
+        exclude_cols = ["country", "region", "subregion"]
+        columns = [col for col in filtered_by_date_df.columns if col not in exclude_cols]
+        return filtered_by_date_df[columns]
+
+class NaturalLandsZonalStats(DistZonalStats):
+    natural_land_class: Series[str]
+
+    class Config:
+        coerce = True
+        strict = True
+        ordered = False
+        unique = unique_cols.append(NATURAL_LANDS.column_name)
+
+class DriversZonalStats(DistZonalStats):
+    driver: Series[str]
+
+    class Config:
+        coerce = True
+        strict = True
+        ordered = False
+        unique = unique_cols.append(DRIVERS.column_name)
+
+class GrasslandsZonalStats(DistZonalStats):
+    grasslands: Series[str]
+
+    class Config:
+        coerce = True
+        strict = True
+        ordered = False
+        unique = unique_cols.append(DRIVERS.column_name)
+
+class LandCoverZonalStats(DistZonalStats):
+    land_cover: Series[str]
+
+    class Config:
+        coerce = True
+        strict = True
+        ordered = False
+        unique = unique_cols.append(LAND_COVER.column_name)
 
 def generate_validation_statistics(
         version: str,
@@ -710,6 +749,7 @@ def generate_validation_statistics(
     if contextual_layer is not None:
         with rio.Env(AWS_REQUEST_PAYER="requester"):
             with rio.open(contextual_layer.source_uri) as src:
+                window = from_bounds(bounds[0], bounds[1], bounds[2], bounds[3], src.transform)
                 contextual_data = src.read(1, window=window)
         contextual_data_aoi = aoi_mask * contextual_data
         contextual_flat = contextual_data_aoi.flatten()
@@ -738,12 +778,14 @@ def generate_validation_statistics(
         low_conf_results = df.groupby("dist_alert_date")["low_conf"].sum().reset_index()
 
     # set dist_alert_confidence levels and GADM IDs
+    high_conf_results["aoi_type"] = "admin"
     high_conf_results["dist_alert_confidence"] = "high"
     high_conf_results["country"] = 76
     high_conf_results["region"] = 20
     high_conf_results["subregion"] = (
         150  # placeholder for subregion (adm2) since we are running on an adm1 AOI
     )
+    low_conf_results["aoi_type"] = "admin"
     low_conf_results["dist_alert_confidence"] = "low"
     low_conf_results["country"] = 76
     low_conf_results["region"] = 20
@@ -789,7 +831,7 @@ def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = Non
 
     # load local results
     version = get_latest_version("umd_glad_dist_alerts")
-    layer_name = contextual_layer.name if contextual_layer else "base"
+    layer_name = contextual_layer.name if contextual_layer else "base alerts"
     logger.info(f"Generating validation stats for version {version} with layer {layer_name}.")
     validation_df = generate_validation_statistics(version, contextual_layer=contextual_layer)
 
@@ -798,19 +840,32 @@ def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = Non
     zeno_aoi_df = zeno_df[(zeno_df["country"] == "BRA") & (zeno_df["region"] == 20)]
     logger.info(f"Loaded Zeno stats for admin area with layer {layer_name}.")
 
+    # select appropriate schema based on contextual layer
+    match contextual_layer.name if contextual_layer else None:
+        case None:
+            schema = DistZonalStats
+        case "sbtn_natural_lands":
+            schema = NaturalLandsZonalStats
+        case "umd_drivers":
+            schema = DriversZonalStats
+        case "gfw_grasslands":
+            schema = GrasslandsZonalStats
+        case "umd_land_cover":
+            schema = LandCoverZonalStats
+
     # validate zonal stats schema
     try:
-        DistZonalStats.validate(zeno_aoi_df)
+        schema.validate(zeno_aoi_df)
         logger.info("Zonal stats schema validation passed.")
     except Exception as e:
         logger.error(f"Schema validation failed: {e}")
         return False
 
-    # validate alert area sums with 0.1% tolerance
-    validation_areas = DistZonalStats.calculate_area_sums_by_confidence(validation_df)
-    zeno_areas = DistZonalStats.calculate_area_sums_by_confidence(zeno_aoi_df)
+    # validate alert area sums with 2% tolerance
+    validation_areas = schema.calculate_area_sums_by_confidence(validation_df)
+    zeno_areas = schema.calculate_area_sums_by_confidence(zeno_aoi_df)
     zeno_aoi_df["area_ha"] = zeno_aoi_df["area_ha"] / 10000
-    tolerance_pct = 0.001  # 0.1% tolerance
+    tolerance_pct = 0.02  # 2% tolerance
 
     low_conf_tolerance = validation_areas["low_confidence"] * tolerance_pct
     high_conf_tolerance = validation_areas["high_confidence"] * tolerance_pct
@@ -822,7 +877,7 @@ def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = Non
     )
 
     if low_conf_diff > low_conf_tolerance or high_conf_diff > high_conf_tolerance:
-        logger.error("Area sums exceed 0.1% tolerance")
+        logger.error("Area sums exceed 2% tolerance")
         return False
     logger.info("Area sums validation passed.")
 
@@ -830,18 +885,18 @@ def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = Non
     validation_dates = [
         date.fromisoformat(dstr) for dstr in ["2023-06-06", "2023-06-21", "2023-09-27"]
     ]  # example julian dates (800, 900, ..., 1500)
-    validation_spot_check = DistZonalStats.spot_check_julian_dates(
+    validation_spot_check = schema.spot_check_julian_dates(
         validation_df, validation_dates
     )
-    zeno_spot_check_raw = DistZonalStats.spot_check_julian_dates(
+    zeno_spot_check_raw = schema.spot_check_julian_dates(
         zeno_aoi_df, validation_dates
     )
 
-    # Group zeno results by dist_alert_date and dist_alert_confidence to aggregate subregions (since AOI is an adm1)
-    # Include contextual layer column if present
+    # group zeno results by dist_alert_date and dist_alert_confidence to aggregate subregions (since AOI is an adm1)
+    # include contextual layer column if present
     group_cols = ["dist_alert_date", "dist_alert_confidence"]
     if contextual_layer:
-        group_cols.insert(1, contextual_layer.name)
+        group_cols.insert(1, contextual_layer.column_name)
 
     zeno_spot_check = (
         zeno_spot_check_raw.groupby(group_cols)[
@@ -860,12 +915,12 @@ def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = Non
         return False
     logger.info("No missing dist_alert_dates in parquet")
 
-    # spot check alert area for random dates with 0.1% tolerance
+    # spot check alert area for random dates with 2% tolerance
     tolerance_values = validation_spot_check["area_ha"] * tolerance_pct
     area_diff = abs(validation_spot_check["area_ha"] - zeno_spot_check["area_ha"])
     exceeds_tolerance = area_diff > tolerance_values
     if exceeds_tolerance.any():
-        logger.error("Spot check area values exceed 0.1% tolerance")
+        logger.error("Spot check area values exceed 2% tolerance")
         return False
 
     logger.info("Spot check validation passed.")

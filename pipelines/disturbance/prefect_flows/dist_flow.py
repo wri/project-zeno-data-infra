@@ -65,7 +65,7 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         )
         validate_natural_lands_result = run_validation_suite(
             gadm_dist_by_natural_lands_result,
-            contextual_layer=validate_zonal_statistics.SBTN_NATURAL_LANDS
+            contextual_layer=validate_zonal_statistics.NATURAL_LANDS
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
