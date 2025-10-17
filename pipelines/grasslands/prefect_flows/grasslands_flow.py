@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from prefect import flow
 
-from pipelines.globals import ANALYTICS_BUCKET
+from pipelines.globals import ANALYTICS_BUCKET, grasslands_zarr_uri, pixel_area_zarr_uri
 from pipelines.grasslands.prefect_flows import grasslands_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
@@ -13,11 +13,6 @@ from pipelines.utils import s3_uri_exists
 @flow(name="Natural grasslands area")
 def gadm_grasslands_area(overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
-
-    base_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
-    contextual_uri = (
-        "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
-    )
     contextual_column_name = "grasslands"
     result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-grasslands.parquet"
     funcname = "sum"
@@ -33,7 +28,7 @@ def gadm_grasslands_area(overwrite: bool = False):
 
     datasets = grasslands_tasks.load_data.with_options(
         name="area-by-grasslands-load-data"
-    )(base_uri, contextual_uri=contextual_uri)
+    )(pixel_area_zarr_uri, contextual_uri=grasslands_zarr_uri)
 
     compute_input = grasslands_tasks.setup_compute.with_options(
         name="set-up-area-by-grasslands-compute"

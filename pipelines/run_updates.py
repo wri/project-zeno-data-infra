@@ -25,11 +25,14 @@ def create_cluster():
         compute_purchase_option="spot_with_fallback",
         no_client_timeout="5 seconds",
         container=os.getenv("PIPELINES_IMAGE"),
+        environ={
+            "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
+        },
     )
     cluster.adapt(minimum=10, maximum=50)
 
     client = cluster.get_client()
-    return client, cluster
+    return client
 
 
 @flow(
@@ -46,6 +49,7 @@ def run_updates(overwrite=False) -> list[str]:
     dask_client = None
     result_uris = []
     try:
+        dask_client = create_cluster()
         gl_result = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
         result_uris.append(gl_result)
 

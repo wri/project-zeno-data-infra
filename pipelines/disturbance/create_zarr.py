@@ -1,5 +1,4 @@
 import numpy as np
-import rasterio
 import xarray as xr
 
 from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
@@ -7,7 +6,8 @@ from pipelines.utils import s3_uri_exists
 
 
 def decode_alert_data(band_data) -> xr.Dataset:
-    """Convert encoded alert date_conf data into separate confidence and alert date variables."""
+    """Convert encoded alert date_conf data into separate confidence
+    and alert date variables."""
     alert_date = (band_data % 10000).astype(np.uint16)
     alert_conf = (band_data // 10000).astype(np.uint8)
     alert_conf.name = "confidence"
@@ -26,11 +26,9 @@ def create_zarr(version, overwrite=False) -> str:
     if s3_uri_exists(f"{zarr_uri}/zarr.json") and not overwrite:
         return zarr_uri
 
-    with rasterio.Env(AWS_REQUEST_PAYER="requester"):
-        dataset = xr.open_dataset(cog_uri, chunks="auto").band_data.chunk(
-            {"x": 10000, "y": 10000}
-        )
-
+    dataset = xr.open_dataset(cog_uri, chunks="auto").band_data.chunk(
+        {"x": 10000, "y": 10000}
+    )
     decoded_alert_data = decode_alert_data(dataset)
     decoded_alert_data.to_zarr(zarr_uri, mode="w")
 

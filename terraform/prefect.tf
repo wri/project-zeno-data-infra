@@ -124,6 +124,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       AWS_SECRET_ACCESS_KEY = var.aws_secret_access_key
       PIPELINES_IMAGE       = var.pipelines_image
       TF_WORKSPACE          = terraform.workspace
+      AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
     }
   })
 }
@@ -150,8 +151,9 @@ module "prefect_vpc" {
   enable_nat_gateway = true
   enable_vpn_gateway = false
 
-  # So as to not waste IP addresses, we only create one NAT gateway per AZ.
-  one_nat_gateway_per_az = true
+  # So as to not waste IP addresses, we only create one NAT gateway across all AZs.
+  one_nat_gateway_per_az = false
+  single_nat_gateway     = true
 
   # Create an internet gateway to allow public subnets to route traffic to the internet.
   create_igw = true
