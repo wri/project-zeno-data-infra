@@ -49,7 +49,7 @@ class AnalyticsIn(StrictBaseModel):
         Generate a deterministic UUID thumbprint including the version.
         """
         # Include version and analytics_name in dump for thumbprint consistency
-        dump_dict = self.model_dump(exclude=set())
+        dump_dict = self.model_dump(exclude=set(), mode="json")
         dump_dict["_version"] = self._version  # Manually include version
         dump_dict["_analytics_name"] = (
             self._analytics_name

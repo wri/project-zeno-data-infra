@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from enum import Enum
 from typing import Iterable
 
 import duckdb
@@ -114,3 +115,10 @@ def initialize_duckdb():
         );
     """
     )
+
+
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Enum):
+            return obj.value
+        return super().default(obj)

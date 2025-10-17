@@ -1,8 +1,10 @@
 import json
 import uuid
+from enum import Enum
 from pathlib import Path
 from typing import Tuple
 
+from app.analysis.common.analysis import EnumEncoder
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
@@ -47,7 +49,9 @@ class FileSystemAnalysisRepository(AnalysisRepository):
         )
 
         if analytics.metadata is not None:
-            analytics_metadata.write_text(json.dumps(analytics.metadata))
+            analytics_metadata.write_text(
+                json.dumps(analytics.metadata, cls=EnumEncoder)
+            )
 
         if analytics.result is not None:
             analytics_data.write_text(json.dumps(analytics.result))
