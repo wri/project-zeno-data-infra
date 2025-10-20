@@ -1,3 +1,4 @@
+import os
 import uuid
 
 import aioboto3
@@ -16,6 +17,9 @@ DUMMY_UUID = uuid.UUID("c9787f41-b194-4589-ae53-f45ef290ce6f")
 
 
 class TestLoadingAnalysis:
+    TEST_ANALYSES_TABLE_NAME = os.getenv("ANALYSES_TABLE_NAME")
+    TEST_ANALYSIS_RESULTS_BUCKET_NAME = os.getenv("ANALYSIS_RESULTS_BUCKET_NAME")
+
     @pytest.fixture(scope="class")
     def moto_server(self):
         """Start Moto server once per test class with isolated port."""
@@ -57,7 +61,7 @@ class TestLoadingAnalysis:
 
         # Create resources
         dynamodb.create_table(
-            TableName="Analyses",
+            TableName=self.TEST_ANALYSES_TABLE_NAME,
             KeySchema=[{"AttributeName": "resource_id", "KeyType": "HASH"}],
             AttributeDefinitions=[
                 {"AttributeName": "resource_id", "AttributeType": "S"}
@@ -65,7 +69,7 @@ class TestLoadingAnalysis:
             BillingMode="PAY_PER_REQUEST",
         )
 
-        s3.create_bucket(Bucket="gnw-analytics-api-analysis-results")
+        s3.create_bucket(Bucket=self.TEST_ANALYSIS_RESULTS_BUCKET_NAME)
 
     @pytest_asyncio.fixture(scope="function")
     async def dynamodb_and_s3(self, moto_server):
@@ -76,7 +80,7 @@ class TestLoadingAnalysis:
             async with session.resource(
                 "dynamodb", region_name="us-east-1", endpoint_url=moto_server
             ) as dynamo:
-                dynamodb_table = await dynamo.Table("Analyses")
+                dynamodb_table = await dynamo.Table(self.TEST_ANALYSES_TABLE_NAME)
 
                 yield dynamodb_table, s3_client, moto_server
 

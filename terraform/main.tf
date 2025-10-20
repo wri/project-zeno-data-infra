@@ -15,9 +15,6 @@ terraform {
 
 terraform {
   backend "s3" {
-    bucket         = "tf-state-zeno-rest-api"
-    key            = "terraform/state/production/terraform.tfstate"
-    region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks-production"
   }
@@ -25,7 +22,6 @@ terraform {
 
 locals {
   name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
-  state_bucket = terraform.workspace == "default" ? "production" : "dev"
   cluster_name = "analytics${local.name_suffix}"
 }
 
@@ -35,9 +31,8 @@ data "aws_vpc" "selected" {
   id = var.vpc
 }
 
-
 provider "aws" {
-    region = "us-east-1" # Replace with your desired region
+    region = var.region
 }
 
 module "gnw_ecs_cluster" {
@@ -447,7 +442,7 @@ module "alb" {
 }
 
 resource "aws_ecs_task_definition" "dask_worker" {
-  family                   = "dask-worker"
+  family                   = "dask-worker${local.name_suffix}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
@@ -462,7 +457,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
 
   container_definitions = jsonencode([
     {
-      name  = "dask-worker"
+      name  = "dask-worker${local.name_suffix}"
       image = var.api_image
       
       environment = [
@@ -669,7 +664,7 @@ resource "aws_security_group" "dask_manager" {
   }
 }
 resource "aws_security_group" "dask_workers" {
-  name_prefix = "dask-workers-${local.name_suffix}"
+  name_prefix = "dask-workers${local.name_suffix}"
   vpc_id      = var.vpc
 
   ingress {
@@ -687,7 +682,7 @@ resource "aws_security_group" "dask_workers" {
   }
 
   tags = {
-    Name = "dask-workers-${local.name_suffix}"
+    Name = "dask-workers${local.name_suffix}"
   }
 }
 
@@ -696,7 +691,7 @@ resource "aws_security_group" "dask_workers" {
 ###############################################################
 
 resource "aws_s3_bucket" "analysis_results" {
-  bucket = "gnw-analytics-api-analysis-results"
+  bucket = "gnw-analytics-api-analysis-results${local.name_suffix}"
 
   tags = {
     Environment = "Staging"
@@ -705,7 +700,7 @@ resource "aws_s3_bucket" "analysis_results" {
 }
 
 resource "aws_dynamodb_table" "analyses" {
-  name         = "Analyses"
+  name         = "Analyses${local.name_suffix}"
   billing_mode = "PAY_PER_REQUEST" # On-demand, scales automatically. Suitable for variable workloads.
   hash_key     = "resource_id"
 
