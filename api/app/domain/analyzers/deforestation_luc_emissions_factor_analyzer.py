@@ -10,7 +10,7 @@ from app.models.land_change.deforestation_luc_emissions_factor import (
 
 
 class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
-    """Get the total area (in hectares) of each land class composition for 2024."""
+    """ "Get the emissions factor, emissions and crop production yields based on land use change."""
 
     def __init__(
         self,
