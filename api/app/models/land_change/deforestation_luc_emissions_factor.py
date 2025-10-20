@@ -120,9 +120,9 @@ class DeforestationLUCEmissionsFactorResult(StrictBaseModel):
     crop_type: List[str]
     gas_type: List[str]
     year: List[int]
-    emissions_factor_Mg_CO2e_per_tonne_production: List[float]
-    emissions_Mg_CO2e: List[float]
-    production_Mg: List[float]
+    emissions_factor_tCO2e_per_tonne_production: List[float]
+    emissions_tCO2e: List[float]
+    production_tonnes: List[float]
 
 
 class DeforestationLUCEmissionsFactorAnalytics(StrictBaseModel):
