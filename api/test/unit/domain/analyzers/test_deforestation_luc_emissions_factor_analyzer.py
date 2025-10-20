@@ -278,7 +278,7 @@ class TestLandCoverChangeAdminAois:
                 2023,
                 2024,
             ],
-            "emissions_factor_tCO2e_per_tonne_production": [
+            "emissions_factor_MgCO2e_per_tonne_production": [
                 0.001568,
                 0.001589,
                 0.001571,
@@ -340,7 +340,7 @@ class TestLandCoverChangeAdminAois:
                 0.001802,
                 0.001428,
             ],
-            "emissions_tCO2e": [
+            "emissions_Mg_CO2e": [
                 0.3461130844816348,
                 0.361776450588094,
                 0.3640167538779352,
@@ -402,7 +402,7 @@ class TestLandCoverChangeAdminAois:
                 1.5914222964559417,
                 1.245633829955154,
             ],
-            "production_tonnes": [
+            "production_Mg": [
                 220.68449819087243,
                 227.71035512538788,
                 231.72107104391625,
