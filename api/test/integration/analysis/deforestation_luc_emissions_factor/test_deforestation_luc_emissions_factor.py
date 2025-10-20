@@ -7,7 +7,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from api.app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.infrastructure.external_services.duck_db_query_service import (

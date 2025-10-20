@@ -3,7 +3,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from api.app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.repositories.analysis_repository import AnalysisRepository

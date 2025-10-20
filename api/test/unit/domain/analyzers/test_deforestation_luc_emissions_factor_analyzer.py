@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 import pytest_asyncio
 
-from api.app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.analysis import Analysis
