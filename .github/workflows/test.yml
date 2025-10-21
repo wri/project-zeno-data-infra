@@ -61,12 +61,10 @@ jobs:
         if: success()
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ secrets.CONTAINER_REGISTRY }}
+          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
 
       - name: Explicitly pull image
         if: success()
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
         run: |
           docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
 
