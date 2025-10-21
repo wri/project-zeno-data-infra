@@ -42,9 +42,9 @@ def create_analysis_service(
         analyzer=DeforestationLUCEmissionsFactorAnalyzer(
             analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
-        ),
-        query_service=DuckDbPrecalcQueryService(
-            table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
+            query_service=DuckDbPrecalcQueryService(
+                table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
+            ),
         ),
         event=ANALYTICS_NAME,
     )
