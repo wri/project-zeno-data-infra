@@ -22,13 +22,12 @@ on:
 
 
 env:
+  CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
   CONTAINER_REPO_NAME: analytics-api
 
 jobs:
   build_and_push_image:
     runs-on: ${{ inputs.run_platform }}
-    env:
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     steps:
       - name: Install needed packages if running under ACT
         if: ${{ env.ACT }}
