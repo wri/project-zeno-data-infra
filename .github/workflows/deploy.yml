@@ -1,4 +1,5 @@
 # Deploy the API
+name: Deploy to AWS
 on:
   workflow_dispatch:
     inputs:
