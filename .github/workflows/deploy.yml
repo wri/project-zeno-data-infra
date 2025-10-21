@@ -1,21 +1,22 @@
 # Deploy the API
+name: Deploy to AWS
 on:
   workflow_dispatch:
     inputs:
       commit_hash:
         required: true
         type: string
-        description: The commit hash to deploy (currently the same hash is used for both code and images)
+        description: The commit hash to deploy (currently the same hash is used for code and both images)
       dry_run:
         default: true
         required: false
         type: boolean
         description: When set to true only generates a plan, does not apply it
       workspace:
-        default: "pre-prod"
+        default: "staging"
         required: true
         type: string
-        description: The TF workspace to deploy to. Set to/leave as "default" for production
+        description: The TF workspace to deploy to
   workflow_call:
     inputs:
       commit_hash:
@@ -41,8 +42,6 @@ on:
         required: true
       AWS_GFW_SECRET_ACCESS_KEY:
         required: true
-      CONTAINER_REGISTRY:
-        required: true
       GFW_API_KEY:
         required: true
       DASK_SCHEDULER_ADDRESS:
@@ -59,6 +58,7 @@ on:
         required: true
 
 env:
+  CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
   CONTAINER_REPO_NAME: analytics-api
 
 jobs:
@@ -110,8 +110,8 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ZENO_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_ZENO_SECRET_ACCESS_KEY }}
         run: |
-          API_IMAGE=${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.API_IMAGE_TAG }}
-          PIPELINES_IMAGE=${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.PIPELINES_IMAGE_TAG }}
+          API_IMAGE=${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.API_IMAGE_TAG }}
+          PIPELINES_IMAGE=${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.PIPELINES_IMAGE_TAG }}
           cd terraform
           terraform plan \
             -var="api_key=${{ secrets.GFW_API_KEY }}" \
