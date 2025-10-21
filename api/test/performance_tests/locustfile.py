@@ -1,10 +1,11 @@
 import inspect
 import json
 import os
-from time import sleep
+import time
+from contextlib import contextmanager
 from typing import Any, Dict, Iterator
 
-from locust import FastHttpUser, between, task
+from locust import FastHttpUser, between, events, task
 
 
 class JSONLogReader(Iterator[Dict[str, Any]]):
@@ -53,58 +54,79 @@ class JSONLogReader(Iterator[Dict[str, Any]]):
 request_log_reader = JSONLogReader("zeno-analytics-requests.json")
 
 
+@contextmanager
+def measure_task_time(name):
+    start_time = time.perf_counter()
+    exception = None
+    try:
+        yield
+    except Exception as e:
+        exception = e
+        raise
+    finally:
+        total_time_ms = (time.perf_counter() - start_time) * 1000
+        events.request.fire(
+            request_type="TASK",
+            name=name,
+            response_time=total_time_ms,
+            response_length=0,
+            exception=exception,
+        )
+
+
 class ApiUser(FastHttpUser):
     wait_time = between(0.5, 2.5)
 
     @task
     def test_request_analytics_and_wait_for_result(self):
-        request_info = next(request_log_reader)
-        dataset = request_info["event"][: -len("_analytics_request")]
-        aois = request_info["js.analytics_in"]
+        with measure_task_time("test_request_analytics_and_wait_for_result"):
+            request_info = next(request_log_reader)
+            dataset = request_info["event"][: -len("_analytics_request")]
+            aois = request_info["js.analytics_in"]
 
-        with self.rest(
-            "POST", f"/v0/land_change/{dataset}/analytics", json=aois
-        ) as post_response:
-            if post_response.status_code != 202:
-                post_response.failure(
-                    f"Got {post_response.status_code} instead of 202 for {dataset} with body {aois}"
-                )
-                return
-
-        # request the results
-        resource_id = request_info["js.resource_id"]
-        max_retries = 10
-        retry_count = 0
-        group_name = f"land_change:analytics:{dataset}:resource"
-
-        while retry_count < max_retries:
             with self.rest(
-                "GET",
-                f"/v0/land_change/{dataset}/analytics/{resource_id}",
-                name=group_name,
-            ) as response:
-                if "Retry-After" in response.headers:
-                    retry_count = retry_count + 1
+                "POST", f"/v0/land_change/{dataset}/analytics", json=aois
+            ) as post_response:
+                if post_response.status_code != 202:
+                    post_response.failure(
+                        f"Got {post_response.status_code} instead of 202 for {dataset} with body {aois}"
+                    )
+                    return
 
-                    if retry_count >= max_retries:
-                        response.failure(
-                            f"Max retries exceeded for {dataset} resource: {resource_id}"
-                        )
-                        break
+            # request the results
+            resource_id = request_info["js.resource_id"]
+            max_retries = 10
+            retry_count = 0
+            group_name = f"land_change:analytics:{dataset}:resource"
 
-                    try:
-                        wait_time = float(response.headers["Retry-After"])
-                        sleep(wait_time)
-                    except ValueError:
-                        response.failure(
-                            f"Invalid Retry-After value for {dataset} resource: {resource_id}"
-                        )
-                else:
-                    if response.status_code == 200:
-                        response.success()
+            while retry_count < max_retries:
+                with self.rest(
+                    "GET",
+                    f"/v0/land_change/{dataset}/analytics/{resource_id}",
+                    name=group_name,
+                ) as response:
+                    if "Retry-After" in response.headers:
+                        retry_count = retry_count + 1
+
+                        if retry_count >= max_retries:
+                            response.failure(
+                                f"Max retries exceeded for {dataset} resource: {resource_id}"
+                            )
+                            break
+
+                        try:
+                            wait_time = float(response.headers["Retry-After"])
+                            time.sleep(wait_time)
+                        except ValueError:
+                            response.failure(
+                                f"Invalid Retry-After value for {dataset} resource: {resource_id}"
+                            )
                     else:
-                        response.failure(
-                            f"Got {response.status_code} instead of 200 for {dataset} resource: {resource_id}"
-                        )
+                        if response.status_code == 200:
+                            response.success()
+                        else:
+                            response.failure(
+                                f"Got {response.status_code} instead of 200 for {dataset} resource: {resource_id}"
+                            )
 
-                    break
+                        break
