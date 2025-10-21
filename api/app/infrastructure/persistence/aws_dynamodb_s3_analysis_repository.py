@@ -6,6 +6,7 @@ import uuid
 
 from botocore.exceptions import ClientError
 
+from app.analysis.common.analysis import EnumEncoder
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
@@ -119,7 +120,7 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         # Therefore, 'metadata' is stored as a JSON string.
         ddb_item = {
             "resource_id": resource_id_str,
-            "metadata": json.dumps(analytics.metadata),
+            "metadata": json.dumps(analytics.metadata, cls=EnumEncoder),
             "status": (
                 analytics.status.value if analytics.status else None
             ),  # Store the enum's value (string)
