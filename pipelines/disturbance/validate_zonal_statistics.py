@@ -12,7 +12,6 @@ from prefect import task
 from prefect.logging import get_run_logger
 from rasterio.features import geometry_mask
 from rasterio.windows import from_bounds
-from rasterio.dtypes import Affine
 from pydantic import BaseModel
 from typing import Dict, Optional, Literal, List
 
@@ -623,7 +622,6 @@ class DistZonalStats(pa.DataFrameModel):
         isin=["low", "high"]
     )  # low confidence, high confidence
     area_ha: Series[float]
-    aoi_type: str = pa.Field(eq="admin")
 
     class Config:
         coerce = True
@@ -703,7 +701,6 @@ def _read_raster_window(uri: str, bounds: tuple, requester_pays: bool = True):
 
 def _add_metadata_to_df(conf_df: pd.DataFrame, conf_level: str) -> pd.DataFrame:
     """Read in df by confidence level and add metadata"""
-    conf_df["aoi_type"] = "admin"
     conf_df["dist_alert_confidence"] = conf_level
     conf_df["country"] = 76
     conf_df["region"] = 20
