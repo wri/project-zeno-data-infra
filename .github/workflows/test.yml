@@ -17,8 +17,6 @@ on:
         required: true
       AWS_ZENO_SECRET_ACCESS_KEY:
         required: true
-      CONTAINER_REGISTRY:
-        required: true
       GFW_API_KEY:
         required: true
       DASK_SCHEDULER_ADDRESS:
@@ -29,7 +27,9 @@ on:
         required: true
 
 env:
+  CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
   CONTAINER_REPO_NAME: analytics-api
+
 
 jobs:
   run_tests:
@@ -61,18 +61,18 @@ jobs:
         if: success()
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ secrets.CONTAINER_REGISTRY }}
+          docker login --username AWS --password-stdin ${{ env.CONTAINER_REGISTRY }}
 
       - name: Explicitly pull image
         if: success()
         run: |
-          docker pull ${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+          docker pull ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
 
       - name: Run tests
         if: success()
         uses: addnab/docker-run-action@v3
         with:
-          image: ${{ secrets.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
+          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
           run: |
             uv sync --locked --no-install-project --dev -p 3.13.5
             API_KEY=${{ secrets.GFW_API_KEY }} \
