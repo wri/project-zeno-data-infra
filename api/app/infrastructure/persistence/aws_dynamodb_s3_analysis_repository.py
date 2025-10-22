@@ -1,13 +1,17 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 
 from botocore.exceptions import ClientError
 
+from app.analysis.common.analysis import EnumEncoder
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
+
+RESULTS_BUCKET_NAME = os.getenv("ANALYSIS_RESULTS_BUCKET_NAME", None)
 
 
 # Helper function for retrying on throttling
@@ -41,7 +45,7 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         self._dynamo_db_table = dynamo_db_table
         self._s3 = s3
         self._aws_endpoint_url = aws_endpoint_url
-        self._bucket_name = "gnw-analytics-api-analysis-results"
+        self._bucket_name = RESULTS_BUCKET_NAME
 
     def _get_s3_key(self, resource_id: uuid.UUID) -> str:
         """Generates the S3 key for storing the result of a given resource_id."""
@@ -116,7 +120,7 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         # Therefore, 'metadata' is stored as a JSON string.
         ddb_item = {
             "resource_id": resource_id_str,
-            "metadata": json.dumps(analytics.metadata),
+            "metadata": json.dumps(analytics.metadata, cls=EnumEncoder),
             "status": (
                 analytics.status.value if analytics.status else None
             ),  # Store the enum's value (string)

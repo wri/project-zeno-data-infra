@@ -5,18 +5,14 @@ on:
     branches:
       - main
 
-env:
-  CONTAINER_REPO_NAME: analytics-api
-
 jobs:
   build_api_image:
     uses: ./.github/workflows/build.yml
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     with:
       project_dir: 'api'
       run_platform: 'ubuntu-24.04'
@@ -26,11 +22,10 @@ jobs:
     uses: ./.github/workflows/test.yml
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      GFW_API_KEY: ${{ secrets.API_KEY }}
+      GFW_API_KEY: ${{ secrets.GFW_API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use Zeno prod key for api tests
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
@@ -42,10 +37,9 @@ jobs:
     uses: ./.github/workflows/build.yml
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
     with:
       project_dir: 'pipelines'
       run_platform: 'ubuntu-24.04-arm'
@@ -55,11 +49,10 @@ jobs:
     uses: ./.github/workflows/test.yml
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      GFW_API_KEY: ${{ secrets.API_KEY }}
+      GFW_API_KEY: ${{ secrets.GFW_API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use GFW prod key for pipelines tests
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use GFW prod key for pipelines tests
@@ -74,12 +67,12 @@ jobs:
       dry_run: false
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ZENO_ACCOUNT_ID: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}
       AWS_ZENO_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ZENO_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_GFW_ACCESS_KEY_ID: ${{ secrets.AWS_GFW_ACCESS_KEY_ID }}
       AWS_GFW_SECRET_ACCESS_KEY: ${{ secrets.AWS_GFW_SECRET_ACCESS_KEY }}
-      CONTAINER_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      GFW_API_KEY: ${{ secrets.API_KEY }}
+      GFW_API_KEY: ${{ secrets.GFW_API_KEY }}
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
       DASK_COILED_TOKEN: ${{ secrets.DASK_COILED_TOKEN }}

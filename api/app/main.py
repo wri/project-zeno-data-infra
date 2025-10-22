@@ -14,6 +14,8 @@ from pyinstrument import Profiler
 
 from .routers import land_change
 
+ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
+
 
 # Configure logging
 def setup_logging():
@@ -57,7 +59,7 @@ async def lifespan(app: FastAPI):
     session = aioboto3.Session()
     async with session.client("s3", region_name="us-east-1") as s3_client:
         async with session.resource("dynamodb", region_name="us-east-1") as dynamo:
-            app.state.dynamodb_table = await dynamo.Table("Analyses")
+            app.state.dynamodb_table = await dynamo.Table(ANALYSES_TABLE_NAME)
             app.state.s3_client = s3_client
             yield
 
