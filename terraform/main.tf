@@ -412,15 +412,13 @@ module "alb" {
   }
 
   listeners = {
-    # HTTP listener - redirect to HTTPS
+    # HTTP listener - keep forwarding for now, redirect to HTTPS later
     ex_http = {
       port     = 80
       protocol = "HTTP"
 
-      redirect = {
-        port        = "443"
-        protocol    = "HTTPS"
-        status_code = "HTTP_301"
+      forward = {
+        target_group_key = "ex_ecs"
       }
     }
 
