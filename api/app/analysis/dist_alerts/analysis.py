@@ -103,7 +103,7 @@ async def zonal_statistics(
         natural_lands = read_zarr_clipped_to_geojson(
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr",
             geojson,
-        ).band_data
+        ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
         natural_lands.name = "natural_lands_class"
 
         groupby_layers.append(natural_lands)
