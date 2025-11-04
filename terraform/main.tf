@@ -15,9 +15,6 @@ terraform {
 
 terraform {
   backend "s3" {
-    bucket         = "tf-state-zeno-rest-api"
-    key            = "terraform/state/production/terraform.tfstate"
-    region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "terraform-locks-production"
   }
@@ -25,8 +22,8 @@ terraform {
 
 locals {
   name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
-  state_bucket = terraform.workspace == "default" ? "production" : "dev"
   cluster_name = "analytics${local.name_suffix}"
+  domain_name = "analytics.globalnaturewatch.org"
 }
 
 data "aws_caller_identity" "current" {}
@@ -35,9 +32,35 @@ data "aws_vpc" "selected" {
   id = var.vpc
 }
 
-
 provider "aws" {
-    region = "us-east-1" # Replace with your desired region
+    region = var.region
+}
+
+# ACM Certificate for HTTPS
+resource "aws_acm_certificate" "analytics" {
+  domain_name       = local.domain_name
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name        = "analytics-cert${local.name_suffix}"
+    Environment = terraform.workspace
+    Project     = "Zeno"
+  }
+}
+
+# Certificate validation (will wait for DNS records to be created)
+resource "aws_acm_certificate_validation" "analytics" {
+  certificate_arn = aws_acm_certificate.analytics.arn
+
+  # This will wait until the certificate is validated
+  # Make sure DNS records are created before applying this
+  timeouts {
+    create = "45m"
+  }
 }
 
 module "gnw_ecs_cluster" {
@@ -66,15 +89,15 @@ module "gnw_ecs_cluster" {
           memory    = 16384
           essential = true
           image     = var.api_image
-          
+
           command = [
             "dask-scheduler",
-            "--host", "0.0.0.0", 
+            "--host", "0.0.0.0",
             "--port", "8786",
             "--dashboard-address", "0.0.0.0:8787",
             "--protocol", "tcp"
           ]
-          
+
           portMappings = [
             {
               name          = "scheduler"
@@ -89,7 +112,7 @@ module "gnw_ecs_cluster" {
               protocol      = "tcp"
             }
           ]
-          
+
           environment = [
             {
               name  = "PYTHONPATH"
@@ -108,7 +131,7 @@ module "gnw_ecs_cluster" {
               value = var.aws_access_key_id
             }
           ]
-          
+
           readonlyRootFilesystem = false
         }
       }
@@ -125,7 +148,7 @@ module "gnw_ecs_cluster" {
           container_port = 8787
         }
       }
-      
+
       enable_cloudwatch_logging = true
       subnet_ids = var.subnet_ids
       security_group_ids = [aws_security_group.dask_scheduler.id]
@@ -143,7 +166,7 @@ resource "terraform_data" "wait_for_scheduler_health" {
         --cluster ${module.gnw_ecs_cluster.cluster_name} \
         --services dask-scheduler${local.name_suffix} \
         --region ${data.aws_region.current.name}
-  
+
       aws elbv2 wait target-in-service \
         --target-group-arn ${module.dask_nlb.target_groups["dask_scheduler"].arn} \
         --region ${data.aws_region.current.name}
@@ -174,7 +197,7 @@ module "analytics" {
   enable_autoscaling = true
   autoscaling_min_capacity = 1
   autoscaling_max_capacity = 30
-  
+
   autoscaling_policies = {
     cpu_scaling = {
       policy_type = "TargetTrackingScaling"
@@ -187,7 +210,7 @@ module "analytics" {
         scale_in_cooldown = 300
       }
     }
-    
+
     memory_scaling = {
       policy_type = "TargetTrackingScaling"
       target_tracking_scaling_policy_configuration = {
@@ -279,7 +302,7 @@ module "dask_cluster_manager" {
   cluster_arn = module.gnw_ecs_cluster.cluster_arn
 
   depends_on = [ terraform_data.wait_for_scheduler_health ]
-  
+
   health_check_grace_period_seconds = 300
   desired_count = 1
   enable_autoscaling = false
@@ -294,11 +317,11 @@ module "dask_cluster_manager" {
       memory    = 4096
       essential = true
       image     = var.api_image
-      
+
       command = [
         "python",
         "/app/dask_cluster/start_cluster.py",
-      ]       
+      ]
       environment = [
         {
           name  = "PYTHONPATH"
@@ -337,7 +360,7 @@ module "dask_cluster_manager" {
           value = aws_security_group.dask_workers.id
         }
       ]
-      
+
       readonlyRootFilesystem = false
     }
   }
@@ -345,6 +368,7 @@ module "dask_cluster_manager" {
   subnet_ids = var.subnet_ids
   security_group_ids = [aws_security_group.dask_manager.id]
 }
+
 module "alb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
@@ -359,11 +383,17 @@ module "alb" {
   # For example only
   enable_deletion_protection = false
 
-  # Security Group
+  # Security Group - Updated to allow HTTPS
   security_group_ingress_rules = {
     all_http = {
       from_port   = 80
       to_port     = 80
+      ip_protocol = "tcp"
+      cidr_ipv4   = "0.0.0.0/0"
+    }
+    all_https = {
+      from_port   = 443
+      to_port     = 443
       ip_protocol = "tcp"
       cidr_ipv4   = "0.0.0.0/0"
     }
@@ -382,6 +412,7 @@ module "alb" {
   }
 
   listeners = {
+    # HTTP listener - keep forwarding for now, redirect to HTTPS later
     ex_http = {
       port     = 80
       protocol = "HTTP"
@@ -390,6 +421,19 @@ module "alb" {
         target_group_key = "ex_ecs"
       }
     }
+
+    # HTTPS listener for main API
+    ex_https = {
+      port            = 443
+      protocol        = "HTTPS"
+      certificate_arn = aws_acm_certificate_validation.analytics.certificate_arn
+
+      forward = {
+        target_group_key = "ex_ecs"
+      }
+    }
+
+    # Dask dashboard - keep on HTTP for now (or add HTTPS if needed)
     dask_dashboard = {
       port = 8787
       protocol = "HTTP"
@@ -419,8 +463,6 @@ module "alb" {
         unhealthy_threshold = 2
       }
 
-      # Theres nothing to attach here in this definition. Instead,
-      # ECS will attach the IPs of the tasks to this target group
       create_attachment = false
     }
 
@@ -447,14 +489,13 @@ module "alb" {
 }
 
 resource "aws_ecs_task_definition" "dask_worker" {
-  family                   = "dask-worker"
+  family                   = "dask-worker${local.name_suffix}"
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
   memory                   = 32768
   execution_role_arn       = module.gnw_ecs_cluster.task_exec_iam_role_arn
 
-  # Set CPU architecture here
   runtime_platform {
     cpu_architecture        = "X86_64"  # or "ARM64"
     operating_system_family = "LINUX"
@@ -462,9 +503,9 @@ resource "aws_ecs_task_definition" "dask_worker" {
 
   container_definitions = jsonencode([
     {
-      name  = "dask-worker"
+      name  = "dask-worker${local.name_suffix}"
       image = var.api_image
-      
+
       environment = [
         {
           name  = "PYTHONPATH"
@@ -483,15 +524,6 @@ resource "aws_ecs_task_definition" "dask_worker" {
           value = var.aws_access_key_id
         }
       ]
-      
-      # logConfiguration = {
-      #   logDriver = "awslogs"
-      #   options = {
-      #     awslogs-group         = aws_cloudwatch_log_group.dask.name
-      #     awslogs-region        = var.aws_region
-      #     awslogs-stream-prefix = "dask-worker"
-      #   }
-      # }
     }
   ])
 }
@@ -499,7 +531,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
 module "dask_nlb" {
   source  = "terraform-aws-modules/alb/aws"
   version = "~> 9.0"
-  
+
   name               = "dask${local.name_suffix}"
   load_balancer_type = "network"
   vpc_id             = var.vpc
@@ -507,7 +539,7 @@ module "dask_nlb" {
   enable_deletion_protection = false
 
   internal = true
-  
+
   listeners = {
     dask_scheduler = {
       port     = 8786
@@ -517,7 +549,7 @@ module "dask_nlb" {
       }
     }
   }
-  
+
   target_groups = {
     dask_scheduler = {
       protocol = "TCP"
@@ -525,22 +557,20 @@ module "dask_nlb" {
       target_type = "ip"
       deregistration_delay = 5
       load_balancing_cross_zone_enabled = true
-  
+
       create_attachment = false
       health_check = {
         enabled = true
         healthy_threshold = 2
         interval = 30
-        # matcher = "200"
         port = "traffic-port"
         protocol = "TCP"
         timeout = 5
         unhealthy_threshold = 2
       }
     }
-
-
   }
+
   security_group_ingress_rules = {
     alb_ingress_8786_api = {
       type                     = "ingress"
@@ -567,7 +597,6 @@ module "dask_nlb" {
     }
   }
 }
-
 
 # Create dedicated security groups separately
 resource "aws_security_group" "analytics_api" {
@@ -629,6 +658,7 @@ resource "aws_security_group" "dask_scheduler" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   tags = {
     Name = "dask-scheduler${local.name_suffix}"
   }
@@ -659,7 +689,6 @@ resource "aws_security_group" "dask_manager" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-
   tags = {
     Name = "dask-manager${local.name_suffix}"
   }
@@ -668,8 +697,9 @@ resource "aws_security_group" "dask_manager" {
     create_before_destroy = true
   }
 }
+
 resource "aws_security_group" "dask_workers" {
-  name_prefix = "dask-workers-${local.name_suffix}"
+  name_prefix = "dask-workers${local.name_suffix}"
   vpc_id      = var.vpc
 
   ingress {
@@ -687,7 +717,7 @@ resource "aws_security_group" "dask_workers" {
   }
 
   tags = {
-    Name = "dask-workers-${local.name_suffix}"
+    Name = "dask-workers${local.name_suffix}"
   }
 }
 
@@ -696,7 +726,7 @@ resource "aws_security_group" "dask_workers" {
 ###############################################################
 
 resource "aws_s3_bucket" "analysis_results" {
-  bucket = "gnw-analytics-api-analysis-results"
+  bucket = "gnw-analytics-api-analysis-results${local.name_suffix}"
 
   tags = {
     Environment = "Staging"
@@ -705,7 +735,7 @@ resource "aws_s3_bucket" "analysis_results" {
 }
 
 resource "aws_dynamodb_table" "analyses" {
-  name         = "Analyses"
+  name         = "Analyses${local.name_suffix}"
   billing_mode = "PAY_PER_REQUEST" # On-demand, scales automatically. Suitable for variable workloads.
   hash_key     = "resource_id"
 

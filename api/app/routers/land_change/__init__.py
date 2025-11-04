@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .carbon_flux import carbon_flux
+from .deforestation_luc_emissions_factor import deforestation_luc_emissions_factor
 from .dist_alerts import dist_alerts
 from .grasslands import grasslands
 from .land_cover import land_cover_change, land_cover_composition
@@ -19,3 +20,4 @@ router.include_router(land_cover_change.router)
 router.include_router(land_cover_composition.router)
 router.include_router(natural_lands.router)
 router.include_router(carbon_flux.router)
+router.include_router(deforestation_luc_emissions_factor.router)
