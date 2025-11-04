@@ -3,7 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 import aioboto3
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import (
     request_validation_exception_handler,
@@ -48,6 +48,10 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the dask cluster
+    if not os.getenv("DASK_SCHEDULER_ADDRESS"):
+        cluster = LocalCluster(n_workers=8, threads_per_worker=2)
+        os.environ["DASK_SCHEDULER_ADDRESS"] = cluster.scheduler_address
+
     app.state.dask_client = await Client(
         os.environ["DASK_SCHEDULER_ADDRESS"],
         asynchronous=True,
