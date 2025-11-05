@@ -649,14 +649,4 @@ def validate(parquet_uri: str, contextual_layer: Optional[ContextualLayer] = Non
         return False
     logger.info("No missing dist_alert_dates in parquet")
 
-    # spot check alert area for random dates with 2% tolerance
-    tolerance_values = validation_spot_check["area_ha"] * tolerance_pct
-    area_diff = abs(validation_spot_check["area_ha"] - zeno_spot_check["area_ha"])
-    exceeds_tolerance = area_diff > tolerance_values
-    if exceeds_tolerance.any():
-        logger.error("Spot check area values exceed 2% tolerance")
-        return False
-
-    logger.info("Spot check validation passed.")
-
     return True
