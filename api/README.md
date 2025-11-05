@@ -39,7 +39,7 @@ API_KEY=your_gfw_api_key
 ```
 Adjust the values according to your local or deployment environment.
 
-### 4. Configure Environment Variables
+### 4. Running the API
 
 ```bash
 docker-compose -f docker-compose-api.yml up --build
@@ -48,6 +48,10 @@ docker-compose -f docker-compose-api.yml up --build
 The API will be available at `http://localhost:8000`
 
 API documentation: `http://localhost:8000/docs`
+
+### Results Storage Note
+
+Analysis metadata and status are stored in DynamoDB in the `analyses-dev` table, while analysis results are stored in the corresponding S3 bucket. **If you need to generate new results for an existing analysis, you must first purge the records from DynamoDB and S3.**
 
 ## Running Tests
 
