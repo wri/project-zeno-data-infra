@@ -51,6 +51,10 @@ setup_logging()
 async def lifespan(app: FastAPI):
     # Load the dask cluster
     if not os.getenv("DASK_SCHEDULER_ADDRESS"):
+        logging.warning(
+            "DASK_SCHEDULER_ADDRESS not set, starting local cluster. "
+            "This is the intended behavior for local development only."
+        )
         cluster = LocalCluster(n_workers=8, threads_per_worker=2)
         os.environ["DASK_SCHEDULER_ADDRESS"] = cluster.scheduler_address
 
