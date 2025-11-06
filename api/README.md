@@ -30,7 +30,7 @@ Set up the following environment variables in your shell or create a `.env` file
 
 ```bash
 
-# AWS
+# Zeno/LCL AWS account credentials
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
 
@@ -73,7 +73,7 @@ source .venv/bin/activate
 # API Keys
 export API_KEY=your_gfw_api_key
 
-# AWS Credentials for Tests
+# Zeno/LCL AWS account credentials
 export AWS_ACCESS_KEY_ID=your_test_access_key
 export AWS_SECRET_ACCESS_KEY=your_test_secret_key
 
