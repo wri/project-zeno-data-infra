@@ -44,7 +44,7 @@ def create_cluster():
         "Grasslands, and Carbon Flux."
     ),
 )
-def run_updates(overwrite=False) -> list[str]:
+def run_updates(dist_version=None, overwrite=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
@@ -56,7 +56,9 @@ def run_updates(overwrite=False) -> list[str]:
         nl_result = nl_prefect_flow.gadm_natural_lands_area(overwrite=overwrite)
         result_uris.append(nl_result)
 
-        dist_result = dist_flow.dist_alerts_flow(overwrite=overwrite)
+        dist_result = dist_flow.dist_alerts_flow(
+            dist_version=dist_version, overwrite=overwrite
+        )
         result_uris.append(dist_result)
 
         carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
@@ -72,8 +74,8 @@ def run_updates(overwrite=False) -> list[str]:
     return result_uris
 
 
-def main(overwrite=False):
-    run_updates(overwrite=overwrite)
+def main(dist_version=None, overwrite=False):
+    run_updates(dist_version=dist_version, overwrite=overwrite)
 
 
 if __name__ == "__main__":

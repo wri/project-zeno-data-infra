@@ -16,7 +16,7 @@ DIST_DRIVERS = {
 }
 
 
-@flow(name="DIST alerts area by drivers")
+@flow(name="DIST alerts area by drivers", retries=2, retry_delay_seconds=120)
 def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-driver.parquet"
     if not overwrite and s3_uri_exists(result_uri):

@@ -127,16 +127,55 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
     }
   })
+
+  parameters = jsonencode({
+    dist_version = {
+      type        = "string"
+      default     = null
+      description = "Version of DIST alerts to process"
+    }
+  })
 }
 
-resource "prefect_deployment_schedule" "gnw_zonal_stats_update_schedule" {
-  deployment_id = prefect_deployment.gnw_zonal_stats_update.id
-  active        = true
-  timezone      = "America/New_York"
 
-  # Runs nightly at 1am ET
-  rrule = "FREQ=DAILY;BYHOUR=1;BYMINUTE=0"
+resource "prefect_webhook" "dist_update_event" {
+  name        = "dist-updated-event"
+  description = "Fire an event when a new DIST alerts version is published."
+  enabled     = true
+  template = jsonencode({
+    event = "dist_updated"
+    resource = {
+      "prefect.resource.id"   = "{{body.dataset}}/{{ body.version }}"
+      "prefect.resource.name" = "DIST Alerts update for v{{ body.version }}"
+    }
+  })
 }
+
+resource "prefect_automation" "run_pipelines_on_dist_update" {
+  name    = "run-gnw-zonal-stats-on-dist-update"
+  enabled = true
+
+  trigger = {
+    event = {
+      posture   = "Reactive"
+      expect    = ["dist_updated"]
+      threshold = 1
+      within    = 0
+    }
+  }
+  actions = [
+    {
+      type          = "run-deployment"
+      source        = "selected"
+      deployment_id = prefect_deployment.gnw_zonal_stats_update.id
+      parameters    = jsonencode({
+        dist_version = "{{ event.body.version }}"
+      })
+      job_variables = jsonencode({})
+    },
+  ]
+}
+
 
 # taken from https://github.com/PrefectHQ/terraform-prefect-ecs-worker/tree/main/examples/ecs-worker
 module "prefect_vpc" {

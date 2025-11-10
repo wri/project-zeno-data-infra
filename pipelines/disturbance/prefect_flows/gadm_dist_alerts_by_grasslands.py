@@ -8,7 +8,7 @@ from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
 
-@flow(name="DIST alerts area by grasslands")
+@flow(name="DIST alerts area by grasslands", retries=2, retry_delay_seconds=120)
 def dist_alerts_by_grasslands_area(
     dist_zarr_uri: str, dist_version: str, overwrite=False
 ):
