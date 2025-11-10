@@ -31,7 +31,7 @@ NATURAL_LANDS_CLASSES = {
 }
 
 
-@flow(name="DIST alerts area by natural lands")
+@flow(name="DIST alerts area by natural lands", retries=2, retry_delay_seconds=120)
 def dist_alerts_by_natural_lands_area(
     dist_zarr_uri: str, dist_version: str, overwrite=False
 ):

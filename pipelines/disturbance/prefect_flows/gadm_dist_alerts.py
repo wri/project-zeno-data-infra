@@ -6,7 +6,7 @@ from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
 
-@flow(name="DIST alerts area")
+@flow(name="DIST alerts area", retries=2, retry_delay_seconds=120)
 def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
     result_uri = (
         f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts.parquet"
