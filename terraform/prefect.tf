@@ -127,6 +127,14 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
     }
   })
+
+  parameters = jsonencode({
+    dist_version = {
+      type        = "string"
+      default     = null
+      description = "Version of DIST alerts to process"
+    }
+  })
 }
 
 
@@ -160,7 +168,9 @@ resource "prefect_automation" "run_pipelines_on_dist_update" {
       type          = "run-deployment"
       source        = "selected"
       deployment_id = prefect_deployment.gnw_zonal_stats_update.id
-      parameters    = jsonencode({})
+      parameters    = jsonencode({
+        dist_version = "{{ event.body.version }}"
+      })
       job_variables = jsonencode({})
     },
   ]

@@ -40,13 +40,14 @@ def write_dist_latest_version(dist_version) -> None:
 
 
 @flow(name="DIST alerts", log_prints=True)
-def dist_alerts_flow(overwrite=False) -> list[str]:
+def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
     try:
-        dist_version = get_new_dist_version()
-        logger.info(f"Latest dist version: {dist_version}")
+        if dist_version is None:
+            dist_version = get_new_dist_version()
+            logger.info(f"Latest dist version: {dist_version}")
 
         dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
 
