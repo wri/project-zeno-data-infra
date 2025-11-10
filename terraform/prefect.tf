@@ -143,7 +143,7 @@ resource "prefect_webhook" "dist_update_event" {
   })
 }
 
-resource "prefect_automation" "event_trigger" {
+resource "prefect_automation" "run_pipelines_on_dist_update" {
   name    = "run-gnw-zonal-stats-on-dist-update"
   enabled = true
 
