@@ -44,8 +44,10 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
+    write_latest = False
     try:
         if dist_version is None:
+            write_latest = True
             dist_version = get_new_dist_version()
             logger.info(f"Latest dist version: {dist_version}")
 
@@ -101,13 +103,18 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
         result_uris.append(gadm_dist_by_land_cover_result)
 
         # Only write latest version if all validations pass
-        if all([
-            validate_result,
-            validate_natural_lands_result,
-            validate_drivers_result,
-            validate_grasslands_result,
-            validate_land_cover_result
-        ]):
+        if (
+            all(
+                [
+                    validate_result,
+                    validate_natural_lands_result,
+                    validate_drivers_result,
+                    validate_grasslands_result,
+                    validate_land_cover_result,
+                ]
+            )
+            and write_latest
+        ):
             write_dist_latest_version(dist_version)
 
     except Exception:
