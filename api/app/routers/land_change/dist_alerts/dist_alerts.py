@@ -55,17 +55,6 @@ async def get_latest_dist_version(request: Request) -> str:
         return "v20251004"
 
 
-async def create_versioned_dist_alerts_data(
-    request: Request,
-    latest_version: str = Depends(get_latest_dist_version),
-) -> DistAlertsAnalyticsIn:
-    """Dependency to create DistAlertsAnalyticsIn with version included."""
-    body_data = await request.json()
-    data = DistAlertsAnalyticsIn(**body_data)
-    data._version = latest_version  # Direct assignment to PrivateAttr
-    return data
-
-
 def _datamart_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
@@ -84,11 +73,14 @@ def _datamart_resource_link_response(request, service) -> str:
 )
 async def create(
     *,
-    data: DistAlertsAnalyticsIn = Depends(create_versioned_dist_alerts_data),
+    data: DistAlertsAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
+    latest_version: str = Depends(get_latest_dist_version),
 ):
+
+    data._version = latest_version
     return await create_analysis(
         data=data,
         service=service,
