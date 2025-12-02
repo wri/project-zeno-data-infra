@@ -27,6 +27,7 @@ from app.models.land_change.dist_alerts import ANALYTICS_NAME, DistAlertsAnalyti
 from app.routers.land_change.dist_alerts.dist_alerts import (
     create_analysis_service,
     get_analysis_repository,
+    get_latest_dist_version,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService
 
@@ -52,6 +53,10 @@ def create_analysis_service_for_tests(
     )
 
 
+async def get_latest_dist_version_for_test(request: Request) -> str:
+    return TEST_VERSION
+
+
 class TestDistAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
     async def setup(self):
@@ -68,6 +73,9 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
         )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -121,6 +129,9 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
+        )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -169,6 +180,9 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
         )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -253,6 +267,9 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
+        )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
         write_metadata_file(dir_path)
@@ -304,6 +321,9 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
         )
 
         dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -383,6 +403,9 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
+        )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -452,6 +475,9 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
+        )
+        app.dependency_overrides[get_latest_dist_version] = (
+            get_latest_dist_version_for_test
         )
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
@@ -562,6 +588,7 @@ async def test_gadm_dist_analytics_no_intersection():
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
+    app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -624,6 +651,7 @@ async def test_kba_dist_analytics_no_intersection():
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
+    app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -679,6 +707,7 @@ async def test_admin_dist_analytics_by_grasslands():
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
+    app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -737,6 +766,7 @@ async def test_admin_dist_analytics_by_land_cover():
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
+    app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
     delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
