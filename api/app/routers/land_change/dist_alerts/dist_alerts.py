@@ -80,10 +80,9 @@ async def create(
     latest_version: str = Depends(get_latest_dist_version),
 ):
 
-    created_data = DistAlertsAnalyticsIn(**data.model_dump())
-    created_data._version = latest_version  # Direct assignment to PrivateAttr
+    data._version = latest_version
     return await create_analysis(
-        data=created_data,
+        data=data,
         service=service,
         request=request,
         background_tasks=background_tasks,
