@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "boto3",
     "coiled",
-    "dask[array,dataframe,distributed,diagnostics]",
+    "dask[array,dataframe,distributed,diagnostics]>=2025.11.0",
     "fastparquet",
     "flox",
     "fsspec",
