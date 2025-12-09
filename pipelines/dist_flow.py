@@ -4,16 +4,12 @@ import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.disturbance.create_zarr import (
-    create_zarr as create_zarr_func,
-)
-from pipelines.disturbance.check_for_new_alerts import get_latest_version
-from pipelines.disturbance import validate_zonal_statistics
-from pipelines.disturbance import prefect_flows
-
-from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
-from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
+from pipelines.disturbance import prefect_flows, validate_zonal_statistics
+from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.disturbance.create_zarr import create_zarr as create_zarr_func
+from pipelines.grasslands.prefect_flows import grasslands_flow
+from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -87,10 +83,8 @@ def dist_alerts_flow(overwrite=False) -> list[str]:
         )
         result_uris.append(gadm_dist_by_drivers_result)
 
-        gadm_dist_by_grasslands_result = (
-            prefect_flows.dist_alerts_by_grasslands_area(
-                dist_zarr_uri, dist_version, overwrite=overwrite
-            )
+        gadm_dist_by_grasslands_result = prefect_flows.dist_alerts_by_grasslands_area(
+            dist_zarr_uri, dist_version, overwrite=overwrite
         )
         result_uris.append(gadm_dist_by_grasslands_result)
 

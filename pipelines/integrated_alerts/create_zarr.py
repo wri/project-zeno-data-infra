@@ -1,8 +1,8 @@
 import numpy as np
 import xarray as xr
 
-from pipelines.utils import s3_uri_exists
 from pipelines.globals import DATA_LAKE_BUCKET
+from pipelines.utils import s3_uri_exists
 
 
 def decode_alert_data(band_data) -> xr.Dataset:

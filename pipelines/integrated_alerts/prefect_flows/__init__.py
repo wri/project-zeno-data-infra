@@ -1,5 +1,5 @@
 from .gadm_dist_alerts import dist_alerts_area
-from .gadm_dist_alerts_by_natural_lands import dist_alerts_by_natural_lands_area
 from .gadm_dist_alerts_by_drivers import dist_alerts_by_drivers_area
 from .gadm_dist_alerts_by_grasslands import dist_alerts_by_grasslands_area
 from .gadm_dist_alerts_by_land_cover import dist_alerts_by_land_cover_area
+from .gadm_dist_alerts_by_natural_lands import dist_alerts_by_natural_lands_area
