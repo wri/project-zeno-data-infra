@@ -25,7 +25,9 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 @task
 def run_validation_suite(gadm_dist_result, contextual_layer=None) -> bool:
-    return validate_zonal_statistics.validate(gadm_dist_result, contextual_layer=contextual_layer)
+    return validate_zonal_statistics.validate(
+        gadm_dist_result, contextual_layer=contextual_layer
+    )
 
 
 @task
@@ -40,14 +42,14 @@ def write_dist_latest_version(dist_version) -> None:
 
 
 @flow(name="DIST alerts", log_prints=True)
-def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
+def dist_alerts_flow(dist_version=None, overwrite=False, is_latest=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
-    write_latest = False
+
     try:
         if dist_version is None:
-            write_latest = True
+            is_latest = True
             dist_version = get_new_dist_version()
             logger.info(f"Latest dist version: {dist_version}")
 
@@ -68,7 +70,7 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
         )
         validate_natural_lands_result = run_validation_suite(
             gadm_dist_by_natural_lands_result,
-            contextual_layer=validate_zonal_statistics.NATURAL_LANDS
+            contextual_layer=validate_zonal_statistics.NATURAL_LANDS,
         )
         result_uris.append(gadm_dist_by_natural_lands_result)
 
@@ -78,7 +80,7 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
         )
         validate_drivers_result = run_validation_suite(
             gadm_dist_by_drivers_result,
-            contextual_layer=validate_zonal_statistics.DIST_DRIVERS
+            contextual_layer=validate_zonal_statistics.DIST_DRIVERS,
         )
         result_uris.append(gadm_dist_by_drivers_result)
 
@@ -88,7 +90,7 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
         )
         validate_grasslands_result = run_validation_suite(
             gadm_dist_by_grasslands_result,
-            contextual_layer=validate_zonal_statistics.GRASSLANDS
+            contextual_layer=validate_zonal_statistics.GRASSLANDS,
         )
         result_uris.append(gadm_dist_by_grasslands_result)
 
@@ -98,7 +100,7 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
         )
         validate_land_cover_result = run_validation_suite(
             gadm_dist_by_land_cover_result,
-            contextual_layer=validate_zonal_statistics.LAND_COVER
+            contextual_layer=validate_zonal_statistics.LAND_COVER,
         )
         result_uris.append(gadm_dist_by_land_cover_result)
 
@@ -113,7 +115,7 @@ def dist_alerts_flow(dist_version=None, overwrite=False) -> list[str]:
                     validate_land_cover_result,
                 ]
             )
-            and write_latest
+            and is_latest
         ):
             write_dist_latest_version(dist_version)
 

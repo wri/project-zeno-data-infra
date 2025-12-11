@@ -130,6 +130,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
 
   parameters = jsonencode({
     dist_version = null
+    is_latest    = false
   })
 }
 
