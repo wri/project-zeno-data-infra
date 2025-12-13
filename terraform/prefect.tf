@@ -144,6 +144,7 @@ resource "prefect_webhook" "dist_update_event" {
     payload = {
       dataset = "{{body.dataset}}"
       version = "{{body.version}}"
+      is_latest = "{{body.is_latest}}"
     }
     resource = {
       "prefect.resource.id"   = "{{body.dataset}}/{{ body.version }}"
@@ -171,6 +172,7 @@ resource "prefect_automation" "run_pipelines_on_dist_update" {
       deployment_id = prefect_deployment.gnw_zonal_stats_update.id
       parameters    = jsonencode({
         dist_version = "{{ event.payload.version }}"
+        is_latest    = "{{ event.payload.is_latest }}"
       })
       job_variables = jsonencode({})
     },

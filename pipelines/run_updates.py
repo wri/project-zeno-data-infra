@@ -44,7 +44,7 @@ def create_cluster():
         "Grasslands, and Carbon Flux."
     ),
 )
-def run_updates(dist_version=None, overwrite=False) -> list[str]:
+def run_updates(dist_version=None, overwrite=False, is_latest=False) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
@@ -57,7 +57,7 @@ def run_updates(dist_version=None, overwrite=False) -> list[str]:
         result_uris.append(nl_result)
 
         dist_result = dist_flow.dist_alerts_flow(
-            dist_version=dist_version, overwrite=overwrite
+            dist_version=dist_version, overwrite=overwrite, is_latest=is_latest
         )
         result_uris.append(dist_result)
 
@@ -74,8 +74,8 @@ def run_updates(dist_version=None, overwrite=False) -> list[str]:
     return result_uris
 
 
-def main(dist_version=None, overwrite=False):
-    run_updates(dist_version=dist_version, overwrite=overwrite)
+def main(dist_version=None, overwrite=False, is_latest=False):
+    run_updates(dist_version=dist_version, overwrite=overwrite, is_latest=is_latest)
 
 
 if __name__ == "__main__":
