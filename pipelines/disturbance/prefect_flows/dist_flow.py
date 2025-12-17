@@ -24,9 +24,9 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 
 @task
-def run_validation_suite(gadm_dist_result, contextual_layer=None) -> bool:
+def run_validation_suite(gadm_dist_result, version, contextual_layer=None) -> bool:
     return validate_zonal_statistics.validate(
-        gadm_dist_result, contextual_layer=contextual_layer
+        gadm_dist_result, version=version, contextual_layer=contextual_layer
     )
 
 
@@ -41,90 +41,95 @@ def write_dist_latest_version(dist_version) -> None:
     )
 
 
-@flow(name="DIST alerts", log_prints=True)
+@flow(
+    name="DIST alerts areas and validation",
+    log_prints=True,
+    description="Compute DIST alerts areas by GADM admin levels 0, 1, and 2, as well as by various contextual layers, and run validation suite on the results.",
+)
 def dist_alerts_flow(dist_version=None, overwrite=False, is_latest=False) -> list[str]:
     logger = get_run_logger()
-    dask_client = None
     result_uris = []
 
-    try:
-        if dist_version is None:
-            is_latest = True
-            dist_version = get_new_dist_version()
-            logger.info(f"Latest dist version: {dist_version}")
+    if dist_version is None:
+        is_latest = True
+        dist_version = get_new_dist_version()
+        logger.info(f"Latest dist version: {dist_version}")
 
-        dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
+    dist_zarr_uri = create_zarr(dist_version, overwrite=overwrite)
 
-        # Base GADM dist alerts
-        gadm_dist_result = prefect_flows.dist_alerts_area(
-            dist_zarr_uri, dist_version, overwrite=overwrite
+    # Base GADM dist alerts
+    gadm_dist_result = prefect_flows.dist_alerts_area(
+        dist_zarr_uri, dist_version, overwrite=overwrite
+    )
+    validate_result = run_validation_suite(gadm_dist_result, version=dist_version)
+    if not validate_result["validation_passed"]:
+        raise ValueError(
+            f"Validation for DIST area failed: {validate_result.get('details', {})}"
         )
-        validate_result = run_validation_suite(gadm_dist_result)
-        result_uris.append(gadm_dist_result)
+    result_uris.append(gadm_dist_result)
 
-        # GADM dist alerts by natural lands
-        gadm_dist_by_natural_lands_result = (
-            prefect_flows.dist_alerts_by_natural_lands_area(
-                dist_zarr_uri, dist_version, overwrite=overwrite
-            )
+    # GADM dist alerts by natural lands
+    gadm_dist_by_natural_lands_result = prefect_flows.dist_alerts_by_natural_lands_area(
+        dist_zarr_uri, dist_version, overwrite=overwrite
+    )
+    validate_natural_lands_result = run_validation_suite(
+        gadm_dist_by_natural_lands_result,
+        version=dist_version,
+        contextual_layer=validate_zonal_statistics.NATURAL_LANDS,
+    )
+    if not validate_natural_lands_result["validation_passed"]:
+        raise ValueError(
+            f"DIST area by natural lands validation failed: {validate_natural_lands_result.get('details', {})}"
         )
-        validate_natural_lands_result = run_validation_suite(
-            gadm_dist_by_natural_lands_result,
-            contextual_layer=validate_zonal_statistics.NATURAL_LANDS,
-        )
-        result_uris.append(gadm_dist_by_natural_lands_result)
+    result_uris.append(gadm_dist_by_natural_lands_result)
 
-        # GADM dist alerts by drivers
-        gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_area(
-            dist_zarr_uri, dist_version, overwrite=overwrite
+    # GADM dist alerts by drivers
+    gadm_dist_by_drivers_result = prefect_flows.dist_alerts_by_drivers_area(
+        dist_zarr_uri, dist_version, overwrite=overwrite
+    )
+    validate_drivers_result = run_validation_suite(
+        gadm_dist_by_drivers_result,
+        version=dist_version,
+        contextual_layer=validate_zonal_statistics.DIST_DRIVERS,
+    )
+    if not validate_drivers_result["validation_passed"]:
+        raise ValueError(
+            f"DIST area by drivers validation failed: {validate_drivers_result.get('details', {})}"
         )
-        validate_drivers_result = run_validation_suite(
-            gadm_dist_by_drivers_result,
-            contextual_layer=validate_zonal_statistics.DIST_DRIVERS,
-        )
-        result_uris.append(gadm_dist_by_drivers_result)
+    result_uris.append(gadm_dist_by_drivers_result)
 
-        # GADM dist alerts by grasslands
-        gadm_dist_by_grasslands_result = prefect_flows.dist_alerts_by_grasslands_area(
-            dist_zarr_uri, dist_version, overwrite=overwrite
+    # GADM dist alerts by grasslands
+    gadm_dist_by_grasslands_result = prefect_flows.dist_alerts_by_grasslands_area(
+        dist_zarr_uri, dist_version, overwrite=overwrite
+    )
+    validate_grasslands_result = run_validation_suite(
+        gadm_dist_by_grasslands_result,
+        version=dist_version,
+        contextual_layer=validate_zonal_statistics.GRASSLANDS,
+    )
+    if not validate_grasslands_result["validation_passed"]:
+        raise ValueError(
+            f"DIST area by grasslands validation failed: {validate_grasslands_result.get('details', {})}"
         )
-        validate_grasslands_result = run_validation_suite(
-            gadm_dist_by_grasslands_result,
-            contextual_layer=validate_zonal_statistics.GRASSLANDS,
-        )
-        result_uris.append(gadm_dist_by_grasslands_result)
+    result_uris.append(gadm_dist_by_grasslands_result)
 
-        # GADM dist alerts by land cover
-        gadm_dist_by_land_cover_result = prefect_flows.dist_alerts_by_land_cover_area(
-            dist_zarr_uri, dist_version, overwrite=overwrite
+    # GADM dist alerts by land cover
+    gadm_dist_by_land_cover_result = prefect_flows.dist_alerts_by_land_cover_area(
+        dist_zarr_uri, dist_version, overwrite=overwrite
+    )
+    validate_land_cover_result = run_validation_suite(
+        gadm_dist_by_land_cover_result,
+        version=dist_version,
+        contextual_layer=validate_zonal_statistics.LAND_COVER,
+    )
+    if not validate_land_cover_result["validation_passed"]:
+        raise ValueError(
+            f"DIST area by land cover validation failed: {validate_land_cover_result.get('details', {})}"
         )
-        validate_land_cover_result = run_validation_suite(
-            gadm_dist_by_land_cover_result,
-            contextual_layer=validate_zonal_statistics.LAND_COVER,
-        )
-        result_uris.append(gadm_dist_by_land_cover_result)
+    result_uris.append(gadm_dist_by_land_cover_result)
 
-        # Only write latest version if all validations pass
-        if (
-            all(
-                [
-                    validate_result,
-                    validate_natural_lands_result,
-                    validate_drivers_result,
-                    validate_grasslands_result,
-                    validate_land_cover_result,
-                ]
-            )
-            and is_latest
-        ):
-            write_dist_latest_version(dist_version)
-
-    except Exception:
-        logger.error("DIST alerts analysis failed.")
-        raise
-    finally:
-        if dask_client:
-            dask_client.shutdown()
+    if is_latest:
+        write_dist_latest_version(dist_version)
 
     return result_uris
 
