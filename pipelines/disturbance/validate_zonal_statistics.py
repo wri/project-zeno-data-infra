@@ -651,9 +651,7 @@ def validate(
             "validation_passed": False,
             "details": {
                 "validation_type": "schema_validation",
-                "details": {
-                    "schema_name": schema.__name__,
-                },
+                "schema_name": schema.__name__,
             },
         }
 
