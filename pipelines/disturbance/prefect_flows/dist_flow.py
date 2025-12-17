@@ -24,7 +24,9 @@ def create_zarr(dist_version: str, overwrite=False) -> str:
 
 
 @task
-def run_validation_suite(gadm_dist_result, version, contextual_layer=None) -> bool:
+def run_validation_suite(
+    gadm_dist_result, version, contextual_layer=None
+) -> dict[str, object]:
     return validate_zonal_statistics.validate(
         gadm_dist_result, version=version, contextual_layer=contextual_layer
     )
