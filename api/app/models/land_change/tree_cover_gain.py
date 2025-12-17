@@ -43,9 +43,9 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
     end_year: str = Field(
         ...,
         title="End Date",
-        description="Must be year in YYYY date format. Minimum year is 2000. Must be a multiple of 5 (e.g., 2000, 2005).",
+        description="Must be year in YYYY date format. Year must be between 2000 and 2020. Must be a multiple of 5 (e.g., 2005, 2010, 2015, 2020).",
         pattern=DATE_REGEX,
-        examples=["2000", "2005"],
+        examples=["2005", "2020"],
     )
     forest_filter: AllowedForestFilter | None = Field(
         default=None,
@@ -53,13 +53,17 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
     )
 
     @field_validator("start_year", "end_year")
-    def year_must_be_at_least_2000(cls, v: str) -> str:
+    def year_must_be_between_2000_2020(cls, v: str) -> str:
         year_int = int(v)
         if year_int < 2000:
             raise ValueError("Year must be at least 2000")
 
         if year_int % 5 != 0:
             raise ValueError("Year must be a multiple of 5 (e.g., 2000, 2005, 2010)")
+
+        # Tree cover gain data is only available up to 2020 (2015-2020 period)
+        if year_int > 2020:
+            raise ValueError("Year must not exceed 2020 (tree cover gain data available through 2015-2020 period)")
 
         return v
 
