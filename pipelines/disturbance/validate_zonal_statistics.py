@@ -714,7 +714,7 @@ def validate(
             "validation_passed": False,
             "details": {
                 "validation_type": "missing_dates",
-                "missing_dates": sorted(missing_in_zeno),
+                "missing_dates": [d.isoformat() for d in sorted(missing_in_zeno)],
             },
         }
     logger.info("No missing dist_alert_dates in parquet")
