@@ -63,8 +63,8 @@ class TreeCoverLossAnalyzer(Analyzer):
             query.filters.append(
                 DatasetFilter(
                     dataset=Dataset.natural_lands,
-                    op="=",
-                    value=2,  # natural lands class value of natural forest
+                    op="in",
+                    value=[2, 5, 8, 9],  # SBTN classes we define as "natural forest"
                 )
             )
 
