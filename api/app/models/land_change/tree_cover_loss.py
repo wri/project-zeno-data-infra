@@ -23,7 +23,7 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedForestFilter = Literal["primary_forest"]
+AllowedForestFilter = Literal["primary_forest", "natural_forest"]
 AllowedIntersections = List[Literal["driver"]]
 
 
@@ -49,11 +49,11 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         pattern=DATE_REGEX,
         examples=["2023", "2024"],
     )
-    canopy_cover: AllowedCanopyCover = Field(
+    canopy_cover: Optional[AllowedCanopyCover] = Field(
         ...,
         title="Minimum percent of area covered by tree canopy to count as forest. Carbon model is only valid for carbon threshold 30% or greater, and will return NaN for carbon emissions if set lower.",
     )
-    forest_filter: AllowedForestFilter | None = Field(
+    forest_filter: Optional[AllowedForestFilter] | None = Field(
         default=None,
         title="Forest Filter",
     )
@@ -68,7 +68,7 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     def year_must_be_at_least_2001(cls, v: str) -> str:
         year_int = int(v)
         if year_int < 2001:
-            raise ValueError("Year must be at least 2001")
+            raise ValueError("Year must be at least 2001.")
         return v
 
     @model_validator(mode="after")
@@ -77,6 +77,25 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         end = int(self.end_year)
         if end < start:
             raise ValueError("end_year must be greater than or equal to start_year")
+        return self
+
+    @model_validator(mode="after")
+    def validate_tree_cover_baseline(self):
+        if not (self.canopy_cover or self.forest_filter):
+            raise ValueError(
+                "Must set a tree cover baseline using either canopy_cover or forest_filter."
+            )
+        if self.forest_filter == "natural_forest":
+            if int(self.start_year) < 2021:
+                raise ValueError(
+                    "natural_forest filter is a snapshot of 2020, and is only valid against loss after 2020."
+                )
+            if self.aoi.type == "admin":
+                # TODO We don't have OTF set up for admin yet, so let's focus on the main use case of
+                # TODO of supporting custom AOI analysis on GFW
+                raise ValueError(
+                    "natural_forest filter is not currently available for admin AOI type."
+                )
         return self
 
 
