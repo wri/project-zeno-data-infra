@@ -32,7 +32,7 @@ def dist_alerts_by_land_cover_area(
         np.arange(999),  # country ISO codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
-        np.arange(8),  # land cover classes
+        np.arange(9),  # land cover classes
         np.arange(731, 2000),  # dates values
         [1, 2, 3],  # confidence values
     )
