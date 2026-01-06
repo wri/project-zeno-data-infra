@@ -74,7 +74,7 @@ resource "aws_ecr_repository" "gnw_ecr_repos" {
   image_tag_mutability = "IMMUTABLE"
 }
 
-resource "aws_ecr_lifecycle_policy" "this" {
+resource "aws_ecr_lifecycle_policy" "staged_ecr_policy" {
   for_each   = aws_ecr_repository.gnw_ecr_repos
   repository = each.value.name
 
@@ -96,7 +96,7 @@ resource "aws_ecr_lifecycle_policy" "this" {
       # Expire PR/test/branch images older than 30 days
       {
         rulePriority = 2
-        description  = "Expire ephemeral images (pr-/test-/branch-) older than 60 days"
+        description  = "Expire ephemeral images (for feature branches) older than 60 days"
         selection = {
           tagStatus     = "tagged"
           tagPrefixList = ["branch-"]
