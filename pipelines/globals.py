@@ -17,3 +17,7 @@ dist_driver_zarr_uri = (
 land_cover_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-cover/umd_lcl_land_cover_2015-2024.zarr"
 )
+
+tree_cover_loss_zarr_uri = (
+    f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/v1.12/umd_tree_cover_loss.zarr"
+)
