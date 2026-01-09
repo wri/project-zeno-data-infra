@@ -19,5 +19,13 @@ land_cover_zarr_uri = (
 )
 
 tree_cover_loss_zarr_uri = (
-    f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/v1.12/umd_tree_cover_loss.zarr"
+    f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/v1.12/year.zarr"
+)
+
+tree_cover_density_zarr_uri = (
+    f"s3://{ANALYTICS_BUCKET}/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr"
+)
+
+carbon_emissions_zarr_uri = (
+    f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-emissions/v20250430/Mg_CO2e_float64.zarr"
 )
