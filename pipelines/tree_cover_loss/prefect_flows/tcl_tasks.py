@@ -11,8 +11,19 @@ def load_data(
     pixel_area_uri: Optional[str] = None,
     carbon_emissions_uri: Optional[str] = None,
     tree_cover_density_uri: Optional[str] = None,
+    ifl_uri: Optional[str] = None,
+    drivers_uri: Optional[str] = None,
+    primary_forests_uri: Optional[str] = None,
 ) -> Tuple:
-    return stages.load_data(tree_cover_loss_uri, pixel_area_uri, carbon_emissions_uri, tree_cover_density_uri)
+    return stages.load_data(
+        tree_cover_loss_uri, 
+        pixel_area_uri, 
+        carbon_emissions_uri, 
+        tree_cover_density_uri,
+        ifl_uri,
+        drivers_uri,
+        primary_forests_uri
+    )
 
 
 @task

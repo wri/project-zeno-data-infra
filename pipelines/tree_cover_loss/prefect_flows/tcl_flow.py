@@ -10,12 +10,15 @@ from pipelines.globals import (
     pixel_area_zarr_uri,
     carbon_emissions_zarr_uri,
     tree_cover_density_zarr_uri,
+    ifl_intact_forest_lands_zarr_uri,
+    wri_google_1km_drivers_zarr_uri,
+    umd_primary_forests_zarr_uri
 )
 from pipelines.tree_cover_loss.prefect_flows import tcl_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
-# Threshold mapping for post-processing
+# tcd threshold mapping
 thresh_to_pct = {
     1: '10',
     2: '15',
@@ -37,11 +40,14 @@ def umd_tree_cover_loss(overwrite: bool = False):
         return result_uri
 
     expected_groups = (
-        np.arange(1, 25),
-        np.arange(1, 8),
-        np.arange(999),
-        np.arange(1, 86),
-        np.arange(1, 854),
+        np.arange(1, 25),   # tcl years
+        np.arange(1, 8),    # tcd threshold
+        np.arange(0, 2),    # ifl
+        np.arange(2, 8),    # drivers
+        np.arange(0, 2),    # primary_forests
+        np.arange(999),     # countries
+        np.arange(1, 86),   # adm1s
+        np.arange(1, 854),  # adm2s
     )
 
     datasets = tcl_tasks.load_data.with_options(
@@ -51,6 +57,9 @@ def umd_tree_cover_loss(overwrite: bool = False):
         pixel_area_uri=pixel_area_zarr_uri,
         carbon_emissions_uri=carbon_emissions_zarr_uri,
         tree_cover_density_uri=tree_cover_density_zarr_uri,
+        ifl_uri=ifl_intact_forest_lands_zarr_uri,
+        drivers_uri=wri_google_1km_drivers_zarr_uri,
+        primary_forests_uri=umd_primary_forests_zarr_uri
     )
 
     compute_input = tcl_tasks.setup_compute.with_options(
@@ -64,7 +73,7 @@ def umd_tree_cover_loss(overwrite: bool = False):
     print("result_dataset")
     print(result_dataset)
 
-    # Use custom postprocessing for multi-variable Dataset
+    # use custom postprocessing for multi-variable dataset (since we sum both area and emissions)
     result_df: pd.DataFrame = tcl_tasks.postprocess_result_multi_var.with_options(
         name="area-emissions-by-tcl-postprocess-result"
     )(result_dataset)
@@ -74,6 +83,23 @@ def umd_tree_cover_loss(overwrite: bool = False):
 
     # convert tcl thresholds to percentages
     result_df['threshold'] = result_df['threshold'].map(thresh_to_pct)
+
+    # convert ifl to boolean
+    result_df['ifl'] = result_df['ifl'].astype(bool)
+
+    # convert driver codes to labels TODO: confirm these are correct
+    categoryid_to_driver = {
+        2: 'Unknown',
+        3: 'Commodity driven deforestation',
+        4: 'Forestry',
+        5: 'Shifting agriculture',
+        6: 'Wildfire',
+        7: 'Urbanization',
+    }
+    result_df['drivers'] = result_df['drivers'].map(categoryid_to_driver)
+
+    # convert primary forest to boolean
+    result_df['primary_forests'] = result_df['primary_forests'].astype(bool)
 
     # convert country codes
     from pipelines.prefect_flows.common_stages import numeric_to_alpha3
