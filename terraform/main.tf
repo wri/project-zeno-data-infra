@@ -24,6 +24,11 @@ locals {
   name_suffix = terraform.workspace == "default" ? "" : "-${terraform.workspace}"
   cluster_name = "analytics${local.name_suffix}"
   domain_name = "analytics.globalnaturewatch.org"
+  ecr_repos = {
+    gnw-analytics-api       = "API service image"
+    gnw-analytics-pipelines = "Pipelines/automation image"
+  }
+
 }
 
 data "aws_caller_identity" "current" {}
@@ -62,6 +67,62 @@ resource "aws_acm_certificate_validation" "analytics" {
     create = "45m"
   }
 }
+
+resource "aws_ecr_repository" "gnw_ecr_repos" {
+  for_each             = local.ecr_repos
+  name                 = each.key
+  image_tag_mutability = "IMMUTABLE"
+}
+
+resource "aws_ecr_lifecycle_policy" "staged_ecr_policy" {
+  for_each   = aws_ecr_repository.gnw_ecr_repos
+  repository = each.value.name
+
+  policy = jsonencode({
+    rules = [
+      # Keep the last 20 releases
+      {
+        rulePriority = 1
+        description  = "Keep last 20 release-* images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["release-"]
+          countType     = "imageCountMoreThan"
+          countNumber   = 20
+        }
+        action = { type = "expire" }
+      },
+
+      # Expire PR/test/branch images older than 30 days
+      {
+        rulePriority = 2
+        description  = "Expire ephemeral images (for feature branches) older than 60 days"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["branch-"]
+          countType     = "sinceImagePushed"
+          countUnit     = "days"
+          countNumber   = 60
+        }
+        action = { type = "expire" }
+      },
+
+      # Expire untagged images older than 14 days (failed uploads, etc.)
+      {
+        rulePriority = 3
+        description  = "Expire untagged images older than 14 days"
+        selection = {
+          tagStatus   = "untagged"
+          countType   = "sinceImagePushed"
+          countUnit   = "days"
+          countNumber = 14
+        }
+        action = { type = "expire" }
+      }
+    ]
+  })
+}
+
 
 module "gnw_ecs_cluster" {
   source = "terraform-aws-modules/ecs/aws"
