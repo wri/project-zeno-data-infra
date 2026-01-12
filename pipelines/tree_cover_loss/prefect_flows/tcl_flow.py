@@ -82,7 +82,7 @@ def umd_tree_cover_loss(overwrite: bool = False):
     result_df[contextual_column_name] = result_df[contextual_column_name] + 2000
 
     # convert tcl thresholds to percentages
-    result_df['threshold'] = result_df['threshold'].map(thresh_to_pct)
+    result_df['canopy_cover'] = result_df['canopy_cover'].map(thresh_to_pct)
 
     # convert ifl to boolean
     result_df['ifl'] = result_df['ifl'].astype(bool)
@@ -96,10 +96,10 @@ def umd_tree_cover_loss(overwrite: bool = False):
         6: 'Wildfire',
         7: 'Urbanization',
     }
-    result_df['drivers'] = result_df['drivers'].map(categoryid_to_driver)
+    result_df['driver'] = result_df['driver'].map(categoryid_to_driver)
 
     # convert primary forest to boolean
-    result_df['primary_forests'] = result_df['primary_forests'].astype(bool)
+    result_df['is_primary_forest'] = result_df['is_primary_forest'].astype(bool)
 
     # convert country codes
     from pipelines.prefect_flows.common_stages import numeric_to_alpha3

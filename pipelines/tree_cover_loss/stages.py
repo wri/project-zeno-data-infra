@@ -64,7 +64,7 @@ def load_data(
 
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset({
-        "area__ha": pixel_area,
+        "area_ha": pixel_area,
         "carbon__Mg_CO2e": carbon_emissions
     })
 
@@ -84,7 +84,6 @@ def load_data(
 def setup_compute(
     datasets: Tuple,
     expected_groups: Optional[ExpectedGroupsType],
-    contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xarray reduce on tree cover loss by area and emissions"""
     tcl, area_and_emissions, tcd, ifl, drivers, primary_forests, country, region, subregion = datasets
@@ -92,11 +91,11 @@ def setup_compute(
     # sum the area_and_emissions xr.dataset
     mask = area_and_emissions
     groupbys: Tuple[xr.DataArray, ...] = (
-        tcl.rename(contextual_column_name if contextual_column_name else "tree_cover_loss_year"),
-        tcd.rename("threshold"),
+        tcl.rename("tree_cover_loss_year"),
+        tcd.rename("canopy_cover"),
         ifl.rename("ifl"),
-        drivers.rename("drivers"),
-        primary_forests.rename("primary_forests"),
+        drivers.rename("driver"),
+        primary_forests.rename("is_primary_forest"),
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
@@ -111,10 +110,10 @@ def create_result_dataframe_multi_var(result_dataset: xr.Dataset) -> pd.DataFram
     Handles different sparsity patterns between vars
     """
     # get sparse data from both area and carbon emissions
-    area_sparse = result_dataset["area__ha"].data
+    area_sparse = result_dataset["area_ha"].data
     carbon_sparse = result_dataset["carbon__Mg_CO2e"].data
 
-    dim_names = result_dataset["area__ha"].dims
+    dim_names = result_dataset["area_ha"].dims
     area_indices = area_sparse.coords
     area_values = area_sparse.data
 
@@ -136,8 +135,8 @@ def create_result_dataframe_multi_var(result_dataset: xr.Dataset) -> pd.DataFram
         dim: result_dataset.coords[dim].values[area_indices[i]]
         for i, dim in enumerate(dim_names)
     }
-    coord_dict["area__ha"] = area_values
-    coord_dict["carbon__Mg_CO2e"] = carbon_values
+    coord_dict["area_ha"] = area_values
+    coord_dict["carbon_Mg_CO2e"] = carbon_values
 
     df = pd.DataFrame(coord_dict)
 
