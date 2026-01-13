@@ -6,6 +6,9 @@ import xarray as xr
 from distributed import Client, LocalCluster
 from shapely.geometry import box
 
+from api.app.domain.models.analysis import Analysis
+from api.app.models.common.analysis import AnalysisStatus
+from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
 )
@@ -18,13 +21,13 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
-from app.domain.models.area_of_interest import AreaOfInterestList
 from app.domain.models.dataset import Dataset
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
+from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
 @pytest.mark.asyncio
@@ -38,6 +41,7 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
                     "tree_cover_loss_year": [2015, 2020, 2023],
                     "area_ha": [1, 10, 100],
                     "canopy_cover": [20, 30, 50],
+                    "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
                 }
             )
 
@@ -51,17 +55,27 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
         )
     )
 
-    aois = AreaOfInterestList(
-        AdminAreaOfInterest(ids=["BRA", "IDN", "COD"]), compute_engine=compute_engine
-    )
-    results = await aois.get_tree_cover_loss(30, 2020, 2024, "primary_forest")
+    aoi = AdminAreaOfInterest(ids=["BRA", "IDN", "COD"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30,
+        start_year="2020",
+        end_year="2024",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
+    results = await analyzer.analyze(analysis)
+
     assert "BRA" in results.aoi_id.to_list()
     assert 2020 in results.tree_cover_loss_year.to_list()
     assert 2023 in results.tree_cover_loss_year.to_list()
     assert 10.0 in results.area_ha.to_list()
     assert 100.0 in results.area_ha.to_list()
     assert "admin" in results.aoi_type.to_list()
-    assert results.size == 8
+    assert results.size == 10
 
 
 @pytest.mark.asyncio
@@ -89,8 +103,14 @@ async def test_flox_handler_happy_path():
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
                 xarr.name = "tree_cover_loss_year"
+            elif dataset == Dataset.carbon_emissions:
+                # top half is 1.5s, bottom half is 0.5s
+                data = np.vstack([np.full((5, 10), 1.5), np.full((5, 10), 0.5)])
+                coords = {"x": np.arange(10), "y": np.arange(10)}
+                xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "tree_cover_loss_year"
             else:
-                raise ValueError("Not a valid dataset for this test")
+                raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
             return xarr
 
@@ -105,10 +125,19 @@ async def test_flox_handler_happy_path():
             dask_client=dask_client,
         )
     )
-    aois = AreaOfInterestList(
-        ProtectedAreaOfInterest(ids=["1234"]), compute_engine=compute_engine
-    )
-    results = await aois.get_tree_cover_loss(20, 2010, 2020, "primary_forest")
+    aoi = ProtectedAreaOfInterest(ids=["1234"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30,
+        start_year="2010",
+        end_year="2020",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
+    results = await analyzer.analyze(analysis)
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),
@@ -118,6 +147,7 @@ async def test_flox_handler_happy_path():
                 "area_ha": [125000.0],
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],
+                "carbon_emissions_MgCO2e": [37.5],
             },
         ),
         check_like=True,
