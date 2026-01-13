@@ -27,11 +27,6 @@ class TreeCoverLossAnalyzer(Analyzer):
             group_bys=[],
             filters=[
                 DatasetFilter(
-                    dataset=Dataset.canopy_cover,
-                    op=">=",
-                    value=analytics_in.canopy_cover,
-                ),
-                DatasetFilter(
                     dataset=Dataset.tree_cover_loss,
                     op=">=",
                     value=analytics_in.start_year,
@@ -50,6 +45,15 @@ class TreeCoverLossAnalyzer(Analyzer):
             query.group_bys.append(Dataset.tree_cover_loss_drivers)
         else:
             query.group_bys.append(Dataset.tree_cover_loss)
+
+        if analytics_in.canopy_cover is not None:
+            query.filters.append(
+                DatasetFilter(
+                    dataset=Dataset.canopy_cover,
+                    op=">=",
+                    value=analytics_in.canopy_cover,
+                ),
+            )
 
         if analytics_in.forest_filter == "primary_forest":
             query.filters.append(

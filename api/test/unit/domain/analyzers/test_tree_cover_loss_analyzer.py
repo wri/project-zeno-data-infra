@@ -108,7 +108,7 @@ async def test_flox_handler_happy_path():
                 data = np.vstack([np.full((5, 10), 1.5), np.full((5, 10), 0.5)])
                 coords = {"x": np.arange(10), "y": np.arange(10)}
                 xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-                xarr.name = "tree_cover_loss_year"
+                xarr.name = "carbon_emissions_MgCO2e"
             else:
                 raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
@@ -144,6 +144,85 @@ async def test_flox_handler_happy_path():
         pd.DataFrame(
             {
                 "tree_cover_loss_year": [2015],
+                "area_ha": [125000.0],
+                "aoi_id": ["1234"],
+                "aoi_type": ["protected_area"],
+                "carbon_emissions_MgCO2e": [37.5],
+            },
+        ),
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
+
+
+@pytest.mark.asyncio
+async def test_flox_handler_natural_forests():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
+    class TestDatasetRepository(ZarrDatasetRepository):
+        def load(self, dataset, geometry=None):
+            if dataset == Dataset.area_hectares:
+                # all values are 0.5
+                data = np.full((10, 10), 5000)
+                coords = {"x": np.arange(10), "y": np.arange(10)}
+                xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "area_ha"
+            elif dataset == Dataset.natural_lands:
+                # left half is 1s, right half is 5s. 5 is a valid natural forest class.
+                data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
+                coords = {"x": np.arange(10), "y": np.arange(10)}
+                xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "natural_lands"
+            elif dataset == Dataset.tree_cover_loss:
+                # top half is 24s, bottom half is 5s
+                data = np.vstack([np.full((5, 10), 24), np.full((5, 10), 5)])
+                coords = {"x": np.arange(10), "y": np.arange(10)}
+                xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "tree_cover_loss_year"
+            elif dataset == Dataset.carbon_emissions:
+                # top half is 1.5s, bottom half is 0.5s
+                data = np.vstack([np.full((5, 10), 1.5), np.full((5, 10), 0.5)])
+                coords = {"x": np.arange(10), "y": np.arange(10)}
+                xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+                xarr.name = "carbon_emissions_MgCO2e"
+            else:
+                raise ValueError(f"Not a valid dataset for this test:{dataset}")
+
+            return xarr
+
+    class TestAoiGeometryRepository:
+        async def load(self, aoi_type, aoi_ids):
+            return [box(10, 0, 0, 10)]
+
+    compute_engine = ComputeEngine(
+        handler=FloxOTFHandler(
+            dataset_repository=TestDatasetRepository(),
+            aoi_geometry_repository=TestAoiGeometryRepository(),
+            dask_client=dask_client,
+        )
+    )
+    aoi = ProtectedAreaOfInterest(ids=["1234"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        start_year="2021",
+        end_year="2024",
+        forest_filter="natural_forest",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
+    results = await analyzer.analyze(analysis)
+
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(results),
+        pd.DataFrame(
+            {
+                "tree_cover_loss_year": [2024],
                 "area_ha": [125000.0],
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],

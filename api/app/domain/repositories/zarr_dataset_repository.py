@@ -64,7 +64,7 @@ class ZarrDatasetRepository:
         elif dataset == Dataset.primary_forest:
             return int(value)
         elif dataset == Dataset.natural_lands:
-            return int(value)
+            return value
         elif dataset == Dataset.tree_cover_loss_drivers:
             match value:
                 case "Unknown":
