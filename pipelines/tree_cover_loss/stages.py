@@ -44,10 +44,10 @@ def load_data(
     tcd = xr.align(tcl, tcd.reindex_like(tcl, method='nearest', tolerance=1e-5), join="left")[1]
 
     ifl: xr.DataArray = _load_zarr(ifl_uri).band_data
-    ifl = xr.align(tcl, ifl.reindex_like(tcl, method='nearest', tolerance=1e-5), join="left")[1]
+    ifl = xr.align(tcl, ifl.reindex_like(tcl, method='nearest', tolerance=1e-5), join="left")[1].astype(np.int16)
 
     drivers: xr.DataArray = _load_zarr(drivers_uri).band_data
-    drivers = xr.align(tcl, drivers.reindex_like(tcl, method='nearest', tolerance=1e-5), join="left")[1]
+    drivers = xr.align(tcl, drivers.reindex_like(tcl, method='nearest', tolerance=1e-5), join="left")[1].astype(np.int16)
 
     primary_forests: xr.DataArray = _load_zarr(primary_forests_uri).band_data
     primary_forests = xr.align(tcl, primary_forests.reindex_like(tcl, method='nearest', tolerance=1e-5), join="left")[1]
@@ -93,7 +93,7 @@ def setup_compute(
     groupbys: Tuple[xr.DataArray, ...] = (
         tcl.rename("tree_cover_loss_year"),
         tcd.rename("canopy_cover"),
-        ifl.rename("ifl"),
+        ifl.rename("is_intact_forest"),
         drivers.rename("driver"),
         primary_forests.rename("is_primary_forest"),
         country.rename("country"),

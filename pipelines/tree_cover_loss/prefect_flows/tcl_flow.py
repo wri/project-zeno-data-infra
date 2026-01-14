@@ -43,7 +43,7 @@ def umd_tree_cover_loss(overwrite: bool = False):
         np.arange(1, 25),   # tcl years
         np.arange(1, 8),    # tcd threshold
         np.arange(0, 2),    # ifl
-        np.arange(2, 8),    # drivers
+        np.arange(1, 8),    # drivers
         np.arange(0, 2),    # primary_forests
         np.arange(999),     # countries
         np.arange(1, 86),   # adm1s
@@ -85,17 +85,19 @@ def umd_tree_cover_loss(overwrite: bool = False):
     result_df['canopy_cover'] = result_df['canopy_cover'].map(thresh_to_pct)
 
     # convert ifl to boolean
-    result_df['ifl'] = result_df['ifl'].astype(bool)
+    result_df['is_intact_forest'] = result_df['is_intact_forest'].astype(bool)
 
-    # convert driver codes to labels TODO: confirm these are correct
+    # convert driver codes to labels
     categoryid_to_driver = {
-        2: 'Unknown',
-        3: 'Commodity driven deforestation',
-        4: 'Forestry',
-        5: 'Shifting agriculture',
-        6: 'Wildfire',
-        7: 'Urbanization',
+        1: 'Permanent agriculture',
+        2: 'Hard commodities',
+        3: 'Shifting cultivation',
+        4: 'Logging',
+        5: 'Wildfire',
+        6: 'Settlements and infrastructure',
+        7: 'Other natural disturbances',
     }
+
     result_df['driver'] = result_df['driver'].map(categoryid_to_driver)
 
     # convert primary forest to boolean
