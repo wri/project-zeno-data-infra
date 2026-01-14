@@ -6,8 +6,6 @@ import xarray as xr
 from distributed import Client, LocalCluster
 from shapely.geometry import box
 
-from api.app.domain.models.analysis import Analysis
-from api.app.models.common.analysis import AnalysisStatus
 from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
@@ -21,8 +19,10 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
+from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
+from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     ProtectedAreaOfInterest,
