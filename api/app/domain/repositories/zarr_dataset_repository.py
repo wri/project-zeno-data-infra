@@ -17,6 +17,7 @@ class ZarrDatasetRepository:
         Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",
         Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",
         Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",
+        Dataset.natural_lands: "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr",
     }
 
     def load(
@@ -62,6 +63,8 @@ class ZarrDatasetRepository:
             return [val_map[val] for val in value]
         elif dataset == Dataset.primary_forest:
             return int(value)
+        elif dataset == Dataset.natural_lands:
+            return value
         elif dataset == Dataset.tree_cover_loss_drivers:
             match value:
                 case "Unknown":
