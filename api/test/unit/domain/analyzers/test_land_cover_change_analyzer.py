@@ -165,7 +165,7 @@ class TestLandCoverChangeCustomAois:
             "features": [
                 {
                     "type": "Feature",
-                    "properties": {"id": "test_aoi"},
+                    "id": "test_aoi",
                     "geometry": {
                         "type": "Polygon",
                         "coordinates": [
