@@ -2,7 +2,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from api.app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
     TreeCoverGainPrecalcHandler,
 )
@@ -18,6 +17,7 @@ from app.domain.models.dataset import (
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
+from app.models.common.areas_of_interest import AdminAreaOfInterest
 
 
 class TestTreeCoverGainPrecalcHandler:
