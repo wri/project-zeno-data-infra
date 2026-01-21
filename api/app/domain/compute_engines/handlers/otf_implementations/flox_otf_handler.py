@@ -33,15 +33,19 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         self.aoi_geometry_repository = aoi_geometry_repository
         self.dask_client = dask_client
 
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        aoi_geometries = await self.aoi_geometry_repository.load(aoi_type, aoi_ids)
+    async def handle(self, aoi, query: DatasetQuery):
+        if aoi.type == "feature_collection":
+            aoi_geometries = aoi.feature_collection
+        else:
+            aoi_geometries = await self.aoi_geometry_repository.load(aoi.type, aoi.ids)
+
         aoi_partial = partial(
             self._handle,
             query=query,
             dataset_repository=self.dataset_repository,
             expected_groups_per_dataset=self.EXPECTED_GROUPS,
         )
-        futures = self.dask_client.map(aoi_partial, list(zip(aoi_ids, aoi_geometries)))
+        futures = self.dask_client.map(aoi_partial, list(zip(aoi.ids, aoi_geometries)))
         results_per_aoi = await self.dask_client.gather(futures)
 
         results = pd.concat(results_per_aoi)
@@ -50,7 +54,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             col = dataset.get_field_name()
             results[col] = self.dataset_repository.unpack(dataset, results[col])
 
-        results["aoi_type"] = aoi_type
+        results["aoi_type"] = aoi.type
         return results.to_dict(orient="list")
 
     @staticmethod

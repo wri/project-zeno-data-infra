@@ -12,31 +12,31 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
         self.precalc_query_service = precalc_query_service
         self.next_handler = next_handler
 
-    async def handle(self, aoi_type, aoi_ids, query: DatasetQuery):
-        if self.should_handle(aoi_type, aoi_ids, query):
-            sql = self.precalc_query_builder.build(aoi_ids, query)
+    async def handle(self, aoi, query: DatasetQuery):
+        if self.should_handle(aoi, query):
+            sql = self.precalc_query_builder.build(aoi.ids, query)
             return await self.precalc_query_service.execute(sql)
 
         if self.next_handler is not None:
-            return await self.next_handler.handle(aoi_type, aoi_ids, query)
+            return await self.next_handler.handle(aoi, query)
 
         return None
 
 
 class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
-    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
-        return aoi_type == "admin" and Dataset.area_hectares in query.aggregate.datasets
+    def should_handle(self, aoi, query: DatasetQuery) -> bool:
+        return aoi.type == "admin" and Dataset.area_hectares in query.aggregate.datasets
 
 
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
-    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
-        return aoi_type == "admin" and Dataset.area_hectares in query.aggregate.datasets
+    def should_handle(self, aoi, query: DatasetQuery) -> bool:
+        return aoi.type == "admin" and Dataset.area_hectares in query.aggregate.datasets
 
 
 class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
-    def should_handle(self, aoi_type, aoi_ids, query: DatasetQuery) -> bool:
+    def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            aoi_type == "admin"
+            aoi.type == "admin"
             and (
                 Dataset.area_hectares in query.aggregate.datasets
                 or Dataset.carbon_emissions in query.aggregate.datasets
