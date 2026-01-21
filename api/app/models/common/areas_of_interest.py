@@ -116,7 +116,15 @@ class CustomAreaOfInterest(AreaOfInterest):
             if not isinstance(feat, dict):
                 raise ValueError(f"feature_collection.features[{i}] must be an object")
 
+            # get ID from top level or properties as backup
             fid = feat.get("id")
+            if fid is None:
+                props = feat.get("properties")
+                if props is not None:
+                    fid = props.get("id")
+                else:
+                    missing_at.append(i)
+
             if fid is None or (isinstance(fid, str) and not fid.strip()):
                 missing_at.append(i)
             else:
