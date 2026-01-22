@@ -1,5 +1,6 @@
 from typing import Optional
 
+import rioxarray
 import xarray as xr
 from shapely import Geometry
 from shapely.geometry import mapping
@@ -23,16 +24,19 @@ class ZarrDatasetRepository:
     def load(
         self, dataset: Dataset, geometry: Optional[Geometry] = None
     ) -> xr.DataArray:
-        xarr = xr.open_zarr(
-            self.ZARR_LOCATIONS[dataset],
-            storage_options={"requester_pays": True},
-        ).band_data
+        xarr = self.open_source(dataset)
         xarr.rio.write_crs("EPSG:4326", inplace=True)
         xarr.name = dataset.get_field_name()
 
         if geometry is not None:
             return self._clip_xarr_to_geometry(xarr, geometry)
         return xarr
+
+    def open_source(self, dataset):
+        return xr.open_zarr(
+            self.ZARR_LOCATIONS[dataset],
+            storage_options={"requester_pays": True},
+        ).band_data
 
     def translate(self, dataset, value):
         """
