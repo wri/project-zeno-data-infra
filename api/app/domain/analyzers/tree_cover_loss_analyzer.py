@@ -72,9 +72,7 @@ class TreeCoverLossAnalyzer(Analyzer):
                 )
             )
 
-        results = await self.compute_engine.compute(
-            analytics_in.aoi.type, analytics_in.aoi.ids, query
-        )
+        results = await self.compute_engine.compute(analytics_in.aoi, query)
 
         # postprocess, set NaN for carbon if canopy cover requested is <30
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:
