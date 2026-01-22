@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from flox.xarray import xarray_reduce
+from shapely.geometry import shape
 
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
@@ -35,7 +36,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
 
     async def handle(self, aoi, query: DatasetQuery):
         if aoi.type == "feature_collection":
-            aoi_geometries = aoi.feature_collection
+            aoi_geometries = [
+                shape(feature) for feature in aoi.feature_collection["features"]
+            ]
         else:
             aoi_geometries = await self.aoi_geometry_repository.load(aoi.type, aoi.ids)
 
