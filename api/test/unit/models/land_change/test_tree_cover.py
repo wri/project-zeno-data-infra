@@ -1,5 +1,4 @@
 import pytest
-from pydantic_core import ValidationError
 
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
@@ -46,7 +45,7 @@ class TestTreeCoverAnalyticsIn:
 
 class TestTreeCoverAnalyticsInValidations:
     def test_tcd_must_be_valid(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             TreeCoverAnalyticsIn(
                 aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
                 canopy_cover=5,
@@ -59,7 +58,7 @@ class TestTreeCoverAnalyticsInValidations:
         )
 
     def test_forest_filter_must_be_valid(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValueError):
             TreeCoverAnalyticsIn(
                 aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
                 canopy_cover=15,
