@@ -233,7 +233,7 @@ async def test_flox_handler_custom_area():
             {
                 "type": "Feature",
                 "id": "my_feature",
-                "geometry": mapping(box(10, 0, 0, 10)),
+                "geometry": mapping(box(10.1, -0.1, -0.1, 10.1)),
             }
         ],
     }
@@ -242,7 +242,7 @@ async def test_flox_handler_custom_area():
         aoi=aoi,
         canopy_cover=30,
         start_year="2010",
-        end_year="2020",
+        end_year="2022",
         intersections=[],
     ).model_dump()
 
@@ -255,7 +255,7 @@ async def test_flox_handler_custom_area():
         pd.DataFrame(results),
         pd.DataFrame(
             {
-                "tree_cover_loss_year": [2015],
+                "tree_cover_loss_year": [2021],
                 "area_ha": [125000.0],
                 "aoi_id": ["my_feature"],
                 "aoi_type": ["feature_collection"],
