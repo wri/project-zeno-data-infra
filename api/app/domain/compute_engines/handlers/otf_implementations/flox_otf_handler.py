@@ -22,6 +22,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         Dataset.tree_cover_gain: np.arange(0, 5),
         Dataset.canopy_cover: np.arange(0, 8),
         Dataset.tree_cover_loss_drivers: np.arange(0, 8),
+        Dataset.natural_forests: np.arange(0, 3),
     }
 
     def __init__(
