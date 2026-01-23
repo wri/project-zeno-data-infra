@@ -32,7 +32,7 @@ def setup_compute(
     expected_groups,
     contextual_name: Optional[str] = None,
 ) -> Tuple:
-    return stages.setup_compute(datasets, expected_groups, contextual_name)
+    return stages.setup_compute(datasets, expected_groups)
 
 
 @task
