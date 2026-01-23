@@ -62,12 +62,12 @@ class TestDatasetRepository(ZarrDatasetRepository):
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
             xarr.name = "carbon_emissions_MgCO2e"
-        elif dataset == Dataset.natural_lands:
-            # left half is 1s, right half is 5s. 5 is a valid natural forest class.
-            data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
+        elif dataset == Dataset.natural_forests:
+            # left half is 0s, middle is 1s,right is 2s
+            data = np.hstack([np.zeros((10, 3)), np.ones((10, 4)), np.full((10, 3), 2)])
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-            xarr.name = "natural_lands"
+            xarr.name = "natural_forests"
         else:
             raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
@@ -196,11 +196,16 @@ async def test_flox_handler_natural_forests():
         pd.DataFrame(results),
         pd.DataFrame(
             {
-                "tree_cover_loss_year": [2021],
-                "area_ha": [125000.0],
-                "aoi_id": ["1234"],
-                "aoi_type": ["protected_area"],
-                "carbon_emissions_MgCO2e": [37.5],
+                "tree_cover_loss_year": [2021, 2021, 2021],
+                "natural_forests_class": [
+                    "Unknown",
+                    "Natural Forest",
+                    "Non-Natural Forest",
+                ],
+                "area_ha": [75000.0, 100000.0, 75000.0],
+                "carbon_emissions_MgCO2e": [22.5, 30.0, 22.5],
+                "aoi_id": ["1234", "1234", "1234"],
+                "aoi_type": ["protected_area", "protected_area", "protected_area"],
             },
         ),
         check_like=True,

@@ -64,13 +64,7 @@ class TreeCoverLossAnalyzer(Analyzer):
                 )
             )
         elif analytics_in.forest_filter == "natural_forest":
-            query.filters.append(
-                DatasetFilter(
-                    dataset=Dataset.natural_lands,
-                    op="in",
-                    value=[2, 5, 8, 9],  # SBTN classes we define as "natural forest"
-                )
-            )
+            query.group_bys.append(Dataset.natural_forests)
 
         results = await self.compute_engine.compute(analytics_in.aoi, query)
 
