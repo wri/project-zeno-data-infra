@@ -1,10 +1,13 @@
 from functools import partial
 
+import dask.array as da
 import numpy as np
 import pandas as pd
 import xarray as xr
+from affine import Affine
 from flox.xarray import xarray_reduce
-from shapely.geometry import shape
+from rasterio.features import geometry_mask
+from shapely.geometry import mapping, shape
 
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
@@ -73,6 +76,11 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             )
             by[ds.get_field_name()] = xarr
 
+        geometry_mask = FloxOTFHandler._lazy_geometry_mask_from_da(
+            next(iter(by.data_vars.values())), aoi_geometry
+        )
+        by = by.where(geometry_mask, other=np.nan)
+
         objs = []
         expected_groups = []
         for filter in query.filters:
@@ -107,7 +115,12 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         if len(objs) > 0:
             results = (
                 xarray_reduce(
-                    by, *objs, func=func, expected_groups=tuple(expected_groups)
+                    by,
+                    *objs,
+                    func=func,
+                    fill_value=np.nan,
+                    min_count=1,
+                    expected_groups=tuple(expected_groups),
                 )
                 .to_dataframe()
                 .reset_index()
@@ -182,3 +195,94 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 return expected_group != value
             case "in":
                 return set(expected_group) & set(value)
+
+    @staticmethod
+    def _lazy_geometry_mask_from_da(
+        template: xr.DataArray,
+        geom,
+        *,
+        all_touched: bool = False,
+    ) -> xr.DataArray:
+        """
+        Lazily rasterize `geom` onto `template`'s grid using dask.map_blocks.
+
+        Assumptions:
+        - template is 2D with dims ('y','x') (will transpose if needed)
+        - template has 1D coords 'x' and 'y' representing pixel centers
+        - rectilinear grid (constant dx/dy)
+
+        Returns:
+        xr.DataArray of dtype bool with same shape/chunks as template,
+        True inside geom, False outside.
+        """
+        if not hasattr(template.data, "chunks"):
+            raise ValueError(
+                "template must be chunked (dask-backed). Use template.chunk(...) first."
+            )
+
+        x = template["x"].values
+        y = template["y"].values
+
+        # Pixel size (y often descending -> dy negative; that's OK)
+        dx = float(x[1] - x[0])
+        dy = float(y[1] - y[0])
+
+        # Rasterio expects transform for *pixel corner* of the upper-left pixel.
+        x0 = float(x[0] - dx / 2.0)
+        y0 = float(y[0] - dy / 2.0)
+        base_transform = Affine.translation(x0, y0) * Affine.scale(dx, dy)
+
+        geom_json = mapping(geom)
+
+        # chunks are per-dimension sizes, e.g. ((5,5),(5,5))
+        y_chunks = template.data.chunks[0]
+        x_chunks = template.data.chunks[1]
+
+        # cumulative pixel offsets for each block index
+        y_offsets = np.cumsum((0,) + y_chunks[:-1])
+        x_offsets = np.cumsum((0,) + x_chunks[:-1])
+
+        def _mask_block(block, block_info=None, block_id=None):
+            # Dask may call once for dtype/shape inference with an empty (0,0) block.
+            # Just return an empty boolean array in that case.
+            if block.size == 0:
+                return np.zeros(block.shape, dtype=bool)
+
+            # Prefer block_id if provided (most reliable)
+            if block_id is not None:
+                by, bx = block_id
+            else:
+                # Fallback: pull chunk-location out of block_info
+                if not block_info:
+                    return np.zeros(block.shape, dtype=bool)
+                info = next(iter(block_info.values()))
+                by, bx = info.get("chunk-location", (0, 0))
+
+            y0i = int(y_offsets[by])
+            x0i = int(x_offsets[bx])
+
+            chunk_transform = base_transform * Affine.translation(x0i, y0i)
+
+            return geometry_mask(
+                [geom_json],
+                out_shape=block.shape,  # (chunk_y, chunk_x)
+                transform=chunk_transform,
+                invert=True,
+                all_touched=all_touched,
+            )
+
+        # Dummy array purely to drive chunking & block_info
+        driver = da.zeros(
+            template.shape,
+            chunks=template.data.chunks,
+            dtype=np.uint8,
+        )
+
+        mask = da.map_blocks(
+            _mask_block,
+            driver,
+            dtype=bool,
+            chunks=template.data.chunks,
+        )
+
+        return xr.DataArray(mask, coords=template.coords, dims=("y", "x"))
