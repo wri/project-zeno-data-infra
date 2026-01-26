@@ -76,3 +76,30 @@ def test_setup_compute_groupby_schema_and_order():
         assert actual_dtype == expected_dtype, (
             f"column {column} ({expected_name}): expected dtype '{expected_dtype}', got '{actual_dtype}'"
         )
+
+
+def test_setup_compute_creates_concat_dataarray():
+    datasets = _create_mock_datasets()
+    mask, groupbys, _ = setup_compute(datasets, expected_groups=None)
+
+    # verify layer dimension exists
+    assert "layer" in mask.dims, (
+        f"mask should have 'layer' dimension, got dims: {mask.dims}"
+    )
+
+    # verify layer coord values
+    expected_layers = ["area_ha", "carbon_Mg_CO2e"]
+    actual_layers = list(mask.coords["layer"].values)
+    assert actual_layers == expected_layers, (
+        f"expected layers {expected_layers}, got {actual_layers}"
+    )
+
+    # verify shape is 2 (for area and emissions)
+    assert mask.shape[0] == 2, (
+        f"first dimension should be 2 (area and emissions), got {mask.shape[0]}"
+    )
+
+    # verify dtype is float
+    assert mask.dtype in [np.float32, np.float64], (
+        f"mask should be float type, got {mask.dtype}"
+    )

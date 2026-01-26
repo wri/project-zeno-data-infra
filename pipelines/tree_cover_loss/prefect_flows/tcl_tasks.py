@@ -36,6 +36,5 @@ def setup_compute(
 
 
 @task
-def postprocess_result_multi_var(result_dataset: xr.Dataset) -> pd.DataFrame:
-    """Postprocess result Dataset with multiple variables to DataFrame"""
-    return stages.create_result_dataframe_multi_var(result_dataset)
+def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
+    return stages.create_result_dataframe(result)

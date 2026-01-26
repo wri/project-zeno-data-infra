@@ -66,17 +66,13 @@ def umd_tree_cover_loss(overwrite: bool = False):
         name="set-up-area-emissions-by-tcl-compute"
     )(datasets, expected_groups, contextual_name=contextual_column_name)
 
-    result_dataset = common_tasks.compute_zonal_stat.with_options(
+    result = common_tasks.compute_zonal_stat.with_options(
         name="area-emissions-by-tcl-compute-zonal-stats"
     )(*compute_input, funcname=funcname)
 
-    print("result_dataset")
-    print(result_dataset)
-
-    # use custom postprocessing for multi-variable dataset (since we sum both area and emissions)
-    result_df: pd.DataFrame = tcl_tasks.postprocess_result_multi_var.with_options(
+    result_df: pd.DataFrame = tcl_tasks.postprocess_result.with_options(
         name="area-emissions-by-tcl-postprocess-result"
-    )(result_dataset)
+    )(result)
 
     # convert year values (1-24) to actual years (2001-2024)
     result_df[contextual_column_name] = result_df[contextual_column_name] + 2000
@@ -107,9 +103,6 @@ def umd_tree_cover_loss(overwrite: bool = False):
     from pipelines.prefect_flows.common_stages import numeric_to_alpha3
     result_df['country'] = result_df['country'].map(numeric_to_alpha3)
     result_df.dropna(subset=['country'], inplace=True)
-
-    print("result_df")
-    print(result_df)
 
     result_uri = common_tasks.save_result.with_options(
         name="area-emissions-by-tcl-save-result"

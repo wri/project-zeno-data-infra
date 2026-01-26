@@ -3,20 +3,21 @@ import pandas as pd
 import xarray as xr
 import sparse
 
-from pipelines.tree_cover_loss.stages import create_result_dataframe_multi_var
+from pipelines.tree_cover_loss.stages import create_result_dataframe
 
 
-def _create_sparse_dataset(area_coords, area_data, carbon_coords, carbon_data, dims, coords, shape):
-    """Helper to create xr. Dataset with sparse arrays"""
+def _create_sparse_dataarray(area_coords, area_data, carbon_coords, carbon_data, dims, coords, shape):
+    """Helper to create xr.DataArray with layer dimension using xr.concat pattern"""
     area_sparse = sparse.COO(area_coords, area_data, shape=shape)
     carbon_sparse = sparse.COO(carbon_coords, carbon_data, shape=shape)
 
-    return xr.Dataset(
-        {
-            "area_ha": xr.DataArray(area_sparse, dims=dims),
-            "carbon__Mg_CO2e": xr.DataArray(carbon_sparse, dims=dims),
-        },
-        coords=coords,
+    area_da = xr.DataArray(area_sparse, dims=dims, coords=coords)
+    carbon_da = xr.DataArray(carbon_sparse, dims=dims, coords=coords)
+
+    # concatenate along layer dimension (following carbon flux pattern)
+    return xr.concat(
+        [area_da, carbon_da],
+        pd.Index(["area_ha", "carbon_Mg_CO2e"], name="layer")
     )
 
 
@@ -28,14 +29,14 @@ def test_create_result_dataframe_same_sparsity_pattern():
     carbon_coords = np.array([[0, 1, 2], [0, 1, 0]])
     carbon_data = np.array([100.0, 200.0, 300.0])
 
-    result_dataset = _create_sparse_dataset(
+    result_dataarray = _create_sparse_dataarray(
         area_coords, area_data, carbon_coords, carbon_data,
         dims=["year", "country"],
         coords={"year": np.array([2001, 2002, 2003]), "country": np.array([1, 2])},
         shape=(3, 2)
     )
 
-    df = create_result_dataframe_multi_var(result_dataset)
+    df = create_result_dataframe(result_dataarray)
 
     # verify correct shape and columns
     assert len(df) == 3, f"expected 3 rows, got {len(df)}"
@@ -55,68 +56,42 @@ def test_create_result_dataframe_same_sparsity_pattern():
     assert row_0_0["carbon_Mg_CO2e"].iloc[0] == 100.0
 
 
-def test_create_result_dataframe_different_sparsity_patterns():
-    """Test df when carbon is present but not pixel area"""
-    # pixel area has data at (0,0) and (1,1)
+def test_create_result_dataframe_mismatched_sparsity():
+    """Test handling of mismatched sparsity patterns"""
+    # area at (0,0) & (1,1), carbon at (0,0) & (2,0)
     area_coords = np.array([[0, 1], [0, 1]])
     area_data = np.array([10.0, 20.0])
+    carbon_coords = np.array([[0, 2], [0, 0]])
+    carbon_data = np.array([100.0, 300.0])
 
-    # carbon has data at (0,0), (1,1), and (2,0)
-    carbon_coords = np.array([[0, 1, 2], [0, 1, 0]])
-    carbon_data = np.array([100.0, 200.0, 300.0])
-
-    result_dataset = _create_sparse_dataset(
+    result_dataarray = _create_sparse_dataarray(
         area_coords, area_data, carbon_coords, carbon_data,
         dims=["year", "country"],
         coords={"year": np.array([2001, 2002, 2003]), "country": np.array([1, 2])},
         shape=(3, 2)
     )
 
-    df = create_result_dataframe_multi_var(result_dataset)
+    df = create_result_dataframe(result_dataarray)
 
-    # df should have rows only where pixel area exists
-    assert len(df) == 2, f"expected 2 rows (area locations only), got {len(df)}"
-    assert not any((df["year"] == 2003) & (df["country"] == 1))
+    assert len(df) == 3, f"expected 3 rows (union of all coordinates), got {len(df)}"
 
-    # verify carbon values are aligned with pixel area
+    # row (0,0): both area and carbon
     row_0_0 = df[(df["year"] == 2001) & (df["country"] == 1)]
     assert len(row_0_0) == 1
     assert row_0_0["area_ha"].iloc[0] == 10.0
     assert row_0_0["carbon_Mg_CO2e"].iloc[0] == 100.0
 
-
-def test_create_result_dataframe_missing_carbon_fills_zero():
-    """Test that missing carbon values are filled with 0.0 where pixel area exists"""
-    # area has data at (0,0) and (1,1)
-    area_coords = np.array([[0, 1], [0, 1]])
-    area_data = np.array([10.0, 20.0])
-
-    # carbon only has data at (0,0) only
-    carbon_coords = np.array([[0], [0]])
-    carbon_data = np.array([100.0])
-
-    result_dataset = _create_sparse_dataset(
-        area_coords, area_data, carbon_coords, carbon_data,
-        dims=["year", "country"],
-        coords={"year": np.array([2001, 2002, 2003]), "country": np.array([1, 2])},
-        shape=(3, 2)
-    )
-
-    df = create_result_dataframe_multi_var(result_dataset)
-
-    assert len(df) == 2, f"expected 2 rows, got {len(df)}"
-
-    # verify (0,0) has both pixel area and carbon
-    row_0_0 = df[(df["year"] == 2001) & (df["country"] == 1)]
-    assert len(row_0_0) == 1
-    assert row_0_0["area_ha"].iloc[0] == 10.0
-    assert row_0_0["carbon_Mg_CO2e"].iloc[0] == 100.0
-
-    # verify (1,1) has pixel area only
+    # row (1,1): area but no carbon
     row_1_1 = df[(df["year"] == 2002) & (df["country"] == 2)]
     assert len(row_1_1) == 1
     assert row_1_1["area_ha"].iloc[0] == 20.0
     assert row_1_1["carbon_Mg_CO2e"].iloc[0] == 0.0, "missing carbon should be filled with 0.0"
+
+    # row (2,0): carbon but no area
+    row_2_0 = df[(df["year"] == 2003) & (df["country"] == 1)]
+    assert len(row_2_0) == 1
+    assert row_2_0["area_ha"].iloc[0] == 0.0, "missing area should be filled with 0.0"
+    assert row_2_0["carbon_Mg_CO2e"].iloc[0] == 300.0
 
 
 def test_create_result_dataframe_output_schema():
@@ -126,14 +101,14 @@ def test_create_result_dataframe_output_schema():
     carbon_coords = np.array([[0], [0]])
     carbon_data = np.array([100.5])
 
-    result_dataset = _create_sparse_dataset(
+    result_dataarray = _create_sparse_dataarray(
         area_coords, area_data, carbon_coords, carbon_data,
         dims=["tree_cover_loss_year", "country"],
         coords={"tree_cover_loss_year": np.array([1, 2]), "country": np.array([100, 200])},
         shape=(2, 2)
     )
 
-    df = create_result_dataframe_multi_var(result_dataset)
+    df = create_result_dataframe(result_dataarray)
 
     # verify column names and dtypes
     expected_columns = {"tree_cover_loss_year", "country", "area_ha", "carbon_Mg_CO2e"}

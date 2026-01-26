@@ -88,8 +88,12 @@ def setup_compute(
     """Setup the arguments for the xarray reduce on tree cover loss by area and emissions"""
     tcl, area_and_emissions, tcd, ifl, drivers, primary_forests, country, region, subregion = datasets
 
-    # sum the area_and_emissions xr.dataset
-    mask = area_and_emissions
+    # stack area and emissions into a single xarray
+    mask = xr.concat(
+        [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"]],
+        pd.Index(["area_ha", "carbon_Mg_CO2e"], name="layer")
+    )
+
     groupbys: Tuple[xr.DataArray, ...] = (
         tcl.rename("tree_cover_loss_year"),
         tcd.rename("canopy_cover"),
@@ -104,40 +108,32 @@ def setup_compute(
     return (mask, groupbys, expected_groups)
 
 
-def create_result_dataframe_multi_var(result_dataset: xr.Dataset) -> pd.DataFrame:
+def create_result_dataframe(result: xr.DataArray) -> pd.DataFrame:
     """
-    Convert a Dataset with multiple sparse vars (pixel area and carbon emissions) to a DataFrame
-    Handles different sparsity patterns between vars
+    Convert an xarray with multiple layers to a result df
     """
-    # get sparse data from both area and carbon emissions
-    area_sparse = result_dataset["area_ha"].data
-    carbon_sparse = result_dataset["carbon__Mg_CO2e"].data
+    # extract sparse data
+    sparse_data = result.data
+    dim_names = result.dims
+    indices = sparse_data.coords
+    values = sparse_data.data
 
-    dim_names = result_dataset["area_ha"].dims
-    area_indices = area_sparse.coords
-    area_values = area_sparse.data
-
-    # convert carbon coords to a lookup map
-    carbon_coords_tuple = tuple(carbon_sparse.coords)
-    carbon_map = {
-        tuple(carbon_coords_tuple[i][j] for i in range(len(carbon_coords_tuple))): carbon_sparse.data[j]
-        for j in range(len(carbon_sparse.data))
-    }
-
-    # create a carbon array aligned with pixel area
-    carbon_values = np.array([
-        carbon_map.get(tuple(area_indices[i][j] for i in range(len(area_indices))), 0.0)
-        for j in range(len(area_values))
-    ])
-
-    # create summary dataframe with both pixel area and carbon emissions
+    # create coordinate dictionary
     coord_dict = {
-        dim: result_dataset.coords[dim].values[area_indices[i]]
+        dim: result.coords[dim].values[indices[i]]
         for i, dim in enumerate(dim_names)
     }
-    coord_dict["area_ha"] = area_values
-    coord_dict["carbon_Mg_CO2e"] = carbon_values
+    coord_dict["value"] = values
 
     df = pd.DataFrame(coord_dict)
 
-    return df
+    # pivot to get separate cols for each layer
+    df_pivoted = df.pivot_table(
+        index=[col for col in df.columns if col not in ["layer", "value"]],
+        columns="layer",
+        values="value",
+        fill_value=0
+    ).reset_index()
+    df_pivoted.columns.name = None
+
+    return df_pivoted
