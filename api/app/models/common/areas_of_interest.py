@@ -1,7 +1,7 @@
 from typing import Annotated, Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import Field, StringConstraints, field_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from .base import StrictBaseModel
 
@@ -96,3 +96,50 @@ class CustomAreaOfInterest(AreaOfInterest):
         ...,
         title="Feature collection of one or more features",
     )
+    ids: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _extract_ids(self):
+        fc = self.feature_collection
+
+        if fc.get("type") != "FeatureCollection":
+            raise ValueError("feature_collection.type must be 'FeatureCollection'")
+
+        features = fc.get("features")
+        if not isinstance(features, list) or not features:
+            raise ValueError("feature_collection.features must be a non-empty list")
+
+        ids: List[str] = []
+        missing_at: List[int] = []
+
+        for i, feat in enumerate(features):
+            if not isinstance(feat, dict):
+                raise ValueError(f"feature_collection.features[{i}] must be an object")
+
+            # get ID from top level or properties as backup
+            fid = feat.get("id")
+            if fid is None:
+                props = feat.get("properties")
+                if props is not None:
+                    fid = props.get("id")
+                else:
+                    missing_at.append(i)
+
+            if fid is None or (isinstance(fid, str) and not fid.strip()):
+                missing_at.append(i)
+            else:
+                ids.append(str(fid))  # coerce int -> str if needed
+
+        if missing_at:
+            raise ValueError(
+                "Each feature must have a non-empty 'id'. Missing/empty at indices: "
+                + ", ".join(map(str, missing_at))
+            )
+
+        if len(set(ids)) != len(ids):
+            raise ValueError("Feature ids must be unique")
+
+        # Set "ids" this way to avoid re-triggering model_validator after hook again
+        object.__setattr__(self, "ids", ids)
+
+        return self

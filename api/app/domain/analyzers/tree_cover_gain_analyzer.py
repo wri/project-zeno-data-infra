@@ -46,9 +46,7 @@ class TreeCoverGainAnalyzer(Analyzer):
             filters=filters,
         )
 
-        return await self.compute_engine.compute(
-            analytics_in.aoi.type, analytics_in.aoi.ids, query
-        )
+        return await self.compute_engine.compute(analytics_in.aoi, query)
 
     def _build_years(self, start_year: str, end_year: str):
         """

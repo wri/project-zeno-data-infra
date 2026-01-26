@@ -17,6 +17,7 @@ from app.domain.models.dataset import (
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
+from app.models.common.areas_of_interest import AdminAreaOfInterest
 
 
 class TestTreeCoverGainPrecalcHandler:
@@ -41,9 +42,7 @@ class TestTreeCoverGainPrecalcHandler:
             ],
         )
 
-        aoi_type = "admin"
-
-        await handler.handle(aoi_type, ["AUS"], query)
+        await handler.handle(AdminAreaOfInterest(ids=["AUS"]), query)
 
         query_service.execute.assert_called_once_with(
             "SELECT aoi_id, aoi_type, SUM(area_ha) AS area_ha FROM data_source WHERE tree_cover_gain_period in ('2000-2005') AND aoi_id in ('AUS') GROUP BY aoi_id, aoi_type"
@@ -70,9 +69,7 @@ class TestTreeCoverGainPrecalcHandler:
             ],
         )
 
-        aoi_type = "admin"
-
-        await handler.handle(aoi_type, ["AUS"], query)
+        await handler.handle(AdminAreaOfInterest(ids=["AUS"]), query)
 
         query_service.execute.assert_called_once_with(
             "SELECT aoi_id, aoi_type, SUM(area_ha) AS area_ha FROM data_source WHERE tree_cover_gain_period in ('2000-2005', '2005-2010') AND aoi_id in ('AUS') GROUP BY aoi_id, aoi_type"

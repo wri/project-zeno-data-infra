@@ -58,3 +58,43 @@ class TestTreeCoverLossAnalyticsIn:
         model.intersections = []
 
         assert model.thumbprint() != base_config.thumbprint()
+
+    def test_natural_forest_no_canopy_cover(self, base_config):
+        TreeCoverLossAnalyticsIn(
+            aoi={"type": "protected_area", "ids": ["9823"]},
+            start_year="2021",
+            end_year="2024",
+            forest_filter="natural_forest",
+            intersections=["driver"],
+        )
+
+    def test_natural_forest_with_canopy_cover_error(self, base_config):
+        with pytest.raises(ValueError):
+            TreeCoverLossAnalyticsIn(
+                aoi={"type": "protected_area", "ids": ["9823"]},
+                start_year="2021",
+                end_year="2024",
+                canopy_cover=30,
+                forest_filter="natural_forest",
+                intersections=["driver"],
+            )
+
+    def test_natural_forest_pre_2021_error(self, base_config):
+        with pytest.raises(ValueError):
+            TreeCoverLossAnalyticsIn(
+                aoi={"type": "protected_area", "ids": ["9823"]},
+                start_year="2020",
+                end_year="2024",
+                forest_filter="natural_forest",
+                intersections=["driver"],
+            )
+
+    def test_natural_forest_admin_error(self, base_config):
+        with pytest.raises(ValueError):
+            TreeCoverLossAnalyticsIn(
+                aoi={"type": "admin", "ids": ["IDN"]},
+                start_year="2020",
+                end_year="2024",
+                forest_filter="natural_forest",
+                intersections=["driver"],
+            )
