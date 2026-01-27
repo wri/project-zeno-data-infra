@@ -5,6 +5,7 @@ import pandas as pd
 from prefect import task
 from pipelines.tree_cover_loss import stages
 
+
 @task
 def load_data(
     tree_cover_loss_uri: str,
@@ -16,9 +17,9 @@ def load_data(
     primary_forests_uri: Optional[str] = None,
 ) -> Tuple:
     return stages.load_data(
-        tree_cover_loss_uri, 
-        pixel_area_uri, 
-        carbon_emissions_uri, 
+        tree_cover_loss_uri,
+        pixel_area_uri,
+        carbon_emissions_uri,
         tree_cover_density_uri,
         ifl_uri,
         drivers_uri,

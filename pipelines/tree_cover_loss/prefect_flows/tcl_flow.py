@@ -43,7 +43,7 @@ def umd_tree_cover_loss(overwrite: bool = False):
         np.arange(1, 25),   # tcl years
         np.arange(1, 8),    # tcd threshold
         np.arange(0, 2),    # ifl
-        np.arange(1, 8),    # drivers
+        np.arange(0, 8),    # drivers
         np.arange(0, 2),    # primary_forests
         np.arange(999),     # countries
         np.arange(1, 86),   # adm1s

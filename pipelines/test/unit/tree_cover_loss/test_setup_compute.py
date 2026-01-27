@@ -96,7 +96,7 @@ def test_setup_compute_creates_concat_dataarray():
 
     # verify shape is 2 (for area and emissions)
     assert mask.shape[0] == 2, (
-        f"first dimension should be 2 (area and emissions), got {mask.shape[0]}"
+        f"first dimension should be 2 (area & emissions), got {mask.shape[0]}"
     )
 
     # verify dtype is float
