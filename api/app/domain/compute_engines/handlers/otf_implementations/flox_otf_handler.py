@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from functools import partial
+from typing import Dict, List, Sequence, Tuple
 
 import dask.array as da
 import numpy as np
@@ -20,6 +23,18 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 
 
 class FloxOTFHandler(AnalyticsOTFHandler):
+    """
+    Key change vs previous version:
+
+    - We DO NOT submit `_handle` to the cluster (no client.map(_handle,...)).
+      `_build_lazy_result` runs on the client and returns *lazy* xarray objects
+      (dask graphs).
+    - We then submit those lazy objects with `client.compute(...)` and gather.
+    - Only after gather do we convert to pandas and post-process.
+
+    This avoids the "one worker spending forever in handle creating tasks" pattern.
+    """
+
     EXPECTED_GROUPS = {
         Dataset.tree_cover_loss: np.arange(0, 25),
         Dataset.tree_cover_gain: np.arange(0, 5),
@@ -46,28 +61,61 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         else:
             aoi_geometries = await self.aoi_geometry_repository.load(aoi.type, aoi.ids)
 
-        aoi_partial = partial(
-            self._handle,
+        # Build lazy results (dask graphs) LOCALLY.
+        build_partial = partial(
+            self._build_lazy_result,
             query=query,
             dataset_repository=self.dataset_repository,
             expected_groups_per_dataset=self.EXPECTED_GROUPS,
         )
-        futures = self.dask_client.map(aoi_partial, list(zip(aoi.ids, aoi_geometries)))
-        results_per_aoi = await self.dask_client.gather(futures)
+        lazy_results: List[xr.Dataset] = [
+            build_partial((aoi_id, geom))
+            for aoi_id, geom in zip(aoi.ids, aoi_geometries)
+        ]
 
-        results = pd.concat(results_per_aoi)
+        # Submit all graphs to the cluster.
+        futures = self.dask_client.compute(lazy_results)
+        computed: List[xr.Dataset] = await self.dask_client.gather(futures)
 
+        # Convert results to pandas after compute completes.
+        results_per_aoi: List[pd.DataFrame] = [
+            self._xr_result_to_df(xr_obj, query=query) for xr_obj in computed
+        ]
+        results = pd.concat(results_per_aoi, ignore_index=True)
+
+        # Unpack group-by coded values (same as before)
         for dataset in query.group_bys:
             col = dataset.get_field_name()
-            results[col] = self.dataset_repository.unpack(dataset, results[col])
+            if col in results.columns:
+                results[col] = self.dataset_repository.unpack(dataset, results[col])
 
         results["aoi_type"] = aoi.type
         return results.to_dict(orient="list")
 
+    # ---------------------------------------------------------------------
+    # Lazy graph builder (runs on client)
+    # ---------------------------------------------------------------------
+
     @staticmethod
-    def _handle(aoi, query, dataset_repository, expected_groups_per_dataset):
+    def _build_lazy_result(aoi, query, dataset_repository, expected_groups_per_dataset):
+        """
+        Build and return a *lazy* xarray.Dataset (dask-backed), with:
+        - group-by dimensions (if any)
+        - aggregate variables
+        - an `aoi_id` coord
+
+        IMPORTANT:
+        - No `.compute()`
+        - No `.to_dataframe()`
+        """
         aoi_id, aoi_geometry = aoi
         func = query.aggregate.func
+
+        # Copy expected groups per AOI because filters may shrink them.
+        # NOTE: values are numpy arrays; copy them so we don't mutate shared state.
+        expected_groups_local: Dict[Dataset, np.ndarray] = {
+            k: np.array(v, copy=True) for k, v in expected_groups_per_dataset.items()
+        }
 
         by = xr.Dataset()
         for ds in query.aggregate.datasets:
@@ -76,86 +124,97 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             )
             by[ds.get_field_name()] = xarr
 
-        geometry_mask = FloxOTFHandler._lazy_geometry_mask_from_da(
+        # AOI mask (lazy via map_blocks)
+        geom_mask = FloxOTFHandler._lazy_geometry_mask_from_da(
             next(iter(by.data_vars.values())), aoi_geometry
         )
-        by = by.where(geometry_mask, other=np.nan)
+        by = by.where(geom_mask, other=np.nan)
 
-        objs = []
-        expected_groups = []
-        for filter in query.filters:
-            translated_value = dataset_repository.translate(
-                filter.dataset, filter.value
-            )
-            da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
-            filter_arr = FloxOTFHandler._get_filter_by_op(
-                da, filter.op, translated_value
-            )
+        # Apply filters (still lazy)
+        for flt in query.filters:
+            translated_value = dataset_repository.translate(flt.dataset, flt.value)
+            arr = dataset_repository.load(flt.dataset, geometry=aoi_geometry)
+            filter_arr = FloxOTFHandler._get_filter_by_op(arr, flt.op, translated_value)
             by = by.where(filter_arr)
 
-            if filter.dataset in query.group_bys:
-                # filter expected groups by the filter itself so it doesn't appear in the results as 0s
-                expected_groups_per_dataset[
-                    filter.dataset
-                ] = expected_groups_per_dataset[filter.dataset][
+            # If a filter applies to a group-by dataset, shrink expected_groups so
+            # flox doesn't emit all other groups as zeros/NaNs.
+            if flt.dataset in query.group_bys:
+                expected_groups_local[flt.dataset] = expected_groups_local[flt.dataset][
                     FloxOTFHandler._get_filter_by_op(
-                        expected_groups_per_dataset[filter.dataset],
-                        filter.op,
+                        expected_groups_local[flt.dataset],
+                        flt.op,
                         translated_value,
                     )
                 ]
 
-        for group_by in query.group_bys:
-            da = dataset_repository.load(group_by, geometry=aoi_geometry).reindex_like(
-                by, method="nearest", tolerance=1e-5
-            )
-            objs.append(da)
-            expected_groups.append(expected_groups_per_dataset[group_by])
+        # Group-by arrays + expected groups
+        objs: List[xr.DataArray] = []
+        expected_groups: List[np.ndarray] = []
 
+        for group_by in query.group_bys:
+            garr = dataset_repository.load(
+                group_by, geometry=aoi_geometry
+            ).reindex_like(by, method="nearest", tolerance=1e-5)
+            objs.append(garr)
+            expected_groups.append(expected_groups_local[group_by])
+
+        # Compute lazily
         if len(objs) > 0:
-            results = (
-                xarray_reduce(
-                    by,
-                    *objs,
-                    func=func,
-                    fill_value=np.nan,
-                    min_count=1,
-                    expected_groups=tuple(expected_groups),
-                )
-                .to_dataframe()
-                .reset_index()
+            reduced = xarray_reduce(
+                by,
+                *objs,
+                func=func,
+                fill_value=np.nan,
+                min_count=1,
+                expected_groups=tuple(expected_groups),
             )
         else:
-            results = FloxOTFHandler._apply_xarr_func(by, func)
+            # Keep result lazy (no compute here)
+            if func == "sum":
+                reduced = by.sum()
+            elif func == "count":
+                reduced = by.count()
+            else:
+                raise ValueError(f"{func} unsupported.")
 
-        # Filter out rows where results for all aggregate datasets are NaN
-        results["aoi_id"] = aoi_id
-        agg_col_names = [ds.get_field_name() for ds in query.aggregate.datasets]
-        filtered_results = results[~results[agg_col_names].isna().all(axis=1)]
+        # Attach AOI id as a coord so it survives compute and conversion
+        reduced = reduced.assign_coords(aoi_id=aoi_id)
+        return reduced
 
-        # TODO remove band and spatial_ref from zarrs
-        return filtered_results.reset_index().drop(
-            columns=["index", "band", "spatial_ref"], errors="ignore"
-        )
+    # ---------------------------------------------------------------------
+    # Post-compute conversion (runs on client after gather)
+    # ---------------------------------------------------------------------
 
     @staticmethod
-    def _apply_xarr_func(by, func):
-        if func == "sum":
-            scalar = by.sum().compute()
-        elif func == "count":
-            scalar = by.count().compute()
-        else:
-            raise ValueError(f"{func} unsupported.")
+    def _xr_result_to_df(xr_obj: xr.Dataset, query: DatasetQuery) -> pd.DataFrame:
+        """
+        Convert computed xarray result to a DataFrame and apply the same filtering
+        you had before (drop rows where all aggregate columns are NaN).
+        """
+        df = xr_obj.to_dataframe().reset_index()
 
-        # to convert scalar to dataframe, need to do some pandas index gymnastics
-        results = (
-            scalar.expand_dims(dim=["index"])
-            .to_dataframe()
-            .reset_index()
-            .drop(columns=["index"])
-        )
+        # Ensure aoi_id is a column
+        if "aoi_id" not in df.columns:
+            if "aoi_id" in xr_obj.coords:
+                df["aoi_id"] = xr_obj.coords["aoi_id"].item()
+            else:
+                df["aoi_id"] = None
 
-        return results
+        agg_col_names = [ds.get_field_name() for ds in query.aggregate.datasets]
+        existing_agg_cols = [c for c in agg_col_names if c in df.columns]
+        if existing_agg_cols:
+            df = df[~df[existing_agg_cols].isna().all(axis=1)]
+
+        # TODO remove band and spatial_ref from zarrs
+        df = df.drop(columns=["band", "spatial_ref"], errors="ignore")
+        # Don't keep the auto index columns from xarray/pandas conversions
+        df = df.reset_index(drop=True)
+        return df
+
+    # ---------------------------------------------------------------------
+    # Utility ops (mostly unchanged)
+    # ---------------------------------------------------------------------
 
     @staticmethod
     def _get_filter_by_op(arr, op, value):
@@ -177,9 +236,11 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                     return arr.isin(value)
                 elif isinstance(arr, np.ndarray):
                     return np.isin(arr, value)
+        raise ValueError(f"Unsupported op: {op}")
 
     @staticmethod
     def _get_expected_group_filter_by_op(expected_group, op, value):
+        # (kept for compatibility; not used directly in this refactor)
         match op:
             case ">":
                 return expected_group > value
@@ -195,6 +256,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 return expected_group != value
             case "in":
                 return set(expected_group) & set(value)
+        raise ValueError(f"Unsupported op: {op}")
 
     @staticmethod
     def _lazy_geometry_mask_from_da(
@@ -223,36 +285,28 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         x = template["x"].values
         y = template["y"].values
 
-        # Pixel size (y often descending -> dy negative; that's OK)
         dx = float(x[1] - x[0])
         dy = float(y[1] - y[0])
 
-        # Rasterio expects transform for *pixel corner* of the upper-left pixel.
         x0 = float(x[0] - dx / 2.0)
         y0 = float(y[0] - dy / 2.0)
         base_transform = Affine.translation(x0, y0) * Affine.scale(dx, dy)
 
         geom_json = mapping(geom)
 
-        # chunks are per-dimension sizes, e.g. ((5,5),(5,5))
         y_chunks = template.data.chunks[0]
         x_chunks = template.data.chunks[1]
 
-        # cumulative pixel offsets for each block index
         y_offsets = np.cumsum((0,) + y_chunks[:-1])
         x_offsets = np.cumsum((0,) + x_chunks[:-1])
 
         def _mask_block(block, block_info=None, block_id=None):
-            # Dask may call once for dtype/shape inference with an empty (0,0) block.
-            # Just return an empty boolean array in that case.
             if block.size == 0:
                 return np.zeros(block.shape, dtype=bool)
 
-            # Prefer block_id if provided (most reliable)
             if block_id is not None:
                 by, bx = block_id
             else:
-                # Fallback: pull chunk-location out of block_info
                 if not block_info:
                     return np.zeros(block.shape, dtype=bool)
                 info = next(iter(block_info.values()))
@@ -265,13 +319,12 @@ class FloxOTFHandler(AnalyticsOTFHandler):
 
             return geometry_mask(
                 [geom_json],
-                out_shape=block.shape,  # (chunk_y, chunk_x)
+                out_shape=block.shape,
                 transform=chunk_transform,
                 invert=True,
                 all_touched=all_touched,
             )
 
-        # Dummy array purely to drive chunking & block_info
         driver = da.zeros(
             template.shape,
             chunks=template.data.chunks,
