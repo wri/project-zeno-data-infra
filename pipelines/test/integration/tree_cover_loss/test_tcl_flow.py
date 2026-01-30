@@ -10,7 +10,7 @@ from pipelines.tree_cover_loss.prefect_flows.tcl_flow import umd_tree_cover_loss
 @pytest.mark.slow
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
-def test_tcl_flow_with_new_contextual_layers(
+def test_tcl_flow(
     mock_load_zarr,
     mock_save_parquet,
     tcl_ds,
@@ -53,7 +53,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "canopy_cover",
         "is_intact_forest",
         "driver",
-        "is_primary_forest", 
+        "is_primary_forest",
         "country",
         "region",
         "subregion",
@@ -66,7 +66,3 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    
-    print(f"\nTCL integration test passed")
-    print(f"Columns: {result_df.columns.tolist()}")
-    print(f"Shape: {result_df.shape}")
