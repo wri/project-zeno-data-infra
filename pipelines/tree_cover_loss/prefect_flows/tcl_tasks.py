@@ -31,7 +31,6 @@ def load_data(
 def setup_compute(
     datasets: Tuple,
     expected_groups,
-    contextual_name: Optional[str] = None,
 ) -> Tuple:
     return stages.setup_compute(datasets, expected_groups)
 

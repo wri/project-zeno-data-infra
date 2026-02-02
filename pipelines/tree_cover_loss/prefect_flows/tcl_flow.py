@@ -32,7 +32,6 @@ thresh_to_pct = {
 @flow(name="Tree Cover Loss")
 def umd_tree_cover_loss(overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
-    contextual_column_name = "tree_cover_loss_year"
     result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-tree-cover-loss-emissions-2001-2024.parquet"
     funcname = "sum"
 
@@ -64,7 +63,7 @@ def umd_tree_cover_loss(overwrite: bool = False):
 
     compute_input = tcl_tasks.setup_compute.with_options(
         name="set-up-area-emissions-by-tcl-compute"
-    )(datasets, expected_groups, contextual_name=contextual_column_name)
+    )(datasets, expected_groups)
 
     result = common_tasks.compute_zonal_stat.with_options(
         name="area-emissions-by-tcl-compute-zonal-stats"
@@ -75,7 +74,7 @@ def umd_tree_cover_loss(overwrite: bool = False):
     )(result)
 
     # convert year values (1-24) to actual years (2001-2024)
-    result_df[contextual_column_name] = result_df[contextual_column_name] + 2000
+    result_df["tree_cover_loss_year"] = result_df["tree_cover_loss_year"] + 2000
 
     # convert tcl thresholds to percentages
     result_df['canopy_cover'] = result_df['canopy_cover'].map(thresh_to_pct)
