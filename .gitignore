@@ -9,7 +9,7 @@
 **/.ipynb_checkpoints/
 .idea/
 .qlty/
-**/zeno_data_analytics.egg-info/
+**/zeno_data_analytics*.egg-info/
 **/build/
 
 .env
