@@ -1,5 +1,6 @@
 from typing import Optional
 
+import rioxarray
 import xarray as xr
 from shapely import Geometry
 from shapely.geometry import mapping
@@ -18,21 +19,25 @@ class ZarrDatasetRepository:
         Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",
         Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",
         Dataset.natural_lands: "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr",
+        Dataset.natural_forests: "s3://gfw-data-lake/sbtn_natural_forests_map/v202504/raster/epsg-4326/zarr/class.zarr",
     }
 
     def load(
         self, dataset: Dataset, geometry: Optional[Geometry] = None
     ) -> xr.DataArray:
-        xarr = xr.open_zarr(
-            self.ZARR_LOCATIONS[dataset],
-            storage_options={"requester_pays": True},
-        ).band_data
+        xarr = self.open_source(dataset)
         xarr.rio.write_crs("EPSG:4326", inplace=True)
         xarr.name = dataset.get_field_name()
 
         if geometry is not None:
             return self._clip_xarr_to_geometry(xarr, geometry)
         return xarr
+
+    def open_source(self, dataset):
+        return xr.open_zarr(
+            self.ZARR_LOCATIONS[dataset],
+            storage_options={"requester_pays": True},
+        ).band_data
 
     def translate(self, dataset, value):
         """
@@ -65,6 +70,14 @@ class ZarrDatasetRepository:
             return int(value)
         elif dataset == Dataset.natural_lands:
             return value
+        elif dataset == Dataset.natural_forests:
+            match value:
+                case "Unknown":
+                    return 0
+                case "Natural Forest":
+                    return 1
+                case "Non-Natural Forest":
+                    return 2
         elif dataset == Dataset.tree_cover_loss_drivers:
             match value:
                 case "Unknown":
@@ -121,6 +134,14 @@ class ZarrDatasetRepository:
             }
 
             return series.map(lambda pixel: drivers[pixel])
+        elif dataset == Dataset.natural_forests:
+            natural_forests_class = {
+                0: "Unknown",
+                1: "Natural Forest",
+                2: "Non-Natural Forest",
+            }
+
+            return series.map(lambda pixel: natural_forests_class[pixel])
         else:
             return series
 

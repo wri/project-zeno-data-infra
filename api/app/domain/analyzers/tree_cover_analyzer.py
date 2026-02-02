@@ -46,6 +46,4 @@ class TreeCoverAnalyzer(Analyzer):
             group_bys=groupbys,
             filters=filters,
         )
-        return await self.compute_engine.compute(
-            tree_cover_analytics_in.aoi.type, tree_cover_analytics_in.aoi.ids, query
-        )
+        return await self.compute_engine.compute(tree_cover_analytics_in.aoi, query)

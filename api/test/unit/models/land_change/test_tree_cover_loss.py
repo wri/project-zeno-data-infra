@@ -69,7 +69,7 @@ class TestTreeCoverLossAnalyticsIn:
         )
 
     def test_natural_forest_with_canopy_cover_error(self, base_config):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             TreeCoverLossAnalyticsIn(
                 aoi={"type": "protected_area", "ids": ["9823"]},
                 start_year="2021",
@@ -80,7 +80,7 @@ class TestTreeCoverLossAnalyticsIn:
             )
 
     def test_natural_forest_pre_2021_error(self, base_config):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             TreeCoverLossAnalyticsIn(
                 aoi={"type": "protected_area", "ids": ["9823"]},
                 start_year="2020",
@@ -90,7 +90,7 @@ class TestTreeCoverLossAnalyticsIn:
             )
 
     def test_natural_forest_admin_error(self, base_config):
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             TreeCoverLossAnalyticsIn(
                 aoi={"type": "admin", "ids": ["IDN"]},
                 start_year="2020",

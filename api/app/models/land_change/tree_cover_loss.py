@@ -3,7 +3,6 @@ from typing import Annotated, List, Literal, Optional, Union
 from pydantic import (
     Field,
     PrivateAttr,
-    ValidationError,
     field_validator,
     model_validator,
 )
@@ -75,7 +74,7 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     def year_must_be_at_least_2001(cls, v: str) -> str:
         year_int = int(v)
         if year_int < 2001:
-            raise ValidationError("Year must be at least 2001.")
+            raise ValueError("Year must be at least 2001.")
         return v
 
     @model_validator(mode="after")
@@ -83,30 +82,28 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         start = int(self.start_year)
         end = int(self.end_year)
         if end < start:
-            raise ValidationError(
-                "end_year must be greater than or equal to start_year"
-            )
+            raise ValueError("end_year must be greater than or equal to start_year")
         return self
 
     @model_validator(mode="after")
     def validate_tree_cover_baseline(self):
         if not (self.canopy_cover or self.forest_filter):
-            raise ValidationError(
+            raise ValueError(
                 "Must set a tree cover baseline using either canopy_cover or forest_filter."
             )
         if self.forest_filter == "natural_forest":
             if int(self.start_year) < 2021:
-                raise ValidationError(
+                raise ValueError(
                     "natural_forest filter is a snapshot of 2020, and is only valid against loss after 2020."
                 )
             elif self.canopy_cover is not None:
-                raise ValidationError(
+                raise ValueError(
                     "Cannot specify both canopy cover from 2000 and natural forest from 2020 as filters."
                 )
             elif self.aoi.type == "admin":
                 # TODO We don't have OTF set up for admin yet, so let's focus on the main use case of
                 # TODO of supporting custom AOI analysis on GFW
-                raise ValidationError(
+                raise ValueError(
                     "natural_forest filter is not currently available for admin AOI type."
                 )
         return self

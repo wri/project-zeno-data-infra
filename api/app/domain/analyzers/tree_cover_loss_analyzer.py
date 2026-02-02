@@ -64,17 +64,9 @@ class TreeCoverLossAnalyzer(Analyzer):
                 )
             )
         elif analytics_in.forest_filter == "natural_forest":
-            query.filters.append(
-                DatasetFilter(
-                    dataset=Dataset.natural_lands,
-                    op="in",
-                    value=[2, 5, 8, 9],  # SBTN classes we define as "natural forest"
-                )
-            )
+            query.group_bys.append(Dataset.natural_forests)
 
-        results = await self.compute_engine.compute(
-            analytics_in.aoi.type, analytics_in.aoi.ids, query
-        )
+        results = await self.compute_engine.compute(analytics_in.aoi, query)
 
         # postprocess, set NaN for carbon if canopy cover requested is <30
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:
