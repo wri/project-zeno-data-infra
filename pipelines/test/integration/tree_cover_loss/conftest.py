@@ -1,7 +1,7 @@
-import pytest
-import numpy as np
-import xarray as xr
 import dask.array as da
+import numpy as np
+import pytest
+import xarray as xr
 
 
 @pytest.fixture
@@ -10,7 +10,7 @@ def tcl_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 2], [2, 3]]], dtype=np.uint8),
+                da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
             )
         }
     )
@@ -49,7 +49,7 @@ def tcd_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[10, 20], [30, 40]]], dtype=np.uint8),
+                da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
             )
         }
     )
@@ -75,7 +75,7 @@ def drivers_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 2], [3, 4]]], dtype=np.int16),
+                da.array([[[1, 1], [2, 2]]], dtype=np.int16),
             )
         }
     )

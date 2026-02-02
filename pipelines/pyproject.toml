@@ -41,5 +41,16 @@ markers = [
     "integration"
 ]
 
+[tool.setuptools]
+packages = [
+  "grasslands",
+  "disturbance",
+  "carbon_flux",
+  "natural_lands",
+  "prefect_flows",
+  "tree_cover_loss",
+  "integrated_alerts"
+]
+
 [tool.ruff]
 line-length = 100

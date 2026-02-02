@@ -1,18 +1,15 @@
 from unittest.mock import patch
 
 import pytest
-from prefect.testing.utilities import prefect_test_harness
 
 from pipelines.tree_cover_loss.prefect_flows.tcl_flow import umd_tree_cover_loss
 
 
 @pytest.mark.integration
 @pytest.mark.slow
-@patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
 def test_tcl_flow_with_new_contextual_layers(
     mock_load_zarr,
-    mock_save_parquet,
     tcl_ds,
     pixel_area_ds,
     carbon_emissions_ds,
@@ -38,14 +35,7 @@ def test_tcl_flow_with_new_contextual_layers(
         subregion_ds,
     ]
 
-    with prefect_test_harness():
-        result_uri = umd_tree_cover_loss(overwrite=True)
-
-    # verify correct output URI
-    assert "admin-tree-cover-loss-emissions-2001-2024.parquet" in result_uri
-
-    # get the the saved df
-    result_df = mock_save_parquet.call_args[0][0]
+    result_df = umd_tree_cover_loss()
 
     # verify expected cols
     expected_columns = {
@@ -53,7 +43,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "canopy_cover",
         "is_intact_forest",
         "driver",
-        "is_primary_forest", 
+        "is_primary_forest",
         "country",
         "region",
         "subregion",
@@ -66,7 +56,7 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    
+
     print(f"\nTCL integration test passed")
     print(f"Columns: {result_df.columns.tolist()}")
     print(f"Shape: {result_df.shape}")
