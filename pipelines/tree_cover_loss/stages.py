@@ -14,6 +14,7 @@ from pipelines.globals import (
 )
 from pipelines.prefect_flows import common_stages
 from pipelines.prefect_flows.common_stages import _load_zarr
+from pipelines.tree_cover_loss.prefect_flows.tcl import umd_tree_cover_loss
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
