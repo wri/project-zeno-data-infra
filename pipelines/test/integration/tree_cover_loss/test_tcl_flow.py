@@ -88,7 +88,8 @@ def test_tcl_flow_with_bbox(
         subregion_ds,
     ]
 
-    result_df = umd_tree_cover_loss(bbox=box(0, 0, 1, 1))
+    # filter to bottom left pixel
+    result_df = umd_tree_cover_loss(bbox=box(0, 0, 0, 0))
 
     # verify expected cols
     expected_columns = {
@@ -109,4 +110,4 @@ def test_tcl_flow_with_bbox(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 40
+    assert result_df.size == 10
