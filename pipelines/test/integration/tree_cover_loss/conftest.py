@@ -136,7 +136,7 @@ def country_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 1], [2, 2]]], dtype=np.int16),
+                da.array([[[4, 4], [8, 8]]], dtype=np.int16),
             )
         },
         coords={

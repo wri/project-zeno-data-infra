@@ -57,7 +57,7 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 20
+    assert result_df.size == 40
 
 
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
@@ -109,3 +109,4 @@ def test_tcl_flow_with_bbox(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
+    assert result_df.size == 40

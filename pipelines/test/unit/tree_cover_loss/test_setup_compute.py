@@ -84,7 +84,6 @@ def _create_mock_datasets(shape=(2, 2)):
 def test_setup_compute_groupby_schema_and_order():
     """Test that groupby has correct column names, order, and dtypes"""
     datasets = _create_mock_datasets()
-
     mask, groupbys, _ = TreeCoverLossTasks.setup_compute(datasets, expected_groups=None)
 
     expected_schema = [
