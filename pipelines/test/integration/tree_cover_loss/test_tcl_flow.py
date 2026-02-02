@@ -66,3 +66,5 @@ def test_tcl_flow(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
+
+    assert result_df.size == 40
