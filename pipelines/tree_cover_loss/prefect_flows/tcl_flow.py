@@ -1,8 +1,10 @@
 import logging
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 from prefect import flow
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     ANALYTICS_BUCKET,
@@ -31,7 +33,7 @@ thresh_to_pct = {
 }
 
 
-def umd_tree_cover_loss(tasks=TreeCoverLossTasks()):
+def umd_tree_cover_loss(bbox: Optional[Polygon] = None, tasks=TreeCoverLossTasks()):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
     contextual_column_name = "tree_cover_loss_year"
     funcname = "sum"
@@ -55,6 +57,7 @@ def umd_tree_cover_loss(tasks=TreeCoverLossTasks()):
         ifl_uri=ifl_intact_forest_lands_zarr_uri,
         drivers_uri=wri_google_1km_drivers_zarr_uri,
         primary_forests_uri=umd_primary_forests_zarr_uri,
+        bbox=bbox,
     )
 
     compute_input = tasks.setup_compute(datasets, expected_groups)

@@ -5,6 +5,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -29,7 +30,7 @@ class TreeCoverLossTasks:
         ifl_uri: Optional[str] = None,
         drivers_uri: Optional[str] = None,
         primary_forests_uri: Optional[str] = None,
-        bbox: Tuple[float, float, float, float] = None,
+        bbox: Optional[Polygon] = None,
     ) -> Tuple[
         xr.DataArray,
         xr.Dataset,
@@ -47,6 +48,10 @@ class TreeCoverLossTasks:
         """
 
         tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri).band_data
+        if bbox is not None:
+            min_x, min_y, max_x, max_y = bbox.bounds
+            # TODO assumption about zarr coords, wrap in class
+            tcl = tcl.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))
 
         # load and align zarrs with tcl
 

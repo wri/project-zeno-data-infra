@@ -12,7 +12,12 @@ def tcl_ds():
                 ("band", "y", "x"),
                 da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return tcl
 
@@ -25,7 +30,12 @@ def pixel_area_ds():
                 ("band", "y", "x"),
                 da.array([[[100.0, 150.0], [200.0, 250.0]]], dtype=np.float32),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return pixel_area
 
@@ -38,7 +48,12 @@ def carbon_emissions_ds():
                 ("band", "y", "x"),
                 da.array([[[1000.0, 1500.0], [2000.0, 2500.0]]], dtype=np.float32),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return carbon
 
@@ -51,7 +66,12 @@ def tcd_ds():
                 ("band", "y", "x"),
                 da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return tcd
 
@@ -64,7 +84,12 @@ def ifl_ds():
                 ("band", "y", "x"),
                 da.array([[[0, 1], [0, 1]]], dtype=np.int16),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return ifl
 
@@ -77,7 +102,12 @@ def drivers_ds():
                 ("band", "y", "x"),
                 da.array([[[1, 1], [2, 2]]], dtype=np.int16),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return drivers
 
@@ -90,7 +120,12 @@ def primary_forests_ds():
                 ("band", "y", "x"),
                 da.array([[[0, 1], [0, 0]]], dtype=np.uint8),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return primary_forests
 
@@ -103,7 +138,12 @@ def country_ds():
                 ("band", "y", "x"),
                 da.array([[[1, 1], [2, 2]]], dtype=np.int16),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return country
 
@@ -116,7 +156,12 @@ def region_ds():
                 ("band", "y", "x"),
                 da.array([[[10, 10], [20, 20]]], dtype=np.uint8),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return region
 
@@ -129,6 +174,11 @@ def subregion_ds():
                 ("band", "y", "x"),
                 da.array([[[100, 101], [200, 201]]], dtype=np.int16),
             )
-        }
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
     )
     return subregion
