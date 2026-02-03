@@ -220,19 +220,27 @@ class TreeCoverLossTasks:
         return True
 
     @staticmethod
-    def get_sample_statistics(iso: str) -> pd.DataFrame:
+    def get_sample_statistics(
+        iso: str,
+        geometry_lookup: Optional[Callable[[str], Polygon]] = None,
+    ) -> pd.DataFrame:
+        if geometry_lookup is None:
+            geometry_lookup = TreeCoverLossTasks.geometry_lookup
+
+        results = umd_tree_cover_loss(TreeCoverLossTasks(), bbox=geometry_lookup(iso))
+        return results
+
+    @staticmethod
+    def geometry_lookup(iso: str) -> Polygon:
         if iso != "BRB":
             raise NotImplementedError()
 
-        barbados_bbox = box(
+        return box(
             -59.856,  # min longitude (west)
             12.845,  # min latitude (south)
             -59.215,  # max longitude (east)
             13.535,  # max latitude (north)
         )
-
-        results = umd_tree_cover_loss(TreeCoverLossTasks(), bbox=barbados_bbox)
-        return results
 
     @staticmethod
     def get_validation_statistics(

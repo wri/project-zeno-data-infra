@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+from shapely.geometry import box
 
 from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 
@@ -77,3 +78,22 @@ def test_tcl_validation_flow():
 
         mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 150.0]})
         assert TreeCoverLossTasks.qc_against_validation_source() is False
+
+
+def test_get_sample_statistics_accepts_injected_geometry_lookup():
+    custom_geometry = box(0, 0, 1, 1)
+    expected = pd.DataFrame({"area_ha": [123.0]})
+    geometry_lookup = MagicMock(return_value=custom_geometry)
+
+    with patch("pipelines.tree_cover_loss.stages.umd_tree_cover_loss") as mock_flow:
+        mock_flow.return_value = expected
+
+        result = TreeCoverLossTasks.get_sample_statistics(
+            "BRB", geometry_lookup=geometry_lookup
+        )
+
+        assert result is expected
+        geometry_lookup.assert_called_once_with("BRB")
+        mock_flow.assert_called_once()
+        _, kwargs = mock_flow.call_args
+        assert kwargs["bbox"] is custom_geometry
