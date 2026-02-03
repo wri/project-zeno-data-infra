@@ -1,10 +1,10 @@
 from typing import Callable, Optional, Tuple
 
 import ee
-import geopandas as gpd
 import numpy as np
 import pandas as pd
 import xarray as xr
+from shapely import box
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
@@ -208,8 +208,8 @@ class TreeCoverLossTasks:
 
     @staticmethod
     def qc_against_validation_source():
-        sample_stats = get_sample_statistics("BRB")
-        validation_stats = get_validation_statistics("BRB")
+        sample_stats = TreeCoverLossTasks.get_sample_statistics("BRB")
+        validation_stats = TreeCoverLossTasks.get_validation_statistics("BRB")
         diff = (
             validation_stats["area_ha"] - sample_stats["area_ha"]
         ) / validation_stats["area_ha"]
@@ -220,23 +220,37 @@ class TreeCoverLossTasks:
         return True
 
     @staticmethod
-    def get_sample_statistics(iso: str, data_load_func) -> pd.DataFrame:
-        # pull from Data API from now and clip to bbox
-        # run compute on that selected bbox
-        pass
+    def get_sample_statistics(iso: str) -> pd.DataFrame:
+        if iso != "BRB":
+            raise NotImplementedError()
+
+        barbados_bbox = box(
+            -59.856,  # min longitude (west)
+            12.845,  # min latitude (south)
+            -59.215,  # max longitude (east)
+            13.535,  # max latitude (north)
+        )
+
+        results = umd_tree_cover_loss(TreeCoverLossTasks(), bbox=barbados_bbox)
+        return results
 
     @staticmethod
-    def get_validation_statistics(iso: str) -> pd.DataFrame:
-        ee.Initialize()
+    def get_validation_statistics(
+        iso: str,
+        ee_module=ee,
+        initialize: bool = True,
+    ) -> pd.DataFrame:
+        if initialize:
+            ee_module.Initialize()
 
-        gfc = ee.Image("UMD/hansen/global_forest_change_2024_v1_12")
+        gfc = ee_module.Image("UMD/hansen/global_forest_change_2024_v1_12")
         loss = gfc.select("loss").selfMask()
         tree_cover = gfc.select("treecover2000")
 
         threshold_mask = tree_cover.gt(30)
         loss_tcd30 = loss.updateMask(threshold_mask)
 
-        drivers24 = ee.Image(
+        drivers24 = ee_module.Image(
             "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"
         ).select("classification")
 
@@ -260,7 +274,7 @@ class TreeCoverLossTasks:
             "natural",
         ]
         drivers = (
-            ee.Image(1)
+            ee_module.Image(1)
             .addBands([permag, hard, shifting, logging, wildfire, settlements, natural])
             .rename(["blank"] + bands)
             .select(bands)
@@ -270,10 +284,10 @@ class TreeCoverLossTasks:
         crs = proj_info["crs"]
         transform = proj_info["transform"]
 
-        def get_regional_stats(im: ee.Image, region: ee.Feature) -> ee.Feature:
-            area_ha_img = im.multiply(ee.Image.pixelArea().divide(10000))
+        def get_regional_stats(im, region):
+            area_ha_img = im.multiply(ee_module.Image.pixelArea().divide(10000))
             stats = area_ha_img.reduceRegion(
-                reducer=ee.Reducer.sum().unweighted(),
+                reducer=ee_module.Reducer.sum().unweighted(),
                 geometry=region.geometry(),
                 crs=crs,
                 crsTransform=transform,
@@ -281,16 +295,16 @@ class TreeCoverLossTasks:
                 maxPixels=1e12,
                 tileScale=16,
             )
-            return ee.Feature(None, stats).copyProperties(
+            return ee_module.Feature(None, stats).copyProperties(
                 region, region.propertyNames()
             )
 
-        gadm = ee.FeatureCollection(
+        gadm = ee_module.FeatureCollection(
             "projects/wri-datalab/GADM_410/gadm_410_ISO_name_1degree_gridded"
         )
-        country = gadm.filter(ee.Filter.eq("GID_0", iso))
+        country = gadm.filter(ee_module.Filter.eq("GID_0", iso))
 
-        fc = country.map(lambda f: get_regional_stats(drivers, ee.Feature(f)))
+        fc = country.map(lambda f: get_regional_stats(drivers, ee_module.Feature(f)))
 
         # Bring it back to the client as JSON (Python dict)
         return fc.getInfo()
