@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from shapely import box
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, mapping
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -14,6 +14,9 @@ from pipelines.globals import (
 )
 from pipelines.prefect_flows import common_stages
 from pipelines.prefect_flows.common_stages import _load_zarr
+from pipelines.repositories.google_earth_engine_dataset_repository import (
+    GoogleEarthEngineDatasetRepository,
+)
 from pipelines.tree_cover_loss.prefect_flows.tcl import umd_tree_cover_loss
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
@@ -320,3 +323,29 @@ class TreeCoverLossTasks:
     @staticmethod
     def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
         return TreeCoverLossTasks.create_result_dataframe(result)
+
+    def get_validation_statistics_xee(
+        geom: Polygon,
+        dataset_repository=GoogleEarthEngineDatasetRepository(),
+    ):
+        loss_ds = dataset_repository.load("loss", geom)
+
+        # pull only what we need
+        loss = loss_ds.loss  # 0/1
+        tcd = loss_ds.treecover2000  # 0-100
+
+        loss_mask = loss == 1
+        loss_tcd30_mask = loss_mask & (tcd > 30)
+
+        drivers_ds = dataset_repository.load("tcl_drivers", geom, like=loss)
+        drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
+
+        area = dataset_repository.load("area", geom, like=loss) / 10000
+
+        results = (
+            area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()
+        )
+        results = results.rename(
+            columns={"area": "area_ha", "classification": "driver"}
+        )
+        return results

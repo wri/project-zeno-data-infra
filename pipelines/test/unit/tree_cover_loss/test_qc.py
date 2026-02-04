@@ -1,68 +1,11 @@
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
+import xarray as xr
 from shapely.geometry import box
 
 from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
-
-
-def _make_mock_ee(get_info_value):
-    image = MagicMock(name="ee_image")
-    image.select.return_value = image
-    image.selfMask.return_value = image
-    image.gt.return_value = image
-    image.updateMask.return_value = image
-    image.multiply.return_value = image
-    image.eq.return_value = image
-    image.addBands.return_value = image
-    image.rename.return_value = image
-    image.projection.return_value.getInfo.return_value = {
-        "crs": "EPSG:4326",
-        "transform": [1, 0, 0, 0, 1, 0],
-    }
-
-    pixel_area = MagicMock(name="ee_pixel_area")
-    pixel_area.divide.return_value = pixel_area
-
-    feature = MagicMock(name="ee_feature")
-    feature.copyProperties.return_value = feature
-
-    fc = MagicMock(name="ee_feature_collection")
-    country = MagicMock(name="ee_country")
-    fc.filter.return_value = country
-    fc_mapped = MagicMock(name="ee_fc_mapped")
-    fc_mapped.getInfo.return_value = get_info_value
-    country.map.return_value = fc_mapped
-
-    reducer = MagicMock(name="ee_reducer")
-    reducer.unweighted.return_value = reducer
-
-    mock_ee = MagicMock(name="ee_module")
-    mock_ee.Image.return_value = image
-    mock_ee.Image.pixelArea.return_value = pixel_area
-    mock_ee.FeatureCollection.return_value = fc
-    mock_ee.Filter.eq.return_value = MagicMock(name="ee_filter")
-    mock_ee.Reducer.sum.return_value = reducer
-    mock_ee.Feature.return_value = feature
-
-    return mock_ee, country, fc_mapped
-
-
-def test_get_validation_statistics_uses_injected_ee_module():
-    expected = {"features": [{"properties": {"area_ha": 1.0}}]}
-    mock_ee, country, fc_mapped = _make_mock_ee(expected)
-
-    result = TreeCoverLossTasks.get_validation_statistics(
-        "BRB", ee_module=mock_ee, initialize=False
-    )
-
-    assert result == expected
-    mock_ee.Initialize.assert_not_called()
-    mock_ee.Image.assert_any_call("UMD/hansen/global_forest_change_2024_v1_12")
-    mock_ee.FeatureCollection.assert_called_once()
-    mock_ee.Filter.eq.assert_called_once_with("GID_0", "BRB")
-    country.map.assert_called_once()
-    fc_mapped.getInfo.assert_called_once()
 
 
 def test_tcl_validation_flow():
@@ -97,3 +40,47 @@ def test_get_sample_statistics_accepts_injected_geometry_lookup():
         mock_flow.assert_called_once()
         _, kwargs = mock_flow.call_args
         assert kwargs["bbox"] is custom_geometry
+
+
+def test_get_validation_statistics_xee_with_fake_repo():
+    class FakeGoogleEarthEngineDatasetRepository:
+        def load(self, dataset, geometry, like=None):
+            if dataset == "loss":
+                return xr.Dataset(
+                    data_vars={
+                        "loss": (
+                            ("y", "x"),
+                            np.array([[1, 0], [1, 1]], dtype=np.uint8),
+                        ),
+                        "treecover2000": (
+                            ("y", "x"),
+                            np.array([[40, 20], [50, 31]], dtype=np.uint8),
+                        ),
+                    }
+                )
+            if dataset == "tcl_drivers":
+                return xr.Dataset(
+                    data_vars={
+                        "classification": (
+                            ("y", "x"),
+                            np.array([[1, 2], [1, 3]], dtype=np.uint8),
+                        )
+                    }
+                )
+            if dataset == "area":
+                return xr.DataArray(
+                    np.array([[10000, 10000], [10000, 20000]], dtype=np.float32),
+                    dims=("y", "x"),
+                    name="area",
+                )
+            raise ValueError(f"Unknown dataset: {dataset}")
+
+    geom = box(0, 0, 1, 1)
+    repo = FakeGoogleEarthEngineDatasetRepository()
+
+    result = TreeCoverLossTasks.get_validation_statistics_xee(
+        geom, dataset_repository=repo
+    )
+
+    expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
+    pd.testing.assert_frame_equal(result, expected, check_dtype=False)
