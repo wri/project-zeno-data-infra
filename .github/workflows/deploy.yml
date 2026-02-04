@@ -66,6 +66,8 @@ on:
         required: true
       PREFECT_WORKSPACE_ID:
         required: true
+      GEE_SERVICE_ACCOUNT_JSON:
+        required: true
 
 env:
   CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
@@ -131,6 +133,7 @@ jobs:
             -var="aws_access_key_id=${{secrets.AWS_ZENO_ACCESS_KEY_ID}}" \
             -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             -var="coiled_token=${{ secrets.DASK_COILED_TOKEN }}" \
+            -var="gee_service_account_json=${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}" \
             -var="prefect_api_key=${{ secrets.PREFECT_API_KEY }}" \
             -var="prefect_account_id=${{ secrets.PREFECT_ACCOUNT_ID }}" \
             -var="prefect_workspace_id=${{ secrets.PREFECT_WORKSPACE_ID }}" \

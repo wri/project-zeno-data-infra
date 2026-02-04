@@ -25,6 +25,8 @@ dependencies = [
     "sparse",
     "xarray",
     "zarr",
+    "earthengine-api",
+    "xee"
 ]
 
 [dependency-groups]
