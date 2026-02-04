@@ -4,9 +4,6 @@ from typing import Dict
 import dask.dataframe as dd
 import newrelic.agent as nr_agent
 import xarray as xr
-import logging
-from rioxarray.exceptions import NoDataInBounds
-import pandas as pd
 
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
@@ -107,86 +104,60 @@ class CarbonFluxAnalyzer(Analyzer):
 
     @staticmethod
     def analyze_area(aoi, geojson, threshold=30) -> dd.DataFrame:
+        threshold_pixel_value = ZarrDatasetRepository().translate(
+            Dataset.canopy_cover, threshold
+        )
+        carbon_net_flux = read_zarr_clipped_to_geojson(
+            carbon_net_flux_zarr_uri, geojson
+        )
+        carbon_gross_removals = read_zarr_clipped_to_geojson(
+            carbon_gross_removals_zarr_uri, geojson
+        )
+        carbon_gross_emissions = read_zarr_clipped_to_geojson(
+            carbon_gross_emissions_zarr_uri, geojson
+        )
+        mangrove_stock_2000 = read_zarr_clipped_to_geojson(
+            mangrove_stock_2000_zarr_uri, geojson
+        ).band_data
+        mangrove_stock_2000.name = "is_mangrove_stock_2000"
+        tree_cover_gain_from_height = read_zarr_clipped_to_geojson(
+            tree_cover_gain_from_height_zarr_uri, geojson
+        ).band_data
+        tree_cover_gain_from_height.name = "tree_cover_gain_from_height"
+        tree_cover_density_2000 = read_zarr_clipped_to_geojson(
+            tree_cover_density_2000_zarr_uri, geojson
+        ).band_data
+        tree_cover_density_2000.name = "tree_cover_density_2000"
 
-        try:
-            threshold_pixel_value = ZarrDatasetRepository().translate(
-                Dataset.canopy_cover, threshold
-            )
-            carbon_net_flux = read_zarr_clipped_to_geojson(
-                carbon_net_flux_zarr_uri, geojson
-            )
-            carbon_gross_removals = read_zarr_clipped_to_geojson(
-                carbon_gross_removals_zarr_uri, geojson
-            )
-            carbon_gross_emissions = read_zarr_clipped_to_geojson(
-                carbon_gross_emissions_zarr_uri, geojson
-            )
-            mangrove_stock_2000 = read_zarr_clipped_to_geojson(
-                mangrove_stock_2000_zarr_uri, geojson
-            ).band_data
-            mangrove_stock_2000.name = "is_mangrove_stock_2000"
-            tree_cover_gain_from_height = read_zarr_clipped_to_geojson(
-                tree_cover_gain_from_height_zarr_uri, geojson
-            ).band_data
-            tree_cover_gain_from_height.name = "tree_cover_gain_from_height"
-            tree_cover_density_2000 = read_zarr_clipped_to_geojson(
-                tree_cover_density_2000_zarr_uri, geojson
-            ).band_data
-            tree_cover_density_2000.name = "tree_cover_density_2000"
+        ds = xr.Dataset(
+            {
+                "carbon_gross_removals_Mg_CO2e": carbon_gross_removals.band_data,
+                "carbon_net_flux_Mg_CO2e": carbon_net_flux.band_data,
+            }
+        )
 
-            ds = xr.Dataset(
-                {
-                    "carbon_gross_removals_Mg_CO2e": carbon_gross_removals.band_data,
-                    "carbon_net_flux_Mg_CO2e": carbon_net_flux.band_data,
-                }
-            )
+        merge = ds * (
+            (tree_cover_density_2000 >= threshold_pixel_value)
+            | mangrove_stock_2000
+            | tree_cover_gain_from_height
+            > 0
+        )
+        emissions = carbon_gross_emissions.band_data * (
+            tree_cover_density_2000 >= threshold_pixel_value
+        )
 
-            merge = ds * (
-                (tree_cover_density_2000 >= threshold_pixel_value)
-                | mangrove_stock_2000
-                | tree_cover_gain_from_height
-                > 0
-            )
-            emissions = carbon_gross_emissions.band_data * (
-                tree_cover_density_2000 >= threshold_pixel_value
-            )
+        merge["carbon_gross_emissions_Mg_CO2e"] = emissions
 
-            merge["carbon_gross_emissions_Mg_CO2e"] = emissions
+        carbon_df: dd.DataFrame = (
+            merge.sum(dim=("x", "y"))
+            .to_dask_dataframe()
+            .drop("spatial_ref", axis=1)
+            .drop("band", axis=1)
+        )
 
-            carbon_df: dd.DataFrame = (
-                merge.sum(dim=("x", "y"))
-                .to_dask_dataframe()
-                .drop("spatial_ref", axis=1)
-                .drop("band", axis=1)
-            )
+        carbon_df["aoi_type"] = aoi["type"].lower()
+        carbon_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
-            carbon_df["aoi_type"] = aoi["type"].lower()
-            carbon_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
-
-            return carbon_df
-        
-        except NoDataInBounds as e:
-            aoi_id = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
-            logging.warning(
-                {
-                    "event": "carbon_flux_analyzer_no_data_in_bounds",
-                    "severity": "low",
-                    "aoi_type": aoi["type"],
-                    "aoi_id": aoi_id,
-                    "message": f"Feature too small or data not in bounds",
-                    "error_details": str(e)
-                }
-            )
-            # Return empty dataframe with zeros
-            return dd.from_pandas(
-                pd.DataFrame({
-                    "carbon_gross_removals_Mg_CO2e": [0.0],
-                    "carbon_net_flux_Mg_CO2e": [0.0],
-                    "carbon_gross_emissions_Mg_CO2e": [0.0],
-                    "aoi_type": [aoi["type"].lower()],
-                    "aoi_id": [aoi_id],
-                }),
-                npartitions=1
-            )
+        return carbon_df
 
 

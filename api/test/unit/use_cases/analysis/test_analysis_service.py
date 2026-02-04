@@ -3,6 +3,7 @@ from uuid import UUID
 
 import pytest
 
+from app.analysis.common.analysis import FeatureTooSmallError
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
@@ -280,3 +281,46 @@ class TestTreeCoverLossServiceCollaborators:
             ),
         )
         assert analysis_service.get_status() == AnalysisStatus.failed
+
+    @pytest.mark.asyncio
+    async def test_feature_too_small_error_stores_error_in_result(
+        self,
+        stub_analysis_in,
+        mock_analysis_repository,
+        mock_analyzer,
+    ):
+        ############
+        # Arrange  #
+        ############
+        mock_analysis_repository.load_analysis.side_effect = [
+            Analysis(result=None, metadata=None, status=None)
+        ]
+
+        error_message = "AOI is too small. Please select a larger AOI."
+        mock_analyzer.analyze.side_effect = [FeatureTooSmallError(error_message)]
+
+        analysis_service = AnalysisService(
+            analysis_repository=mock_analysis_repository,
+            analyzer=mock_analyzer,
+            event="test_endpoint_name",
+        )
+
+        ############
+        # Act      #
+        ############
+        await analysis_service.set_resource_from(stub_analysis_in)
+        await analysis_service.do()
+
+        ############
+        # Assert   #
+        ############
+        mock_analyzer.analyze.assert_called()
+        assert analysis_service.get_status() == AnalysisStatus.failed
+        mock_analysis_repository.store_analysis.assert_called_with(
+            stub_analysis_in.thumbprint(),
+            Analysis(
+                metadata={"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                result={"error": error_message},
+                status=AnalysisStatus.failed,
+            ),
+        )

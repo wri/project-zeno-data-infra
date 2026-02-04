@@ -90,7 +90,10 @@ async def get_analysis(
         case AnalysisStatus.saved:
             message = "Analysis completed successfully."
         case AnalysisStatus.failed:
-            message = "Analysis failed. Result is not available."
+            if analysis.result and "error" in analysis.result:
+                message = analysis.result["error"]
+            else:
+                message = "Analysis failed. Result is not available."
         case _:
             response.headers["Retry-After"] = "1"
             message = "Resource is initializing, follow Retry-After header."
