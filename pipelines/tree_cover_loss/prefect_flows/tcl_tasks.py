@@ -7,6 +7,8 @@ from prefect import task
 from pipelines.prefect_flows.common_tasks import compute_zonal_stat
 from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 
+_tasks = TreeCoverLossTasks()
+
 
 @task
 def load_data(
@@ -18,7 +20,7 @@ def load_data(
     drivers_uri: Optional[str] = None,
     primary_forests_uri: Optional[str] = None,
 ) -> Tuple:
-    return TreeCoverLossTasks.load_data(
+    return _tasks.load_data(
         tree_cover_loss_uri,
         pixel_area_uri,
         carbon_emissions_uri,
@@ -35,12 +37,12 @@ def setup_compute(
     expected_groups,
     contextual_name: Optional[str] = None,
 ) -> Tuple:
-    return TreeCoverLossTasks.setup_compute(datasets, expected_groups)
+    return _tasks.setup_compute(datasets, expected_groups)
 
 
 @task
 def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
-    return TreeCoverLossTasks.create_result_dataframe(result)
+    return _tasks.create_result_dataframe(result)
 
 
 class TreeCoverLossPrefectTasks:

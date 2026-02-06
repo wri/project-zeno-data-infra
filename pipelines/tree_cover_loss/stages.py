@@ -1,11 +1,9 @@
 from typing import Callable, Optional, Tuple
 
-import ee
 import numpy as np
 import pandas as pd
 import xarray as xr
-from shapely import box
-from shapely.geometry import Polygon, mapping
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -17,6 +15,7 @@ from pipelines.prefect_flows.common_stages import _load_zarr
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
+from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
 from pipelines.tree_cover_loss.prefect_flows.tcl import umd_tree_cover_loss
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
@@ -25,8 +24,16 @@ SaverType = Callable[[pd.DataFrame, str], None]
 
 
 class TreeCoverLossTasks:
-    @staticmethod
+    def __init__(
+        self,
+        qc_feature_repository=QCFeaturesRepository(),
+        gee_repository=GoogleEarthEngineDatasetRepository(),
+    ):
+        self.qc_feature_repository = qc_feature_repository
+        self.gee_repository = gee_repository
+
     def load_data(
+        self,
         tree_cover_loss_uri: str,
         pixel_area_uri: Optional[str] = None,
         carbon_emissions_uri: Optional[str] = None,
@@ -138,12 +145,11 @@ class TreeCoverLossTasks:
             subregion,
         )
 
-    @staticmethod
-    def compute_zonal_stat(*args, **kwargs) -> xr.DataArray:
+    def compute_zonal_stat(self, *args, **kwargs) -> xr.DataArray:
         return common_stages.compute(*args, **kwargs)
 
-    @staticmethod
     def setup_compute(
+        self,
         datasets: Tuple,
         expected_groups: Optional[ExpectedGroupsType],
     ) -> Tuple:
@@ -178,8 +184,7 @@ class TreeCoverLossTasks:
 
         return (mask, groupbys, expected_groups)
 
-    @staticmethod
-    def create_result_dataframe(result: xr.DataArray) -> pd.DataFrame:
+    def create_result_dataframe(self, result: xr.DataArray) -> pd.DataFrame:
         """
         Convert an xarray with multiple layers to a result df
         """
@@ -209,126 +214,38 @@ class TreeCoverLossTasks:
 
         return df_pivoted
 
-    @staticmethod
-    def qc_against_validation_source():
-        sample_stats = TreeCoverLossTasks.get_sample_statistics("BRB")
-        validation_stats = TreeCoverLossTasks.get_validation_statistics("BRB")
-        diff = (
-            validation_stats["area_ha"] - sample_stats["area_ha"]
-        ) / validation_stats["area_ha"]
+    def postprocess_result(self, result: xr.DataArray) -> pd.DataFrame:
+        return self.create_result_dataframe(result)
 
-        if (diff.abs() > 0.01).any():
-            return False
+    def qc_against_validation_source(self):
+        qc_features = self.qc_feature_repository.load()
 
-        return True
+        def qc_feature(geom):
+            sample_stats = self.get_sample_statistics(geom)
+            validation_stats = self.get_validation_statistics(geom)
+            diff = (
+                validation_stats["area_ha"] - sample_stats["area_ha"]
+            ) / validation_stats["area_ha"]
 
-    @staticmethod
-    def get_sample_statistics(
-        iso: str,
-        geometry_lookup: Optional[Callable[[str], Polygon]] = None,
-    ) -> pd.DataFrame:
-        if geometry_lookup is None:
-            geometry_lookup = TreeCoverLossTasks.geometry_lookup
+            if (diff.abs() > 0.01).any():
+                return False
 
-        results = umd_tree_cover_loss(TreeCoverLossTasks(), bbox=geometry_lookup(iso))
+            return True
+
+        qc_features["qc_pass"] = qc_features.geometry.apply(qc_feature)
+
+        return qc_features.qc_pass.all()
+
+    def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
+
+        results = umd_tree_cover_loss(self, bbox=geom.bounds)
         return results
 
-    @staticmethod
-    def geometry_lookup(iso: str) -> Polygon:
-        if iso != "BRB":
-            raise NotImplementedError()
-
-        return box(
-            -59.856,  # min longitude (west)
-            12.845,  # min latitude (south)
-            -59.215,  # max longitude (east)
-            13.535,  # max latitude (north)
-        )
-
-    @staticmethod
     def get_validation_statistics(
-        iso: str,
-        ee_module=ee,
-        initialize: bool = True,
-    ) -> pd.DataFrame:
-        if initialize:
-            ee_module.Initialize()
-
-        gfc = ee_module.Image("UMD/hansen/global_forest_change_2024_v1_12")
-        loss = gfc.select("loss").selfMask()
-        tree_cover = gfc.select("treecover2000")
-
-        threshold_mask = tree_cover.gt(30)
-        loss_tcd30 = loss.updateMask(threshold_mask)
-
-        drivers24 = ee_module.Image(
-            "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"
-        ).select("classification")
-
-        loss_drivers24 = loss_tcd30.multiply(drivers24).selfMask()
-
-        permag = loss_drivers24.eq(1).selfMask()
-        hard = loss_drivers24.eq(2).selfMask()
-        shifting = loss_drivers24.eq(3).selfMask()
-        logging = loss_drivers24.eq(4).selfMask()
-        wildfire = loss_drivers24.eq(5).selfMask()
-        settlements = loss_drivers24.eq(6).selfMask()
-        natural = loss_drivers24.eq(7).selfMask()
-
-        bands = [
-            "permag",
-            "hard",
-            "shifting",
-            "logging",
-            "wildfire",
-            "settlements",
-            "natural",
-        ]
-        drivers = (
-            ee_module.Image(1)
-            .addBands([permag, hard, shifting, logging, wildfire, settlements, natural])
-            .rename(["blank"] + bands)
-            .select(bands)
-        )
-
-        proj_info = gfc.projection().getInfo()
-        crs = proj_info["crs"]
-        transform = proj_info["transform"]
-
-        def get_regional_stats(im, region):
-            area_ha_img = im.multiply(ee_module.Image.pixelArea().divide(10000))
-            stats = area_ha_img.reduceRegion(
-                reducer=ee_module.Reducer.sum().unweighted(),
-                geometry=region.geometry(),
-                crs=crs,
-                crsTransform=transform,
-                bestEffort=False,
-                maxPixels=1e12,
-                tileScale=16,
-            )
-            return ee_module.Feature(None, stats).copyProperties(
-                region, region.propertyNames()
-            )
-
-        gadm = ee_module.FeatureCollection(
-            "projects/wri-datalab/GADM_410/gadm_410_ISO_name_1degree_gridded"
-        )
-        country = gadm.filter(ee_module.Filter.eq("GID_0", iso))
-
-        fc = country.map(lambda f: get_regional_stats(drivers, ee_module.Feature(f)))
-
-        # Bring it back to the client as JSON (Python dict)
-        return fc.getInfo()
-
-    @staticmethod
-    def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
-        return TreeCoverLossTasks.create_result_dataframe(result)
-
-    def get_validation_statistics_xee(
+        self,
         geom: Polygon,
-        dataset_repository=GoogleEarthEngineDatasetRepository(),
     ):
-        loss_ds = dataset_repository.load("loss", geom)
+        loss_ds = self.gee_repository.load("loss", geom)
 
         # pull only what we need
         loss = loss_ds.loss  # 0/1
@@ -337,10 +254,10 @@ class TreeCoverLossTasks:
         loss_mask = loss == 1
         loss_tcd30_mask = loss_mask & (tcd > 30)
 
-        drivers_ds = dataset_repository.load("tcl_drivers", geom, like=loss)
+        drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        area = dataset_repository.load("area", geom, like=loss) / 10000
+        area = self.gee_repository.load("area", geom, like=loss) / 10000
 
         results = (
             area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()
