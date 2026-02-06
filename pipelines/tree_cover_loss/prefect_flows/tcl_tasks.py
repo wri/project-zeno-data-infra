@@ -1,9 +1,13 @@
 from typing import Optional, Tuple
-import xarray as xr
-import pandas as pd
 
+import pandas as pd
+import xarray as xr
 from prefect import task
-from pipelines.tree_cover_loss import stages
+
+from pipelines.prefect_flows.common_tasks import compute_zonal_stat
+from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
+
+_tasks = TreeCoverLossTasks()
 
 
 @task
@@ -16,14 +20,14 @@ def load_data(
     drivers_uri: Optional[str] = None,
     primary_forests_uri: Optional[str] = None,
 ) -> Tuple:
-    return stages.load_data(
+    return _tasks.load_data(
         tree_cover_loss_uri,
         pixel_area_uri,
         carbon_emissions_uri,
         tree_cover_density_uri,
         ifl_uri,
         drivers_uri,
-        primary_forests_uri
+        primary_forests_uri,
     )
 
 
@@ -31,10 +35,32 @@ def load_data(
 def setup_compute(
     datasets: Tuple,
     expected_groups,
+    contextual_name: Optional[str] = None,
 ) -> Tuple:
-    return stages.setup_compute(datasets, expected_groups)
+    return _tasks.setup_compute(datasets, expected_groups)
 
 
 @task
 def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
-    return stages.create_result_dataframe(result)
+    return _tasks.create_result_dataframe(result)
+
+
+@task
+def qc_against_validation_source(result: xr.DataArray) -> pd.DataFrame:
+    return _tasks.qc_against_validation_source()
+
+
+class TreeCoverLossPrefectTasks:
+    load_data = load_data.with_options(name="area-emissions-by-tcl-load-data")
+    setup_compute = setup_compute.with_options(
+        name="set-up-area-emissions-by-tcl-compute"
+    )
+    compute_zonal_stat = compute_zonal_stat.with_options(
+        name="area-emissions-by-tcl-compute-zonal-stats"
+    )
+    postprocess_result = postprocess_result.with_options(
+        name="area-emissions-by-tcl-postprocess-result"
+    )
+    qc_against_validation_source = qc_against_validation_source.with_options(
+        "area-emissions-by-tcl-qc-validation"
+    )
