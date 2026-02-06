@@ -27,7 +27,14 @@ thresh_to_pct = {
 }
 
 
-def umd_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
+def umd_tree_cover_loss(tasks):
+    if not tasks.qc_against_validation_source():
+        raise AssertionError("TCL did not pass QC validation, stopping job")
+
+    compute_tree_cover_loss(tasks)
+
+
+def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
     contextual_column_name = "tree_cover_loss_year"
     funcname = "sum"

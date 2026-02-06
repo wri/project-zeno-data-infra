@@ -3,7 +3,14 @@ from unittest.mock import patch
 import pytest
 from shapely.geometry import box
 
-from pipelines.tree_cover_loss.prefect_flows.tcl import umd_tree_cover_loss
+from pipelines.test.integration.tree_cover_loss.conftest import (
+    FakeGoogleEarthEngineDatasetRepository,
+    FakeQCRepository,
+)
+from pipelines.tree_cover_loss.prefect_flows.tcl import (
+    compute_tree_cover_loss,
+    umd_tree_cover_loss,
+)
 from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 
 
@@ -37,7 +44,12 @@ def test_tcl_flow_with_new_contextual_layers(
         subregion_ds,
     ]
 
-    result_df = umd_tree_cover_loss(TreeCoverLossTasks())
+    result_df = umd_tree_cover_loss(
+        TreeCoverLossTasks(
+            gee_repository=FakeGoogleEarthEngineDatasetRepository(),
+            qc_feature_repository=FakeQCRepository(),
+        )
+    )
 
     # verify expected cols
     expected_columns = {
@@ -90,7 +102,7 @@ def test_tcl_flow_with_bbox(
     ]
 
     # filter to bottom left pixel
-    result_df = umd_tree_cover_loss(TreeCoverLossTasks(), bbox=box(0, 0, 0, 0))
+    result_df = compute_tree_cover_loss(TreeCoverLossTasks(), bbox=box(0, 0, 0, 0))
 
     # verify expected cols
     expected_columns = {

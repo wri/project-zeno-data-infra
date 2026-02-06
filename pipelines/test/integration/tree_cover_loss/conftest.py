@@ -1,7 +1,9 @@
 import dask.array as da
+import geopandas as gpd
 import numpy as np
 import pytest
 import xarray as xr
+from shapely.geometry import box
 
 
 @pytest.fixture
@@ -182,3 +184,41 @@ def subregion_ds():
         },
     )
     return subregion
+
+
+class FakeQCRepository:
+    def load(self, aoi_id=None, aoi_type=None):
+        return gpd.GeoDataFrame(geometry=[box(0, 0, 1, 1)])
+
+
+class FakeGoogleEarthEngineDatasetRepository:
+    def load(self, dataset, geometry, like=None):
+        if dataset == "loss":
+            return xr.Dataset(
+                data_vars={
+                    "loss": (
+                        ("y", "x"),
+                        np.array([[1, 0], [1, 1]], dtype=np.uint8),
+                    ),
+                    "treecover2000": (
+                        ("y", "x"),
+                        np.array([[40, 20], [50, 31]], dtype=np.uint8),
+                    ),
+                }
+            )
+        if dataset == "tcl_drivers":
+            return xr.Dataset(
+                data_vars={
+                    "classification": (
+                        ("y", "x"),
+                        np.array([[1, 2], [1, 3]], dtype=np.uint8),
+                    )
+                }
+            )
+        if dataset == "area":
+            return xr.DataArray(
+                np.array([[10000, 10000], [10000, 20000]], dtype=np.float32),
+                dims=("y", "x"),
+                name="area",
+            )
+        raise ValueError(f"Unknown dataset: {dataset}")

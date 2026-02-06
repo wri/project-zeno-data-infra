@@ -45,6 +45,11 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     return _tasks.create_result_dataframe(result)
 
 
+@task
+def qc_against_validation_source(result: xr.DataArray) -> pd.DataFrame:
+    return _tasks.qc_against_validation_source()
+
+
 class TreeCoverLossPrefectTasks:
     load_data = load_data.with_options(name="area-emissions-by-tcl-load-data")
     setup_compute = setup_compute.with_options(
@@ -55,4 +60,7 @@ class TreeCoverLossPrefectTasks:
     )
     postprocess_result = postprocess_result.with_options(
         name="area-emissions-by-tcl-postprocess-result"
+    )
+    qc_against_validation_source = qc_against_validation_source.with_options(
+        "area-emissions-by-tcl-qc-validation"
     )

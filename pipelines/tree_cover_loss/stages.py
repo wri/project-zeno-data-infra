@@ -16,7 +16,7 @@ from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
-from pipelines.tree_cover_loss.prefect_flows.tcl import umd_tree_cover_loss
+from pipelines.tree_cover_loss.prefect_flows.tcl import compute_tree_cover_loss
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
@@ -238,7 +238,7 @@ class TreeCoverLossTasks:
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
 
-        results = umd_tree_cover_loss(self, bbox=geom.bounds)
+        results = compute_tree_cover_loss(self, bbox=geom)
         return results
 
     def get_validation_statistics(
