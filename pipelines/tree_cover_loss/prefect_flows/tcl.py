@@ -27,11 +27,11 @@ thresh_to_pct = {
 }
 
 
-def umd_tree_cover_loss(tasks):
+def umd_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
     if not tasks.qc_against_validation_source():
         raise AssertionError("TCL did not pass QC validation, stopping job")
 
-    return compute_tree_cover_loss(tasks)
+    return compute_tree_cover_loss(tasks, bbox)
 
 
 def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):

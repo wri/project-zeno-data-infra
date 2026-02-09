@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 import pandas as pd
 import xarray as xr
 from prefect import task
+from shapely import Polygon
 
 from pipelines.prefect_flows.common_tasks import compute_zonal_stat
 from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
@@ -19,6 +20,7 @@ def load_data(
     ifl_uri: Optional[str] = None,
     drivers_uri: Optional[str] = None,
     primary_forests_uri: Optional[str] = None,
+    bbox: Optional[Polygon] = None,
 ) -> Tuple:
     return _tasks.load_data(
         tree_cover_loss_uri,
@@ -28,6 +30,7 @@ def load_data(
         ifl_uri,
         drivers_uri,
         primary_forests_uri,
+        bbox,
     )
 
 
@@ -46,7 +49,7 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
 
 
 @task
-def qc_against_validation_source(result: xr.DataArray) -> pd.DataFrame:
+def qc_against_validation_source() -> bool:
     return _tasks.qc_against_validation_source()
 
 
@@ -62,5 +65,5 @@ class TreeCoverLossPrefectTasks:
         name="area-emissions-by-tcl-postprocess-result"
     )
     qc_against_validation_source = qc_against_validation_source.with_options(
-        "area-emissions-by-tcl-qc-validation"
+        name="area-emissions-by-tcl-qc-validation"
     )
