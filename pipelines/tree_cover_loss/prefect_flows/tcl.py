@@ -46,8 +46,8 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
         np.arange(0, 8),  # drivers
         np.arange(0, 2),  # primary_forests
         np.arange(999),  # countries
-        np.arange(1, 86),  # adm1s
-        np.arange(1, 854),  # adm2s
+        np.arange(86),  # adm1s
+        np.arange(854),  # adm2s
     )
 
     datasets = tasks.load_data(

@@ -224,10 +224,17 @@ class TreeCoverLossTasks:
 
         def qc_feature(geom):
             sample_stats = self.get_sample_statistics(geom)
+            sample_driver_area_ha_total = sample_stats[
+                (sample_stats.canopy_cover.astype(np.int8) >= 30)
+                & ~(sample_stats.driver.isna())
+            ].area_ha.sum()
+
             validation_stats = self.get_validation_statistics(geom)
+            validation_driver_area_ha_total = validation_stats.area_ha.sum()
+
             diff = abs(
-                (validation_stats["area_ha"].sum() - sample_stats["area_ha"].sum())
-                / validation_stats["area_ha"].sum()
+                (validation_driver_area_ha_total - sample_driver_area_ha_total)
+                / validation_driver_area_ha_total
             )
 
             if diff > self.qc_error_threshold:
@@ -259,7 +266,7 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        area = self.gee_repository.load("area", geom, like=loss)
+        area = self.gee_repository.load("area", geom, like=loss) / 10000
 
         results = (
             area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()

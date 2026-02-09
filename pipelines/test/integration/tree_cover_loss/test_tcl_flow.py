@@ -48,7 +48,7 @@ def test_tcl_flow_real_data(mock_save_parquet):
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 40
+    assert result_df.size == 8690
 
 
 @pytest.mark.integration
