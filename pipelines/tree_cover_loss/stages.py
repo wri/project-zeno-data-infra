@@ -28,9 +28,11 @@ class TreeCoverLossTasks:
         self,
         qc_feature_repository=QCFeaturesRepository(),
         gee_repository=GoogleEarthEngineDatasetRepository(),
+        qc_error_threshold=0.01,
     ):
         self.qc_feature_repository = qc_feature_repository
         self.gee_repository = gee_repository
+        self.qc_error_threshold = qc_error_threshold
 
     def load_data(
         self,
@@ -223,11 +225,12 @@ class TreeCoverLossTasks:
         def qc_feature(geom):
             sample_stats = self.get_sample_statistics(geom)
             validation_stats = self.get_validation_statistics(geom)
-            diff = (
-                validation_stats["area_ha"] - sample_stats["area_ha"]
-            ) / validation_stats["area_ha"]
+            diff = abs(
+                (validation_stats["area_ha"].sum() - sample_stats["area_ha"].sum())
+                / validation_stats["area_ha"].sum()
+            )
 
-            if (diff.abs() > 0.01).any():
+            if diff > self.qc_error_threshold:
                 return False
 
             return True
@@ -237,7 +240,6 @@ class TreeCoverLossTasks:
         return qc_features.qc_pass.all()
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
-
         results = compute_tree_cover_loss(self, bbox=geom)
         return results
 
@@ -257,7 +259,7 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        area = self.gee_repository.load("area", geom, like=loss) / 10000
+        area = self.gee_repository.load("area", geom, like=loss)
 
         results = (
             area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()

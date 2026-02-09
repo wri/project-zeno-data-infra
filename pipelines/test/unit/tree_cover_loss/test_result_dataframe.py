@@ -40,7 +40,8 @@ def test_create_result_dataframe_same_sparsity_pattern():
         shape=(3, 2),
     )
 
-    df = TreeCoverLossTasks.create_result_dataframe(result_dataarray)
+    tasks = TreeCoverLossTasks()
+    df = tasks.create_result_dataframe(result_dataarray)
 
     # verify correct shape and columns
     assert len(df) == 3, f"expected 3 rows, got {len(df)}"
@@ -82,7 +83,8 @@ def test_create_result_dataframe_mismatched_sparsity():
         shape=(3, 2),
     )
 
-    df = TreeCoverLossTasks.create_result_dataframe(result_dataarray)
+    tasks = TreeCoverLossTasks()
+    df = tasks.create_result_dataframe(result_dataarray)
 
     assert len(df) == 3, f"expected 3 rows (union of all coordinates), got {len(df)}"
 
@@ -127,7 +129,8 @@ def test_create_result_dataframe_output_schema():
         shape=(2, 2),
     )
 
-    df = TreeCoverLossTasks.create_result_dataframe(result_dataarray)
+    tasks = TreeCoverLossTasks()
+    df = tasks.create_result_dataframe(result_dataarray)
 
     # verify column names and dtypes
     expected_columns = {"tree_cover_loss_year", "country", "area_ha", "carbon_Mg_CO2e"}

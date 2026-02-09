@@ -31,7 +31,7 @@ def umd_tree_cover_loss(tasks):
     if not tasks.qc_against_validation_source():
         raise AssertionError("TCL did not pass QC validation, stopping job")
 
-    compute_tree_cover_loss(tasks)
+    return compute_tree_cover_loss(tasks)
 
 
 def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):

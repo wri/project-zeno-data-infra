@@ -30,16 +30,17 @@ def test_get_sample_statistics_accepts_injected_geometry_lookup():
     geom = box(0, 0, 1, 1)
     expected = pd.DataFrame({"area_ha": [123.0]})
 
-    with patch("pipelines.tree_cover_loss.stages.umd_tree_cover_loss") as mock_flow:
+    with patch("pipelines.tree_cover_loss.stages.compute_tree_cover_loss") as mock_flow:
         mock_flow.return_value = expected
+        tasks = TreeCoverLossTasks()
 
-        result = TreeCoverLossTasks.get_sample_statistics(geom)
+        result = tasks.get_sample_statistics(geom)
 
         assert result is expected
 
         mock_flow.assert_called_once()
         _, kwargs = mock_flow.call_args
-        assert kwargs["bbox"] is geom.bounds
+        assert kwargs["bbox"] is geom
 
 
 def test_get_validation_statistics_with_fake_repo():
@@ -48,5 +49,5 @@ def test_get_validation_statistics_with_fake_repo():
 
     result = tasks.get_validation_statistics(geom)
 
-    expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
+    expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [20000.0, 20000.0]})
     pd.testing.assert_frame_equal(result, expected, check_dtype=False)

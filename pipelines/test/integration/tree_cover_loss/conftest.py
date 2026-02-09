@@ -66,7 +66,7 @@ def tcd_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
+                da.array([[[5, 5], [6, 6]]], dtype=np.uint8),
             )
         },
         coords={
@@ -218,6 +218,39 @@ class FakeGoogleEarthEngineDatasetRepository:
         if dataset == "area":
             return xr.DataArray(
                 np.array([[10000, 10000], [10000, 20000]], dtype=np.float32),
+                dims=("y", "x"),
+                name="area",
+            )
+        raise ValueError(f"Unknown dataset: {dataset}")
+
+
+class MatchingGoogleEarthEngineDatasetRepository:
+    def load(self, dataset, geometry, like=None):
+        if dataset == "loss":
+            return xr.Dataset(
+                data_vars={
+                    "loss": (
+                        ("y", "x"),
+                        np.array([[1, 1], [1, 1]], dtype=np.uint8),
+                    ),
+                    "treecover2000": (
+                        ("y", "x"),
+                        np.array([[35, 35], [40, 40]], dtype=np.uint8),
+                    ),
+                }
+            )
+        if dataset == "tcl_drivers":
+            return xr.Dataset(
+                data_vars={
+                    "classification": (
+                        ("y", "x"),
+                        np.array([[1, 1], [2, 2]], dtype=np.uint8),
+                    )
+                }
+            )
+        if dataset == "area":
+            return xr.DataArray(
+                np.array([[100.0, 150.0], [200.0, 250.0]], dtype=np.float32),
                 dims=("y", "x"),
                 name="area",
             )

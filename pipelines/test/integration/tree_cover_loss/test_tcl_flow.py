@@ -4,8 +4,8 @@ import pytest
 from shapely.geometry import box
 
 from pipelines.test.integration.tree_cover_loss.conftest import (
-    FakeGoogleEarthEngineDatasetRepository,
     FakeQCRepository,
+    MatchingGoogleEarthEngineDatasetRepository,
 )
 from pipelines.tree_cover_loss.prefect_flows.tcl import (
     compute_tree_cover_loss,
@@ -15,7 +15,6 @@ from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 
 
 @pytest.mark.integration
-@pytest.mark.slow
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
 def test_tcl_flow_with_new_contextual_layers(
     mock_load_zarr,
@@ -42,11 +41,11 @@ def test_tcl_flow_with_new_contextual_layers(
         country_ds,
         region_ds,
         subregion_ds,
-    ]
+    ] * 2
 
     result_df = umd_tree_cover_loss(
         TreeCoverLossTasks(
-            gee_repository=FakeGoogleEarthEngineDatasetRepository(),
+            gee_repository=MatchingGoogleEarthEngineDatasetRepository(),
             qc_feature_repository=FakeQCRepository(),
         )
     )

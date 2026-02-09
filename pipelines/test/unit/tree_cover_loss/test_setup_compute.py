@@ -84,7 +84,8 @@ def _create_mock_datasets(shape=(2, 2)):
 def test_setup_compute_groupby_schema_and_order():
     """Test that groupby has correct column names, order, and dtypes"""
     datasets = _create_mock_datasets()
-    mask, groupbys, _ = TreeCoverLossTasks.setup_compute(datasets, expected_groups=None)
+    tasks = TreeCoverLossTasks()
+    mask, groupbys, _ = tasks.setup_compute(datasets, expected_groups=None)
 
     expected_schema = [
         (0, "tree_cover_loss_year", np.uint8),
@@ -112,7 +113,8 @@ def test_setup_compute_groupby_schema_and_order():
 
 def test_setup_compute_creates_concat_dataarray():
     datasets = _create_mock_datasets()
-    mask, groupbys, _ = TreeCoverLossTasks.setup_compute(datasets, expected_groups=None)
+    tasks = TreeCoverLossTasks()
+    mask, groupbys, _ = tasks.setup_compute(datasets, expected_groups=None)
 
     # verify layer dimension exists
     assert (
