@@ -30,6 +30,7 @@ jobs:
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use Zeno prod key for api tests
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
+      GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}
     with:
       image_type: 'branch'
       project_dir: 'api'
