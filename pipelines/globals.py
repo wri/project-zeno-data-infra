@@ -1,28 +1,6 @@
-import base64
-import json
-import os
-
-import ee
-
 DATA_LAKE_BUCKET = "gfw-data-lake"
 ANALYTICS_BUCKET = "lcl-analytics"
 GADM_VERSION = "v4.1.85"
-
-GEE_SERVICE_ACCOUNT_FILE = "gee_credentials.json"
-if os.getenv("GEE_SERVICE_ACCOUNT_JSON") is not None:
-    gee_service_account_b64 = os.environ["GEE_SERVICE_ACCOUNT_JSON"]
-    GEE_SERVICE_ACCOUNT_JSON = json.loads(
-        base64.b64decode(gee_service_account_b64).decode("utf-8")
-    )
-    with open(GEE_SERVICE_ACCOUNT_FILE, "w") as f:
-        json.dump(GEE_SERVICE_ACCOUNT_JSON, f)
-
-    creds = ee.ServiceAccountCredentials(
-        GEE_SERVICE_ACCOUNT_JSON["client_email"],
-        GEE_SERVICE_ACCOUNT_FILE,
-    )
-
-    ee.Initialize()
 
 country_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm0.zarr"
 region_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm1.zarr"

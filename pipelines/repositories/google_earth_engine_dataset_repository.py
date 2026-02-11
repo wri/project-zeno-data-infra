@@ -1,3 +1,7 @@
+import base64
+import json
+import os
+
 import ee
 import xarray as xr
 from shapely.geometry import mapping
@@ -18,7 +22,8 @@ class GoogleEarthEngineDatasetRepository:
         self.default_projection = default_projection
 
     def load(self, dataset, geometry, like=None):
-        ee.Initialize()
+        # initialize lazily if not already initialized
+        self.initialize()
 
         # must wrap geometry in ee Geometry object to use
         ee_geom = ee.Geometry(mapping(geometry))
@@ -36,3 +41,18 @@ class GoogleEarthEngineDatasetRepository:
             return ds.reindex_like(like, method="nearest")
 
         return ds
+
+    def initialize(self):
+        if not ee.data.is_initialized():
+            gee_service_account_b64 = os.getenv("GEE_SERVICE_ACCOUNT_JSON")
+            if gee_service_account_b64:
+                gee_service_account = json.loads(
+                    base64.b64decode(gee_service_account_b64).decode("utf-8")
+                )
+                creds = ee.ServiceAccountCredentials(
+                    gee_service_account["client_email"],
+                    key_data=json.dumps(gee_service_account),
+                )
+                ee.Initialize(creds)
+            else:
+                raise RuntimeError("No valid EE credentials found")
