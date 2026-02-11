@@ -29,6 +29,8 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY_FOR_TESTS:
         required: true
+      GEE_SERVICE_ACCOUNT_JSON:
+        required: true
 
 env:
   CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
@@ -82,6 +84,7 @@ jobs:
             API_KEY=${{ secrets.GFW_API_KEY }} \
               AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} \
               AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
+              GEE_SERVICE_ACCOUNT_JSON=${{ secrets.GEE_SERVICE_ACCOUNT_JSON }} \
               DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} \
               ANALYSES_TABLE_NAME=Analyses-test \
               ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
