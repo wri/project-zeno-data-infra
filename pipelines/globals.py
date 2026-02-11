@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 
@@ -9,7 +10,10 @@ GADM_VERSION = "v4.1.85"
 
 GEE_SERVICE_ACCOUNT_FILE = "gee_credentials.json"
 if os.getenv("GEE_SERVICE_ACCOUNT_JSON") is not None:
-    GEE_SERVICE_ACCOUNT_JSON = json.loads(os.getenv("GEE_SERVICE_ACCOUNT_JSON"))
+    gee_service_account_b64 = os.environ["GEE_SERVICE_ACCOUNT_JSON"]
+    GEE_SERVICE_ACCOUNT_JSON = json.loads(
+        base64.b64decode(gee_service_account_b64).decode("utf-8")
+    )
     with open(GEE_SERVICE_ACCOUNT_FILE, "w") as f:
         json.dump(GEE_SERVICE_ACCOUNT_JSON, f)
 
@@ -43,7 +47,7 @@ tree_cover_density_zarr_uri = (
 carbon_emissions_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-emissions/v20250430/Mg_CO2e_float64.zarr"
 )
-wri_google_1km_drivers_zarr_uri = f"s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr"
+wri_google_1km_drivers_zarr_uri = "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr"
 ifl_intact_forest_lands_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/ifl-intact-forest-landscapes-2000/v2021/is.zarr/"
 )
