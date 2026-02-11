@@ -110,6 +110,12 @@ variable "coiled_token" {
   type = string
 }
 
+variable "gee_service_account_json" {
+  description = "Google Earth Engine service account JSON (string)"
+  type        = string
+  sensitive   = true
+}
+
 variable "region" {
   description = "AWS region"
   type = string

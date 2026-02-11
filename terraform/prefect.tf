@@ -125,6 +125,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       PIPELINES_IMAGE       = var.pipelines_image
       TF_WORKSPACE          = terraform.workspace
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
+      GEE_SERVICE_ACCOUNT_JSON = var.gee_service_account_json
     }
   })
 

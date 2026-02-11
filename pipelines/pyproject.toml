@@ -25,6 +25,8 @@ dependencies = [
     "sparse",
     "xarray",
     "zarr",
+    "earthengine-api",
+    "xee"
 ]
 
 [dependency-groups]
@@ -39,6 +41,17 @@ dev = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration"
+]
+
+[tool.setuptools]
+packages = [
+  "grasslands",
+  "disturbance",
+  "carbon_flux",
+  "natural_lands",
+  "prefect_flows",
+  "tree_cover_loss",
+  "integrated_alerts"
 ]
 
 [tool.ruff]
