@@ -250,7 +250,9 @@ class MatchingGoogleEarthEngineDatasetRepository:
             )
         if dataset == "area":
             return xr.DataArray(
-                np.array([[100.0, 150.0], [200.0, 250.0]], dtype=np.float32),
+                np.array(
+                    [[1000000.0, 1500000.0], [2000000.0, 2500000.0]], dtype=np.float32
+                ),
                 dims=("y", "x"),
                 name="area",
             )

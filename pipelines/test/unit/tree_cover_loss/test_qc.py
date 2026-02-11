@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 from shapely.geometry import box
 
@@ -17,12 +18,36 @@ def test_tcl_validation_flow():
         "pipelines.tree_cover_loss.stages.TreeCoverLossTasks.get_validation_statistics"
     ) as mock_validation:
         tasks = TreeCoverLossTasks(qc_feature_repository=FakeQCRepository())
-        mock_sample.return_value = pd.DataFrame({"area_ha": [100.0, 200.0]})
+        mock_sample.return_value = pd.DataFrame(
+            {
+                "area_ha": [100.0, 200.0],
+                "canopy_cover": ["30", "30"],
+                "driver": ["Agriculture", "Permanent settlement"],
+            }
+        )
         mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 200.0]})
 
         assert bool(tasks.qc_against_validation_source()) is True
 
         mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 150.0]})
+        assert bool(tasks.qc_against_validation_source()) is False
+
+        mock_sample.return_value = pd.DataFrame(
+            {
+                "area_ha": [100.0, 200.0],
+                "canopy_cover": ["10", "30"],
+                "driver": ["Agriculture", "Permanent settlement"],
+            }
+        )
+        assert bool(tasks.qc_against_validation_source()) is False
+
+        mock_sample.return_value = pd.DataFrame(
+            {
+                "area_ha": [100.0, 200.0],
+                "canopy_cover": ["30", "30"],
+                "driver": [np.nan, "Permanent settlement"],
+            }
+        )
         assert bool(tasks.qc_against_validation_source()) is False
 
 
@@ -49,5 +74,5 @@ def test_get_validation_statistics_with_fake_repo():
 
     result = tasks.get_validation_statistics(geom)
 
-    expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [20000.0, 20000.0]})
+    expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
     pd.testing.assert_frame_equal(result, expected, check_dtype=False)
