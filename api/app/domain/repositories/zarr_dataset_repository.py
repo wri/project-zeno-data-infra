@@ -1,6 +1,10 @@
 from typing import Optional
 
+import dask.array as da
+import numpy as np
 import xarray as xr
+from rasterio.features import geometry_mask
+from rasterio.transform import Affine
 from shapely import Geometry
 from shapely.geometry import mapping
 
@@ -135,5 +139,61 @@ class ZarrDatasetRepository:
         if sliced.size == 0:
             return sliced
 
-        clipped = sliced.rio.clip([geojson])
-        return clipped
+        x_coords = sliced.x.values
+        y_coords = sliced.y.values
+
+        if len(x_coords) < 1000 or len(y_coords) < 1000:
+            # Small region — fall back to rio.clip that computes eagerly
+            clipped = sliced.rio.clip([geojson])
+            return clipped
+
+        res_x = float(abs(x_coords[1] - x_coords[0]))
+        res_y = float(abs(y_coords[1] - y_coords[0]))
+
+        def _build_mask_chunk(block, block_info=None):
+            """Build a boolean geometry mask for a single dask chunk."""
+            if block_info is None or block.size == 0:
+                return np.ones(block.shape, dtype=bool)
+
+            y_start, y_stop = block_info[0]["array-location"][-2]
+            x_start, x_stop = block_info[0]["array-location"][-1]
+
+            chunk_y = y_coords[y_start:y_stop]
+            chunk_x = x_coords[x_start:x_stop]
+
+            if len(chunk_y) == 0 or len(chunk_x) == 0:
+                return np.ones(block.shape, dtype=bool)
+
+            transform = Affine(
+                res_x,
+                0,
+                float(chunk_x[0]) - res_x / 2,
+                0,
+                -res_y,
+                float(chunk_y[0]) + res_y / 2,
+            )
+
+            return geometry_mask(
+                [geojson],
+                out_shape=block.shape[-2:],
+                transform=transform,
+                invert=True,
+            )
+
+        mask_data = da.map_blocks(
+            _build_mask_chunk,
+            sliced.data,
+            dtype=bool,
+        )
+        clip_mask = xr.DataArray(
+            mask_data,
+            dims=sliced.dims,
+            coords=sliced.coords,
+        )
+
+        orig_dtype = sliced.dtype
+        cropped = sliced.where(clip_mask)
+        nodata = sliced.rio.nodata
+        if nodata is not None and not np.isnan(nodata):
+            cropped = cropped.fillna(nodata)
+        return cropped.astype(orig_dtype)
