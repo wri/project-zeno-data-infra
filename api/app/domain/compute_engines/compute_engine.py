@@ -11,5 +11,5 @@ class ComputeEngine:
     def __init__(self, handler: AnalyticsPrecalcHandler | AnalyticsOTFHandler):
         self.handler = handler
 
-    async def compute(self, aoi_type, aoi_ids, query: DatasetQuery):
-        return await self.handler.handle(aoi_type, aoi_ids, query)
+    async def compute(self, aoi, query: DatasetQuery):
+        return await self.handler.handle(aoi, query)

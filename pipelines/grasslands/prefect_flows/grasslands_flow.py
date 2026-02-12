@@ -38,15 +38,10 @@ def gadm_grasslands_area(overwrite: bool = False):
         name="area-by-grasslands-compute-zonal-stats"
     )(*compute_input, funcname=funcname)
 
-    print("result_dataset")
-    print(result_dataset)
-
     result_df: pd.DataFrame = common_tasks.postprocess_result.with_options(
         name="area-by-grasslands-postprocess-result"
     )(result_dataset)
 
-    print("result_df")
-    print(result_df)
     result_df.rename(columns={"value": "area_ha"}, inplace=True)
     result_df["area_ha"] = result_df["area_ha"] / 1e4
 
