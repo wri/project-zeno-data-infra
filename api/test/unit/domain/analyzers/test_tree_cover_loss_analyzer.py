@@ -1,3 +1,4 @@
+import dask.array as da
 import duckdb
 import numpy as np
 import pandas as pd
@@ -38,36 +39,47 @@ class TestAoiGeometryRepository:
 
 class TestDatasetRepository(ZarrDatasetRepository):
     def open_source(self, dataset):
+        chunks = (5, 5)
+        coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
+
         if dataset == Dataset.area_hectares:
             # all values are 5000
-            data = np.full((10, 10), 5000)
-            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
-            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-            xarr.name = "area_ha"
+            data = da.full((10, 10), 5000, chunks=chunks, dtype=np.float32)
+            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"), name="area_ha")
         elif dataset == Dataset.canopy_cover:
             # left half is 1s, right half is 5s
-            data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
-            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
-            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-            xarr.name = "canopy_cover"
+            left = da.ones((10, 5), chunks=(5, 5), dtype=np.int8)
+            right = da.full((10, 5), 5, chunks=(5, 5), dtype=np.int8)
+            data = da.hstack([left, right])
+            xarr = xr.DataArray(
+                data, coords=coords, dims=("x", "y"), name="canopy_cover"
+            )
         elif dataset == Dataset.tree_cover_loss:
             # top half is 21s, bottom half is 5s
-            data = np.vstack([np.full((5, 10), 21), np.full((5, 10), 5)])
-            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
-            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-            xarr.name = "tree_cover_loss_year"
+            top = da.full((5, 10), 21, chunks=(5, 5), dtype=np.int8)
+            bottom = da.full((5, 10), 5, chunks=(5, 5), dtype=np.int8)
+            data = da.vstack([top, bottom])
+            xarr = xr.DataArray(
+                data, coords=coords, dims=("x", "y"), name="tree_cover_loss_year"
+            )
         elif dataset == Dataset.carbon_emissions:
             # top half is 1.5s, bottom half is 0.5s
-            data = np.vstack([np.full((5, 10), 1.5), np.full((5, 10), 0.5)])
-            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
-            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-            xarr.name = "carbon_emissions_MgCO2e"
+            top = da.full((5, 10), 1.5, chunks=(5, 5), dtype=np.float32)
+            bottom = da.full((5, 10), 0.5, chunks=(5, 5), dtype=np.float32)
+            data = da.vstack([top, bottom])
+            xarr = xr.DataArray(
+                data, coords=coords, dims=("x", "y"), name="carbon_emissions_MgCO2e"
+            )
         elif dataset == Dataset.natural_forests:
-            # left half is 0s, middle is 1s,right is 2s
-            data = np.hstack([np.zeros((10, 3)), np.ones((10, 4)), np.full((10, 3), 2)])
-            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
-            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
-            xarr.name = "natural_forests"
+            # left half is 0s, middle is 1s, right is 2s
+            left = da.zeros((10, 3), chunks=(5, 3), dtype=np.int8)
+            middle = da.ones((10, 4), chunks=(5, 4), dtype=np.int8)
+            right = da.full((10, 3), 2, chunks=(5, 3), dtype=np.int8)
+            data = da.hstack([left, middle, right])
+            xarr = xr.DataArray(
+                data, coords=coords, dims=("x", "y"), name="natural_forests"
+            )
+
         else:
             raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
