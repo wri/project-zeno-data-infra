@@ -79,7 +79,6 @@ jobs:
             -e API_KEY=${{ secrets.GFW_API_KEY }} \
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
-            -e DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} \
             -e ANALYSES_TABLE_NAME=Analyses-test \
             -e ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
             ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }} \
