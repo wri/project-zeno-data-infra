@@ -11,6 +11,8 @@ dependencies = [
     "flox",
     "fsspec",
     "geopandas",
+    "jupyterlab",
+    "jupyter-server",
     "numba>=0.61.2",
     "numbagg",
     "numpy",
