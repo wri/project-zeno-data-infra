@@ -14,6 +14,7 @@ from pipelines.globals import (
     umd_primary_forests_zarr_uri,
     wri_google_1km_drivers_zarr_uri,
 )
+from pipelines.prefect_flows.common_stages import numeric_to_alpha3
 
 # tcd threshold mapping
 thresh_to_pct = {
@@ -90,9 +91,6 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
 
     # convert primary forest to boolean
     result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
-
-    # convert country codes
-    from pipelines.prefect_flows.common_stages import numeric_to_alpha3
 
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)

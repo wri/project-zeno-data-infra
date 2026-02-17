@@ -53,6 +53,8 @@ class GoogleEarthEngineDatasetRepository:
                     gee_service_account["client_email"],
                     key_data=json.dumps(gee_service_account),
                 )
-                ee.Initialize(creds)
+                ee.Initialize(
+                    creds, opt_url="https://earthengine-highvolume.googleapis.com"
+                )
             else:
                 raise RuntimeError("No valid EE credentials found")

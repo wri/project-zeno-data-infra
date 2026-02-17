@@ -1,9 +1,10 @@
 from typing import Callable, Optional, Tuple
 
+import ee
 import numpy as np
 import pandas as pd
 import xarray as xr
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, mapping
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -222,28 +223,64 @@ class TreeCoverLossTasks:
     def qc_against_validation_source(self):
         qc_features = self.qc_feature_repository.load()
 
-        def qc_feature(geom):
-            sample_stats = self.get_sample_statistics(geom)
-            sample_driver_area_ha_total = sample_stats[
-                (sample_stats.canopy_cover.astype(np.int8) >= 30)
-                & ~(sample_stats.driver.isna())
-            ].area_ha.sum()
+        def qc_feature(row):
+            try:
+                sample_stats = self.get_sample_statistics(row.geometry)
+                iso, adm1_str, adm2_suffix = row.GID_2.split(".")
+                adm2_str, _ = adm2_suffix.split("_")
 
-            validation_stats = self.get_validation_statistics(geom)
-            validation_driver_area_ha_total = validation_stats.area_ha.sum()
+                adm1 = int(adm1_str)
+                adm2 = int(adm2_str)
 
-            diff = abs(
-                (validation_driver_area_ha_total - sample_driver_area_ha_total)
-                / validation_driver_area_ha_total
-            )
+                if sample_stats.size > 0:
+                    sample_driver_area_ha_total = sample_stats[
+                        (sample_stats.canopy_cover.astype(np.int8) >= 30)
+                        & ~(sample_stats.driver.isna())
+                        & (sample_stats.country == iso)
+                        & (sample_stats.region == adm1)
+                        & (sample_stats.subregion == adm2)
+                    ].area_ha.sum()
+                else:
+                    sample_driver_area_ha_total = 0
 
-            if diff > self.qc_error_threshold:
-                return False
+                validation_stats = self.get_validation_statistics(row.geometry)
+                if validation_stats.size > 0:
+                    validation_driver_area_ha_total = validation_stats.area_ha.sum()
+                else:
+                    validation_driver_area_ha_total = 0
 
-            return True
+                diff = abs(
+                    (validation_driver_area_ha_total - sample_driver_area_ha_total)
+                    / validation_driver_area_ha_total
+                )
 
-        qc_features["qc_pass"] = qc_features.geometry.apply(qc_feature)
+                if diff > self.qc_error_threshold:
+                    result = False
 
+                result = True
+                return pd.Series(
+                    {
+                        "pass": result,
+                        "sample": sample_driver_area_ha_total,
+                        "validation": validation_driver_area_ha_total,
+                        "detail": "",
+                    }
+                )
+            except Exception as e:
+                return pd.Series(
+                    {
+                        "pass": False,
+                        "sample": np.nan,
+                        "validation": np.nan,
+                        "detail": str(e),
+                    }
+                )
+
+        qc_features[["qc_pass", "sample", "validation", "detail"]] = qc_features[
+            :10
+        ].apply(qc_feature, axis=1)
+
+        qc_features.to_file("validation_results.geojson", index=False)
         return qc_features.qc_pass.all()
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
@@ -266,6 +303,10 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
+        # if the whole thing is masked just exit early
+        if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
+            return pd.DataFrame({"area_ha": [], "driver": []})
+
         area = self.gee_repository.load("area", geom, like=loss) / 10000
 
         results = (
@@ -275,3 +316,71 @@ class TreeCoverLossTasks:
             columns={"area": "area_ha", "classification": "driver"}
         )
         return results
+
+    def get_validation_statistics_old(
+        self,
+        geom: Polygon,
+    ) -> pd.DataFrame:
+        geom_ee = ee.Geometry(mapping(geom))
+
+        gfc = ee.Image("UMD/hansen/global_forest_change_2024_v1_12")
+        loss = gfc.select("loss").selfMask()
+        tree_cover = gfc.select("treecover2000")
+
+        threshold_mask = tree_cover.gt(30)
+        loss_tcd30 = loss.updateMask(threshold_mask)
+
+        drivers24 = ee.Image(
+            "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"
+        ).select("classification")
+
+        loss_drivers24 = loss_tcd30.multiply(drivers24).selfMask()
+
+        permag = loss_drivers24.eq(1).selfMask()
+        hard = loss_drivers24.eq(2).selfMask()
+        shifting = loss_drivers24.eq(3).selfMask()
+        logging = loss_drivers24.eq(4).selfMask()
+        wildfire = loss_drivers24.eq(5).selfMask()
+        settlements = loss_drivers24.eq(6).selfMask()
+        natural = loss_drivers24.eq(7).selfMask()
+
+        bands = [
+            "permag",
+            "hard",
+            "shifting",
+            "logging",
+            "wildfire",
+            "settlements",
+            "natural",
+        ]
+        drivers = (
+            ee.Image(1)
+            .addBands([permag, hard, shifting, logging, wildfire, settlements, natural])
+            .rename(["blank"] + bands)
+            .select(bands)
+        )
+
+        proj_info = gfc.projection().getInfo()
+        crs = proj_info["crs"]
+        transform = proj_info["transform"]
+
+        def get_regional_stats(im, region):
+            area_ha_img = im.multiply(ee.Image.pixelArea().divide(10000))
+            stats = area_ha_img.reduceRegion(
+                reducer=ee.Reducer.sum().unweighted(),
+                geometry=region.geometry(),
+                crs=crs,
+                crsTransform=transform,
+                bestEffort=False,
+                maxPixels=1e12,
+                tileScale=16,
+            )
+            return ee.Feature(None, stats).copyProperties(
+                region, region.propertyNames()
+            )
+
+        adm2 = ee.FeatureCollection([ee.Feature(geom_ee, {"id": "aoi_1"})])
+        fc = adm2.map(lambda f: get_regional_stats(drivers, ee.Feature(f)))
+
+        # Bring it back to the client as JSON (Python dict)
+        return fc.getInfo()
