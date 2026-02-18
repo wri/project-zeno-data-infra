@@ -1,10 +1,12 @@
 from unittest.mock import patch
 
+import geopandas as gpd
 import pytest
 from prefect.testing.utilities import prefect_test_harness
-from shapely.geometry import box
+from shapely.geometry import box, shape
 
 from pipelines.test.integration.tree_cover_loss.conftest import (
+    ARG_1_28,
     FakeQCRepository,
     MatchingGoogleEarthEngineDatasetRepository,
 )
@@ -19,10 +21,16 @@ from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 @pytest.mark.integration
 @pytest.mark.slow
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
-def test_tcl_flow_real_data(mock_save_parquet):
-    bbox_brb = [-59.856, 12.845, -59.215, 13.535]
+@patch("pipelines.repositories.qc_feature_repository.QCFeaturesRepository.load")
+def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
+    test_geom = shape(ARG_1_28)
+
+    mock_qc_load.return_value = gpd.GeoDataFrame(
+        {"geometry": [test_geom], "GID_2": "ARG.1.28_1"}
+    )
+
     with prefect_test_harness():
-        result_uri = umd_tree_cover_loss_flow(overwrite=True, bbox=bbox_brb)
+        result_uri = umd_tree_cover_loss_flow(overwrite=True, bbox=test_geom.bounds)
 
     assert "admin-tree-cover-loss-emissions-2001-2024.parquet" in result_uri
 
@@ -48,7 +56,7 @@ def test_tcl_flow_real_data(mock_save_parquet):
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 8690
+    assert result_df.size == 8500
 
 
 @pytest.mark.integration
