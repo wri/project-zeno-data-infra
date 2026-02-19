@@ -44,7 +44,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
         "is_intact_forest",
         "driver",
         "is_primary_forest",
-        "is_natural_forest",
+        "natural_forest_class",
         "country",
         "region",
         "subregion",
@@ -57,7 +57,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df["is_natural_forest"].dtype == bool
+    assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 10538
 
 
@@ -106,7 +106,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
-        "is_natural_forest",
+        "natural_forest_class",
         "country",
         "region",
         "subregion",
@@ -119,7 +119,7 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df["is_natural_forest"].dtype == bool
+    assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 44
 
 
@@ -163,7 +163,7 @@ def test_tcl_flow_with_bbox(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
-        "is_natural_forest",
+        "natural_forest_class",
         "country",
         "region",
         "subregion",
@@ -176,5 +176,5 @@ def test_tcl_flow_with_bbox(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df["is_natural_forest"].dtype == bool
+    assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 11

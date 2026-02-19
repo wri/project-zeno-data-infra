@@ -191,7 +191,7 @@ class TreeCoverLossTasks:
             ifl.rename("is_intact_forest"),
             drivers.rename("driver"),
             primary_forests.rename("is_primary_forest"),
-            natural_forests.rename("is_natural_forest"),
+            natural_forests.rename("natural_forest_class"),
             country.rename("country"),
             region.rename("region"),
             subregion.rename("subregion"),

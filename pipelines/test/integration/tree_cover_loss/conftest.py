@@ -138,7 +138,7 @@ def natural_forests_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 1], [0, 0]]], dtype=np.uint8),
+                da.array([[[1, 1], [0, 2]]], dtype=np.uint8),
             )
         },
         coords={
