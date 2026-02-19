@@ -371,69 +371,7 @@ class TestLoadingAnalysis:
             status=AnalysisStatus.failed,
         )
 
-
-class TestCustomAoiGeometryOffloading:
-    """Tests for offloading CustomAreaOfInterest geometry to S3."""
-
-    TEST_ANALYSES_TABLE_NAME = os.getenv("ANALYSES_TABLE_NAME")
-    TEST_ANALYSIS_RESULTS_BUCKET_NAME = os.getenv("ANALYSIS_RESULTS_BUCKET_NAME")
-
-    @pytest.fixture(scope="class")
-    def moto_server(self):
-        server = ThreadedMotoServer(port=0)
-        server.start()
-        host, port = server.get_host_and_port()
-        yield f"http://{host}:{port}"
-        server.stop()
-
-    @pytest.fixture(scope="class", autouse=True)
-    def aws_infrastructure(self, moto_server):
-        import boto3
-        from botocore.config import Config
-
-        config = Config(
-            region_name="us-east-1",
-            retries={"max_attempts": 0},
-        )
-        dynamodb = boto3.resource(
-            "dynamodb",
-            endpoint_url=moto_server,
-            config=config,
-            aws_access_key_id="testing",
-            aws_secret_access_key="testing",
-            aws_session_token="testing",
-        )
-        s3 = boto3.client(
-            "s3",
-            endpoint_url=moto_server,
-            config=config,
-            aws_access_key_id="testing",
-            aws_secret_access_key="testing",
-            aws_session_token="testing",
-        )
-        dynamodb.create_table(
-            TableName=self.TEST_ANALYSES_TABLE_NAME,
-            KeySchema=[{"AttributeName": "resource_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[
-                {"AttributeName": "resource_id", "AttributeType": "S"}
-            ],
-            BillingMode="PAY_PER_REQUEST",
-        )
-        s3.create_bucket(Bucket=self.TEST_ANALYSIS_RESULTS_BUCKET_NAME)
-
-    @pytest_asyncio.fixture(scope="function")
-    async def dynamodb_and_s3(self, moto_server):
-        session = aioboto3.Session()
-        async with session.client(
-            "s3", region_name="us-east-1", endpoint_url=moto_server
-        ) as s3_client:
-            async with session.resource(
-                "dynamodb",
-                region_name="us-east-1",
-                endpoint_url=moto_server,
-            ) as dynamo:
-                dynamodb_table = await dynamo.Table(self.TEST_ANALYSES_TABLE_NAME)
-                yield dynamodb_table, s3_client, moto_server
+    # --- Custom AOI geometry offloading tests ---
 
     def _make_custom_aoi_metadata(self):
         custom_aoi = CustomAreaOfInterest(
@@ -495,7 +433,7 @@ class TestCustomAoiGeometryOffloading:
         expected_key = f"{GEOMETRY_S3_PREFIX}{expected_hash}.geojson"
 
         response = await s3_client.get_object(
-            Bucket=os.getenv("ANALYSIS_RESULTS_BUCKET_NAME"),
+            Bucket=self.TEST_ANALYSIS_RESULTS_BUCKET_NAME,
             Key=expected_key,
         )
         async with response["Body"] as stream:
