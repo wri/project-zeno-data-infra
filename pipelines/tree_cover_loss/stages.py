@@ -313,19 +313,25 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        # if the whole thing is masked just exit early
-        if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
-            return pd.DataFrame({"area_ha": [], "driver": []})
+        # natural_lands_class = self.gee_repository.load("natural_lands", geom, like=loss)
 
         area = self.gee_repository.load("area", geom, like=loss) / 10000
 
-        results = (
-            area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()
-        )
-        results = results.rename(
-            columns={"area": "area_ha", "classification": "driver"}
-        )
-        return results
+        # if the whole thing is masked just exit early
+        if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
+            driver_results = pd.DataFrame({"area_ha": [], "driver": []})
+        else:
+            driver_results = (
+                area.groupby(drivers_class)
+                .sum(skipna=True)
+                .to_dataframe()
+                .reset_index()
+            )
+            driver_results = driver_results.rename(
+                columns={"area": "area_ha", "classification": "driver"}
+            )
+
+        return driver_results
 
     def get_validation_statistics_old(
         self,

@@ -15,6 +15,7 @@ class GoogleEarthEngineDatasetRepository:
             "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"
         ),
         "area": lambda: ee.Image.pixelArea(),
+        "natural_lands": lambda: ee.Image("WRI/SBTN/naturalLands/v1_1/2020"),
     }
 
     def __init__(self, default_scale=0.00025, default_projection="EPSG:4326"):
