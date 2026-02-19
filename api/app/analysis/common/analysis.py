@@ -7,9 +7,16 @@ from typing import Iterable
 import duckdb
 import httpx
 import xarray as xr
+from rioxarray.exceptions import NoDataInBounds
 from shapely.geometry import shape
 
 JULIAN_DATE_2021 = 2459215
+
+
+class FeatureTooSmallError(Exception):
+    """Raised when a AOI is too small to contain any pixel centroids."""
+
+    pass
 
 
 async def send_request_to_data_api(url, params):
@@ -72,7 +79,12 @@ def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
     if all(d.size == 0 for d in sliced.data_vars.values()):
         return sliced
 
-    clipped = sliced.rio.clip([geojson])
+    try:
+        clipped = sliced.rio.clip([geojson])
+    except NoDataInBounds:
+        raise FeatureTooSmallError(
+            "AOI is too small. Please select a larger AOI "
+        )
     return clipped
 
 
