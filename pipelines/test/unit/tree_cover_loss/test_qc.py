@@ -23,29 +23,38 @@ def test_tcl_validation_flow():
                 "area_ha": [100.0, 200.0],
                 "canopy_cover": ["30", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
+                "country": ["AFG", "AFG"],
+                "region": [1, 1],
+                "subregion": [1, 1],
             }
         )
         mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 200.0]})
 
-        assert bool(tasks.qc_against_validation_source()) is True
+        assert tasks.qc_against_validation_source() is True
 
         mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 150.0]})
-        assert bool(tasks.qc_against_validation_source()) is False
+        assert tasks.qc_against_validation_source() is False
 
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
                 "canopy_cover": ["10", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
+                "country": ["AFG", "AFG"],
+                "region": [1, 1],
+                "subregion": [1, 1],
             }
         )
-        assert bool(tasks.qc_against_validation_source()) is False
+        assert tasks.qc_against_validation_source() is False
 
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
                 "canopy_cover": ["30", "30"],
                 "driver": [np.nan, "Permanent settlement"],
+                "country": ["AFG", "AFG"],
+                "region": [1, 1],
+                "subregion": [1, 1],
             }
         )
         assert bool(tasks.qc_against_validation_source()) is False

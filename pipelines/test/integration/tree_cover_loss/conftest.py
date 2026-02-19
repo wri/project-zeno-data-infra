@@ -188,7 +188,7 @@ def subregion_ds():
 
 class FakeQCRepository:
     def load(self, aoi_id=None, aoi_type=None):
-        return gpd.GeoDataFrame(geometry=[box(0, 0, 1, 1)])
+        return gpd.GeoDataFrame({"geometry": [box(0, 0, 1, 1)], "GID_2": ["AFG.1.1_1"]})
 
 
 class FakeGoogleEarthEngineDatasetRepository:

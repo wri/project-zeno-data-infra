@@ -254,10 +254,8 @@ class TreeCoverLossTasks:
                     / validation_driver_area_ha_total
                 )
 
-                if diff > self.qc_error_threshold:
-                    result = False
+                result = bool(diff < self.qc_error_threshold)
 
-                result = True
                 return pd.Series(
                     {
                         "pass": result,
@@ -276,12 +274,12 @@ class TreeCoverLossTasks:
                     }
                 )
 
-        qc_features[["qc_pass", "sample", "validation", "detail"]] = qc_features[
-            :10
-        ].apply(qc_feature, axis=1)
+        qc_features[["qc_pass", "sample", "validation", "detail"]] = qc_features.apply(
+            qc_feature, axis=1
+        )
 
-        qc_features.to_file("validation_results.geojson", index=False)
-        return qc_features.qc_pass.all()
+        # qc_features.to_file("validation_results.geojson", index=False)
+        return bool(qc_features.qc_pass.all())
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
         results = compute_tree_cover_loss(self, bbox=geom)
