@@ -9,6 +9,7 @@ from pipelines.globals import (
     carbon_emissions_zarr_uri,
     ifl_intact_forest_lands_zarr_uri,
     pixel_area_zarr_uri,
+    sbtn_natural_forests_zarr_uri,
     tree_cover_density_zarr_uri,
     tree_cover_loss_zarr_uri,
     umd_primary_forests_zarr_uri,
@@ -46,6 +47,7 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
         np.arange(0, 2),  # ifl
         np.arange(0, 8),  # drivers
         np.arange(0, 2),  # primary_forests
+        np.arange(0, 2),  # natural_forests
         np.arange(999),  # countries
         np.arange(86),  # adm1s
         np.arange(854),  # adm2s
@@ -59,6 +61,7 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
         ifl_uri=ifl_intact_forest_lands_zarr_uri,
         drivers_uri=wri_google_1km_drivers_zarr_uri,
         primary_forests_uri=umd_primary_forests_zarr_uri,
+        natural_forests_uri=sbtn_natural_forests_zarr_uri,
         bbox=bbox,
     )
 
@@ -91,6 +94,7 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
 
     # convert primary forest to boolean
     result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
+    result_df["is_natural_forest"] = result_df["is_natural_forest"].astype(bool)
 
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)

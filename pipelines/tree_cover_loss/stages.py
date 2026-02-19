@@ -44,10 +44,12 @@ class TreeCoverLossTasks:
         ifl_uri: Optional[str] = None,
         drivers_uri: Optional[str] = None,
         primary_forests_uri: Optional[str] = None,
+        natural_forests_uri: Optional[str] = None,
         bbox: Optional[Polygon] = None,
     ) -> Tuple[
         xr.DataArray,
         xr.Dataset,
+        xr.DataArray,
         xr.DataArray,
         xr.DataArray,
         xr.DataArray,
@@ -111,6 +113,13 @@ class TreeCoverLossTasks:
             join="left",
         )[1]
 
+        natural_forests: xr.DataArray = _load_zarr(natural_forests_uri).band_data
+        natural_forests = xr.align(
+            tcl,
+            natural_forests.reindex_like(tcl, method="nearest", tolerance=1e-5),
+            join="left",
+        )[1]
+
         # GADM zarrs
         country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
         country = xr.align(
@@ -143,6 +152,7 @@ class TreeCoverLossTasks:
             ifl,
             drivers,
             primary_forests,
+            natural_forests,
             country,
             region,
             subregion,
@@ -164,6 +174,7 @@ class TreeCoverLossTasks:
             ifl,
             drivers,
             primary_forests,
+            natural_forests,
             country,
             region,
             subregion,
@@ -180,6 +191,7 @@ class TreeCoverLossTasks:
             ifl.rename("is_intact_forest"),
             drivers.rename("driver"),
             primary_forests.rename("is_primary_forest"),
+            natural_forests.rename("is_natural_forest"),
             country.rename("country"),
             region.rename("region"),
             subregion.rename("subregion"),

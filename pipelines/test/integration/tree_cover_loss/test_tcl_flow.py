@@ -44,6 +44,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
         "is_intact_forest",
         "driver",
         "is_primary_forest",
+        "is_natural_forest",
         "country",
         "region",
         "subregion",
@@ -56,7 +57,8 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 8500
+    assert result_df["is_natural_forest"].dtype == bool
+    assert result_df.size == 10538
 
 
 @pytest.mark.integration
@@ -70,6 +72,7 @@ def test_tcl_flow_with_new_contextual_layers(
     ifl_ds,
     drivers_ds,
     primary_forests_ds,
+    natural_forests_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -83,6 +86,7 @@ def test_tcl_flow_with_new_contextual_layers(
         ifl_ds,
         drivers_ds,
         primary_forests_ds,
+        natural_forests_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -102,6 +106,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
+        "is_natural_forest",
         "country",
         "region",
         "subregion",
@@ -114,7 +119,8 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 40
+    assert result_df["is_natural_forest"].dtype == bool
+    assert result_df.size == 44
 
 
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
@@ -127,6 +133,7 @@ def test_tcl_flow_with_bbox(
     ifl_ds,
     drivers_ds,
     primary_forests_ds,
+    natural_forests_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -140,6 +147,7 @@ def test_tcl_flow_with_bbox(
         ifl_ds,
         drivers_ds,
         primary_forests_ds,
+        natural_forests_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -155,6 +163,7 @@ def test_tcl_flow_with_bbox(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
+        "is_natural_forest",
         "country",
         "region",
         "subregion",
@@ -167,4 +176,5 @@ def test_tcl_flow_with_bbox(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 10
+    assert result_df["is_natural_forest"].dtype == bool
+    assert result_df.size == 11
