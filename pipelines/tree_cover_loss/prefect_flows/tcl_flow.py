@@ -12,7 +12,7 @@ from pipelines.tree_cover_loss.prefect_flows.tcl import umd_tree_cover_loss
 from pipelines.utils import s3_uri_exists
 
 
-@flow
+@flow(name="Tree Cover Loss")
 def umd_tree_cover_loss_flow(
     overwrite=False, bbox: Optional[Tuple[float, float, float, float]] = None
 ):
