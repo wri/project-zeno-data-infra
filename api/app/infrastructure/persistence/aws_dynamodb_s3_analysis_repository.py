@@ -12,6 +12,7 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
 
 RESULTS_BUCKET_NAME = os.getenv("ANALYSIS_RESULTS_BUCKET_NAME", None)
+GEOMETRY_S3_PREFIX = "custom_areas/"
 
 
 # Helper function for retrying on throttling
@@ -51,6 +52,40 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         """Generates the S3 key for storing the result of a given resource_id."""
         return f"{self.analytics_category}/{resource_id}.json"
 
+    @staticmethod
+    def _get_geometry_s3_key(geometry_hash: str) -> str:
+        return f"{GEOMETRY_S3_PREFIX}{geometry_hash}.geojson"
+
+    async def _store_geometry(self, geometry: dict, geometry_hash: str):
+        """Upload feature_collection to S3, skipping if it already exists."""
+        s3_key = self._get_geometry_s3_key(geometry_hash)
+        try:
+            await _retry_on_throttling(
+                self._s3.head_object,
+                Bucket=self._bucket_name,
+                Key=s3_key,
+            )
+        except ClientError:
+            await _retry_on_throttling(
+                self._s3.put_object,
+                Bucket=self._bucket_name,
+                Key=s3_key,
+                Body=json.dumps(geometry).encode("utf-8"),
+                ContentType="application/geo+json",
+            )
+
+    async def _load_geometry(self, geometry_hash: str) -> dict:
+        """Retrieve a feature_collection from S3 by its hash."""
+        s3_key = self._get_geometry_s3_key(geometry_hash)
+        response = await _retry_on_throttling(
+            self._s3.get_object,
+            Bucket=self._bucket_name,
+            Key=s3_key,
+        )
+        async with response["Body"] as stream:
+            content = await stream.read()
+            return json.loads(content)
+
     async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
         try:
             # Use consistent read for strong consistency
@@ -81,6 +116,24 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         status_value = item.get("status")
         status = AnalysisStatus(status_value) if status_value else None
         s3_key = item.get("s3_result_key")  # This is the pointer to the result in S3
+
+        # Hydrate custom AOI geometry from S3 if stored as a reference
+        if metadata and isinstance(metadata.get("aoi"), dict):
+            aoi = metadata["aoi"]
+            geometry_hash = aoi.get("feature_collection_hash")
+            if geometry_hash and "feature_collection" not in aoi:
+                try:
+                    fc = await self._load_geometry(geometry_hash)
+                    metadata["aoi"]["feature_collection"] = fc
+                    del metadata["aoi"]["feature_collection_hash"]
+                except ClientError as e:
+                    logging.warning(
+                        {
+                            "event": "geometry_hydration_failed",
+                            "geometry_hash": geometry_hash,
+                            "error": str(e),
+                        }
+                    )
 
         result_payload = None
         # Only try to fetch from S3 if a key exists and status suggests there's a result
@@ -115,12 +168,27 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         s3_key = self._get_s3_key(resource_id)
         resource_id_str = str(resource_id)
 
+        # Offload custom AOI feature_collection to S3 before storing metadata
+        metadata = analytics.metadata
+        if metadata and isinstance(metadata.get("aoi"), dict):
+            aoi = metadata["aoi"]
+            if aoi.get("type") == "feature_collection" and "feature_collection" in aoi:
+                from app.models.common.areas_of_interest import (
+                    CustomAreaOfInterest,
+                )
+
+                custom_aoi = CustomAreaOfInterest(**aoi)
+                geometry_hash = custom_aoi.compute_geometry_hash()
+                await self._store_geometry(aoi.pop("feature_collection"), geometry_hash)
+                metadata = {**metadata, "aoi": {**aoi}}
+                metadata["aoi"]["feature_collection_hash"] = geometry_hash
+
         # Prepare the item for DynamoDB
         # DynamoDB does not allow floats like coordinates found in CustomAOIs.
         # Therefore, 'metadata' is stored as a JSON string.
         ddb_item = {
             "resource_id": resource_id_str,
-            "metadata": json.dumps(analytics.metadata, cls=EnumEncoder),
+            "metadata": json.dumps(metadata, cls=EnumEncoder),
             "status": (
                 analytics.status.value if analytics.status else None
             ),  # Store the enum's value (string)
