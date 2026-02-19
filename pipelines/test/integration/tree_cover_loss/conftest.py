@@ -275,6 +275,15 @@ class MatchingGoogleEarthEngineDatasetRepository:
                     )
                 }
             )
+        if dataset == "natural_lands":
+            return xr.Dataset(
+                data_vars={
+                    "classification": (
+                        ("y", "x"),
+                        np.array([[1, 1], [2, 2]], dtype=np.uint8),
+                    )
+                }
+            )
         if dataset == "area":
             return xr.DataArray(
                 np.array(

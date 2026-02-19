@@ -236,55 +236,45 @@ class TreeCoverLossTasks:
         qc_features = self.qc_feature_repository.load()
 
         def qc_feature(row):
-            try:
-                sample_stats = self.get_sample_statistics(row.geometry)
-                iso, adm1_str, adm2_suffix = row.GID_2.split(".")
-                adm2_str, _ = adm2_suffix.split("_")
+            sample_stats = self.get_sample_statistics(row.geometry)
+            iso, adm1_str, adm2_suffix = row.GID_2.split(".")
+            adm2_str, _ = adm2_suffix.split("_")
 
-                adm1 = int(adm1_str)
-                adm2 = int(adm2_str)
+            adm1 = int(adm1_str)
+            adm2 = int(adm2_str)
 
-                if sample_stats.size > 0:
-                    sample_driver_area_ha_total = sample_stats[
-                        (sample_stats.canopy_cover.astype(np.int8) >= 30)
-                        & ~(sample_stats.driver.isna())
-                        & (sample_stats.country == iso)
-                        & (sample_stats.region == adm1)
-                        & (sample_stats.subregion == adm2)
-                    ].area_ha.sum()
-                else:
-                    sample_driver_area_ha_total = 0
+            if sample_stats.size > 0:
+                sample_driver_area_ha_total = sample_stats[
+                    (sample_stats.canopy_cover.astype(np.int8) >= 30)
+                    & ~(sample_stats.driver.isna())
+                    & (sample_stats.country == iso)
+                    & (sample_stats.region == adm1)
+                    & (sample_stats.subregion == adm2)
+                ].area_ha.sum()
+            else:
+                sample_driver_area_ha_total = 0
 
-                validation_stats = self.get_validation_statistics(row.geometry)
-                if validation_stats.size > 0:
-                    validation_driver_area_ha_total = validation_stats.area_ha.sum()
-                else:
-                    validation_driver_area_ha_total = 0
+            validation_stats = self.get_validation_statistics(row.geometry)
+            if validation_stats.size > 0:
+                validation_driver_area_ha_total = validation_stats.area_ha.sum()
+            else:
+                validation_driver_area_ha_total = 0
 
-                diff = abs(
-                    (validation_driver_area_ha_total - sample_driver_area_ha_total)
-                    / validation_driver_area_ha_total
-                )
+            diff = abs(
+                (validation_driver_area_ha_total - sample_driver_area_ha_total)
+                / validation_driver_area_ha_total
+            )
 
-                result = bool(diff < self.qc_error_threshold)
+            result = bool(diff < self.qc_error_threshold)
 
-                return pd.Series(
-                    {
-                        "pass": result,
-                        "sample": sample_driver_area_ha_total,
-                        "validation": validation_driver_area_ha_total,
-                        "detail": "",
-                    }
-                )
-            except Exception as e:
-                return pd.Series(
-                    {
-                        "pass": False,
-                        "sample": np.nan,
-                        "validation": np.nan,
-                        "detail": str(e),
-                    }
-                )
+            return pd.Series(
+                {
+                    "pass": result,
+                    "sample": sample_driver_area_ha_total,
+                    "validation": validation_driver_area_ha_total,
+                    "detail": "",
+                }
+            )
 
         qc_features[["qc_pass", "sample", "validation", "detail"]] = qc_features.apply(
             qc_feature, axis=1
@@ -313,7 +303,7 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        # natural_lands_class = self.gee_repository.load("natural_lands", geom, like=loss)
+        natural_lands_class = self.gee_repository.load("natural_lands", geom, like=loss)
 
         area = self.gee_repository.load("area", geom, like=loss) / 10000
 
