@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import ee
 import numpy as np
@@ -254,7 +254,9 @@ class TreeCoverLossTasks:
             else:
                 sample_driver_area_ha_total = 0
 
-            validation_stats, _ = self.get_validation_statistics(row.geometry)
+            validation_stats = self.get_validation_statistics(row.geometry)[
+                "driver_results"
+            ]
             if validation_stats.size > 0:
                 validation_driver_area_ha_total = validation_stats.area_ha.sum()
             else:
@@ -290,7 +292,7 @@ class TreeCoverLossTasks:
     def get_validation_statistics(
         self,
         geom: Polygon,
-    ):
+    ) -> Dict[str, pd.DataFrame]:
         loss_ds = self.gee_repository.load("loss", geom)
 
         # pull only what we need
@@ -340,7 +342,10 @@ class TreeCoverLossTasks:
             columns={"area": "area_ha", "classification": "natural_forests_class"}
         )
 
-        return driver_results, natural_forests_results
+        return {
+            "driver_results": driver_results,
+            "natural_forests_results": natural_forests_results,
+        }
 
     def get_validation_statistics_old(
         self,
