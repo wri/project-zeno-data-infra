@@ -179,9 +179,12 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
 
                 custom_aoi = CustomAreaOfInterest(**aoi)
                 geometry_hash = custom_aoi.compute_geometry_hash()
-                await self._store_geometry(aoi.pop("feature_collection"), geometry_hash)
-                metadata = {**metadata, "aoi": {**aoi}}
-                metadata["aoi"]["feature_collection_hash"] = geometry_hash
+
+                feature_collection = aoi.get("feature_collection")
+                await self._store_geometry(feature_collection, geometry_hash)
+                new_aoi = {k: v for k, v in aoi.items() if k != "feature_collection"}
+                new_aoi["feature_collection_hash"] = geometry_hash
+                metadata = {**metadata, "aoi": new_aoi}
 
         # Prepare the item for DynamoDB
         # DynamoDB does not allow floats like coordinates found in CustomAOIs.

@@ -480,7 +480,7 @@ class TestLoadingAnalysis:
         second_uuid = uuid.UUID("b2c3d4e5-f6a7-8901-bcde-f12345678901")
 
         await repo.store_analysis(
-            CUSTOM_AOI_UUID,
+            DUMMY_UUID,
             Analysis(result=None, metadata=metadata, status=None),
         )
         await repo.store_analysis(
@@ -488,7 +488,7 @@ class TestLoadingAnalysis:
             Analysis(result=None, metadata=metadata, status=None),
         )
 
-        loaded1 = await repo.load_analysis(CUSTOM_AOI_UUID)
+        loaded1 = await repo.load_analysis(DUMMY_UUID)
         loaded2 = await repo.load_analysis(second_uuid)
         assert (
             loaded1.metadata["aoi"]["feature_collection"] == SAMPLE_FEATURE_COLLECTION
