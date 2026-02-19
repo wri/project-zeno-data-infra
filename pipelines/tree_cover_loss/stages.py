@@ -254,11 +254,10 @@ class TreeCoverLossTasks:
             else:
                 sample_driver_area_ha_total = 0
 
-            validation_stats = self.get_validation_statistics(row.geometry)[
-                "driver_results"
-            ]
-            if validation_stats.size > 0:
-                validation_driver_area_ha_total = validation_stats.area_ha.sum()
+            validation_stats = self.get_validation_statistics(row.geometry)
+            validation_driver_stats = validation_stats["driver_results"]
+            if validation_driver_stats.size > 0:
+                validation_driver_area_ha_total = validation_driver_stats.area_ha.sum()
             else:
                 validation_driver_area_ha_total = 0
 
