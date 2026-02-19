@@ -30,6 +30,7 @@ jobs:
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use Zeno prod key for api tests
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use zeno prod key for api tests
+      GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}
     with:
       image_type: 'release'
       project_dir: 'api'
@@ -59,6 +60,7 @@ jobs:
       DASK_SCHEDULER_ADDRESS: ${{ secrets.DASK_SCHEDULER_ADDRESS }}
       AWS_ACCESS_KEY_ID_FOR_TESTS: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Use GFW prod key for pipelines tests
       AWS_SECRET_ACCESS_KEY_FOR_TESTS: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Use GFW prod key for pipelines tests
+      GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}
     with:
       image_type: 'release'
       project_dir: 'pipelines'
@@ -84,3 +86,4 @@ jobs:
       PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
       PREFECT_ACCOUNT_ID: ${{ secrets.PREFECT_ACCOUNT_ID }}
       PREFECT_WORKSPACE_ID: ${{ secrets.PREFECT_WORKSPACE_ID }}
+      GEE_SERVICE_ACCOUNT_JSON: ${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}

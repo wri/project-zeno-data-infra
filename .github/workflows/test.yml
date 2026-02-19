@@ -29,6 +29,8 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY_FOR_TESTS:
         required: true
+      GEE_SERVICE_ACCOUNT_JSON:
+        required: true
 
 env:
   CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
@@ -81,5 +83,6 @@ jobs:
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
             -e ANALYSES_TABLE_NAME=Analyses-test \
             -e ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
+            -e GEE_SERVICE_ACCOUNT_JSON=${{ secrets.GEE_SERVICE_ACCOUNT_JSON }} \
             ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }} \
             sh -c "uv sync --locked --no-install-project --dev -p 3.13.5 && pytest test --disable-warnings"
