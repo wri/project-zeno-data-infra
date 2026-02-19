@@ -76,16 +76,13 @@ jobs:
 
       - name: Run tests
         if: success()
-        uses: addnab/docker-run-action@v3
-        with:
-          image: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }}
-          run: |
-            uv sync --locked --no-install-project --dev -p 3.13.5
-            API_KEY=${{ secrets.GFW_API_KEY }} \
-              AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} \
-              AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
-              GEE_SERVICE_ACCOUNT_JSON=${{ secrets.GEE_SERVICE_ACCOUNT_JSON }} \
-              DASK_SCHEDULER_ADDRESS=${{ secrets.DASK_SCHEDULER_ADDRESS }} \
-              ANALYSES_TABLE_NAME=Analyses-test \
-              ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
-              pytest test --disable-warnings
+        run: |
+          docker run --rm \
+            -e API_KEY=${{ secrets.GFW_API_KEY }} \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_FOR_TESTS }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_FOR_TESTS }} \
+            -e ANALYSES_TABLE_NAME=Analyses-test \
+            -e ANALYSIS_RESULTS_BUCKET_NAME=gnw-analytics-api-analysis-results-test \
+            -e GEE_SERVICE_ACCOUNT_JSON=${{ secrets.GEE_SERVICE_ACCOUNT_JSON }} \
+            ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_REPO_NAME }}:${{ env.IMAGE_TAG }} \
+            sh -c "uv sync --locked --no-install-project --dev -p 3.13.5 && pytest test --disable-warnings"
