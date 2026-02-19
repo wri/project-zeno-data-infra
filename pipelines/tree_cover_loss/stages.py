@@ -254,7 +254,7 @@ class TreeCoverLossTasks:
             else:
                 sample_driver_area_ha_total = 0
 
-            validation_stats = self.get_validation_statistics(row.geometry)
+            validation_stats, _ = self.get_validation_statistics(row.geometry)
             if validation_stats.size > 0:
                 validation_driver_area_ha_total = validation_stats.area_ha.sum()
             else:
@@ -296,6 +296,7 @@ class TreeCoverLossTasks:
         # pull only what we need
         loss = loss_ds.loss  # 0/1
         tcd = loss_ds.treecover2000  # 0-100
+        loss_year = loss_ds.lossyear
 
         loss_mask = loss == 1
         loss_tcd30_mask = loss_mask & (tcd > 30)
@@ -303,7 +304,14 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        natural_lands_class = self.gee_repository.load("natural_lands", geom, like=loss)
+        natural_lands_class = self.gee_repository.load(
+            "natural_lands", geom, like=loss
+        ).classification
+        natural_forests_class = xr.where(
+            natural_lands_class.isin([2, 5, 8, 9]),
+            1,
+            xr.where(natural_lands_class.isin([14, 17, 18]), 2, 0),
+        )
 
         area = self.gee_repository.load("area", geom, like=loss) / 10000
 
@@ -321,7 +329,18 @@ class TreeCoverLossTasks:
                 columns={"area": "area_ha", "classification": "driver"}
             )
 
-        return driver_results
+        natural_forests_results = (
+            area.where(loss_year > 20)
+            .groupby(natural_forests_class)
+            .sum()
+            .to_dataframe()
+            .reset_index()
+        )
+        natural_forests_results = natural_forests_results.rename(
+            columns={"area": "area_ha", "classification": "natural_forests_class"}
+        )
+
+        return driver_results, natural_forests_results
 
     def get_validation_statistics_old(
         self,

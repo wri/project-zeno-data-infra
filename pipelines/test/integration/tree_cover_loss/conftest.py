@@ -12,7 +12,7 @@ def tcl_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
+                da.array([[[1, 1], [22, 22]]], dtype=np.uint8),
             )
         },
         coords={
@@ -218,6 +218,10 @@ class FakeGoogleEarthEngineDatasetRepository:
                         ("y", "x"),
                         np.array([[1, 0], [1, 1]], dtype=np.uint8),
                     ),
+                    "lossyear": (
+                        ("y", "x"),
+                        np.array([[2, 10], [21, 30]], dtype=np.uint8),
+                    ),
                     "treecover2000": (
                         ("y", "x"),
                         np.array([[40, 20], [50, 31]], dtype=np.uint8),
@@ -238,7 +242,7 @@ class FakeGoogleEarthEngineDatasetRepository:
                 data_vars={
                     "classification": (
                         ("y", "x"),
-                        np.array([[1, 1], [1, 2]], dtype=np.uint8),
+                        np.array([[2, 14], [5, 1]], dtype=np.uint8),
                     )
                 }
             )
@@ -260,6 +264,10 @@ class MatchingGoogleEarthEngineDatasetRepository:
                         ("y", "x"),
                         np.array([[1, 1], [1, 1]], dtype=np.uint8),
                     ),
+                    "lossyear": (
+                        ("y", "x"),
+                        np.array([[1, 1], [22, 22]], dtype=np.uint8),
+                    ),
                     "treecover2000": (
                         ("y", "x"),
                         np.array([[35, 35], [40, 40]], dtype=np.uint8),
@@ -280,7 +288,7 @@ class MatchingGoogleEarthEngineDatasetRepository:
                 data_vars={
                     "classification": (
                         ("y", "x"),
-                        np.array([[1, 1], [2, 2]], dtype=np.uint8),
+                        np.array([[2, 14], [5, 1]], dtype=np.uint8),
                     )
                 }
             )
