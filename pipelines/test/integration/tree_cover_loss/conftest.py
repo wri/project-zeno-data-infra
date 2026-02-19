@@ -138,7 +138,7 @@ def country_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[4, 4], [8, 8]]], dtype=np.int16),
+                da.array([[[4, 4], [4, 4]]], dtype=np.int16),
             )
         },
         coords={
@@ -156,7 +156,7 @@ def region_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[10, 10], [20, 20]]], dtype=np.uint8),
+                da.array([[[1, 1], [1, 1]]], dtype=np.uint8),
             )
         },
         coords={
@@ -174,7 +174,7 @@ def subregion_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[100, 101], [200, 201]]], dtype=np.int16),
+                da.array([[[1, 1], [1, 1]]], dtype=np.int16),
             )
         },
         coords={
