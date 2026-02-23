@@ -1,5 +1,6 @@
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple, Union
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
@@ -10,6 +11,7 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
+from pipelines.utils import s3_uri_exists
 
 numeric_to_alpha3 = {
     4: "AFG",
@@ -361,3 +363,65 @@ def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
 
 def _load_zarr(zarr_uri):
     return xr.open_zarr(zarr_uri, storage_options={"requester_pays": True})
+
+
+def _load_tile_uris(tiles_geojson_uri: str) -> list[str]:
+    """Read a tiles.geojson manifest and return a list of S3 URIs."""
+    tiles = pd.read_json(tiles_geojson_uri)
+
+    def _get_uri(feature):
+        raw = feature["properties"]["name"].split("/")[2:]
+        return "/".join(["s3:/"] + raw)
+
+    return tiles.features.apply(_get_uri).tolist()
+
+
+def create_zarr(
+    source_uri: str,
+    zarr_uri: str,
+    transform: Optional[Callable] = None,
+    overwrite: bool = False,
+    chunks: Optional[dict] = None,
+) -> str:
+    """Create a zarr store in S3 from a COG or tiled GeoTIFF source.
+
+    Parameters
+    ----------
+    source_uri : str
+        S3 URI of the source data.  If the URI ends with ``.geojson`` it is
+        treated as a tile manifest (the GeoJSON is read with ``pd.read_json``
+        and individual tile URIs are opened with ``xr.open_mfdataset``).
+        Otherwise it is treated as a single COG opened with
+        ``xr.open_dataset``.
+    zarr_uri : str
+        S3 URI for the output zarr store.
+    transform : callable, optional
+        A function applied to the loaded dataset before writing to zarr.
+        Receives an xarray DataArray/Dataset and should return an xarray
+        Dataset or DataArray.  When *None* the raw band data is written as-is.
+    overwrite : bool
+        When False (default), skip writing if the zarr already exists.
+    chunks : dict, optional
+        Chunk sizes for the loaded dataset.  Defaults to
+        ``{"x": 10000, "y": 10000}``.
+    """
+    if chunks is None:
+        chunks = {"x": 10000, "y": 10000}
+
+    if s3_uri_exists(f"{zarr_uri}/zarr.json") and not overwrite:
+        return zarr_uri
+
+    if source_uri.endswith(".geojson"):
+        tile_uris = _load_tile_uris(source_uri)
+        dataset = xr.open_mfdataset(
+            tile_uris, parallel=True, chunks=chunks
+        ).band_data.chunk(chunks)
+    else:
+        dataset = xr.open_dataset(source_uri, chunks="auto").band_data.chunk(chunks)
+
+    if transform is not None:
+        dataset = transform(dataset)
+
+    dataset.to_zarr(zarr_uri, mode="w")
+
+    return zarr_uri

@@ -58,8 +58,8 @@ def test_decode_alert_data():
     assert list(result.y.values) == [0, 1]
 
 
-@patch("pipelines.disturbance.create_zarr.s3_uri_exists")
-@patch("pipelines.disturbance.create_zarr.xr.open_dataset")
+@patch("pipelines.prefect_flows.common_stages.s3_uri_exists")
+@patch("pipelines.prefect_flows.common_stages.xr.open_dataset")
 def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
     """Test creating a new zarr file when it doesn't exist."""
     mock_s3_exists.return_value = False
@@ -67,20 +67,71 @@ def test_create_zarr_new_file(mock_open_dataset, mock_s3_exists, mock_dataset):
 
     version = "v20250102"
     cog_uri = "s3://gfw-data-lake/umd_glad_dist_alerts/v20250102/raster/epsg-4326/cog/default.tif"
+    expected_uri = (
+        "s3://lcl-analytics/zarr/dist-alerts/v20250102/umd_glad_dist_alerts.zarr"
+    )
 
     with patch.object(xr.Dataset, "to_zarr") as mock_to_zarr:
+        # Test via the disturbance convenience wrapper (includes decode_alert_data)
         result = create_zarr(version, overwrite=False)
-
-        expected_uri = (
-            "s3://lcl-analytics/zarr/dist-alerts/v20250102/umd_glad_dist_alerts.zarr"
-        )
 
         assert result == expected_uri
 
         mock_s3_exists.assert_called_once_with(
-            "s3://lcl-analytics/zarr/dist-alerts/v20250102/umd_glad_dist_alerts.zarr/zarr.json",
+            f"{expected_uri}/zarr.json",
         )
 
         mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
 
         mock_to_zarr.assert_called_once_with(expected_uri, mode="w")
+
+
+@patch("pipelines.prefect_flows.common_stages.s3_uri_exists")
+@patch("pipelines.prefect_flows.common_stages.xr.open_dataset")
+def test_create_zarr_generic_no_transform(
+    mock_open_dataset, mock_s3_exists, mock_dataset
+):
+    """Test the generic create_zarr without a transform."""
+    from pipelines.prefect_flows.common_stages import create_zarr as generic_create_zarr
+
+    mock_s3_exists.return_value = False
+    mock_open_dataset.return_value = mock_dataset
+
+    cog_uri = "s3://bucket/source.tif"
+    zarr_uri = "s3://bucket/output.zarr"
+
+    with patch.object(xr.DataArray, "to_zarr") as mock_to_zarr:
+        result = generic_create_zarr(cog_uri, zarr_uri)
+
+        assert result == zarr_uri
+        mock_open_dataset.assert_called_once_with(cog_uri, chunks="auto")
+        mock_to_zarr.assert_called_once_with(zarr_uri, mode="w")
+
+
+@patch("pipelines.prefect_flows.common_stages.s3_uri_exists")
+@patch("pipelines.prefect_flows.common_stages._load_tile_uris")
+@patch("pipelines.prefect_flows.common_stages.xr.open_mfdataset")
+def test_create_zarr_tiled_geotiff(
+    mock_open_mfdataset, mock_load_tiles, mock_s3_exists, mock_dataset
+):
+    """Test create_zarr with a tiled GeoTIFF source (tiles.geojson)."""
+    from pipelines.prefect_flows.common_stages import create_zarr as generic_create_zarr
+
+    mock_s3_exists.return_value = False
+    tile_uris = ["s3://bucket/tile_0.tif", "s3://bucket/tile_1.tif"]
+    mock_load_tiles.return_value = tile_uris
+    mock_open_mfdataset.return_value = mock_dataset
+
+    source_uri = "s3://bucket/tiles.geojson"
+    zarr_uri = "s3://bucket/output.zarr"
+    chunks = {"x": 10000, "y": 10000}
+
+    with patch.object(xr.DataArray, "to_zarr") as mock_to_zarr:
+        result = generic_create_zarr(source_uri, zarr_uri)
+
+        assert result == zarr_uri
+        mock_load_tiles.assert_called_once_with(source_uri)
+        mock_open_mfdataset.assert_called_once_with(
+            tile_uris, parallel=True, chunks=chunks
+        )
+        mock_to_zarr.assert_called_once_with(zarr_uri, mode="w")

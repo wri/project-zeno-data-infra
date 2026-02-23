@@ -6,8 +6,9 @@ from prefect.logging import get_run_logger
 
 from pipelines.disturbance import prefect_flows, validate_zonal_statistics
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
-from pipelines.disturbance.create_zarr import create_zarr as create_zarr_func
-from pipelines.globals import ANALYTICS_BUCKET
+from pipelines.disturbance.create_zarr import decode_alert_data
+from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
+from pipelines.prefect_flows.common_tasks import create_zarr as create_zarr_task
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -17,10 +18,16 @@ def get_new_dist_version() -> str:
     return get_latest_version("umd_glad_dist_alerts")
 
 
-@task
 def create_zarr(dist_version: str, overwrite=False) -> str:
-    zarr_uri = create_zarr_func(dist_version, overwrite=overwrite)
-    return zarr_uri
+    base_folder = f"umd_glad_dist_alerts/{dist_version}/raster/epsg-4326"
+    zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/dist-alerts/{dist_version}/umd_glad_dist_alerts.zarr"
+    cog_uri = f"s3://{DATA_LAKE_BUCKET}/{base_folder}/cog/default.tif"
+    return create_zarr_task(
+        source_uri=cog_uri,
+        zarr_uri=zarr_uri,
+        transform=decode_alert_data,
+        overwrite=overwrite,
+    )
 
 
 @task

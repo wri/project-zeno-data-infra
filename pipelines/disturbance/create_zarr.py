@@ -1,8 +1,16 @@
+"""Disturbance-specific zarr helpers.
+
+``decode_alert_data`` is the disturbance transform applied when creating
+the DIST alerts zarr.  ``create_zarr`` is a convenience wrapper around
+the generic ``common_stages.create_zarr`` with the disturbance-specific
+URIs and transform pre-filled.
+"""
+
 import numpy as np
 import xarray as xr
 
 from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
-from pipelines.utils import s3_uri_exists
+from pipelines.prefect_flows.common_stages import create_zarr as _create_zarr
 
 
 def decode_alert_data(band_data) -> xr.Dataset:
@@ -16,20 +24,15 @@ def decode_alert_data(band_data) -> xr.Dataset:
 
 
 def create_zarr(version, overwrite=False) -> str:
-    """create a full extent zarr file in s3."""
+    """Create a DIST alerts zarr, decoding alert data."""
     base_folder = f"umd_glad_dist_alerts/{version}/raster/epsg-4326"
     zarr_uri = (
         f"s3://{ANALYTICS_BUCKET}/zarr/dist-alerts/{version}/umd_glad_dist_alerts.zarr"
     )
     cog_uri = f"s3://{DATA_LAKE_BUCKET}/{base_folder}/cog/default.tif"
-
-    if s3_uri_exists(f"{zarr_uri}/zarr.json") and not overwrite:
-        return zarr_uri
-
-    dataset = xr.open_dataset(cog_uri, chunks="auto").band_data.chunk(
-        {"x": 10000, "y": 10000}
+    return _create_zarr(
+        cog_uri, zarr_uri, transform=decode_alert_data, overwrite=overwrite
     )
-    decoded_alert_data = decode_alert_data(dataset)
-    decoded_alert_data.to_zarr(zarr_uri, mode="w")
 
-    return zarr_uri
+
+__all__ = ["create_zarr", "decode_alert_data"]

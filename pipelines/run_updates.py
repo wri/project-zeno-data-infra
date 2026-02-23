@@ -1,38 +1,15 @@
 import logging
-import os
 
-import coiled
-from prefect import flow, task
+from prefect import flow
 from prefect.logging import get_run_logger
 
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
+from pipelines.prefect_flows import common_tasks
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
-
-
-@task
-def create_cluster():
-    cluster = coiled.Cluster(
-        name="gnw_zonal_stat_count",
-        region="us-east-1",
-        n_workers=10,
-        tags={"project": "gnw_zonal_stat"},
-        scheduler_vm_types=["r7g.xlarge"],
-        worker_vm_types=["r7g.2xlarge"],
-        compute_purchase_option="spot_with_fallback",
-        no_client_timeout="5 seconds",
-        container=os.getenv("PIPELINES_IMAGE"),
-        environ={
-            "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
-        },
-    )
-    cluster.adapt(minimum=10, maximum=50)
-
-    client = cluster.get_client()
-    return client
 
 
 @flow(
@@ -49,7 +26,7 @@ def run_updates(dist_version=None, overwrite=False, is_latest=False) -> list[str
     dask_client = None
     result_uris = []
     try:
-        dask_client = create_cluster()
+        dask_client = common_tasks.create_cluster()
         gl_result = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
         result_uris.append(gl_result)
 
