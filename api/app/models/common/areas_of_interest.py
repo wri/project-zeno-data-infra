@@ -1,3 +1,5 @@
+import hashlib
+import json
 from typing import Annotated, Any, Dict, List, Literal, Optional
 from uuid import UUID
 
@@ -143,3 +145,12 @@ class CustomAreaOfInterest(AreaOfInterest):
         object.__setattr__(self, "ids", ids)
 
         return self
+
+    def compute_geometry_hash(self) -> str:
+        """Compute a deterministic SHA-256 hash of the feature_collection."""
+        canonical = json.dumps(
+            self.feature_collection,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
