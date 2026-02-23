@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import traceback
 import uuid
 
 from botocore.exceptions import ClientError
@@ -10,6 +11,7 @@ from app.analysis.common.analysis import EnumEncoder
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus
+from app.models.common.areas_of_interest import CustomAreaOfInterest
 
 RESULTS_BUCKET_NAME = os.getenv("ANALYSIS_RESULTS_BUCKET_NAME", None)
 GEOMETRY_S3_PREFIX = "custom_areas/"
@@ -77,14 +79,27 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
     async def _load_geometry(self, geometry_hash: str) -> dict:
         """Retrieve a feature_collection from S3 by its hash."""
         s3_key = self._get_geometry_s3_key(geometry_hash)
-        response = await _retry_on_throttling(
-            self._s3.get_object,
-            Bucket=self._bucket_name,
-            Key=s3_key,
-        )
-        async with response["Body"] as stream:
-            content = await stream.read()
-            return json.loads(content)
+        try:
+            response = await _retry_on_throttling(
+                self._s3.get_object,
+                Bucket=self._bucket_name,
+                Key=s3_key,
+            )
+            async with response["Body"] as stream:
+                content = await stream.read()
+                return json.loads(content)
+        except ClientError as e:
+            logging.error(
+                {
+                    "event": "load_geometry_failed",
+                    "severity": "high",
+                    "geometry_hash": geometry_hash,
+                    "error_type": e.__class__.__name__,
+                    "error_details": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            )
+            raise
 
     async def load_analysis(self, resource_id: uuid.UUID) -> Analysis:
         try:
@@ -122,18 +137,9 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
             aoi = metadata["aoi"]
             geometry_hash = aoi.get("feature_collection_hash")
             if geometry_hash and "feature_collection" not in aoi:
-                try:
-                    fc = await self._load_geometry(geometry_hash)
-                    metadata["aoi"]["feature_collection"] = fc
-                    del metadata["aoi"]["feature_collection_hash"]
-                except ClientError as e:
-                    logging.warning(
-                        {
-                            "event": "geometry_hydration_failed",
-                            "geometry_hash": geometry_hash,
-                            "error": str(e),
-                        }
-                    )
+                fc = await self._load_geometry(geometry_hash)
+                metadata["aoi"]["feature_collection"] = fc
+                del metadata["aoi"]["feature_collection_hash"]
 
         result_payload = None
         # Only try to fetch from S3 if a key exists and status suggests there's a result
@@ -173,10 +179,6 @@ class AwsDynamoDbS3AnalysisRepository(AnalysisRepository):
         if metadata and isinstance(metadata.get("aoi"), dict):
             aoi = metadata["aoi"]
             if aoi.get("type") == "feature_collection" and "feature_collection" in aoi:
-                from app.models.common.areas_of_interest import (
-                    CustomAreaOfInterest,
-                )
-
                 custom_aoi = CustomAreaOfInterest(**aoi)
                 geometry_hash = custom_aoi.compute_geometry_hash()
 
