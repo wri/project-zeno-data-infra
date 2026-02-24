@@ -21,6 +21,7 @@ def test_tcl_validation_flow():
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
+                "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["30", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
                 "country": ["AFG", "AFG"],
@@ -45,6 +46,7 @@ def test_tcl_validation_flow():
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
+                "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["10", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
                 "country": ["AFG", "AFG"],
@@ -58,6 +60,7 @@ def test_tcl_validation_flow():
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
+                "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["30", "30"],
                 "driver": [np.nan, "Permanent settlement"],
                 "country": ["AFG", "AFG"],
