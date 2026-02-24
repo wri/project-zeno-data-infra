@@ -19,19 +19,18 @@ def load_data(
         carbon_gross_removals_zarr_uri,
         carbon_gross_emissions_zarr_uri,
         tree_cover_density_2000_zarr_uri,
-        tree_cover_loss_zarr_uri,
         mangrove_stock_2000_zarr_uri,
         tree_cover_gain_from_height_zarr_uri,
 ) -> Tuple[xr.DataArray, ...]:
     """Load in the layers needed for carbon flux analysis"""
 
-    base_layer = _load_zarr(carbon_net_flux_zarr_uri)
+    base_layer = _load_zarr(carbon_net_flux_zarr_uri).astype("float64")
     carbon_gross_removals = _load_zarr(carbon_gross_removals_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
-    )
+    ).astype("float64")
     carbon_gross_emissions = _load_zarr(carbon_gross_emissions_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
-    )
+    ).astype("float64")
 
     # reindex to dist alerts to avoid floating point precision issues
     # when aligning the datasets
@@ -58,16 +57,17 @@ def load_data(
         base_layer, method="nearest", tolerance=1e-5
     )
     tree_cover_gain_from_height_aligned = xr.align(base_layer, tree_cover_gain_from_height, join="left")[1].band_data
+    # Map tree_cover_gain_from_height to 1 if any gain, 0 otherwise.
+    tree_cover_gain_from_height_aligned = xr.where(tree_cover_gain_from_height_aligned > 0, 1, 0).astype("uint8")
 
     tree_cover_density_2000 = _load_zarr(tree_cover_density_2000_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
     )
     tree_cover_density_2000_aligned = xr.align(base_layer, tree_cover_density_2000, join="left")[1].band_data
-
-    tree_cover_loss = _load_zarr(tree_cover_loss_zarr_uri).reindex_like(
-        base_layer, method="nearest", tolerance=1e-5
-    )
-    tree_cover_loss_aligned = xr.align(base_layer, tree_cover_loss, join="left")[1].band_data
+    # Only keep the 30/50/75 densities (codes 5, 6, and 7), map the rest (10, 15, 20,
+    # 25) to 0, which means less than 30% density.
+    tree_cover_density_2000_aligned = tree_cover_density_2000_aligned.where(
+        tree_cover_density_2000_aligned >= 5, other=0)
 
     return (
         base_layer,
@@ -79,7 +79,6 @@ def load_data(
         mangrove_stock_2000_aligned,
         tree_cover_gain_from_height_aligned,
         tree_cover_density_2000_aligned,
-        tree_cover_loss_aligned
     )
 
 
@@ -89,7 +88,7 @@ def setup_compute(
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xrarray reduce on natural lands by area"""
-    carbon_net_flux, carbon_gross_removals, carbon_gross_emissions, country, region, subregion, mangrove_stock_2000, tree_cover_gain_from_height, tree_cover_density_2000, tree_cover_loss = datasets
+    carbon_net_flux, carbon_gross_removals, carbon_gross_emissions, country, region, subregion, mangrove_stock_2000, tree_cover_gain_from_height, tree_cover_density_2000 = datasets
 
     # I created a data array with the multiple data inputs on a "carbontype"
     # dimension, rather than a dataset with multiple data variables, because only a
@@ -105,7 +104,6 @@ def setup_compute(
         region.rename("region"),
         subregion.rename("subregion"),
         tree_cover_density_2000.rename("tree_cover_density"),
-        tree_cover_loss.rename("tree_cover_loss"),
         mangrove_stock_2000.rename("mangrove_stock_2000"),
         tree_cover_gain_from_height.rename("tree_cover_gain_from_height"),
     )
@@ -113,11 +111,50 @@ def setup_compute(
     return (ds, groupbys, expected_groups)
 
 
+# tcd threshold mapping
+thresh_to_pct = {
+    0: 0,
+    1: 10,
+    2: 15,
+    3: 20,
+    4: 25,
+    5: 30,
+    6: 50,
+    7: 75,
+}
+
+
 def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_count)
+
+    # Convert tcd thresholds to percentages
+    df["tree_cover_density"] = df["tree_cover_density"].map(thresh_to_pct)
+
+    # For each tcd value T in [30, 50, 75], aggregate carbon emissions/removal/flux if
+    # (tree_cover_density >= T) OR (mangrove_stock_2000 is True) OR (tree_cover_gain_from_height is non-zero)
+    thresholds = [30, 50, 75]
+    results = []
+
+    for T in thresholds:
+        mask = ((df['tree_cover_density'] >= T)
+                | (df['mangrove_stock_2000'] == 1)
+                | (df['tree_cover_gain_from_height'] == 1)
+                )
+
+        temp_df = df[mask].groupby(
+            ['country', 'region', 'subregion', 'carbontype'],
+            as_index=False
+        )['value'].sum()
+        temp_df['tree_cover_density'] = T
+        results.append(temp_df)
+
+    df = pd.concat(results, ignore_index=True)
+    df = df[['country', 'region', 'subregion', 'tree_cover_density', 'carbontype', 'value']]
 
     return df
 
 
 def _load_zarr(zarr_uri):
-    return xr.open_zarr(zarr_uri)
+    # Will change before checkin, temporary requester_pays here until I move all the
+    # datasets to LCL buckets.
+    return xr.open_zarr(zarr_uri, storage_options={"requester_pays": True})
