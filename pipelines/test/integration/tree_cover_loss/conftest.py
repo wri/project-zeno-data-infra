@@ -288,7 +288,7 @@ class MatchingGoogleEarthEngineDatasetRepository:
                 data_vars={
                     "classification": (
                         ("y", "x"),
-                        np.array([[2, 14], [5, 1]], dtype=np.uint8),
+                        np.array([[2, 5], [1, 14]], dtype=np.uint8),
                     )
                 }
             )

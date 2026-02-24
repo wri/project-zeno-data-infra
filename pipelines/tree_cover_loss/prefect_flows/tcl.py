@@ -19,6 +19,7 @@ from pipelines.prefect_flows.common_stages import numeric_to_alpha3
 
 # tcd threshold mapping
 thresh_to_pct = {
+    0: "0",
     1: "10",
     2: "15",
     3: "20",
@@ -43,7 +44,7 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
 
     expected_groups = (
         np.arange(1, 25),  # tcl years
-        np.arange(1, 8),  # tcd threshold
+        np.arange(0, 8),  # tcd threshold
         np.arange(0, 2),  # ifl
         np.arange(0, 8),  # drivers
         np.arange(0, 2),  # primary_forests

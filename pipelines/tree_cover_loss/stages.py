@@ -251,35 +251,66 @@ class TreeCoverLossTasks:
                     & (sample_stats.region == adm1)
                     & (sample_stats.subregion == adm2)
                 ].area_ha.sum()
+
+                sample_natural_forests_ha_total = sample_stats[
+                    (sample_stats.natural_forest_class != "Unknown")
+                    & (sample_stats.tree_cover_loss_year > 2020)
+                    & (sample_stats.country == iso)
+                    & (sample_stats.region == adm1)
+                    & (sample_stats.subregion == adm2)
+                ].area_ha.sum()
             else:
                 sample_driver_area_ha_total = 0
+                sample_natural_forests_ha_total = 0
 
             validation_stats = self.get_validation_statistics(row.geometry)
-            validation_driver_stats = validation_stats["driver_results"]
-            if validation_driver_stats.size > 0:
-                validation_driver_area_ha_total = validation_driver_stats.area_ha.sum()
+            if validation_stats["driver_results"].size > 0:
+                validation_driver_area_ha_total = validation_stats[
+                    "driver_results"
+                ].area_ha.sum()
             else:
                 validation_driver_area_ha_total = 0
 
-            diff = abs(
+            if validation_stats["natural_forests_results"].size > 0:
+                validation_natural_forests_ha_total = validation_stats[
+                    "natural_forests_results"
+                ].area_ha.sum()
+            else:
+                validation_natural_forests_ha_total = 0
+
+            diff_driver = abs(
                 (validation_driver_area_ha_total - sample_driver_area_ha_total)
                 / validation_driver_area_ha_total
             )
+            diff_natural_forest = abs(
+                (validation_natural_forests_ha_total - sample_natural_forests_ha_total)
+                / validation_natural_forests_ha_total
+            )
 
-            result = bool(diff < self.qc_error_threshold)
+            driver_result = bool(diff_driver < self.qc_error_threshold)
+            natural_forest_result = bool(diff_natural_forest < self.qc_error_threshold)
 
             return pd.Series(
                 {
-                    "pass": result,
-                    "sample": sample_driver_area_ha_total,
-                    "validation": validation_driver_area_ha_total,
+                    "pass": all([driver_result, natural_forest_result]),
+                    "sample_driver": sample_driver_area_ha_total,
+                    "validation_driver": validation_driver_area_ha_total,
+                    "sample_natural_forest": sample_natural_forests_ha_total,
+                    "validation_natural_forest": validation_natural_forests_ha_total,
                     "detail": "",
                 }
             )
 
-        qc_features[["qc_pass", "sample", "validation", "detail"]] = qc_features.apply(
-            qc_feature, axis=1
-        )
+        qc_features[
+            [
+                "qc_pass",
+                "sample_driver",
+                "validation_driver",
+                "sample_natural_forest",
+                "validation_natural_forest",
+                "detail",
+            ]
+        ] = qc_features.apply(qc_feature, axis=1)
 
         # qc_features.to_file("validation_results.geojson", index=False)
         return bool(qc_features.qc_pass.all())
@@ -332,6 +363,7 @@ class TreeCoverLossTasks:
 
         natural_forests_results = (
             area.where(loss_year > 20)
+            .where(natural_forests_class > 0)
             .groupby(natural_forests_class)
             .sum()
             .to_dataframe()

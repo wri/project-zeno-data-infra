@@ -26,18 +26,19 @@ def test_tcl_validation_flow():
                 "country": ["AFG", "AFG"],
                 "region": [1, 1],
                 "subregion": [1, 1],
+                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
         mock_validation.return_value = {
             "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
-            "natural_forests_results": pd.DataFrame({}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
         }
 
         assert tasks.qc_against_validation_source() is True
 
         mock_validation.return_value = {
             "driver_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
-            "natural_forests_results": pd.DataFrame({}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
         }
         assert tasks.qc_against_validation_source() is False
 
@@ -49,6 +50,7 @@ def test_tcl_validation_flow():
                 "country": ["AFG", "AFG"],
                 "region": [1, 1],
                 "subregion": [1, 1],
+                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
         assert tasks.qc_against_validation_source() is False
@@ -61,6 +63,7 @@ def test_tcl_validation_flow():
                 "country": ["AFG", "AFG"],
                 "region": [1, 1],
                 "subregion": [1, 1],
+                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
         assert bool(tasks.qc_against_validation_source()) is False
