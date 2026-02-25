@@ -283,7 +283,60 @@ class TreeCoverLossTasks:
         result_df["country"] = result_df["country"].map(numeric_to_alpha3)
         result_df.dropna(subset=["country"], inplace=True)
 
-        return result_df
+        region_df = (
+            result_df.drop(columns=["subregion"])
+            .groupby(
+                [
+                    "country",
+                    "region",
+                    "canopy_cover",
+                    "tree_cover_loss_year",
+                    "driver",
+                    "is_primary_forest",
+                    "is_intact_forest",
+                ]
+            )
+            .sum()
+            .reset_index()
+        )
+        country_df = (
+            region_df.drop(columns=["region"])
+            .groupby(
+                [
+                    "country",
+                    "canopy_cover",
+                    "tree_cover_loss_year",
+                    "driver",
+                    "is_primary_forest",
+                    "is_intact_forest",
+                ]
+            )
+            .sum()
+            .reset_index()
+        )
+
+        subregion_df = result_df.copy()
+        region_df = region_df.copy()
+        country_df = country_df.copy()
+
+        subregion_df["aoi_id"] = (
+            subregion_df[["country", "region", "subregion"]]
+            .astype(str)
+            .agg(".".join, axis=1)
+        )
+        region_df["aoi_id"] = (
+            region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
+        )
+        country_df["aoi_id"] = country_df["country"]
+
+        subregion_df = subregion_df.drop(columns=["country", "region", "subregion"])
+        region_df = region_df.drop(columns=["country", "region"])
+        country_df = country_df.drop(columns=["country"])
+
+        results_with_ids = pd.concat([country_df, region_df, subregion_df])
+        results_with_ids["aoi_type"] = "admin"
+
+        return results_with_ids
 
     def qc_against_validation_source(self):
         qc_features = self.qc_feature_repository.load()
