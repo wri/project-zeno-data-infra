@@ -15,19 +15,6 @@ from pipelines.globals import (
     umd_primary_forests_zarr_uri,
     wri_google_1km_drivers_zarr_uri,
 )
-from pipelines.prefect_flows.common_stages import numeric_to_alpha3
-
-# tcd threshold mapping
-thresh_to_pct = {
-    0: "0",
-    1: "10",
-    2: "15",
-    3: "20",
-    4: "25",
-    5: "30",
-    6: "50",
-    7: "75",
-}
 
 
 def umd_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
@@ -39,7 +26,6 @@ def umd_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
 
 def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
-    contextual_column_name = "tree_cover_loss_year"
     funcname = "sum"
 
     expected_groups = (
@@ -70,42 +56,5 @@ def compute_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
     result = tasks.compute_zonal_stat(*compute_input, funcname=funcname)
 
     result_df: pd.DataFrame = tasks.postprocess_result(result)
-
-    # convert year values (1-24) to actual years (2001-2024)
-    result_df[contextual_column_name] = result_df[contextual_column_name] + 2000
-
-    # convert tcl thresholds to percentages
-    result_df["canopy_cover"] = result_df["canopy_cover"].map(thresh_to_pct)
-
-    # convert ifl to boolean
-    result_df["is_intact_forest"] = result_df["is_intact_forest"].astype(bool)
-
-    # convert driver codes to labels
-    categoryid_to_driver = {
-        1: "Permanent agriculture",
-        2: "Hard commodities",
-        3: "Shifting cultivation",
-        4: "Logging",
-        5: "Wildfire",
-        6: "Settlements and infrastructure",
-        7: "Other natural disturbances",
-    }
-
-    result_df["driver"] = result_df["driver"].map(categoryid_to_driver)
-
-    # convert primary forest to boolean
-    result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
-
-    natural_forest_class_to_label = {
-        0: "Unknown",
-        1: "Natural Forest",
-        2: "Non-natural Forest",
-    }
-    result_df["natural_forest_class"] = result_df["natural_forest_class"].map(
-        natural_forest_class_to_label
-    )
-
-    result_df["country"] = result_df["country"].map(numeric_to_alpha3)
-    result_df.dropna(subset=["country"], inplace=True)
 
     return result_df

@@ -77,7 +77,6 @@ def test_tcl_flow_with_new_contextual_layers(
     region_ds,
     subregion_ds,
 ):
-
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,

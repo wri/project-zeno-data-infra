@@ -23,6 +23,20 @@ LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
+from pipelines.prefect_flows.common_stages import numeric_to_alpha3
+
+# tcd threshold mapping
+thresh_to_pct = {
+    0: "0",
+    1: "10",
+    2: "15",
+    3: "20",
+    4: "25",
+    5: "30",
+    6: "50",
+    7: "75",
+}
+
 
 class TreeCoverLossTasks:
     def __init__(
@@ -230,7 +244,46 @@ class TreeCoverLossTasks:
         return df_pivoted
 
     def postprocess_result(self, result: xr.DataArray) -> pd.DataFrame:
-        return self.create_result_dataframe(result)
+        result_df = self.create_result_dataframe(result)
+        # convert year values (1-24) to actual years (2001-2024)
+
+        result_df["tree_cover_loss_year"] = result_df["tree_cover_loss_year"] + 2000
+
+        # convert tcl thresholds to percentages
+        result_df["canopy_cover"] = result_df["canopy_cover"].map(thresh_to_pct)
+
+        # convert ifl to boolean
+        result_df["is_intact_forest"] = result_df["is_intact_forest"].astype(bool)
+
+        # convert driver codes to labels
+        categoryid_to_driver = {
+            1: "Permanent agriculture",
+            2: "Hard commodities",
+            3: "Shifting cultivation",
+            4: "Logging",
+            5: "Wildfire",
+            6: "Settlements and infrastructure",
+            7: "Other natural disturbances",
+        }
+
+        result_df["driver"] = result_df["driver"].map(categoryid_to_driver)
+
+        # convert primary forest to boolean
+        result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
+
+        natural_forest_class_to_label = {
+            0: "Unknown",
+            1: "Natural Forest",
+            2: "Non-natural Forest",
+        }
+        result_df["natural_forest_class"] = result_df["natural_forest_class"].map(
+            natural_forest_class_to_label
+        )
+
+        result_df["country"] = result_df["country"].map(numeric_to_alpha3)
+        result_df.dropna(subset=["country"], inplace=True)
+
+        return result_df
 
     def qc_against_validation_source(self):
         qc_features = self.qc_feature_repository.load()
