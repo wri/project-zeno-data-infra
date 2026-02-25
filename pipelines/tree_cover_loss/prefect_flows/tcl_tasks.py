@@ -47,7 +47,7 @@ def setup_compute(
 
 @task
 def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
-    return _tasks.create_result_dataframe(result)
+    return _tasks.postprocess_result(result)
 
 
 @task

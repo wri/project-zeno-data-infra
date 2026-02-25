@@ -24,9 +24,7 @@ def test_tcl_validation_flow():
                 "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["30", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
-                "country": ["AFG", "AFG"],
-                "region": [1, 1],
-                "subregion": [1, 1],
+                "aoi_id": ["AFG.1.1", "AFG.1.1"],
                 "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
@@ -49,9 +47,7 @@ def test_tcl_validation_flow():
                 "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["10", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
-                "country": ["AFG", "AFG"],
-                "region": [1, 1],
-                "subregion": [1, 1],
+                "aoi_id": ["AFG.1.1", "AFG.1.1"],
                 "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
@@ -63,9 +59,7 @@ def test_tcl_validation_flow():
                 "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["30", "30"],
                 "driver": [np.nan, "Permanent settlement"],
-                "country": ["AFG", "AFG"],
-                "region": [1, 1],
-                "subregion": [1, 1],
+                "aoi_id": ["AFG.1.1", "AFG.1.1"],
                 "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )

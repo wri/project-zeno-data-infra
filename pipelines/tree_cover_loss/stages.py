@@ -343,27 +343,19 @@ class TreeCoverLossTasks:
 
         def qc_feature(row):
             sample_stats = self.get_sample_statistics(row.geometry)
-            iso, adm1_str, adm2_suffix = row.GID_2.split(".")
-            adm2_str, _ = adm2_suffix.split("_")
-
-            adm1 = int(adm1_str)
-            adm2 = int(adm2_str)
+            admin2_aoi_id = row.GID_2.split("_")[0]
 
             if sample_stats.size > 0:
                 sample_driver_area_ha_total = sample_stats[
                     (sample_stats.canopy_cover.astype(np.int8) >= 30)
                     & ~(sample_stats.driver.isna())
-                    & (sample_stats.country == iso)
-                    & (sample_stats.region == adm1)
-                    & (sample_stats.subregion == adm2)
+                    & (sample_stats.aoi_id == admin2_aoi_id)
                 ].area_ha.sum()
 
                 sample_natural_forests_ha_total = sample_stats[
                     (sample_stats.natural_forest_class != "Unknown")
                     & (sample_stats.tree_cover_loss_year > 2020)
-                    & (sample_stats.country == iso)
-                    & (sample_stats.region == adm1)
-                    & (sample_stats.subregion == adm2)
+                    & (sample_stats.aoi_id == admin2_aoi_id)
                 ].area_ha.sum()
             else:
                 sample_driver_area_ha_total = 0

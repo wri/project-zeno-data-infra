@@ -45,9 +45,8 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
         "driver",
         "is_primary_forest",
         "natural_forest_class",
-        "country",
-        "region",
-        "subregion",
+        "aoi_id",
+        "aoi_type",
         "area_ha",
         "carbon_Mg_CO2e",
     }
@@ -58,7 +57,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 15169
+    assert result_df.size == 19590
 
 
 @pytest.mark.integration
@@ -106,9 +105,8 @@ def test_tcl_flow_with_new_contextual_layers(
         "driver",
         "is_primary_forest",
         "natural_forest_class",
-        "country",
-        "region",
-        "subregion",
+        "aoi_id",
+        "aoi_type",
         "area_ha",
         "carbon_Mg_CO2e",
     }
@@ -119,7 +117,7 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 44
+    assert result_df.size == 120
 
 
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
@@ -163,9 +161,8 @@ def test_tcl_flow_with_bbox(
         "driver",
         "is_primary_forest",
         "natural_forest_class",
-        "country",
-        "region",
-        "subregion",
+        "aoi_id",
+        "aoi_type",
         "area_ha",
         "carbon_Mg_CO2e",
     }
