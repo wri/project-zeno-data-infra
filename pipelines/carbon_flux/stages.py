@@ -48,8 +48,14 @@ def load_data(
     )
     subregion_aligned = xr.align(base_layer, subregion, join="left")[1].band_data
 
+    # Very important "fill_value = 0" argument here, since mangroves has lots of
+    # non-existent tiles, so the zarr file has a much smaller extent than the other
+    # global datasets (including the base carbon layer). This effectively means those
+    # areas will be filled with NoData/Nans, which will mess up the groupby. So, we
+    # make sure to fill all those empty areas with 0 during the reindex to the base
+    # layer.
     mangrove_stock_2000 = _load_zarr(mangrove_stock_2000_zarr_uri).reindex_like(
-        base_layer, method="nearest", tolerance=1e-5
+        base_layer, method="nearest", tolerance=1e-5, fill_value=0
     )
     mangrove_stock_2000_aligned = xr.align(base_layer, mangrove_stock_2000, join="left")[1].band_data
 
