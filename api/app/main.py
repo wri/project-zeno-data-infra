@@ -75,6 +75,24 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+@app.middleware("http")
+async def profile_request(request: Request, call_next):
+    print(request.method)
+    # only profile if header is present
+    if request.method == "GET":
+        "HELLO 2"
+        profiler = Profiler(async_mode="enabled")
+        profiler.start()
+        try:
+            response = await call_next(request)
+        finally:
+            profiler.stop()
+        # return the HTML profile report instead of the normal response
+        return HTMLResponse(profiler.output_html())
+    else:
+        return await call_next(request)
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logging.warning(
