@@ -2,12 +2,12 @@ from typing import Optional
 
 import dask.array as da
 import numpy as np
-import rioxarray
+import rioxarray  # noqa: F401 — needed for .rio accessor
 import xarray as xr
 from rasterio.features import geometry_mask
 from rasterio.transform import Affine
 from shapely import Geometry
-from shapely.geometry import mapping
+from shapely.geometry import box, mapping
 
 from app.domain.models.dataset import Dataset
 
@@ -187,6 +187,17 @@ class ZarrDatasetRepository:
 
             if len(chunk_y) == 0 or len(chunk_x) == 0:
                 return np.ones(block.shape, dtype=bool)
+
+            chunk_box = box(
+                float(chunk_x[0]) - res_x / 2,
+                float(chunk_y[-1]) - res_y / 2,
+                float(chunk_x[-1]) + res_x / 2,
+                float(chunk_y[0]) + res_y / 2,
+            )
+            if geom.contains(chunk_box):
+                return np.ones(block.shape[-2:], dtype=bool)
+            if not geom.intersects(chunk_box):
+                return np.zeros(block.shape[-2:], dtype=bool)
 
             transform = Affine(
                 res_x,
