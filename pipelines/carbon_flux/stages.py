@@ -161,6 +161,4 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
 
 def _load_zarr(zarr_uri):
-    # Will change before checkin, temporary requester_pays here until I move all the
-    # datasets to LCL buckets.
-    return xr.open_zarr(zarr_uri, storage_options={"requester_pays": True})
+    return xr.open_zarr(zarr_uri)
