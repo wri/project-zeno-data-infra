@@ -67,8 +67,8 @@ def run_tcl_update(
     return result_uris
 
 
-def main(version, overwrite=False, is_latest=False):
-    run_tcl_update(version=version, overwrite=overwrite, is_latest=is_latest)
+def main(version, overwrite=False):
+    run_tcl_update(version=version, overwrite=overwrite)
 
 
 if __name__ == "__main__":
