@@ -137,11 +137,11 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
 
 
 resource "prefect_webhook" "dist_update_event" {
-  name        = "dist-updated-event"
+  name        = "dist-updated-event${local.name_suffix}"
   description = "Fire an event when a new DIST alerts version is published."
   enabled     = true
   template = jsonencode({
-    event = "dist_updated"
+    event = "dist_updated${local.name_suffix}"
     payload = {
       dataset = "{{body.dataset}}"
       version = "{{body.version}}"
@@ -155,13 +155,13 @@ resource "prefect_webhook" "dist_update_event" {
 }
 
 resource "prefect_automation" "run_pipelines_on_dist_update" {
-  name    = "run-gnw-zonal-stats-on-dist-update"
-  enabled = true
+  name    = "run-gnw-zonal-stats-on-dist-update${local.name_suffix}"
+  enabled = terraform.workspace == "default"
 
   trigger = {
     event = {
       posture   = "Reactive"
-      expect    = ["dist_updated"]
+      expect    = ["dist_updated${local.name_suffix}"]
       threshold = 1
       within    = 0
     }
