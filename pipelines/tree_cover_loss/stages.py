@@ -282,6 +282,12 @@ class TreeCoverLossTasks:
         result_df["country"] = result_df["country"].map(numeric_to_alpha3)
         result_df.dropna(subset=["country"], inplace=True)
 
+        if result_df.size == 0:
+            result_df = result_df.drop(columns=["country", "region", "subregion"])
+            result_df["aoi_id"] = pd.Series(dtype="object")
+            result_df["aoi_type"] = pd.Series(dtype="object")
+            return result_df
+
         region_df = (
             result_df.drop(columns=["subregion"])
             .groupby(
@@ -318,14 +324,18 @@ class TreeCoverLossTasks:
         region_df = region_df.copy()
         country_df = country_df.copy()
 
-        subregion_df["aoi_id"] = (
-            subregion_df[["country", "region", "subregion"]]
-            .astype(str)
-            .agg(".".join, axis=1)
-        )
-        region_df["aoi_id"] = (
-            region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
-        )
+        if subregion_df.size > 0:
+            subregion_df["aoi_id"] = (
+                subregion_df[["country", "region", "subregion"]]
+                .astype(str)
+                .agg(".".join, axis=1)
+            )
+
+        if region_df.size > 0:
+            region_df["aoi_id"] = (
+                region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
+            )
+
         country_df["aoi_id"] = country_df["country"]
 
         subregion_df = subregion_df.drop(columns=["country", "region", "subregion"])
@@ -338,7 +348,7 @@ class TreeCoverLossTasks:
         return results_with_ids
 
     def qc_against_validation_source(self, version: Optional[str] = None):
-        qc_features = self.qc_feature_repository.load(limit=20)
+        qc_features = self.qc_feature_repository.load(limit=1)
 
         def qc_feature(row):
             sample_stats = self.get_sample_statistics(row.geometry)
@@ -375,13 +385,11 @@ class TreeCoverLossTasks:
             else:
                 validation_natural_forests_ha_total = 0
 
-            diff_driver = abs(
-                (validation_driver_area_ha_total - sample_driver_area_ha_total)
-                / validation_driver_area_ha_total
+            diff_driver = self._symmetric_relative_difference(
+                validation_driver_area_ha_total, sample_driver_area_ha_total
             )
-            diff_natural_forest = abs(
-                (validation_natural_forests_ha_total - sample_natural_forests_ha_total)
-                / validation_natural_forests_ha_total
+            diff_natural_forest = self._symmetric_relative_difference(
+                validation_natural_forests_ha_total, sample_natural_forests_ha_total
             )
 
             driver_result = bool(diff_driver < self.qc_error_threshold)
@@ -545,3 +553,8 @@ class TreeCoverLossTasks:
 
         # Bring it back to the client as JSON (Python dict)
         return fc.getInfo()
+
+    @staticmethod
+    def _symmetric_relative_difference(a, b):
+        avg = (abs(a) + abs(b)) / 2
+        return 0 if avg == 0 else abs(a - b) / avg

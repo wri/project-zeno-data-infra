@@ -1,5 +1,6 @@
 import geopandas as gpd
-from globals import ANALYTICS_BUCKET
+
+from pipelines.globals import ANALYTICS_BUCKET
 
 
 class QCFeaturesRepository:

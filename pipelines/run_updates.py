@@ -1,7 +1,6 @@
 import logging
 import os
 from enum import Enum
-from typing import List
 
 import coiled
 from prefect import flow, task
@@ -158,4 +157,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(overwrite=False)
+    main(overwrite=False, flow=FlowSelection.TCL_UPDATE, version="v1.12.1")
