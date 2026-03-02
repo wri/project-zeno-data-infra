@@ -339,7 +339,7 @@ class TreeCoverLossTasks:
         return results_with_ids
 
     def qc_against_validation_source(self):
-        qc_features = self.qc_feature_repository.load()
+        qc_features = self.qc_feature_repository.load(limit=20)
 
         def qc_feature(row):
             sample_stats = self.get_sample_statistics(row.geometry)
@@ -410,7 +410,9 @@ class TreeCoverLossTasks:
             ]
         ] = qc_features.apply(qc_feature, axis=1)
 
-        # qc_features.to_file("validation_results.geojson", index=False)
+        self.qc_feature_repository.write_results(
+            qc_feature, "admin-tree-cover-loss", version
+        )
         return bool(qc_features.qc_pass.all())
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
