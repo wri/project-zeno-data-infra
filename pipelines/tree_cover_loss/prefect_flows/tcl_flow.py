@@ -26,7 +26,9 @@ def umd_tree_cover_loss_flow(
     if bbox is not None:
         bbox = box(*bbox)
 
-    result_df = umd_tree_cover_loss(tcl_tasks.TreeCoverLossPrefectTasks, bbox=bbox)
+    result_df = umd_tree_cover_loss(
+        tcl_tasks.TreeCoverLossPrefectTasks, version=version, bbox=bbox
+    )
 
     result_uri = common_tasks.save_result.with_options(
         name="area-emissions-by-tcl-save-result"

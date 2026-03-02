@@ -12,7 +12,7 @@ from pipelines.globals import (
     subregion_zarr_uri,
 )
 from pipelines.prefect_flows import common_stages
-from pipelines.prefect_flows.common_stages import _load_zarr
+from pipelines.prefect_flows.common_stages import _load_zarr, numeric_to_alpha3
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
@@ -23,7 +23,6 @@ LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
-from pipelines.prefect_flows.common_stages import numeric_to_alpha3
 
 # tcd threshold mapping
 thresh_to_pct = {
@@ -338,7 +337,7 @@ class TreeCoverLossTasks:
 
         return results_with_ids
 
-    def qc_against_validation_source(self):
+    def qc_against_validation_source(self, version: Optional[str] = None):
         qc_features = self.qc_feature_repository.load(limit=20)
 
         def qc_feature(row):
@@ -410,9 +409,10 @@ class TreeCoverLossTasks:
             ]
         ] = qc_features.apply(qc_feature, axis=1)
 
-        self.qc_feature_repository.write_results(
-            qc_feature, "admin-tree-cover-loss", version
-        )
+        if version is not None:
+            self.qc_feature_repository.write_results(
+                qc_features, "admin-tree-cover-loss", version
+            )
         return bool(qc_features.qc_pass.all())
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:

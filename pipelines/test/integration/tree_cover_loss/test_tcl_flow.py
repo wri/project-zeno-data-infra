@@ -21,8 +21,11 @@ from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 @pytest.mark.integration
 @pytest.mark.slow
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
+@patch(
+    "pipelines.repositories.qc_feature_repository.QCFeaturesRepository.write_results"
+)
 @patch("pipelines.repositories.qc_feature_repository.QCFeaturesRepository.load")
-def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
+def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parquet):
     test_geom = shape(ARG_1_28)
 
     mock_qc_load.return_value = gpd.GeoDataFrame(
@@ -61,6 +64,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 19590
+    mock_qc_write_results.assert_called_once()
 
 
 @pytest.mark.integration

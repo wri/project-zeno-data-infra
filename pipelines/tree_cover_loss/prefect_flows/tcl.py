@@ -17,8 +17,10 @@ from pipelines.globals import (
 )
 
 
-def umd_tree_cover_loss(tasks, bbox: Optional[Polygon] = None):
-    if not tasks.qc_against_validation_source():
+def umd_tree_cover_loss(
+    tasks, version: Optional[str] = None, bbox: Optional[Polygon] = None
+):
+    if not tasks.qc_against_validation_source(version=version):
         raise AssertionError("TCL did not pass QC validation, stopping job")
 
     return compute_tree_cover_loss(tasks, bbox)

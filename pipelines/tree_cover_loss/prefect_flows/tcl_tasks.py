@@ -51,8 +51,8 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
 
 
 @task
-def qc_against_validation_source() -> bool:
-    return _tasks.qc_against_validation_source()
+def qc_against_validation_source(version: Optional[str] = None) -> bool:
+    return _tasks.qc_against_validation_source(version=version)
 
 
 class TreeCoverLossPrefectTasks:
