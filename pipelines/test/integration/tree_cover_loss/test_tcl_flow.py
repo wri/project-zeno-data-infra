@@ -30,9 +30,12 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     )
 
     with prefect_test_harness():
-        result_uri = umd_tree_cover_loss_flow(overwrite=True, bbox=test_geom.bounds)
+        result_uri = umd_tree_cover_loss_flow(
+            "v1.12", overwrite=True, bbox=test_geom.bounds
+        )
 
-    assert "admin-tree-cover-loss-emissions-2001-2024.parquet" in result_uri
+    assert "admin-tree-cover-loss.parquet" in result_uri
+    assert "v1.12" in result_uri
 
     # get the the saved df
     result_df = mock_save_parquet.call_args[0][0]
@@ -173,4 +176,4 @@ def test_tcl_flow_with_bbox(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 11
+    assert result_df.size == 30

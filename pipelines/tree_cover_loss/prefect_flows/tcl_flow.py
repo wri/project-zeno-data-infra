@@ -14,9 +14,11 @@ from pipelines.utils import s3_uri_exists
 
 @flow(name="Tree Cover Loss")
 def umd_tree_cover_loss_flow(
-    overwrite=False, bbox: Optional[Tuple[float, float, float, float]] = None
+    version: str,
+    overwrite=False,
+    bbox: Optional[Tuple[float, float, float, float]] = None,
 ):
-    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-tree-cover-loss-emissions-2001-2024.parquet"
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/{version}/admin-tree-cover-loss.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
