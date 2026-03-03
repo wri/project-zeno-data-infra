@@ -44,15 +44,15 @@ def create_cluster():
 
 
 @flow
-def run_dist_update(dist_version=None, overwrite=False, is_latest=False) -> list[str]:
+def run_dist_update(version=None, overwrite=False, is_latest=False) -> list[str]:
     dist_result = dist_flow.dist_alerts_flow(
-        dist_version=dist_version, overwrite=overwrite, is_latest=is_latest
+        dist_version=version, overwrite=overwrite, is_latest=is_latest
     )
     return [dist_result]
 
 
 @flow
-def run_all(dist_version=None, overwrite=False, is_latest=False) -> list[str]:
+def run_all(version=None, overwrite=False, is_latest=False) -> list[str]:
     result_uris = []
 
     gl_result = grasslands_flow.gadm_grasslands_area(overwrite=overwrite)
@@ -62,7 +62,7 @@ def run_all(dist_version=None, overwrite=False, is_latest=False) -> list[str]:
     result_uris.append(nl_result)
 
     dist_result = dist_flow.dist_alerts_flow(
-        dist_version=dist_version, overwrite=overwrite, is_latest=is_latest
+        dist_version=version, overwrite=overwrite, is_latest=is_latest
     )
     result_uris.append(dist_result)
 
@@ -96,10 +96,9 @@ def run_tcl_update(version, overwrite=False) -> list[str]:
     ),
 )
 def run_updates(
-    dist_version=None,
+    version=None,
     overwrite=False,
     is_latest=False,
-    version=None,
     flow: FlowSelection = FlowSelection.DIST_UPDATE,
 ) -> list[str]:
     logger = get_run_logger()
@@ -111,13 +110,13 @@ def run_updates(
 
         if flow == FlowSelection.DIST_UPDATE:
             result_uris = run_dist_update(
-                dist_version=dist_version,
+                version=version,
                 overwrite=overwrite,
                 is_latest=is_latest,
             )
         elif flow == FlowSelection.ALL:
             result_uris = run_all(
-                dist_version=dist_version,
+                version=version,
                 overwrite=overwrite,
                 is_latest=is_latest,
             )
@@ -141,17 +140,15 @@ def run_updates(
 
 
 def main(
-    dist_version=None,
+    version=None,
     overwrite=False,
     is_latest=False,
-    version=None,
     flow: FlowSelection = FlowSelection.DIST_UPDATE,
 ):
     run_updates(
-        dist_version=dist_version,
+        version=version,
         overwrite=overwrite,
         is_latest=is_latest,
-        version=version,
         flow=flow,
     )
 

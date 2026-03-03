@@ -358,7 +358,7 @@ class TreeCoverLossTasks:
             if sample_stats.size > 0:
                 sample_driver_area_ha_total = sample_stats[
                     (sample_stats.canopy_cover.astype(np.int8) >= 30)
-                    & ~(sample_stats.driver.isna())
+                    & (sample_stats.driver != "Unknown")
                     & (sample_stats.aoi_id == admin2_aoi_id)
                 ].area_ha.sum()
 
