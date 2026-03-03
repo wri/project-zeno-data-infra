@@ -256,6 +256,7 @@ class TreeCoverLossTasks:
 
         # convert driver codes to labels
         categoryid_to_driver = {
+            0: "Unknown",
             1: "Permanent agriculture",
             2: "Hard commodities",
             3: "Shifting cultivation",
@@ -348,7 +349,7 @@ class TreeCoverLossTasks:
         return results_with_ids
 
     def qc_against_validation_source(self, version: Optional[str] = None):
-        qc_features = self.qc_feature_repository.load(limit=1)
+        qc_features = self.qc_feature_repository.load(limit=20)
 
         def qc_feature(row):
             sample_stats = self.get_sample_statistics(row.geometry)
