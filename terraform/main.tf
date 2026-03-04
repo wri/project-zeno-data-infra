@@ -334,6 +334,10 @@ module "analytics" {
         {
           name = "NEW_RELIC_LICENSE_KEY"
           value = var.new_relic_license_key
+        },
+        {
+          name  = "NEW_RELIC_ENVIRONMENT"
+          value = var.new_relic_environment
         }
       ]
       enable_cloudwatch_logging = true
