@@ -144,14 +144,16 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         default = null
       }
       overwrite = {
-        title   = "Overwrite"
-        type    = "boolean"
-        default = false
+        title       = "Overwrite"
+        description = "If true, this will run the analysis overwriting over any existing outputs from previous runs of the same version."
+        type        = "boolean"
+        default     = false
       }
       is_latest = {
-        title   = "Is Latest"
-        type    = "boolean"
-        default = false
+        title       = "Set as latest"
+        description = "If true, this version will be marked as the latest and served in the analytics API. Right now implemented for DIST updates."
+        type        = "boolean"
+        default     = false
       }
       flow_name = {
         title   = "Flow Name"

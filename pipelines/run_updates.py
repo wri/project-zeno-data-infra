@@ -81,7 +81,7 @@ update_flows = {
     name="GNW zonal stats update",
     log_prints=True,
     description=(
-        "Update the zonal statistics by GADM areas (admin levels 0, 1 and 2). Three flows are available: "
+        "Update the zonal statistics by GADM areas (admin levels 0, 1 and 2). Two flows are available: "
         "-'dist_update' will just run an update on DIST alerts, and is the default for backward compatibility"
         "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide all necessary updates for TCL."
     ),
