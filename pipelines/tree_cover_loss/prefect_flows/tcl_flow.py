@@ -14,9 +14,22 @@ from pipelines.utils import s3_uri_exists
 
 @flow(name="Tree Cover Loss")
 def umd_tree_cover_loss_flow(
-    overwrite=False, bbox: Optional[Tuple[float, float, float, float]] = None
+    version: str,
+    overwrite=False,
+    bbox: Optional[Tuple[float, float, float, float]] = None,
 ):
-    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-tree-cover-loss-emissions-2001-2024.parquet"
+    """Run the UMD tree cover loss flow and persist the resulting parquet.
+
+    Args:
+        version: Output version string used in the destination S3 path.
+        overwrite: If True, recompute and overwrite existing output at the target URI.
+        bbox: Optional bounding box as ``(min_x, min_y, max_x, max_y)`` to limit
+            processing to a spatial subset.
+
+    Returns:
+        The S3 URI for the saved parquet result.
+    """
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/{version}/admin-tree-cover-loss.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
@@ -24,7 +37,9 @@ def umd_tree_cover_loss_flow(
     if bbox is not None:
         bbox = box(*bbox)
 
-    result_df = umd_tree_cover_loss(tcl_tasks.TreeCoverLossPrefectTasks, bbox=bbox)
+    result_df = umd_tree_cover_loss(
+        tcl_tasks.TreeCoverLossPrefectTasks, version=version, bbox=bbox
+    )
 
     result_uri = common_tasks.save_result.with_options(
         name="area-emissions-by-tcl-save-result"

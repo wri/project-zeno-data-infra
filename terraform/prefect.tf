@@ -130,8 +130,9 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
   })
 
   parameters = jsonencode({
-    dist_version = null
-    is_latest    = false
+    version   = null
+    is_latest = false
+    flow_name = "dist_update"
   })
 }
 
@@ -172,8 +173,9 @@ resource "prefect_automation" "run_pipelines_on_dist_update" {
       source        = "selected"
       deployment_id = prefect_deployment.gnw_zonal_stats_update.id
       parameters    = jsonencode({
-        dist_version = "{{ event.payload.version }}"
-        is_latest    = "{{ event.payload.is_latest }}"
+        version   = "{{ event.payload.version }}"
+        is_latest = "{{ event.payload.is_latest }}"
+        flow_name = "dist_update"
       })
       job_variables = jsonencode({})
     },

@@ -10,6 +10,7 @@ pixel_area_zarr_uri = (
 )
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
 sbtn_natural_lands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr"
+sbtn_natural_forests_zarr_uri = "s3://gfw-data-lake/sbtn_natural_forests_map/v202504/raster/epsg-4326/zarr/class.zarr"
 dist_driver_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/dist-alerts-drivers/umd_dist_alerts_drivers.zarr"
 )

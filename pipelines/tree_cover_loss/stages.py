@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import ee
 import numpy as np
@@ -12,7 +12,7 @@ from pipelines.globals import (
     subregion_zarr_uri,
 )
 from pipelines.prefect_flows import common_stages
-from pipelines.prefect_flows.common_stages import _load_zarr
+from pipelines.prefect_flows.common_stages import _load_zarr, numeric_to_alpha3
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
@@ -22,6 +22,19 @@ from pipelines.tree_cover_loss.prefect_flows.tcl import compute_tree_cover_loss
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
+
+
+# tcd threshold mapping
+thresh_to_pct = {
+    0: "0",
+    1: "10",
+    2: "15",
+    3: "20",
+    4: "25",
+    5: "30",
+    6: "50",
+    7: "75",
+}
 
 
 class TreeCoverLossTasks:
@@ -44,10 +57,12 @@ class TreeCoverLossTasks:
         ifl_uri: Optional[str] = None,
         drivers_uri: Optional[str] = None,
         primary_forests_uri: Optional[str] = None,
+        natural_forests_uri: Optional[str] = None,
         bbox: Optional[Polygon] = None,
     ) -> Tuple[
         xr.DataArray,
         xr.Dataset,
+        xr.DataArray,
         xr.DataArray,
         xr.DataArray,
         xr.DataArray,
@@ -111,6 +126,13 @@ class TreeCoverLossTasks:
             join="left",
         )[1]
 
+        natural_forests: xr.DataArray = _load_zarr(natural_forests_uri).band_data
+        natural_forests = xr.align(
+            tcl,
+            natural_forests.reindex_like(tcl, method="nearest", tolerance=1e-5),
+            join="left",
+        )[1]
+
         # GADM zarrs
         country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
         country = xr.align(
@@ -143,6 +165,7 @@ class TreeCoverLossTasks:
             ifl,
             drivers,
             primary_forests,
+            natural_forests,
             country,
             region,
             subregion,
@@ -164,6 +187,7 @@ class TreeCoverLossTasks:
             ifl,
             drivers,
             primary_forests,
+            natural_forests,
             country,
             region,
             subregion,
@@ -180,6 +204,7 @@ class TreeCoverLossTasks:
             ifl.rename("is_intact_forest"),
             drivers.rename("driver"),
             primary_forests.rename("is_primary_forest"),
+            natural_forests.rename("natural_forest_class"),
             country.rename("country"),
             region.rename("region"),
             subregion.rename("subregion"),
@@ -218,67 +243,185 @@ class TreeCoverLossTasks:
         return df_pivoted
 
     def postprocess_result(self, result: xr.DataArray) -> pd.DataFrame:
-        return self.create_result_dataframe(result)
+        result_df = self.create_result_dataframe(result)
+        # convert year values (1-24) to actual years (2001-2024)
 
-    def qc_against_validation_source(self):
-        qc_features = self.qc_feature_repository.load()
+        result_df["tree_cover_loss_year"] = result_df["tree_cover_loss_year"] + 2000
 
-        def qc_feature(row):
-            try:
-                sample_stats = self.get_sample_statistics(row.geometry)
-                iso, adm1_str, adm2_suffix = row.GID_2.split(".")
-                adm2_str, _ = adm2_suffix.split("_")
+        # convert tcl thresholds to percentages
+        result_df["canopy_cover"] = result_df["canopy_cover"].map(thresh_to_pct)
 
-                adm1 = int(adm1_str)
-                adm2 = int(adm2_str)
+        # convert ifl to boolean
+        result_df["is_intact_forest"] = result_df["is_intact_forest"].astype(bool)
 
-                if sample_stats.size > 0:
-                    sample_driver_area_ha_total = sample_stats[
-                        (sample_stats.canopy_cover.astype(np.int8) >= 30)
-                        & ~(sample_stats.driver.isna())
-                        & (sample_stats.country == iso)
-                        & (sample_stats.region == adm1)
-                        & (sample_stats.subregion == adm2)
-                    ].area_ha.sum()
-                else:
-                    sample_driver_area_ha_total = 0
+        # convert driver codes to labels
+        categoryid_to_driver = {
+            0: "Unknown",
+            1: "Permanent agriculture",
+            2: "Hard commodities",
+            3: "Shifting cultivation",
+            4: "Logging",
+            5: "Wildfire",
+            6: "Settlements and infrastructure",
+            7: "Other natural disturbances",
+        }
 
-                validation_stats = self.get_validation_statistics(row.geometry)
-                if validation_stats.size > 0:
-                    validation_driver_area_ha_total = validation_stats.area_ha.sum()
-                else:
-                    validation_driver_area_ha_total = 0
+        result_df["driver"] = result_df["driver"].map(categoryid_to_driver)
 
-                diff = abs(
-                    (validation_driver_area_ha_total - sample_driver_area_ha_total)
-                    / validation_driver_area_ha_total
-                )
+        # convert primary forest to boolean
+        result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
 
-                result = bool(diff < self.qc_error_threshold)
-
-                return pd.Series(
-                    {
-                        "pass": result,
-                        "sample": sample_driver_area_ha_total,
-                        "validation": validation_driver_area_ha_total,
-                        "detail": "",
-                    }
-                )
-            except Exception as e:
-                return pd.Series(
-                    {
-                        "pass": False,
-                        "sample": np.nan,
-                        "validation": np.nan,
-                        "detail": str(e),
-                    }
-                )
-
-        qc_features[["qc_pass", "sample", "validation", "detail"]] = qc_features.apply(
-            qc_feature, axis=1
+        natural_forest_class_to_label = {
+            0: "Unknown",
+            1: "Natural Forest",
+            2: "Non-natural Forest",
+        }
+        result_df["natural_forest_class"] = result_df["natural_forest_class"].map(
+            natural_forest_class_to_label
         )
 
-        # qc_features.to_file("validation_results.geojson", index=False)
+        result_df["country"] = result_df["country"].map(numeric_to_alpha3)
+        result_df.dropna(subset=["country"], inplace=True)
+
+        if result_df.size == 0:
+            result_df = result_df.drop(columns=["country", "region", "subregion"])
+            result_df["aoi_id"] = pd.Series(dtype="object")
+            result_df["aoi_type"] = pd.Series(dtype="object")
+            return result_df
+
+        region_df = (
+            result_df.drop(columns=["subregion"])
+            .groupby(
+                [
+                    "country",
+                    "region",
+                    "canopy_cover",
+                    "tree_cover_loss_year",
+                    "driver",
+                    "is_primary_forest",
+                    "is_intact_forest",
+                ]
+            )
+            .sum()
+            .reset_index()
+        )
+        country_df = (
+            region_df.drop(columns=["region"])
+            .groupby(
+                [
+                    "country",
+                    "canopy_cover",
+                    "tree_cover_loss_year",
+                    "driver",
+                    "is_primary_forest",
+                    "is_intact_forest",
+                ]
+            )
+            .sum()
+            .reset_index()
+        )
+
+        subregion_df = result_df.copy()
+        region_df = region_df.copy()
+        country_df = country_df.copy()
+
+        if subregion_df.size > 0:
+            subregion_df["aoi_id"] = (
+                subregion_df[["country", "region", "subregion"]]
+                .astype(str)
+                .agg(".".join, axis=1)
+            )
+
+        if region_df.size > 0:
+            region_df["aoi_id"] = (
+                region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
+            )
+
+        country_df["aoi_id"] = country_df["country"]
+
+        subregion_df = subregion_df.drop(columns=["country", "region", "subregion"])
+        region_df = region_df.drop(columns=["country", "region"])
+        country_df = country_df.drop(columns=["country"])
+
+        results_with_ids = pd.concat([country_df, region_df, subregion_df])
+        results_with_ids["aoi_type"] = "admin"
+
+        return results_with_ids
+
+    def qc_against_validation_source(self, version: Optional[str] = None):
+        qc_features = self.qc_feature_repository.load(limit=20)
+
+        def qc_feature(row):
+            sample_stats = self.get_sample_statistics(row.geometry)
+            admin2_aoi_id = row.GID_2.split("_")[0]
+
+            if sample_stats.size > 0:
+                sample_driver_area_ha_total = sample_stats[
+                    (sample_stats.canopy_cover.astype(np.int8) >= 30)
+                    & (sample_stats.driver != "Unknown")
+                    & (sample_stats.aoi_id == admin2_aoi_id)
+                ].area_ha.sum()
+
+                sample_natural_forests_ha_total = sample_stats[
+                    (sample_stats.natural_forest_class != "Unknown")
+                    & (sample_stats.tree_cover_loss_year > 2020)
+                    & (sample_stats.aoi_id == admin2_aoi_id)
+                ].area_ha.sum()
+            else:
+                sample_driver_area_ha_total = 0
+                sample_natural_forests_ha_total = 0
+
+            validation_stats = self.get_validation_statistics(row.geometry)
+            if validation_stats["driver_results"].size > 0:
+                validation_driver_area_ha_total = validation_stats[
+                    "driver_results"
+                ].area_ha.sum()
+            else:
+                validation_driver_area_ha_total = 0
+
+            if validation_stats["natural_forests_results"].size > 0:
+                validation_natural_forests_ha_total = validation_stats[
+                    "natural_forests_results"
+                ].area_ha.sum()
+            else:
+                validation_natural_forests_ha_total = 0
+
+            diff_driver = self._symmetric_relative_difference(
+                validation_driver_area_ha_total, sample_driver_area_ha_total
+            )
+            diff_natural_forest = self._symmetric_relative_difference(
+                validation_natural_forests_ha_total, sample_natural_forests_ha_total
+            )
+
+            driver_result = bool(diff_driver < self.qc_error_threshold)
+            natural_forest_result = bool(diff_natural_forest < self.qc_error_threshold)
+
+            return pd.Series(
+                {
+                    "pass": all([driver_result, natural_forest_result]),
+                    "sample_driver": sample_driver_area_ha_total,
+                    "validation_driver": validation_driver_area_ha_total,
+                    "sample_natural_forest": sample_natural_forests_ha_total,
+                    "validation_natural_forest": validation_natural_forests_ha_total,
+                    "detail": "",
+                }
+            )
+
+        qc_features[
+            [
+                "qc_pass",
+                "sample_driver",
+                "validation_driver",
+                "sample_natural_forest",
+                "validation_natural_forest",
+                "detail",
+            ]
+        ] = qc_features.apply(qc_feature, axis=1)
+
+        if version is not None:
+            self.qc_feature_repository.write_results(
+                qc_features, "admin-tree-cover-loss", version
+            )
         return bool(qc_features.qc_pass.all())
 
     def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
@@ -288,12 +431,13 @@ class TreeCoverLossTasks:
     def get_validation_statistics(
         self,
         geom: Polygon,
-    ):
+    ) -> Dict[str, pd.DataFrame]:
         loss_ds = self.gee_repository.load("loss", geom)
 
         # pull only what we need
         loss = loss_ds.loss  # 0/1
         tcd = loss_ds.treecover2000  # 0-100
+        loss_year = loss_ds.lossyear
 
         loss_mask = loss == 1
         loss_tcd30_mask = loss_mask & (tcd > 30)
@@ -301,19 +445,47 @@ class TreeCoverLossTasks:
         drivers_ds = self.gee_repository.load("tcl_drivers", geom, like=loss)
         drivers_class = drivers_ds.classification.where(loss_tcd30_mask)
 
-        # if the whole thing is masked just exit early
-        if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
-            return pd.DataFrame({"area_ha": [], "driver": []})
+        natural_lands_class = self.gee_repository.load(
+            "natural_lands", geom, like=loss
+        ).classification
+        natural_forests_class = xr.where(
+            natural_lands_class.isin([2, 5, 8, 9]),
+            1,
+            xr.where(natural_lands_class.isin([14, 17, 18]), 2, 0),
+        )
 
         area = self.gee_repository.load("area", geom, like=loss) / 10000
 
-        results = (
-            area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()
+        # if the whole thing is masked just exit early
+        if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
+            driver_results = pd.DataFrame({"area_ha": [], "driver": []})
+        else:
+            driver_results = (
+                area.groupby(drivers_class)
+                .sum(skipna=True)
+                .to_dataframe()
+                .reset_index()
+            )
+            driver_results = driver_results.rename(
+                columns={"area": "area_ha", "classification": "driver"}
+            )
+
+        natural_forests_results = (
+            area.where(loss_year > 20)
+            .where(natural_forests_class > 0)
+            .groupby(natural_forests_class)
+            .sum()
+            .to_dataframe()
+            .reset_index()
         )
-        results = results.rename(
-            columns={"area": "area_ha", "classification": "driver"}
+        natural_forests_results = natural_forests_results.rename(
+            columns={"area": "area_ha", "classification": "natural_forests_class"}
         )
-        return results
+
+        return {
+            "driver_results": driver_results,
+            "natural_forests_results": natural_forests_results,
+        }
 
     def get_validation_statistics_old(
         self,
@@ -382,3 +554,8 @@ class TreeCoverLossTasks:
 
         # Bring it back to the client as JSON (Python dict)
         return fc.getInfo()
+
+    @staticmethod
+    def _symmetric_relative_difference(a, b):
+        avg = (abs(a) + abs(b)) / 2
+        return 0 if avg == 0 else abs(a - b) / avg
