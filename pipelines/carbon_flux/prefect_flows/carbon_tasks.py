@@ -9,7 +9,6 @@ def load_data(carbon_net_flux_zarr_uri,
               carbon_gross_removals_zarr_uri,
               carbon_gross_emissions_zarr_uri,
               tree_cover_density_2000_zarr_uri,
-              tree_cover_loss_zarr_uri,
               mangrove_stock_2000_zarr_uri,
               tree_cover_gain_from_height_zarr_uri,
               ) -> Tuple[xr.DataArray, ...]:
@@ -17,10 +16,9 @@ def load_data(carbon_net_flux_zarr_uri,
                             carbon_gross_removals_zarr_uri,
                             carbon_gross_emissions_zarr_uri,
                             tree_cover_density_2000_zarr_uri,
-                            tree_cover_loss_zarr_uri,
                             mangrove_stock_2000_zarr_uri,
                             tree_cover_gain_from_height_zarr_uri,
-      )
+                            )
 
 @task
 def setup_compute(

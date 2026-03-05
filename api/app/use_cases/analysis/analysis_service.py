@@ -4,6 +4,7 @@ import uuid
 
 import newrelic.agent as nr_agent
 
+from app.analysis.common.analysis import FeatureTooSmallError
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -73,6 +74,25 @@ class AnalysisService:
 
             self.analytics_resource.status = AnalysisStatus.saved
             self.analytics_resource.result = results
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id,
+                Analysis(
+                    metadata=self.analytics_resource.metadata,
+                    result=self.analytics_resource.result,
+                    status=self.analytics_resource.status,
+                ),
+            )
+        except FeatureTooSmallError as e:
+            logging.warning(
+                {
+                    "event": f"{self.event}_analytics_feature_too_small",
+                    "severity": "medium",
+                    "metadata": self.analytics_resource.metadata,
+                    "error_details": str(e),
+                }
+            )
+            self.analytics_resource.status = AnalysisStatus.failed
+            self.analytics_resource.result = {"error": str(e)}
             await self.analysis_repository.store_analysis(
                 self.analytics_resource_id,
                 Analysis(
