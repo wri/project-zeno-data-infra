@@ -113,7 +113,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
   work_pool_name = prefect_work_pool.ecs_pool.name
   flow_id        = prefect_flow.gnw_zonal_stats_update.id
   path           = "/app"
-  entrypoint     = "pipelines/run_updates.py:main"
+  entrypoint     = "pipelines/run_updates.py:run_updates"
 
   job_variables = jsonencode({
     image = var.pipelines_image
@@ -130,8 +130,38 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
   })
 
   parameters = jsonencode({
-    dist_version = null
-    is_latest    = false
+    version   = null
+    is_latest = false
+    flow_name = "dist_update"
+  })
+
+  parameter_openapi_schema = jsonencode({
+    type = "object"
+    properties = {
+      version = {
+        title   = "Version"
+        anyOf   = [{ type = "string" }, { type = "null" }]
+        default = null
+      }
+      overwrite = {
+        title       = "Overwrite"
+        description = "If true, this will run the analysis overwriting over any existing outputs from previous runs of the same version."
+        type        = "boolean"
+        default     = false
+      }
+      is_latest = {
+        title       = "Set as latest"
+        description = "If true, this version will be marked as the latest and served in the analytics API. Right now implemented for DIST updates."
+        type        = "boolean"
+        default     = false
+      }
+      flow_name = {
+        title   = "Flow Name"
+        type    = "string"
+        default = "dist_update"
+        enum    = ["dist_update", "tcl_update"]
+      }
+    }
   })
 }
 
@@ -172,8 +202,9 @@ resource "prefect_automation" "run_pipelines_on_dist_update" {
       source        = "selected"
       deployment_id = prefect_deployment.gnw_zonal_stats_update.id
       parameters    = jsonencode({
-        dist_version = "{{ event.payload.version }}"
-        is_latest    = "{{ event.payload.is_latest }}"
+        version   = "{{ event.payload.version }}"
+        is_latest = "{{ event.payload.is_latest }}"
+        flow_name = "dist_update"
       })
       job_variables = jsonencode({})
     },

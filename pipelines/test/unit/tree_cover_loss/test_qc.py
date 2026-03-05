@@ -21,28 +21,34 @@ def test_tcl_validation_flow():
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
+                "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["30", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
-                "country": ["AFG", "AFG"],
-                "region": [1, 1],
-                "subregion": [1, 1],
+                "aoi_id": ["AFG.1.1", "AFG.1.1"],
+                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
-        mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 200.0]})
+        mock_validation.return_value = {
+            "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+        }
 
         assert tasks.qc_against_validation_source() is True
 
-        mock_validation.return_value = pd.DataFrame({"area_ha": [100.0, 150.0]})
+        mock_validation.return_value = {
+            "driver_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
+        }
         assert tasks.qc_against_validation_source() is False
 
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
+                "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["10", "30"],
                 "driver": ["Agriculture", "Permanent settlement"],
-                "country": ["AFG", "AFG"],
-                "region": [1, 1],
-                "subregion": [1, 1],
+                "aoi_id": ["AFG.1.1", "AFG.1.1"],
+                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
         assert tasks.qc_against_validation_source() is False
@@ -50,11 +56,11 @@ def test_tcl_validation_flow():
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
+                "tree_cover_loss_year": [2021, 2022],
                 "canopy_cover": ["30", "30"],
                 "driver": [np.nan, "Permanent settlement"],
-                "country": ["AFG", "AFG"],
-                "region": [1, 1],
-                "subregion": [1, 1],
+                "aoi_id": ["AFG.1.1", "AFG.1.1"],
+                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
         assert bool(tasks.qc_against_validation_source()) is False
@@ -81,7 +87,7 @@ def test_get_validation_statistics_with_fake_repo():
     geom = box(0, 0, 1, 1)
     tasks = TreeCoverLossTasks(gee_repository=FakeGoogleEarthEngineDatasetRepository())
 
-    result = tasks.get_validation_statistics(geom)
+    result = tasks.get_validation_statistics(geom)["driver_results"]
 
     expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
     pd.testing.assert_frame_equal(result, expected, check_dtype=False)
