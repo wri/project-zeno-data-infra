@@ -1,5 +1,6 @@
 import logging
 import os
+from enum import Enum
 
 import coiled
 from prefect import flow, task
@@ -65,9 +66,14 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
     return result_uris
 
 
+class UpdateFlow(str, Enum):
+    DIST_UPDATE = "dist_update"
+    TCL_UPDATE = "tcl_update"
+
+
 update_flows = {
-    "dist_update": run_dist_update,
-    "tcl_update": run_tcl_update,
+    UpdateFlow.DIST_UPDATE: run_dist_update,
+    UpdateFlow.TCL_UPDATE: run_tcl_update,
 }
 
 
@@ -76,7 +82,6 @@ update_flows = {
     log_prints=True,
     description=(
         "Update the zonal statistics by GADM areas (admin levels 0, 1 and 2). Three flows are available: "
-        "-'all' will update all existing GNW versions with the given `version`"
         "-'dist_update' will just run an update on DIST alerts, and is the default for backward compatibility"
         "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide all necessary updates for TCL."
     ),
@@ -85,7 +90,7 @@ def run_updates(
     version=None,
     overwrite=False,
     is_latest=False,
-    flow="dist_update",
+    flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -93,15 +98,20 @@ def run_updates(
 
     try:
         dask_client = create_cluster()
-        flow = update_flows.get(flow)
 
-        if flow is None:
-            raise ValueError(f"Unsupported flow selection: {flow}")
+        flow_fn = update_flows.get(flow_name)
+        if flow_fn is None:
+            accepted = [e.value for e in UpdateFlow]
+            raise ValueError(
+                f"Unsupported flow selection: '{flow_name}'. Accepted values: {accepted}"
+            )
 
-        if version is None:
-            raise ValueError("version is required when flow is 'tcl_update'")
+        if flow_name == UpdateFlow.TCL_UPDATE and version is None:
+            raise ValueError(
+                f"version is required when flow is {UpdateFlow.TCL_UPDATE}"
+            )
 
-        result_uris = flow(
+        result_uris = flow_fn(
             version=version,
             overwrite=overwrite,
             is_latest=is_latest,
@@ -121,13 +131,13 @@ def main(
     version=None,
     overwrite=False,
     is_latest=False,
-    flow="dist_update",
+    flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
 ):
     run_updates(
         version=version,
         overwrite=overwrite,
         is_latest=is_latest,
-        flow=flow,
+        flow_name=flow_name,
     )
 
 
