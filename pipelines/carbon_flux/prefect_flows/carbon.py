@@ -5,26 +5,8 @@ import numpy as np
 import pandas as pd
 from shapely.geometry import Polygon
 
-from pipelines.prefect_flows.common_stages import numeric_to_alpha3
-
-# tcd threshold mapping
-thresh_to_pct = {
-    0: 0,
-    1: 10,
-    2: 15,
-    3: 20,
-    4: 25,
-    5: 30,
-    6: 50,
-    7: 75,
-}
-
 
 def gadm_carbon_flux(tasks, bbox: Optional[Polygon] = None):
-    return compute_carbon_flux(tasks, bbox)
-
-
-def compute_carbon_flux(tasks, bbox: Optional[Polygon] = None):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
     funcname = "sum"
 
@@ -58,10 +40,5 @@ def compute_carbon_flux(tasks, bbox: Optional[Polygon] = None):
     result = tasks.compute_zonal_stat(*compute_input, funcname=funcname)
 
     result_df: pd.DataFrame = tasks.postprocess_result(result)
-
-    # Convert tcd thresholds to percentages (already done in stages.py)
-    # Convert country codes to alpha3
-    result_df["country"] = result_df["country"].map(numeric_to_alpha3)
-    result_df.dropna(subset=["country"], inplace=True)
 
     return result_df

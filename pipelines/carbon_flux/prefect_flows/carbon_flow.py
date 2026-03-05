@@ -12,8 +12,8 @@ from pipelines.carbon_flux.prefect_flows.carbon import gadm_carbon_flux
 from pipelines.utils import s3_uri_exists
 
 
-@flow(name="Carbon Flux")
-def gadm_carbon_flux_flow(
+@flow(name="Carbon flux")
+def gadm_carbon_flux(
     overwrite=False, bbox: Optional[Tuple[float, float, float, float]] = None
 ):
     result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-carbon.parquet"

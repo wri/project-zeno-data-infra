@@ -151,20 +151,7 @@ class CarbonFluxTasks:
         """
         Convert an xarray with multiple layers to a result df
         """
-        # extract sparse data
-        sparse_data = alerts_count.data
-        dim_names = alerts_count.dims
-        indices = sparse_data.coords
-        values = sparse_data.data
-
-        # create coordinate dictionary
-        coord_dict = {
-            dim: alerts_count.coords[dim].values[indices[i]]
-            for i, dim in enumerate(dim_names)
-        }
-        coord_dict["value"] = values
-
-        df = pd.DataFrame(coord_dict)
+        df = common_stages.create_result_dataframe(alerts_count)
 
         # Convert tcd thresholds to percentages
         df["tree_cover_density"] = df["tree_cover_density"].map(thresh_to_pct)
