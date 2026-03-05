@@ -127,19 +127,5 @@ def run_updates(
     return result_uris
 
 
-def main(
-    version=None,
-    overwrite=False,
-    is_latest=False,
-    flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
-):
-    run_updates(
-        version=version,
-        overwrite=overwrite,
-        is_latest=is_latest,
-        flow_name=flow_name,
-    )
-
-
 if __name__ == "__main__":
-    main(overwrite=False)
+    run_updates(overwrite=False)

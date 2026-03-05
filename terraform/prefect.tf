@@ -113,7 +113,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
   work_pool_name = prefect_work_pool.ecs_pool.name
   flow_id        = prefect_flow.gnw_zonal_stats_update.id
   path           = "/app"
-  entrypoint     = "pipelines/run_updates.py:main"
+  entrypoint     = "pipelines/run_updates.py:run_updates"
 
   job_variables = jsonencode({
     image = var.pipelines_image
