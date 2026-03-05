@@ -29,7 +29,7 @@ def umd_tree_cover_loss_flow(
     Returns:
         The S3 URI for the saved parquet result.
     """
-    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/{version}/admin-tree-cover-loss.parquet"
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/tcl/{version}/admin-tree-cover-loss.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
