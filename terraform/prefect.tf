@@ -134,6 +134,33 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
     is_latest = false
     flow_name = "dist_update"
   })
+
+  parameter_openapi_schema = jsonencode({
+    type = "object"
+    properties = {
+      version = {
+        title   = "Version"
+        anyOf   = [{ type = "string" }, { type = "null" }]
+        default = null
+      }
+      overwrite = {
+        title   = "Overwrite"
+        type    = "boolean"
+        default = false
+      }
+      is_latest = {
+        title   = "Is Latest"
+        type    = "boolean"
+        default = false
+      }
+      flow_name = {
+        title   = "Flow Name"
+        type    = "string"
+        default = "dist_update"
+        enum    = ["dist_update", "tcl_update"]
+      }
+    }
+  })
 }
 
 
