@@ -113,7 +113,7 @@ class IntenseApiUser(FastHttpUser):
                     resp = requests.get(
                         f"https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query?sql=select wdpaid from data where 1=1 {area_filter} limit {number_of_ids} offset {offset}&x-api-key={API_KEY}"
                     ).json()
-                    aoi_ids = [str(row["wdpaid"]) for row in resp["data"]]
+                    aoi_ids = [str(int(row["wdpaid"])) for row in resp["data"]]
                     print("WDPA AOI IDS", aoi_ids, area_label)
                 elif aoi_type == "indigenous_land":
                     count_resp = requests.get(
