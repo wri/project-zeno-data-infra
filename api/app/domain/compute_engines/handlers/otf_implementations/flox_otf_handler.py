@@ -10,6 +10,7 @@ from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
 )
 from app.domain.models.dataset import Dataset, DatasetQuery
+from app.domain.models.environment import Environment
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
@@ -27,10 +28,13 @@ class FloxOTFHandler(AnalyticsOTFHandler):
 
     def __init__(
         self,
+        environment: Environment = Environment.production,
         dataset_repository=ZarrDatasetRepository(),
         aoi_geometry_repository=DataApiAoiGeometryRepository(),
         dask_client=None,
     ):
+        if dataset_repository is None:
+            dataset_repository = ZarrDatasetRepository(environment=environment)
         self.dataset_repository = dataset_repository
         self.aoi_geometry_repository = aoi_geometry_repository
         self.dask_client = dask_client
@@ -86,7 +90,8 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             by = by.where(filter_arr)
 
             if filter.dataset in query.group_bys:
-                # filter expected groups by the filter itself so it doesn't appear in the results as 0s
+                # filter expected groups by the filter itself so it doesn't appear
+                # in the results as 0s
                 expected_groups_per_dataset[
                     filter.dataset
                 ] = expected_groups_per_dataset[filter.dataset][
