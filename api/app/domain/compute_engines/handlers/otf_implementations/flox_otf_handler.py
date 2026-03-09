@@ -6,6 +6,11 @@ import xarray as xr
 from flox.xarray import xarray_reduce
 from shapely.geometry import shape
 
+from app.analysis.common.geodesic_area import (
+    compute_geodesic_area_ha,
+    compute_total_feature_collection_area_ha,
+)
+from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.compute_engines.handlers.analytics_otf_handler import (
     AnalyticsOTFHandler,
 )
@@ -30,18 +35,33 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         dataset_repository=ZarrDatasetRepository(),
         aoi_geometry_repository=DataApiAoiGeometryRepository(),
         dask_client=None,
+        dask_client_router: DaskClientRouter = None,
     ):
         self.dataset_repository = dataset_repository
         self.aoi_geometry_repository = aoi_geometry_repository
         self.dask_client = dask_client
+        self.dask_client_router = dask_client_router
+
+    def _resolve_dask_client(self, total_area_ha: float):
+        if self.dask_client_router is not None:
+            return self.dask_client_router.get_client(total_area_ha)
+        return self.dask_client
 
     async def handle(self, aoi, query: DatasetQuery):
         if aoi.type == "feature_collection":
             aoi_geometries = [
                 shape(feature) for feature in aoi.feature_collection["features"]
             ]
+            total_area_ha = compute_total_feature_collection_area_ha(
+                aoi.feature_collection["features"]
+            )
         else:
-            aoi_geometries = await self.aoi_geometry_repository.load(aoi.type, aoi.ids)
+            aoi_geometries, areas_ha = await self.aoi_geometry_repository.load(
+                aoi.type, aoi.ids
+            )
+            total_area_ha = sum(areas_ha)
+
+        dask_client = self._resolve_dask_client(total_area_ha)
 
         aoi_partial = partial(
             self._handle,
@@ -49,8 +69,8 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             dataset_repository=self.dataset_repository,
             expected_groups_per_dataset=self.EXPECTED_GROUPS,
         )
-        futures = self.dask_client.map(aoi_partial, list(zip(aoi.ids, aoi_geometries)))
-        results_per_aoi = await self.dask_client.gather(futures)
+        futures = dask_client.map(aoi_partial, list(zip(aoi.ids, aoi_geometries)))
+        results_per_aoi = await dask_client.gather(futures)
 
         results = pd.concat(results_per_aoi)
 
