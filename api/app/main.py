@@ -53,8 +53,8 @@ async def lifespan(app: FastAPI):
     # Local dask cluster for small-area requests
     local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 4))
     local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 2))
-    local_cluster = LocalCluster(
-        n_workers=local_n_workers, threads_per_worker=local_threads
+    local_cluster = await LocalCluster(
+        n_workers=local_n_workers, threads_per_worker=local_threads, asynchronous=True
     )
     app.state.local_dask_client = await Client(local_cluster, asynchronous=True)
 
