@@ -334,6 +334,10 @@ module "analytics" {
         {
           name = "NEW_RELIC_LICENSE_KEY"
           value = var.new_relic_license_key
+        },
+        {
+          name  = "LOCAL_CLUSTER_AREA_THRESHOLD_HA"
+          value = tostring(var.local_cluster_area_threshold_ha)
         }
       ]
       enable_cloudwatch_logging = true
