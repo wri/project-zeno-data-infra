@@ -50,20 +50,6 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Remote dask cluster
-    if not os.getenv("DASK_SCHEDULER_ADDRESS"):
-        logging.warning(
-            "DASK_SCHEDULER_ADDRESS not set, using local cluster as remote fallback. "
-            "This is the intended behavior for local development only."
-        )
-        remote_cluster = LocalCluster(n_workers=8, threads_per_worker=2)
-        os.environ["DASK_SCHEDULER_ADDRESS"] = remote_cluster.scheduler_address
-
-    app.state.dask_client = await Client(
-        os.environ["DASK_SCHEDULER_ADDRESS"],
-        asynchronous=True,
-    )
-
     # Local dask cluster for small-area requests
     local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 4))
     local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 2))
@@ -71,6 +57,19 @@ async def lifespan(app: FastAPI):
         n_workers=local_n_workers, threads_per_worker=local_threads
     )
     app.state.local_dask_client = await Client(local_cluster, asynchronous=True)
+
+    # Remote dask cluster
+    if not os.getenv("DASK_SCHEDULER_ADDRESS"):
+        logging.warning(
+            "DASK_SCHEDULER_ADDRESS not set, using local cluster as remote fallback. "
+            "This is the intended behavior for local development only."
+        )
+        app.state.dask_client = app.state.local_dask_client
+    else:
+        app.state.dask_client = await Client(
+            os.environ["DASK_SCHEDULER_ADDRESS"],
+            asynchronous=True,
+        )
 
     app.state.dask_client_router = DaskClientRouter(
         local_client=app.state.local_dask_client,
