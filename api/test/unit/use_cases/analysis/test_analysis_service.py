@@ -1,5 +1,4 @@
 from unittest.mock import AsyncMock, MagicMock, call
-from uuid import UUID
 
 import pytest
 
@@ -9,8 +8,6 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
 from app.use_cases.analysis.analysis_service import AnalysisService
-
-resource_thumbprint = UUID("fe76241f-63d6-5e3f-8090-e9e8e98ea9aa")
 
 
 @pytest.fixture
@@ -65,7 +62,7 @@ class TestTreeCoverLossServiceCollaborators:
         # Assert  #
         ############
         mock_analysis_repository.load_analysis.assert_called_once_with(
-            resource_thumbprint
+            stub_analysis_in.thumbprint()
         )
 
         mock_analysis_repository_calls = (
@@ -78,7 +75,7 @@ class TestTreeCoverLossServiceCollaborators:
             stub_analysis_in.thumbprint(),
             Analysis(
                 None,
-                {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                stub_analysis_in.model_dump(),
                 None,
             ),
         )
@@ -88,7 +85,7 @@ class TestTreeCoverLossServiceCollaborators:
             stub_analysis_in.thumbprint(),
             Analysis(
                 None,
-                {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                stub_analysis_in.model_dump(),
                 AnalysisStatus.pending,
             ),
         )
@@ -98,12 +95,12 @@ class TestTreeCoverLossServiceCollaborators:
             stub_analysis_in.thumbprint(),
             Analysis(
                 None,
-                {"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                stub_analysis_in.model_dump(),
                 AnalysisStatus.failed,
             ),
         )
 
-        assert result_thumbprint == resource_thumbprint
+        assert result_thumbprint == stub_analysis_in.thumbprint()
         mock_analyzer.analyze.assert_called_once_with(
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
@@ -147,9 +144,9 @@ class TestTreeCoverLossServiceCollaborators:
         # Assert  #
         ############
         mock_analysis_repository.load_analysis.assert_called_once_with(
-            resource_thumbprint
+            stub_analysis_in.thumbprint()
         )
-        assert result_thumbprint == resource_thumbprint
+        assert result_thumbprint == stub_analysis_in.thumbprint()
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -188,9 +185,9 @@ class TestTreeCoverLossServiceCollaborators:
         # Assert   #
         ############
         mock_analysis_repository.load_analysis.assert_called_once_with(
-            resource_thumbprint
+            stub_analysis_in.thumbprint()
         )
-        assert result_thumbprint == resource_thumbprint
+        assert result_thumbprint == stub_analysis_in.thumbprint()
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -229,9 +226,9 @@ class TestTreeCoverLossServiceCollaborators:
         # Assert   #
         ############
         mock_analysis_repository.load_analysis.assert_called_once_with(
-            resource_thumbprint
+            stub_analysis_in.thumbprint()
         )
-        assert result_thumbprint == resource_thumbprint
+        assert result_thumbprint == stub_analysis_in.thumbprint()
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -268,14 +265,14 @@ class TestTreeCoverLossServiceCollaborators:
         # Assert   #
         ############
         mock_analysis_repository.load_analysis.assert_called_once_with(
-            resource_thumbprint
+            stub_analysis_in.thumbprint()
         )
-        assert result_thumbprint == resource_thumbprint
+        assert result_thumbprint == stub_analysis_in.thumbprint()
         mock_analyzer.analyze.assert_called()
         mock_analysis_repository.store_analysis.assert_called_with(
             stub_analysis_in.thumbprint(),
             Analysis(
-                metadata={"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                metadata=stub_analysis_in.model_dump(),
                 result=None,
                 status=AnalysisStatus.failed,
             ),
@@ -319,7 +316,7 @@ class TestTreeCoverLossServiceCollaborators:
         mock_analysis_repository.store_analysis.assert_called_with(
             stub_analysis_in.thumbprint(),
             Analysis(
-                metadata={"aoi": {}, "_version": "v0", "_analytics_name": "analytics"},
+                metadata=stub_analysis_in.model_dump(),
                 result={"error": error_message},
                 status=AnalysisStatus.failed,
             ),
