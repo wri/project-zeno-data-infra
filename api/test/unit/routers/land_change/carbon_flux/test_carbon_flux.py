@@ -17,7 +17,6 @@ from app.use_cases.analysis.analysis_service import AnalysisService
 client = TestClient(app)
 
 ENDPOINT_PATH = "/v0/land_change/carbon_flux/analytics"
-RESOURCE_THUMBPRINT = "9b068e84-7b15-5ef2-b37d-415a7a844f4d"
 
 
 @pytest.fixture
@@ -57,7 +56,7 @@ class TestCarbonFluxPostUseCaseInitiation:
         app.dependency_overrides[create_analysis_service] = create_mock_service
 
         mock_service.get_status.return_value = AnalysisStatus.pending
-        mock_service.resource_thumbprint.return_value = RESOURCE_THUMBPRINT
+        mock_service.resource_thumbprint.return_value = dummy_analytics_in.thumbprint()
         response = client.post(
             ENDPOINT_PATH,
             json=json.loads(dummy_analytics_in.model_dump_json()),
@@ -68,7 +67,7 @@ class TestCarbonFluxPostUseCaseInitiation:
         assert response.json() == json.loads(
             DataMartResourceLinkResponse(
                 data=DataMartResourceLink(
-                    link=f"http://testserver{ENDPOINT_PATH}/{RESOURCE_THUMBPRINT}"
+                    link=f"http://testserver{ENDPOINT_PATH}/{dummy_analytics_in.thumbprint()}"
                 ),
                 status=AnalysisStatus.pending,
             ).model_dump_json()
