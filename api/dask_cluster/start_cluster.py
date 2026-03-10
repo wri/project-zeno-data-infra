@@ -36,13 +36,12 @@ def run_cluster_manager():
 
     cluster = EC2Cluster(
         vpc=cluster_vpc,
-        worker_instance_type="r7i.xlarge",
+        worker_instance_type="r7i.2xlarge",
         scheduler_instance_type="r7i.xlarge",
         subnet_id="subnet-0f1544432f2a769d2",
         security_groups=[security_group_id],
         filesystem_size=50,
         n_workers=2,
-        docker_image=os.getenv("API_IMAGE"),
         env_vars={
             "AWS_ACCESS_KEY_ID": os.getenv(
                 "AWS_ACCESS_KEY_ID",

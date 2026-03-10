@@ -423,10 +423,6 @@ module "dask_cluster_manager" {
         {
           name  = "DASK_WORKER_SECURITY_GROUP"
           value = aws_security_group.dask_workers.id
-        },
-        {
-          name = "API_IMAGE"
-          value = var.api_image
         }
       ]
 
