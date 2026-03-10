@@ -58,9 +58,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
         app.dependency_overrides[create_analysis_service] = create_mock_service
 
         mock_service.get_status.return_value = AnalysisStatus.pending
-        mock_service.resource_thumbprint.return_value = (
-            "12665e7b-e976-5ab2-adc2-c4576399f0bb"
-        )
+        mock_service.resource_thumbprint.return_value = dummy_analytics_in.thumbprint()
         response = client.post(
             "/v0/land_change/tree_cover_loss/analytics",
             json=json.loads(dummy_analytics_in.model_dump_json()),
@@ -71,7 +69,7 @@ class TestTreeCoverLossPostUseCaseInitiation:
         assert response.json() == json.loads(
             DataMartResourceLinkResponse(
                 data=DataMartResourceLink(
-                    link="http://testserver/v0/land_change/tree_cover_loss/analytics/12665e7b-e976-5ab2-adc2-c4576399f0bb"
+                    link=f"http://testserver/v0/land_change/tree_cover_loss/analytics/{dummy_analytics_in.thumbprint()}"
                 ),
                 status=AnalysisStatus.pending,
             ).model_dump_json()

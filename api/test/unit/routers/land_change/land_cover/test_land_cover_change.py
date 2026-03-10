@@ -53,9 +53,7 @@ class TestLandCoverChangePostUseCaseInitiation:
         app.dependency_overrides[create_analysis_service] = create_mock_service
 
         mock_service.get_status.return_value = AnalysisStatus.pending
-        mock_service.resource_thumbprint.return_value = (
-            "e5431188-e85e-5893-8ed7-96baa895e21c"
-        )
+        mock_service.resource_thumbprint.return_value = dummy_analytics_in.thumbprint()
         response = client.post(
             "/v0/land_change/land_cover_change/analytics",
             json=json.loads(dummy_analytics_in.model_dump_json()),
@@ -66,7 +64,7 @@ class TestLandCoverChangePostUseCaseInitiation:
         assert response.json() == json.loads(
             DataMartResourceLinkResponse(
                 data=DataMartResourceLink(
-                    link="http://testserver/v0/land_change/land_cover_change/analytics/e5431188-e85e-5893-8ed7-96baa895e21c"
+                    link=f"http://testserver/v0/land_change/land_cover_change/analytics/{dummy_analytics_in.thumbprint()}"
                 ),
                 status=AnalysisStatus.pending,
             ).model_dump_json()
