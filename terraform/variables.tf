@@ -108,7 +108,7 @@ variable "flow_memory" {
 variable "local_cluster_area_threshold_ha" {
   description = "Total AOI area (hectares) below which the API routes compute to the local dask cluster"
   type    = number
-  default = 10000000
+  default = 5000000
 }
 
 variable "coiled_token" {
