@@ -63,6 +63,7 @@ def run_cluster_manager():
             "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 084375562450.dkr.ecr.us-east-1.amazonaws.com",
         ],
         scheduler_options={"idle_timeout": "30 minutes"},
+        security=False,
     )
     logger.info(f"Cluster ready: {cluster.scheduler_address}")
 
