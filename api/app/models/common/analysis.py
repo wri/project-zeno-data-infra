@@ -32,7 +32,7 @@ class AnalyticsIn(StrictBaseModel):
 
     _analytics_name: str = PrivateAttr(default="analytics")
     _version: str = PrivateAttr(default="v0")
-    _environment: str = PrivateAttr(default="production")
+    _environment: str | None = PrivateAttr(default=None)
 
     aoi: AreaOfInterest
 
@@ -45,7 +45,6 @@ class AnalyticsIn(StrictBaseModel):
         remain valid across that promotion. Conversely, two environments that
         happen to share all the same URIs will correctly share cached results.
         """
-
         from app.domain.models.dataset import Dataset
         from app.domain.repositories.zarr_dataset_repository import (
             ZarrDatasetRepository,
@@ -75,9 +74,13 @@ class AnalyticsIn(StrictBaseModel):
 
     def thumbprint(self) -> uuid.UUID:
         """
-        Generate a deterministic UUID thumbprint including the version.
+        Generate a deterministic UUID thumbprint including the version and environment.
         """
-        # Include version, analytics_name, and env in dump for thumbprint consistency
+        if self._environment is None:
+            from app.domain.models.environment import Environment
+
+            self.set_environment(Environment.production)
+
         dump_dict = self.model_dump(exclude=set(), mode="json")
         dump_dict["_version"] = self._version  # Manually include version
         dump_dict["_analytics_name"] = (
