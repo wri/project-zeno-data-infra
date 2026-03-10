@@ -591,6 +591,10 @@ resource "aws_ecs_task_definition" "dask_worker" {
         {
           name  = "PIPELINES_IMAGE"
           value = var.pipelines_image
+        },
+        {
+          name = "API_IMAGE"
+          value = var.api_image
         }
       ]
     }

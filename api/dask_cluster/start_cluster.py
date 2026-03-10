@@ -36,13 +36,13 @@ def run_cluster_manager():
 
     cluster = EC2Cluster(
         vpc=cluster_vpc,
-        worker_instance_type="r7g.xlarge",
-        scheduler_instance_type="r7g.xlarge",
+        worker_instance_type="r7i.xlarge",
+        scheduler_instance_type="r7i.xlarge",
         subnet_id="subnet-0f1544432f2a769d2",
         security_groups=[security_group_id],
         filesystem_size=50,
         n_workers=2,
-        docker_image=os.getenv("PIPELINES_IMAGE"),
+        docker_image=os.getenv("API_IMAGE"),
         env_vars={
             "AWS_ACCESS_KEY_ID": os.getenv(
                 "AWS_ACCESS_KEY_ID",
@@ -53,7 +53,7 @@ def run_cluster_manager():
             "DASK_TEMPORARY_DIRECTORY": "/tmp/dask",
         },
         # ami="ami-00cdb36f35bd8af7d",
-        ami="ami-07fd483033ece4a50",  # slimmed down
+        ami="ami-09252de1c909bd925",  # slimmed down
         key_name="solomon_dask_test",
         iam_instance_profile={"Name": "analytics-ec2-role"},
         bootstrap=True,
