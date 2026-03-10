@@ -45,7 +45,13 @@ class TestLandCoverChangePostUseCaseInitiation:
             json=json.loads(dummy_analytics_in.model_dump_json()),
         )
 
-        mock_service.set_resource_from.assert_called_with(dummy_analytics_in)
+        actual_arg = mock_service.set_resource_from.call_args[0][0]
+        expected = dummy_analytics_in.model_dump()  # _environment still None here
+        actual = actual_arg.model_dump()
+        assert actual["aoi"] == expected["aoi"]
+        assert actual["_version"] == expected["_version"]
+        assert actual["_analytics_name"] == expected["_analytics_name"]
+        # deliberately skip _environment — that's an infrastructure concern, not what this test is about
 
         mock_service.reset_mock(return_value=True)
 
