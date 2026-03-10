@@ -21,8 +21,11 @@ from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 @pytest.mark.integration
 @pytest.mark.slow
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
+@patch(
+    "pipelines.repositories.qc_feature_repository.QCFeaturesRepository.write_results"
+)
 @patch("pipelines.repositories.qc_feature_repository.QCFeaturesRepository.load")
-def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
+def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parquet):
     test_geom = shape(ARG_1_28)
 
     mock_qc_load.return_value = gpd.GeoDataFrame(
@@ -30,9 +33,12 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     )
 
     with prefect_test_harness():
-        result_uri = umd_tree_cover_loss_flow(overwrite=True, bbox=test_geom.bounds)
+        result_uri = umd_tree_cover_loss_flow(
+            "v1.12", overwrite=True, bbox=test_geom.bounds
+        )
 
-    assert "admin-tree-cover-loss-emissions-2001-2024.parquet" in result_uri
+    assert "admin-tree-cover-loss.parquet" in result_uri
+    assert "v1.12" in result_uri
 
     # get the the saved df
     result_df = mock_save_parquet.call_args[0][0]
@@ -44,9 +50,9 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
         "is_intact_forest",
         "driver",
         "is_primary_forest",
-        "country",
-        "region",
-        "subregion",
+        "natural_forest_class",
+        "aoi_id",
+        "aoi_type",
         "area_ha",
         "carbon_Mg_CO2e",
     }
@@ -56,7 +62,9 @@ def test_tcl_flow_real_data(mock_qc_load, mock_save_parquet):
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 8500
+    assert result_df["natural_forest_class"].dtype == object
+    assert result_df.size == 22450
+    mock_qc_write_results.assert_called_once()
 
 
 @pytest.mark.integration
@@ -70,11 +78,11 @@ def test_tcl_flow_with_new_contextual_layers(
     ifl_ds,
     drivers_ds,
     primary_forests_ds,
+    natural_forests_ds,
     country_ds,
     region_ds,
     subregion_ds,
 ):
-
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,
@@ -83,6 +91,7 @@ def test_tcl_flow_with_new_contextual_layers(
         ifl_ds,
         drivers_ds,
         primary_forests_ds,
+        natural_forests_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -102,9 +111,9 @@ def test_tcl_flow_with_new_contextual_layers(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
-        "country",
-        "region",
-        "subregion",
+        "natural_forest_class",
+        "aoi_id",
+        "aoi_type",
         "area_ha",
         "carbon_Mg_CO2e",
     }
@@ -114,7 +123,8 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 40
+    assert result_df["natural_forest_class"].dtype == object
+    assert result_df.size == 120
 
 
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
@@ -127,6 +137,7 @@ def test_tcl_flow_with_bbox(
     ifl_ds,
     drivers_ds,
     primary_forests_ds,
+    natural_forests_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -140,6 +151,7 @@ def test_tcl_flow_with_bbox(
         ifl_ds,
         drivers_ds,
         primary_forests_ds,
+        natural_forests_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -155,9 +167,9 @@ def test_tcl_flow_with_bbox(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
-        "country",
-        "region",
-        "subregion",
+        "natural_forest_class",
+        "aoi_id",
+        "aoi_type",
         "area_ha",
         "carbon_Mg_CO2e",
     }
@@ -167,4 +179,5 @@ def test_tcl_flow_with_bbox(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df.size == 10
+    assert result_df["natural_forest_class"].dtype == object
+    assert result_df.size == 30

@@ -12,7 +12,7 @@ def tcl_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[1, 1], [2, 2]]], dtype=np.uint8),
+                da.array([[[1, 1], [22, 22]]], dtype=np.uint8),
             )
         },
         coords={
@@ -133,6 +133,24 @@ def primary_forests_ds():
 
 
 @pytest.fixture
+def natural_forests_ds():
+    natural_forests = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[1, 1], [0, 2]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
+    )
+    return natural_forests
+
+
+@pytest.fixture
 def country_ds():
     country = xr.Dataset(
         data_vars={
@@ -187,8 +205,11 @@ def subregion_ds():
 
 
 class FakeQCRepository:
-    def load(self, aoi_id=None, aoi_type=None):
+    def load(self, limit=None, aoi_id=None, aoi_type=None):
         return gpd.GeoDataFrame({"geometry": [box(0, 0, 1, 1)], "GID_2": ["AFG.1.1_1"]})
+
+    def write_results(self, results: gpd.GeoDataFrame, analysis: str, version: str):
+        pass
 
 
 class FakeGoogleEarthEngineDatasetRepository:
@@ -199,6 +220,10 @@ class FakeGoogleEarthEngineDatasetRepository:
                     "loss": (
                         ("y", "x"),
                         np.array([[1, 0], [1, 1]], dtype=np.uint8),
+                    ),
+                    "lossyear": (
+                        ("y", "x"),
+                        np.array([[2, 10], [21, 30]], dtype=np.uint8),
                     ),
                     "treecover2000": (
                         ("y", "x"),
@@ -212,6 +237,15 @@ class FakeGoogleEarthEngineDatasetRepository:
                     "classification": (
                         ("y", "x"),
                         np.array([[1, 2], [1, 3]], dtype=np.uint8),
+                    )
+                }
+            )
+        if dataset == "natural_lands":
+            return xr.Dataset(
+                data_vars={
+                    "classification": (
+                        ("y", "x"),
+                        np.array([[2, 14], [5, 1]], dtype=np.uint8),
                     )
                 }
             )
@@ -233,6 +267,10 @@ class MatchingGoogleEarthEngineDatasetRepository:
                         ("y", "x"),
                         np.array([[1, 1], [1, 1]], dtype=np.uint8),
                     ),
+                    "lossyear": (
+                        ("y", "x"),
+                        np.array([[1, 1], [22, 22]], dtype=np.uint8),
+                    ),
                     "treecover2000": (
                         ("y", "x"),
                         np.array([[35, 35], [40, 40]], dtype=np.uint8),
@@ -245,6 +283,15 @@ class MatchingGoogleEarthEngineDatasetRepository:
                     "classification": (
                         ("y", "x"),
                         np.array([[1, 1], [2, 2]], dtype=np.uint8),
+                    )
+                }
+            )
+        if dataset == "natural_lands":
+            return xr.Dataset(
+                data_vars={
+                    "classification": (
+                        ("y", "x"),
+                        np.array([[2, 5], [1, 14]], dtype=np.uint8),
                     )
                 }
             )

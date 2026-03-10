@@ -20,6 +20,7 @@ def load_data(
     ifl_uri: Optional[str] = None,
     drivers_uri: Optional[str] = None,
     primary_forests_uri: Optional[str] = None,
+    natural_forests_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
 ) -> Tuple:
     return _tasks.load_data(
@@ -30,6 +31,7 @@ def load_data(
         ifl_uri,
         drivers_uri,
         primary_forests_uri,
+        natural_forests_uri,
         bbox,
     )
 
@@ -45,12 +47,12 @@ def setup_compute(
 
 @task
 def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
-    return _tasks.create_result_dataframe(result)
+    return _tasks.postprocess_result(result)
 
 
 @task
-def qc_against_validation_source() -> bool:
-    return _tasks.qc_against_validation_source()
+def qc_against_validation_source(version: Optional[str] = None) -> bool:
+    return _tasks.qc_against_validation_source(version=version)
 
 
 class TreeCoverLossPrefectTasks:
