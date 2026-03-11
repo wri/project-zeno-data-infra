@@ -109,27 +109,27 @@ class TreeCoverLossTasks:
 
         ifl: xr.DataArray = _load_zarr(ifl_uri).band_data
         ifl = xr.align(
-            tcl, ifl.reindex_like(tcl, method="nearest", tolerance=1e-5), join="left"
+            tcl, ifl.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0), join="left"
         )[1].astype(np.int16)
 
         drivers: xr.DataArray = _load_zarr(drivers_uri).band_data
         drivers = xr.align(
             tcl,
-            drivers.reindex_like(tcl, method="nearest", tolerance=1e-5),
+            drivers.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
             join="left",
         )[1].astype(np.int16)
 
         primary_forests: xr.DataArray = _load_zarr(primary_forests_uri).band_data
         primary_forests = xr.align(
             tcl,
-            primary_forests.reindex_like(tcl, method="nearest", tolerance=1e-5),
+            primary_forests.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
             join="left",
         )[1]
 
         natural_forests: xr.DataArray = _load_zarr(natural_forests_uri).band_data
         natural_forests = xr.align(
             tcl,
-            natural_forests.reindex_like(tcl, method="nearest", tolerance=1e-5),
+            natural_forests.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
             join="left",
         )[1]
 
@@ -352,6 +352,7 @@ class TreeCoverLossTasks:
         qc_features = self.qc_feature_repository.load(limit=20)
 
         def qc_feature(row):
+            print(f"Starting QC on GID {row.GID_2}")
             sample_stats = self.get_sample_statistics(row.geometry)
             admin2_aoi_id = row.GID_2.split("_")[0]
 
@@ -396,7 +397,7 @@ class TreeCoverLossTasks:
             driver_result = bool(diff_driver < self.qc_error_threshold)
             natural_forest_result = bool(diff_natural_forest < self.qc_error_threshold)
 
-            return pd.Series(
+            r = pd.Series(
                 {
                     "pass": all([driver_result, natural_forest_result]),
                     "sample_driver": sample_driver_area_ha_total,
@@ -406,6 +407,8 @@ class TreeCoverLossTasks:
                     "detail": "",
                 }
             )
+            print(f"\n{row.GID_2}\n{r}")
+            return r
 
         qc_features[
             [
