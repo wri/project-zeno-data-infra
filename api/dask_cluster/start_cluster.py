@@ -3,7 +3,7 @@ import os
 import time
 
 from dask.distributed import Client
-from dask_cloudprovider.aws import ECSCluster, EC2Cluster
+from dask_cloudprovider.aws import EC2Cluster
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,9 +53,10 @@ def run_cluster_manager():
         },
         # ami="ami-00cdb36f35bd8af7d",
         ami="ami-09252de1c909bd925",  # slimmed down
+        docker_image=os.getenv("API_IMAGE"),
         key_name="solomon_dask_test",
         iam_instance_profile={"Name": "analytics-ec2-role"},
-        bootstrap=True,
+        bootstrap=False,
         debug=False,
         shutdown_on_close=True,
         extra_bootstrap=[
@@ -75,7 +76,13 @@ def run_cluster_manager():
         client.retire_workers(workers=workers, close_workers=True, remove=True)
 
     # Enable adaptive scaling
-    cluster.adapt(minimum=minimum, maximum=maximum)
+    cluster.adapt(
+        minimum=minimum,
+        maximum=maximum,
+        wait_count=60,  # number of scheduler cycles with pending tasks before scaling up (default 3)
+        target_duration="500ms",  # how long tasks should take — shorter = more aggressive scaling
+        interval="500ms",
+    )
 
     logger.info(f"Adaptive scaling active! Dashboard: {cluster.dashboard_link}")
 
