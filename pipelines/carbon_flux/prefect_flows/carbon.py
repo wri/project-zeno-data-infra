@@ -6,6 +6,15 @@ import pandas as pd
 from shapely.geometry import Polygon
 
 
+def carbon_flux(
+    tasks, version: Optional[str] = None, bbox: Optional[Polygon] = None
+):
+    if not tasks.qc_against_validation_source(version=version):
+        raise AssertionError("Carbon analysis did not pass QC validation, stopping job")
+
+    return gadm_carbon_flux(tasks, bbox)
+
+
 def gadm_carbon_flux(tasks, bbox: Optional[Polygon] = None):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
     funcname = "sum"

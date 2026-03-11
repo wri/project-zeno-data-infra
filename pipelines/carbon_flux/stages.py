@@ -1,5 +1,6 @@
 from typing import Callable, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
@@ -11,6 +12,10 @@ from pipelines.globals import (
 )
 from pipelines.prefect_flows import common_stages
 from pipelines.prefect_flows.common_stages import _load_zarr
+from pipelines.repositories.google_earth_engine_dataset_repository import (
+    GoogleEarthEngineDatasetRepository,
+)
+from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
@@ -31,8 +36,15 @@ thresh_to_pct = {
 
 
 class CarbonFluxTasks:
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        qc_feature_repository=QCFeaturesRepository(),
+        gee_repository=GoogleEarthEngineDatasetRepository(),
+        qc_error_threshold=0.10,
+    ):
+        self.qc_feature_repository = qc_feature_repository
+        self.gee_repository = gee_repository
+        self.qc_error_threshold = qc_error_threshold
 
     def load_data(
         self,
@@ -180,4 +192,108 @@ class CarbonFluxTasks:
         return df
 
     def postprocess_result(self, result: xr.DataArray) -> pd.DataFrame:
-        return self.create_result_dataframe(result)
+        result_df = self.create_result_dataframe(result)
+
+        if result_df.size > 0:
+            result_df["aoi_id"] = (
+                result_df[["country", "region", "subregion"]]
+                .astype(str)
+                .agg(".".join, axis=1)
+            )
+        else:
+            result_df["aoi_id"] = pd.Series(dtype="object")
+
+        return result_df
+
+    def qc_against_validation_source(self, version: Optional[str] = None):
+        qc_features = self.qc_feature_repository.load(limit=20)
+
+        def qc_feature(row):
+            try:
+                # get pipeline stats for this geom
+                sample_stats = self.get_sample_statistics(row.geometry)
+                admin2_aoi_id = row.GID_2.split("_")[0]
+
+                # filter to tcd >= 30% 
+                if sample_stats.size > 0:
+                    sample_gross_emissions_total = sample_stats[
+                        (sample_stats.tree_cover_density >= 30)
+                        & (sample_stats.carbontype == "carbon_gross_emissions")
+                        & (sample_stats.aoi_id == admin2_aoi_id)
+                    ].value.sum()
+                else:
+                    sample_gross_emissions_total = 0
+
+                # get validation stats from GEE
+                validation_stats = self.get_validation_statistics(row.geometry)
+                validation_gross_emissions_total = validation_stats["gross_emissions_results"]
+
+                # calc relative error
+                if validation_gross_emissions_total == 0:
+                    diff_emissions = 0 if sample_gross_emissions_total == 0 else 1
+                else:
+                    diff_emissions = abs(
+                        (validation_gross_emissions_total - sample_gross_emissions_total)
+                        / validation_gross_emissions_total
+                    )
+
+                emissions_result = bool(diff_emissions < self.qc_error_threshold)
+
+                return pd.Series(
+                    {
+                        "pass": emissions_result,
+                        "sample_gross_emissions": sample_gross_emissions_total,
+                        "validation_gross_emissions": validation_gross_emissions_total,
+                        "detail": "",
+                    }
+                )
+            except Exception as e:
+                return pd.Series(
+                    {
+                        "pass": False,
+                        "sample_gross_emissions": np.nan,
+                        "validation_gross_emissions": np.nan,
+                        "detail": str(e),
+                    }
+                )
+
+        qc_features[
+            [
+                "qc_pass",
+                "sample_gross_emissions",
+                "validation_gross_emissions",
+                "detail",
+            ]
+        ] = qc_features.apply(qc_feature, axis=1)
+
+        if version is not None:
+            self.qc_feature_repository.write_results(
+                qc_features, "admin-carbon-flux", version
+            )
+        return bool(qc_features.qc_pass.all())
+
+    def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
+        from pipelines.carbon_flux.prefect_flows.carbon import gadm_carbon_flux
+
+        results = gadm_carbon_flux(self, bbox=geom)
+        return results
+
+    def get_validation_statistics(self, geom: Polygon) -> dict:
+        """
+        GEE gross emissions validation data:
+        - Single band (b1)
+        - Units: Mg CO2e/ha (must convert pixel_area to ha to get pixel-level emissions)
+        - Forest extent: TCD >30% in 2000 or TCG 2000-2020 or mangroves
+        """
+        # load gross emissions
+        gross_emissions_ds = self.gee_repository.load("gross_emissions", geom)
+
+        # Load pixel area and convert sq m to ha
+        area = self.gee_repository.load("area", geom, like=gross_emissions_ds) / 10000
+
+        # multiply by area to get total emissions per pixel, then sum
+        gross_emissions_total = (gross_emissions_ds.b1 * area).sum(skipna=True).item()
+
+        return {
+            "gross_emissions_results": gross_emissions_total,
+        }
