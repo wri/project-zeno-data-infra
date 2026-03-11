@@ -423,6 +423,10 @@ module "dask_cluster_manager" {
         {
           name  = "DASK_WORKER_SECURITY_GROUP"
           value = aws_security_group.dask_workers.id
+        },
+        {
+          name = "API_IMAGE"
+          value = var.api_image
         }
       ]
 
@@ -587,6 +591,14 @@ resource "aws_ecs_task_definition" "dask_worker" {
         {
           name  = "AWS_ACCESS_KEY_ID"
           value = var.aws_access_key_id
+        },
+        {
+          name  = "PIPELINES_IMAGE"
+          value = var.pipelines_image
+        },
+        {
+          name = "API_IMAGE"
+          value = var.api_image
         }
       ]
     }

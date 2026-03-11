@@ -83,6 +83,15 @@ class FloxOTFHandler(AnalyticsOTFHandler):
 
     @staticmethod
     def _handle(aoi, query, dataset_repository, expected_groups_per_dataset):
+        from dask.distributed import worker_client
+
+        with worker_client():
+            return FloxOTFHandler._handle_inner(
+                aoi, query, dataset_repository, expected_groups_per_dataset
+            )
+
+    @staticmethod
+    def _handle_inner(aoi, query, dataset_repository, expected_groups_per_dataset):
         aoi_id, aoi_geometry = aoi
         func = query.aggregate.func
 
