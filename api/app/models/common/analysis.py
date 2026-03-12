@@ -1,7 +1,7 @@
 import json
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import PrivateAttr
 
@@ -23,11 +23,11 @@ class AnalysisStatus(str, Enum):
 
 class AnalyticsIn(StrictBaseModel):
     def __init__(self, **kwargs):
-        kwargs.pop("_version", None)  # remove _version if in serialized data
-        kwargs.pop(
-            "_analytics_name", None
-        )  # remove _analytics_name if in serialized data
-        kwargs.pop("_environment", None)  # remove _environment if in serialized data
+        # Remove private attributes if in serialized data
+        kwargs.pop("_version", None)
+        kwargs.pop("_analytics_name", None)
+        kwargs.pop("_environment", None)
+
         super().__init__(**kwargs)
 
     _analytics_name: str = PrivateAttr(default="analytics")
@@ -50,14 +50,14 @@ class AnalyticsIn(StrictBaseModel):
             ZarrDatasetRepository,
         )
 
-        uris = sorted(
+        uris: List = sorted(
             ZarrDatasetRepository.resolve_zarr_uri(dataset, environment)
             for dataset in Dataset
         )
         self._environment = json.dumps(uris)
 
     def model_dump(self, **kwargs):
-        """Add the _version private attribute"""
+        """Generate dictionary representation of object including private attributes"""
         result = super().model_dump(**kwargs)
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
@@ -65,7 +65,7 @@ class AnalyticsIn(StrictBaseModel):
         return result
 
     def model_dump_json(self, **kwargs):
-        """Add the _version private attribute"""
+        """Generate JSON representation of object including private attributes"""
         result = json.loads(super().model_dump_json(**kwargs))
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
@@ -73,20 +73,19 @@ class AnalyticsIn(StrictBaseModel):
         return json.dumps(result)
 
     def thumbprint(self) -> uuid.UUID:
-        """
-        Generate a deterministic UUID thumbprint including the version and environment.
-        """
+        """Generate a deterministic UUID thumbprint."""
         if self._environment is None:
             from app.domain.models.environment import Environment
 
             self.set_environment(Environment.production)
 
         dump_dict = self.model_dump(exclude=set(), mode="json")
-        dump_dict["_version"] = self._version  # Manually include version
-        dump_dict["_analytics_name"] = (
-            self._analytics_name
-        )  # Manually include analytics_name
-        dump_dict["_environment"] = self._environment  # Manually include environment
+
+        # Manually include important private attributes
+        dump_dict["_version"] = self._version
+        dump_dict["_analytics_name"] = self._analytics_name
+        dump_dict["_environment"] = self._environment
+
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
