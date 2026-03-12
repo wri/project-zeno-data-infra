@@ -29,7 +29,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
     def __init__(
         self,
         environment: Environment = Environment.production,
-        dataset_repository=ZarrDatasetRepository(),
+        dataset_repository=None,
         aoi_geometry_repository=DataApiAoiGeometryRepository(),
         dask_client=None,
     ):
