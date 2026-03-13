@@ -334,6 +334,10 @@ module "analytics" {
         {
           name = "NEW_RELIC_LICENSE_KEY"
           value = var.new_relic_license_key
+        },
+        {
+          name  = "LOCAL_CLUSTER_AREA_THRESHOLD_HA"
+          value = tostring(var.local_cluster_area_threshold_ha)
         }
       ]
       enable_cloudwatch_logging = true
@@ -554,7 +558,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
-  memory                   = 32768
+  memory                   = 61440
   execution_role_arn       = module.gnw_ecs_cluster.task_exec_iam_role_arn
 
   runtime_platform {
@@ -564,7 +568,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
 
   container_definitions = jsonencode([
     {
-      name  = "dask-worker${local.name_suffix}"
+      name  = "dask-worker"
       image = var.api_image
 
       environment = [

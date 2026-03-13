@@ -62,7 +62,7 @@ class NaturalLandsAnalyzer(Analyzer):
             results = await self.analyze_admin_areas(gadm_ids)
         else:
             aois = natural_lands_analytics_in.aoi.model_dump()
-            geojsons = await get_geojson(aois)
+            geojsons, _ = await get_geojson(aois)
             if aois["type"] != "feature_collection":
                 aoi_list = sorted(
                     [{"type": aois["type"], "id": id} for id in aois["ids"]],

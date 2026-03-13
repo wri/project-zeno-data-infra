@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
+from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .routers import land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
@@ -49,18 +50,30 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load the dask cluster
+    # Local dask cluster for small-area requests
+    local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 4))
+    local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 2))
+    local_cluster = await LocalCluster(
+        n_workers=local_n_workers, threads_per_worker=local_threads, asynchronous=True
+    )
+    app.state.local_dask_client = await Client(local_cluster, asynchronous=True)
+
+    # Remote dask cluster
     if not os.getenv("DASK_SCHEDULER_ADDRESS"):
         logging.warning(
-            "DASK_SCHEDULER_ADDRESS not set, starting local cluster. "
+            "DASK_SCHEDULER_ADDRESS not set, using local cluster as remote fallback. "
             "This is the intended behavior for local development only."
         )
-        cluster = LocalCluster(n_workers=8, threads_per_worker=2)
-        os.environ["DASK_SCHEDULER_ADDRESS"] = cluster.scheduler_address
+        app.state.dask_client = app.state.local_dask_client
+    else:
+        app.state.dask_client = await Client(
+            os.environ["DASK_SCHEDULER_ADDRESS"],
+            asynchronous=True,
+        )
 
-    app.state.dask_client = await Client(
-        os.environ["DASK_SCHEDULER_ADDRESS"],
-        asynchronous=True,
+    app.state.dask_client_router = DaskClientRouter(
+        local_client=app.state.local_dask_client,
+        remote_client=app.state.dask_client,
     )
 
     # Create an AWS Session and connections to DyamoDb and S3

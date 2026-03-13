@@ -62,7 +62,7 @@ def create_analysis_service_for_tests(
             next_handler=FloxOTFHandler(
                 dataset_repository=ZarrDatasetRepository(),
                 aoi_geometry_repository=DataApiAoiGeometryRepository(),
-                dask_client=request.app.state.dask_client,
+                dask_client_router=request.app.state.dask_client_router,
             ),
         )
     )
