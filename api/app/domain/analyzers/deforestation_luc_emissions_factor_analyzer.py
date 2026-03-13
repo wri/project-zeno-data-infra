@@ -10,7 +10,7 @@ from app.models.land_change.deforestation_luc_emissions_factor import (
 
 
 class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
-    """ "Get the emissions factor, emissions and crop production yields based on land use change."""
+    """Get the emissions factor, emissions and crop production yields based on land use change."""
 
     def __init__(
         self,
@@ -29,6 +29,10 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         deforestation_luc_emissions_factor_analytics_in = (
             DeforestationLUCEmissionsFactorAnalyticsIn(**analysis.metadata)
         )
+        if "_environment" in analysis.metadata:
+            deforestation_luc_emissions_factor_analytics_in._environment = (
+                analysis.metadata["_environment"]
+            )
         if deforestation_luc_emissions_factor_analytics_in.aoi.type == "admin":
             results = await self.analyze_admin_areas(
                 deforestation_luc_emissions_factor_analytics_in

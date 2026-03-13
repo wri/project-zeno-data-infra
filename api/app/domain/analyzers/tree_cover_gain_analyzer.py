@@ -21,6 +21,8 @@ class TreeCoverGainAnalyzer(Analyzer):
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
+        if "_environment" in analysis.metadata:
+            analytics_in._environment = analysis.metadata["_environment"]
 
         filters: List[DatasetFilter] = [
             DatasetFilter(

@@ -8,6 +8,7 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
 
@@ -49,6 +50,10 @@ class LandCoverChangeAnalyzer(Analyzer):
     @nr_agent.function_trace(name="LandCoverChangeAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
+        if "_environment" in analysis.metadata:
+            land_cover_change_analytics_in._environment = analysis.metadata[
+                "_environment"
+            ]
         if land_cover_change_analytics_in.aoi.type == "admin":
             gadm_ids = land_cover_change_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)

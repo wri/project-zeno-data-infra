@@ -21,6 +21,8 @@ class TreeCoverAnalyzer(Analyzer):
     @nr_agent.function_trace(name="TreeCoverAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         tree_cover_analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
+        if "_environment" in analysis.metadata:
+            tree_cover_analytics_in._environment = analysis.metadata["_environment"]
         groupbys: List[Dataset] = []
 
         filters: List[DatasetFilter] = [
