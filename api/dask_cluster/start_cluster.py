@@ -29,7 +29,7 @@ def run_cluster_manager():
         security_groups=[security_group_id],
         fargate_workers=True,
         worker_cpu=8192,
-        worker_mem=32768,
+        worker_mem=61440,
         skip_cleanup=True,
         shutdown_on_close=False,
     )
