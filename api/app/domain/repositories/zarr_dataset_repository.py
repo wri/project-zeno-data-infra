@@ -10,21 +10,43 @@ from shapely import Geometry
 from shapely.geometry import box, mapping
 
 from app.domain.models.dataset import Dataset
+from app.domain.models.environment import Environment
 
 
 class ZarrDatasetRepository:
-    ZARR_LOCATIONS = {
-        Dataset.area_hectares: "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr",
-        Dataset.tree_cover_loss: "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr",
-        Dataset.tree_cover_gain: "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr",
-        Dataset.canopy_cover: "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr",
-        Dataset.primary_forest: "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",
-        Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",
-        Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",
-        Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",
-        Dataset.natural_lands: "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr",
-        Dataset.natural_forests: "s3://gfw-data-lake/sbtn_natural_forests_map/v202504/raster/epsg-4326/zarr/class.zarr",
+    _ZARR_URIS = {
+        Environment.staging: {},
+        Environment.production: {
+            Dataset.area_hectares: "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr",  # noqa: E501
+            Dataset.tree_cover_loss: "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr",  # noqa: E501
+            Dataset.tree_cover_gain: "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr",  # noqa: E501
+            Dataset.canopy_cover: "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr",  # noqa: E501
+            Dataset.primary_forest: "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",  # noqa: E501
+            Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",  # noqa: E501
+            Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",  # noqa: E501
+            Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",  # noqa: E501
+            Dataset.natural_lands: "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr",  # noqa: E501
+            Dataset.natural_forests: "s3://gfw-data-lake/sbtn_natural_forests_map/v202504/raster/epsg-4326/zarr/class.zarr",  # noqa: E501
+        },
     }
+
+    @staticmethod
+    def resolve_zarr_uri(dataset: Dataset, environment: Environment) -> str:
+        """Resolve the Zarr URI for a dataset in a given environment.
+
+        URIs of specific envs are returned if asked for; any dataset not explicitly
+        configured for that env falls through to production. This fallback means
+        we can add datasets to staging without having to define every URI up front.
+        """
+        uri = ZarrDatasetRepository._ZARR_URIS[environment].get(dataset)
+        if uri is None and environment != Environment.production:
+            uri = ZarrDatasetRepository._ZARR_URIS[Environment.production].get(dataset)
+        if uri is None:
+            raise KeyError(f"No Zarr URI configured for dataset {dataset!r}")
+        return uri
+
+    def __init__(self, environment: Environment = Environment.production):
+        self.environment = environment
 
     def load(
         self, dataset: Dataset, geometry: Optional[Geometry] = None
@@ -38,8 +60,9 @@ class ZarrDatasetRepository:
         return xarr
 
     def open_source(self, dataset):
+        uri = self.resolve_zarr_uri(dataset, self.environment)
         return xr.open_zarr(
-            self.ZARR_LOCATIONS[dataset],
+            uri,
             storage_options={"requester_pays": True},
         ).band_data
 
