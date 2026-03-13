@@ -45,7 +45,13 @@ def run_cluster_manager():
         client.retire_workers(workers=workers, close_workers=True, remove=True)
 
     # Enable adaptive scaling
-    cluster.adapt(minimum=minimum, maximum=maximum)
+    cluster.adapt(
+        minimum=minimum,
+        maximum=maximum,
+        wait_count=60,  # number of scheduler cycles with pending tasks before scaling up (default 3)
+        target_duration="500ms",  # how long tasks should take — shorter = more aggressive scaling
+        interval="500ms",
+    )
 
     logger.info(f"Adaptive scaling active! Dashboard: {cluster.dashboard_link}")
 
