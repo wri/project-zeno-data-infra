@@ -558,7 +558,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 8192
-  memory                   = 32768
+  memory                   = 61440
   execution_role_arn       = module.gnw_ecs_cluster.task_exec_iam_role_arn
 
   runtime_platform {
