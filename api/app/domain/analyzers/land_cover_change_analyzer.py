@@ -50,7 +50,7 @@ class LandCoverChangeAnalyzer(Analyzer):
     @nr_agent.function_trace(name="LandCoverChangeAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
-        if "_environment" in analysis.metadata:
+        if analysis.metadata.get("_environment") is not None:
             land_cover_change_analytics_in._environment = analysis.metadata[
                 "_environment"
             ]

@@ -29,7 +29,7 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         deforestation_luc_emissions_factor_analytics_in = (
             DeforestationLUCEmissionsFactorAnalyticsIn(**analysis.metadata)
         )
-        if "_environment" in analysis.metadata:
+        if analysis.metadata.get("_environment") is not None:
             deforestation_luc_emissions_factor_analytics_in._environment = (
                 analysis.metadata["_environment"]
             )

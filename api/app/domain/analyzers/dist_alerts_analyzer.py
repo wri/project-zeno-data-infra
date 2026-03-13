@@ -20,7 +20,7 @@ class DistAlertsAnalyzer(Analyzer):
 
     async def analyze(self, analysis: Analysis):
         dist_analytics_in = DistAlertsAnalyticsIn(**analysis.metadata)
-        if "_environment" in analysis.metadata:
+        if analysis.metadata.get("_environment") is not None:
             dist_analytics_in._environment = analysis.metadata["_environment"]
 
         # for now we only support one intersection, as enforced by the route

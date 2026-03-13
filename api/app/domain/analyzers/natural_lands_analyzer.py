@@ -57,7 +57,7 @@ class NaturalLandsAnalyzer(Analyzer):
     @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
-        if "_environment" in analysis.metadata:
+        if analysis.metadata.get("_environment") is not None:
             natural_lands_analytics_in._environment = analysis.metadata["_environment"]
         if natural_lands_analytics_in.aoi.type == "admin":
             gadm_ids = natural_lands_analytics_in.aoi.ids
