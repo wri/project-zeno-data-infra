@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -64,6 +65,7 @@ class TestLandCoverChangeData:
         analytics_in = LandCoverChangeAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
+        analytics_in.set_environment(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

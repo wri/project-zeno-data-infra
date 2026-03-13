@@ -18,6 +18,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -81,6 +82,7 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
             start_year="2005",
             end_year="2020",
         )
+        analytics_in.set_environment(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -149,6 +151,7 @@ class TestGainAnalyticsPostWithKba:
             start_year="2005",
             end_year="2020",
         )
+        analytics_in.set_environment(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -218,6 +221,7 @@ class TestGainAnalyticsKeyErrorFix:
             start_year="2015",
             end_year="2020",
         )
+        analytics_in.set_environment(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

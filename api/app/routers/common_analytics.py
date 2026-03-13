@@ -150,6 +150,7 @@ async def test_dynamodb_s3_repository():
             canopy_cover=30,
             intersections=[],
         )
+        analytics_in.set_environment(Environment.production)
         thumbprint = analytics_in.thumbprint()
         await repo.store_analysis(
             thumbprint,
