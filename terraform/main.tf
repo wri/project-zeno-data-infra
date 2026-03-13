@@ -869,3 +869,83 @@ resource "aws_iam_role_policy_attachment" "ecs_task_analysis" {
   role       = module.gnw_ecs_cluster.task_exec_iam_role_name # This references the role created by the ECS module
   policy_arn = aws_iam_policy.ecs_task_analysis.arn
 }
+
+###############################################################
+#     VPC Endpoints for ECR (private image pulls from ECS)    #
+###############################################################
+
+# Security group for VPC interface endpoints (ECR API & DKR)
+resource "aws_security_group" "vpc_endpoints" {
+  count       = terraform.workspace == "staging" ? 1 : 0
+  name_prefix = "vpc-endpoints-"
+  vpc_id      = var.vpc
+  description = "Security group for VPC interface endpoints"
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [data.aws_vpc.selected.cidr_block]
+    description = "Allow HTTPS from VPC"
+  }
+
+  tags = {
+    Name    = "vpc-endpoints"
+    Project = "Zeno"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ECR API endpoint (for ECR API calls like GetAuthorizationToken)
+resource "aws_vpc_endpoint" "ecr_api" {
+  count               = terraform.workspace == "staging" ? 1 : 0
+  vpc_id              = var.vpc
+  service_name        = "com.amazonaws.${var.region}.ecr.api"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = {
+    Name    = "ecr-api"
+    Project = "Zeno"
+  }
+}
+
+# ECR DKR endpoint (for Docker image pulls)
+resource "aws_vpc_endpoint" "ecr_dkr" {
+  count               = terraform.workspace == "staging" ? 1 : 0
+  vpc_id              = var.vpc
+  service_name        = "com.amazonaws.${var.region}.ecr.dkr"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = var.subnet_ids
+  security_group_ids  = [aws_security_group.vpc_endpoints[0].id]
+  private_dns_enabled = true
+
+  tags = {
+    Name    = "ecr-dkr"
+    Project = "Zeno"
+  }
+}
+
+# Look up route tables associated with the subnets for the S3 gateway endpoint
+data "aws_route_tables" "selected" {
+  vpc_id = var.vpc
+}
+
+# S3 gateway endpoint (ECR stores image layers in S3)
+resource "aws_vpc_endpoint" "s3" {
+  count             = terraform.workspace == "staging" ? 1 : 0
+  vpc_id            = var.vpc
+  service_name      = "com.amazonaws.${var.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = data.aws_route_tables.selected.ids
+
+  tags = {
+    Name    = "s3"
+    Project = "Zeno"
+  }
+}
