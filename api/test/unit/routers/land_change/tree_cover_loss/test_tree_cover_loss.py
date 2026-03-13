@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.domain.models.environment import Environment
 from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
@@ -19,7 +20,7 @@ client = TestClient(app)
 
 @pytest.fixture
 def dummy_analytics_in():
-    return TreeCoverLossAnalyticsIn(
+    analytics_in = TreeCoverLossAnalyticsIn(
         aoi=AdminAreaOfInterest(
             type="admin",
             ids=["IDN.24.9"],
@@ -30,6 +31,8 @@ def dummy_analytics_in():
         forest_filter="primary_forest",
         intersections=["driver"],
     )
+    analytics_in.set_environment(Environment.production)
+    return analytics_in
 
 
 mock_service = MagicMock(spec=AnalysisService)

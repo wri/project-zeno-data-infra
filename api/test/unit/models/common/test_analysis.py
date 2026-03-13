@@ -1,3 +1,5 @@
+import pytest
+
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
@@ -13,10 +15,24 @@ def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
         canopy_cover=30,
         intersections=[],
     )
-    return TreeCoverLossAnalyticsIn(**{**defaults, **kwargs})
+    analytics_in = TreeCoverLossAnalyticsIn(**{**defaults, **kwargs})
+    analytics_in.set_environment(Environment.production)
+    return analytics_in
 
 
 class TestThumbprint:
+    def test_thumbprint_without_set_environment_raises(self):
+        defaults = dict(
+            aoi=AdminAreaOfInterest(type="admin", ids=["BRA.1"]),
+            start_year="2020",
+            end_year="2021",
+            canopy_cover=30,
+            intersections=[],
+        )
+        analytics_in = TreeCoverLossAnalyticsIn(**defaults)
+        with pytest.raises(ValueError):
+            _ = analytics_in.thumbprint()
+
     def test_thumbprint_without_set_environment_defaults_to_production(self):
         a = _make_analytics_in()
         b = _make_analytics_in()

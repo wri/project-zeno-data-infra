@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.domain.models.environment import Environment
 from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
@@ -19,12 +20,14 @@ client = TestClient(app)
 
 @pytest.fixture
 def dummy_analytics_in():
-    return LandCoverChangeAnalyticsIn(
+    analytics_in = LandCoverChangeAnalyticsIn(
         aoi=AdminAreaOfInterest(
             type="admin",
             ids=["IDN.24.9"],
         ),
     )
+    analytics_in.set_environment(Environment.production)
+    return analytics_in
 
 
 mock_service = MagicMock(spec=AnalysisService)
