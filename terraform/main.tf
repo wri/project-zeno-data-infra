@@ -334,6 +334,10 @@ module "analytics" {
         {
           name = "NEW_RELIC_LICENSE_KEY"
           value = var.new_relic_license_key
+        },
+        {
+          name  = "NEW_RELIC_ENVIRONMENT"
+          value = var.new_relic_environment
         }
       ]
       enable_cloudwatch_logging = true
@@ -564,7 +568,7 @@ resource "aws_ecs_task_definition" "dask_worker" {
 
   container_definitions = jsonencode([
     {
-      name  = "dask-worker${local.name_suffix}"
+      name  = "dask-worker"
       image = var.api_image
 
       environment = [
