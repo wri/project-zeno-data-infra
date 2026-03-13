@@ -4,6 +4,7 @@ import pytest
 
 from app.analysis.common.analysis import FeatureTooSmallError
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
@@ -12,12 +13,14 @@ from app.use_cases.analysis.analysis_service import AnalysisService
 
 @pytest.fixture
 def stub_analysis_in():
-    return AnalyticsIn(
+    analytics_in = AnalyticsIn(
         aoi=ProtectedAreaOfInterest(
             type="protected_area",
             ids=["1234"],
         )
     )
+    analytics_in.set_environment(Environment.production)
+    return analytics_in
 
 
 @pytest.fixture
