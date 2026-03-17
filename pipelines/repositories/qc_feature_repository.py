@@ -6,16 +6,17 @@ from pipelines.globals import ANALYTICS_BUCKET
 class QCFeaturesRepository:
     QC_FEATURES_URI = f"s3://{ANALYTICS_BUCKET}/vectors/qc_features.geojson"
 
-    def load(self, limit=None, aoi_id=None, aoi_type=None):
+    def load(self, start=0, limit=None, aoi_id=None, aoi_type=None):
+        # 'start' specified where to start in the feature list, 'limit' where to end.
+        # Or you can choose a specific feature by GID_2 value.
         qc_features = gpd.read_file(self.QC_FEATURES_URI)
 
-        if aoi_id is not None and aoi_type is not None:
+        if aoi_id is not None:
             return qc_features[
-                (qc_features["aoi_id"] == aoi_id)
-                & (qc_features["aoi_type"] == aoi_type)
+                (qc_features["GID_2"] == aoi_id)
             ]
         elif limit is not None:
-            return qc_features[:limit]
+            return qc_features[start:limit]
 
         return qc_features
 
