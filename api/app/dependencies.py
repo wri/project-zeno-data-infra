@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Header
 
 from app.domain.models.environment import Environment
@@ -12,4 +14,15 @@ async def get_environment(
     require no changes. Non-production environments will later require a
     bearer token; that gate is not enforced here yet.
     """
-    return x_environment or Environment.production
+    resolved_environment = (
+        x_environment if x_environment is not None else Environment.production
+    )
+    logging.info(
+        {
+            "event": "get_environment_called",
+            "specified_environment": repr(x_environment),
+            "resolved_environment": resolved_environment,
+        }
+    )
+
+    return resolved_environment
