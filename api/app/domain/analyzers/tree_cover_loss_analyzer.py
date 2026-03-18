@@ -19,6 +19,8 @@ class TreeCoverLossAnalyzer(Analyzer):
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_environment") is not None:
+            analytics_in._environment = analysis.metadata["_environment"]
 
         query = DatasetQuery(
             aggregate=DatasetAggregate(

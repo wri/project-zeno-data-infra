@@ -11,6 +11,7 @@ from dask.distributed import Client
 
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -181,12 +182,14 @@ class TestLandCoverChangeCustomAois:
                 }
             ],
         }
-        self.metadata = LandCoverChangeAnalyticsIn(
+        metadata = LandCoverChangeAnalyticsIn(
             aoi={
                 "type": "feature_collection",
                 "feature_collection": feature_collection,
             },
-        ).model_dump()
+        )
+        metadata.set_environment(Environment.production)
+        self.metadata = metadata.model_dump()
 
         analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
         await analyzer.analyze(analysis)
@@ -293,6 +296,7 @@ class TestLandCoverChangeAdminAois:
         analytics_in = LandCoverChangeAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
         )
+        analytics_in.set_environment(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(),
