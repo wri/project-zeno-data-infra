@@ -50,30 +50,32 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Local dask cluster for small-area requests
-    local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 4))
-    local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 2))
-    local_cluster = await LocalCluster(
-        n_workers=local_n_workers, threads_per_worker=local_threads, asynchronous=True
-    )
-    app.state.local_dask_client = await Client(local_cluster, asynchronous=True)
+    local_cluster = None
+    local_client = None
+    remote_client = None
 
-    # Remote dask cluster
-    if not os.getenv("DASK_SCHEDULER_ADDRESS"):
-        logging.warning(
-            "DASK_SCHEDULER_ADDRESS not set, using local cluster as remote fallback. "
-            "This is the intended behavior for local development only."
-        )
-        app.state.dask_client = app.state.local_dask_client
-    else:
-        app.state.dask_client = await Client(
-            os.environ["DASK_SCHEDULER_ADDRESS"],
+    local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 4))
+
+    # Create a local in-process cluster when LOCAL_DASK_WORKERS > 0.
+    # Tests set this to 0 and provide a shared cluster via
+    # DASK_SCHEDULER_ADDRESS instead.
+    if local_n_workers > 0:
+        local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 2))
+        local_cluster = await LocalCluster(
+            n_workers=local_n_workers,
+            threads_per_worker=local_threads,
             asynchronous=True,
         )
+        local_client = await Client(local_cluster, asynchronous=True)
+
+    # Connect to an external scheduler when available (prod / tests).
+    scheduler_addr = os.getenv("DASK_SCHEDULER_ADDRESS")
+    if scheduler_addr:
+        remote_client = await Client(scheduler_addr, asynchronous=True)
 
     app.state.dask_client_router = DaskClientRouter(
-        local_client=app.state.local_dask_client,
-        remote_client=app.state.dask_client,
+        local_client=local_client or remote_client,
+        remote_client=remote_client or local_client,
     )
 
     # Create an AWS Session and connections to DyamoDb and S3
