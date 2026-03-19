@@ -54,6 +54,7 @@ async def lifespan(app: FastAPI):
     local_client = None
     remote_client = None
 
+    # we have one uvicorn worker so using the remaining cpus for the local dask cluster
     local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 7))
 
     # Create a local in-process cluster when LOCAL_DASK_WORKERS > 0.
