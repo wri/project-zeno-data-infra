@@ -558,7 +558,7 @@ class TestLandCoverChangeAdminAois:
             start_year="2021",
             end_year="2023",
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(mode="json"),

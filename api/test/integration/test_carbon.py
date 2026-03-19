@@ -61,7 +61,7 @@ class TestCarbonDataAdmin:
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
             canopy_cover=30,
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -156,7 +156,7 @@ class TestCarbonDataFeature:
             ),
             canopy_cover=50,
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

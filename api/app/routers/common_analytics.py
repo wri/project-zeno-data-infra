@@ -30,7 +30,7 @@ async def create_analysis(
     environment: Environment = Environment.production,
 ) -> DataMartResourceLinkResponse:
     try:
-        data.set_environment(environment)
+        data.set_input_uris(environment)
 
         logging.info(
             {
@@ -150,7 +150,7 @@ async def test_dynamodb_s3_repository():
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         thumbprint = analytics_in.thumbprint()
         await repo.store_analysis(
             thumbprint,

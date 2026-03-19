@@ -26,7 +26,7 @@ def dummy_analytics_in():
             ids=["IDN.24.9"],
         ),
     )
-    analytics_in.set_environment(Environment.production)
+    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 

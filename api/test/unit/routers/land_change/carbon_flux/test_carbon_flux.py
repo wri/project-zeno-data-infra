@@ -29,7 +29,7 @@ def dummy_analytics_in():
         ),
         canopy_cover=50,
     )
-    analytics_in.set_environment(Environment.production)
+    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 

@@ -30,7 +30,7 @@ def dummy_analytics_in():
         start_year="2010",
         end_year="2015",
     )
-    analytics_in.set_environment(Environment.production)
+    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 

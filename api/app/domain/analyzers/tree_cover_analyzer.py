@@ -21,8 +21,8 @@ class TreeCoverAnalyzer(Analyzer):
     @nr_agent.function_trace(name="TreeCoverAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         tree_cover_analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_environment") is not None:
-            tree_cover_analytics_in._environment = analysis.metadata["_environment"]
+        if analysis.metadata.get("_input_uris") is not None:
+            tree_cover_analytics_in._input_uris = analysis.metadata["_input_uris"]
         groupbys: List[Dataset] = []
 
         filters: List[DatasetFilter] = [

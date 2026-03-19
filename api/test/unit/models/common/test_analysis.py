@@ -16,7 +16,7 @@ def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
         intersections=[],
     )
     analytics_in = TreeCoverLossAnalyticsIn(**{**defaults, **kwargs})
-    analytics_in.set_environment(Environment.production)
+    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 
@@ -36,14 +36,14 @@ class TestThumbprint:
     def test_thumbprint_without_set_environment_defaults_to_production(self):
         a = _make_analytics_in()
         b = _make_analytics_in()
-        b.set_environment(Environment.production)
+        b.set_input_uris(Environment.production)
         assert a.thumbprint() == b.thumbprint()
 
     def test_identical_requests_same_environment_same_thumbprint(self):
         a = _make_analytics_in()
         b = _make_analytics_in()
-        a.set_environment(Environment.production)
-        b.set_environment(Environment.production)
+        a.set_input_uris(Environment.production)
+        b.set_input_uris(Environment.production)
         assert a.thumbprint() == b.thumbprint()
 
     def test_different_environments_with_different_uris_different_thumbprints(self):
@@ -56,8 +56,8 @@ class TestThumbprint:
 
             a = _make_analytics_in()
             b = _make_analytics_in()
-            a.set_environment(Environment.production)
-            b.set_environment(Environment.staging)
+            a.set_input_uris(Environment.production)
+            b.set_input_uris(Environment.staging)
             assert a.thumbprint() != b.thumbprint()
         finally:
             ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original
@@ -77,8 +77,8 @@ class TestThumbprint:
 
             a = _make_analytics_in()
             b = _make_analytics_in()
-            a.set_environment(Environment.production)
-            b.set_environment(Environment.staging)
+            a.set_input_uris(Environment.production)
+            b.set_input_uris(Environment.staging)
             assert a.thumbprint() == b.thumbprint()
         finally:
             ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original
@@ -86,6 +86,6 @@ class TestThumbprint:
     def test_different_request_params_different_thumbprints(self):
         a = _make_analytics_in(start_year="2015")
         b = _make_analytics_in(start_year="2020")
-        a.set_environment(Environment.production)
-        b.set_environment(Environment.production)
+        a.set_input_uris(Environment.production)
+        b.set_input_uris(Environment.production)
         assert a.thumbprint() != b.thumbprint()

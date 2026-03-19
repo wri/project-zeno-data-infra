@@ -86,7 +86,7 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -160,7 +160,7 @@ class TestTclAnalyticsPostWithKba:
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -231,7 +231,7 @@ class TestTclAnalyticsAdminAOIWithDriver:
             canopy_cover=30,
             intersections=["driver"],
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -301,7 +301,7 @@ class TestTclAnalyticsPostWithKbaWithDriver:
             canopy_cover=30,
             intersections=["driver"],
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -371,7 +371,7 @@ class TestTclAnalyticsWithForestFilters:
             forest_filter="primary_forest",
             intersections=[],
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

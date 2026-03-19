@@ -56,8 +56,8 @@ class CarbonFluxAnalyzer(Analyzer):
     @nr_agent.function_trace(name="CarbonFluxAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         carbon_flux_analytics_in = CarbonFluxAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_environment") is not None:
-            carbon_flux_analytics_in._environment = analysis.metadata["_environment"]
+        if analysis.metadata.get("_input_uris") is not None:
+            carbon_flux_analytics_in._input_uris = analysis.metadata["_input_uris"]
         if carbon_flux_analytics_in.aoi.type == "admin":
             gadm_ids = carbon_flux_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(

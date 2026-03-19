@@ -188,7 +188,7 @@ class TestLandCoverChangeCustomAois:
                 "feature_collection": feature_collection,
             },
         )
-        metadata.set_environment(Environment.production)
+        metadata.set_input_uris(Environment.production)
         self.metadata = metadata.model_dump()
 
         analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
@@ -296,7 +296,7 @@ class TestLandCoverChangeAdminAois:
         analytics_in = LandCoverChangeAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(),

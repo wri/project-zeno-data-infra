@@ -82,7 +82,7 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
             start_year="2005",
             end_year="2020",
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -151,7 +151,7 @@ class TestGainAnalyticsPostWithKba:
             start_year="2005",
             end_year="2020",
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -221,7 +221,7 @@ class TestGainAnalyticsKeyErrorFix:
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

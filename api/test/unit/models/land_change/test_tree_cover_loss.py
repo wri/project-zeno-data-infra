@@ -15,7 +15,7 @@ def base_config():
         forest_filter="primary_forest",
         intersections=["driver"],  # Replace with actual enum
     )
-    analytics_in.set_environment(Environment.production)
+    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 
@@ -24,13 +24,13 @@ class TestTreeCoverLossAnalyticsIn:
         original_thumbprint = base_config.thumbprint()
 
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         assert model.thumbprint() == original_thumbprint
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         model.aoi = {"type": "admin", "ids": ["BRA.12"]}
 
@@ -38,7 +38,7 @@ class TestTreeCoverLossAnalyticsIn:
 
     def test_thumbprint_changes_when_start_year_changes(self, base_config):
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         model.start_year = "2021"
 
@@ -46,7 +46,7 @@ class TestTreeCoverLossAnalyticsIn:
 
     def test_thumbprint_changes_when_end_year_changes(self, base_config):
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         model.end_year = "2022"
 
@@ -54,7 +54,7 @@ class TestTreeCoverLossAnalyticsIn:
 
     def test_thumbprint_changes_when_canopy_cover_changes(self, base_config):
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         model.canopy_cover = 50
 
@@ -63,7 +63,7 @@ class TestTreeCoverLossAnalyticsIn:
     @pytest.mark.xfail
     def test_thumbprint_changes_when_forest_filter_changes(self, base_config):
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         model.forest_filter = "primary_forest"
 
@@ -71,7 +71,7 @@ class TestTreeCoverLossAnalyticsIn:
 
     def test_thumbprint_changes_when_intersections_changes(self, base_config):
         model = TreeCoverLossAnalyticsIn(**base_config.model_dump())
-        model.set_environment(Environment.production)
+        model.set_input_uris(Environment.production)
 
         model.intersections = []
 

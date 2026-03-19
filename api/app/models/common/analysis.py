@@ -23,18 +23,18 @@ class AnalyticsIn(StrictBaseModel):
         # Remove private attributes if in serialized data
         kwargs.pop("_version", None)
         kwargs.pop("_analytics_name", None)
-        kwargs.pop("_environment", None)
+        kwargs.pop("_input_uris", None)
 
         super().__init__(**kwargs)
 
     _analytics_name: str = PrivateAttr(default="analytics")
     _version: str = PrivateAttr(default="v0")
-    _environment: str | None = PrivateAttr(default=None)
+    _input_uris: str | None = PrivateAttr(default=None)
 
     aoi: AreaOfInterest
 
-    def set_environment(self, environment: Environment) -> None:
-        """Fingerprint the Zarr URIs for the given environment and store it.
+    def set_input_uris(self, environment: Environment) -> None:
+        """Capture the current input URIs for the given environment and store them.
 
         Using URIs rather than the environment name means the thumbprint is
         tied to the actual data, not the label. When a staging dataset is
@@ -51,14 +51,14 @@ class AnalyticsIn(StrictBaseModel):
             ZarrDatasetRepository.resolve_zarr_uri(dataset, environment)
             for dataset in Dataset
         )
-        self._environment = json.dumps(uris)
+        self._input_uris = json.dumps(uris)
 
     def model_dump(self, **kwargs):
         """Generate dictionary representation of object including private attributes"""
         result = super().model_dump(**kwargs)
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
-        result["_environment"] = self._environment
+        result["_input_uris"] = self._input_uris
         return result
 
     def model_dump_json(self, **kwargs):
@@ -66,20 +66,20 @@ class AnalyticsIn(StrictBaseModel):
         result = json.loads(super().model_dump_json(**kwargs))
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
-        result["_environment"] = self._environment
+        result["_input_uris"] = self._input_uris
         return json.dumps(result)
 
     def thumbprint(self) -> uuid.UUID:
         """Generate a deterministic UUID thumbprint."""
-        if self._environment is None:
-            raise ValueError("Environment not set")
+        if self._input_uris is None:
+            raise ValueError("Input URIs not set")
 
         dump_dict = self.model_dump(exclude=set(), mode="json")
 
         # Manually include important private attributes
         dump_dict["_version"] = self._version
         dump_dict["_analytics_name"] = self._analytics_name
-        dump_dict["_environment"] = self._environment
+        dump_dict["_input_uris"] = self._input_uris
 
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)

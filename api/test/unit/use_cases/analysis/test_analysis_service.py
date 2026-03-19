@@ -19,7 +19,7 @@ def stub_analysis_in():
             ids=["1234"],
         )
     )
-    analytics_in.set_environment(Environment.production)
+    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 

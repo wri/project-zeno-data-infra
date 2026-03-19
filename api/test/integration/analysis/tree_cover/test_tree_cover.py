@@ -77,7 +77,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             canopy_cover=15,
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -144,7 +144,7 @@ class TestTreeCoverAnalyticsPostWithKba:
             ),
             canopy_cover=15,
         )
-        analytics_in.set_environment(Environment.production)
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
