@@ -54,13 +54,13 @@ async def lifespan(app: FastAPI):
     local_client = None
     remote_client = None
 
-    local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 4))
+    local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 7))
 
     # Create a local in-process cluster when LOCAL_DASK_WORKERS > 0.
     # Tests set this to 0 and provide a shared cluster via
     # DASK_SCHEDULER_ADDRESS instead.
     if local_n_workers > 0:
-        local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 2))
+        local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 1))
         local_cluster = await LocalCluster(
             n_workers=local_n_workers,
             threads_per_worker=local_threads,
