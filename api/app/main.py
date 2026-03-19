@@ -78,6 +78,9 @@ async def lifespan(app: FastAPI):
         remote_client=remote_client or local_client,
     )
 
+    # Expose a single client for routers that don't use the router yet.
+    app.state.dask_client = remote_client or local_client
+
     # Create an AWS Session and connections to DyamoDb and S3
     session = aioboto3.Session()
     async with session.client("s3", region_name="us-east-1") as s3_client:
