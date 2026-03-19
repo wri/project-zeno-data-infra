@@ -7,7 +7,6 @@ from flox.xarray import xarray_reduce
 from shapely.geometry import shape
 
 from app.analysis.common.geodesic_area import (
-    compute_geodesic_area_ha,
     compute_total_feature_collection_area_ha,
 )
 from app.domain.compute_engines.dask_client_router import DaskClientRouter
