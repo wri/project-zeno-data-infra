@@ -74,6 +74,16 @@ async def lifespan(app: FastAPI):
     if scheduler_addr:
         remote_client = await Client(scheduler_addr, asynchronous=True)
 
+    # Ensure that at least one Dask client is available.
+    # This prevents downstream attribute errors when both LOCAL_DASK_WORKERS=0
+    # and DASK_SCHEDULER_ADDRESS is not set.
+    if not (local_client or remote_client):
+        raise RuntimeError(
+            "Dask client configuration error: neither a local client nor a remote "
+            "client could be created. Set LOCAL_DASK_WORKERS > 0 to start a local "
+            "cluster, or provide DASK_SCHEDULER_ADDRESS to use a remote scheduler."
+        )
+
     app.state.dask_client_router = DaskClientRouter(
         local_client=local_client or remote_client,
         remote_client=remote_client or local_client,
