@@ -348,6 +348,13 @@ class TreeCoverLossTasks:
 
         return results_with_ids
 
+    # In Justin's original QC feature file (now at
+    # s3://lcl-analytics/vectors/qc_features.geojson.orig), only 3 features in the
+    # first 55 did not pass. Those GADM2 areas are listed in bug GTC-3496 to
+    # investigate why they are off by 3-4%. Those 3 features were removed from the QC
+    # feature file, along with 8 other features that took 6 or more minutes for the
+    # GEE processing to run. The result is the first 44 feature should pass (and we
+    # are checking the first 20 by default).
     def qc_against_validation_source(self, version: Optional[str] = None):
         qc_features = self.qc_feature_repository.load(limit=20)
 
