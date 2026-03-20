@@ -50,7 +50,7 @@ def run_cluster_manager():
         maximum=maximum,
         wait_count=60,  # number of scheduler cycles with pending tasks before scaling up (default 3)
         target_duration="500ms",  # how long tasks should take — shorter = more aggressive scaling
-        interval="500ms",
+        interval="500ms",  # how often to check for scaling opportunities
     )
 
     logger.info(f"Adaptive scaling active! Dashboard: {cluster.dashboard_link}")
