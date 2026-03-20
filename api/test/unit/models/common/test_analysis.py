@@ -21,7 +21,7 @@ def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
 
 
 class TestThumbprint:
-    def test_thumbprint_without_set_environment_raises(self):
+    def test_thumbprint_without_set_input_uris_raises(self):
         defaults = dict(
             aoi=AdminAreaOfInterest(type="admin", ids=["BRA.1"]),
             start_year="2020",
@@ -33,7 +33,7 @@ class TestThumbprint:
         with pytest.raises(ValueError):
             _ = analytics_in.thumbprint()
 
-    def test_thumbprint_without_set_environment_defaults_to_production(self):
+    def test_thumbprint_without_set_input_uris_defaults_to_production(self):
         a = _make_analytics_in()
         b = _make_analytics_in()
         b.set_input_uris(Environment.production)
