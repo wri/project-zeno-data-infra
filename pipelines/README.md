@@ -94,4 +94,43 @@ python -m pipelines.run_updates --flow dist_update --version v20260301
 
 ## Running Pipeline from Prefect Cloud UI
 
-<!-- TODO: Add details for running pipeline from Prefect Cloud UI -->
+### Architecture Overview
+
+![Pipeline Architecture](pipeline_arch.png)
+
+Pipelines are deployed to **Prefect Cloud** and execute on **AWS ECS Fargate**. The infrastructure is managed via Terraform (see `terraform/prefect.tf`). Here's how the pieces fit together:
+
+1. A **Deployment** (defined in Terraform) schedules a job or a user triggers a run from the Dashboard UI.
+2. The job is submitted to an **ECS Work Pool**, which defines the Fargate task template (CPU, memory, container image, IAM role).
+3. A **Worker** running continuously in the ECS cluster polls the work pool for pending jobs and spawns an ephemeral **Flow Runner Task** on Fargate.
+4. The Flow Runner executes the pipeline code and reports status and logs back to the Prefect Server, visible in the Dashboard UI.
+
+### Pipeline Docker Image
+
+Both the ECS Fargate task and the Coiled Dask cluster require a Docker image containing the pipeline code and dependencies. This image is configured via the `PIPELINES_IMAGE` environment variable:
+
+- **ECS (Prefect):** The deployment's job variables in Terraform set `image` to the value of `var.pipelines_image`, which is also passed as the `PIPELINES_IMAGE` env var inside the container.
+- **Coiled:** The `create_cluster()` task in `run_updates.py` reads `os.getenv("PIPELINES_IMAGE")` to specify the container image for the Dask scheduler and workers.
+
+Make sure the image is up to date and pushed to the container registry before triggering a run.
+
+### Triggering a Run from the Dashboard
+
+1. Open the [Prefect Cloud Dashboard](https://app.prefect.cloud/).
+2. Navigate to **Deployments** and find **gnw-zonal-stats-update**.
+3. Click **Run** → **Custom Run** to configure parameters:
+
+![Find the deployment and trigger a custom run](prefect_cloud_1.png)
+
+   - **flow_name** — `dist_update` or `tcl_update`
+   - **version** — the dataset version (e.g. `v20260301`; required for `tcl_update`)
+   - **overwrite** — set to `true` to re-run over existing outputs
+   - **is_latest** — set to `true` to mark this version as the latest served by the analytics API
+
+![Configure run parameters](prefect_cloud_2.png)
+
+4. Submit the run. The ECS worker will pick it up and execute it on Fargate.
+
+### Automatic Triggers
+
+A **webhook + automation** is configured so that when a new DIST alerts version is published, the `dist_update` flow is triggered automatically with the version from the event payload. This is defined in `terraform/prefect.tf` as the `run-gnw-zonal-stats-on-dist-update` automation.
