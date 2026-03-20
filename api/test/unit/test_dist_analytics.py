@@ -174,7 +174,7 @@ async def test_get_geojsons_from_data_api():
         }
 
     aoi = {"type": "protected_area", "ids": ["555625448"]}
-    geojson, areas_ha = await get_geojsons_from_data_api(
+    geojson = await get_geojsons_from_data_api(
         aoi, send_request=send_request_to_data_api_test
     )
     assert geojson[0]["type"] == "MultiPolygon"
@@ -202,7 +202,7 @@ def test_get_geojson_request_for_data_api_protected_areas():
         == "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
     )
     assert params == {
-        "sql": "select gfw_geojson, gfw_area__ha from data where wdpa_pid in ('555625448') order by wdpa_pid"
+        "sql": "select gfw_geojson from data where wdpa_pid in ('555625448') order by wdpa_pid"
     }
 
 
@@ -214,7 +214,7 @@ def test_get_geojson_request_for_data_api_indigenous_lands():
         == "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
     )
     assert params == {
-        "sql": "select gfw_geojson, gfw_area__ha from data where landmark_id in ('CAN1') order by landmark_id"
+        "sql": "select gfw_geojson from data where landmark_id in ('CAN1') order by landmark_id"
     }
 
 
@@ -226,7 +226,7 @@ def test_get_geojson_request_for_data_api_kba():
         == "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
     )
     assert params == {
-        "sql": "select gfw_geojson, gfw_area__ha from data where sitrecid in ('1241') order by sitrecid"
+        "sql": "select gfw_geojson from data where sitrecid in ('1241') order by sitrecid"
     }
 
 

@@ -37,21 +37,20 @@ async def get_geojsons_from_data_api(aoi, send_request=send_request_to_data_api)
         raise ValueError("Unable to get GeoJSON from Data API.")
 
     geojsons = [json.loads(data["gfw_geojson"]) for data in response["data"]]
-    areas_ha = [data.get("gfw_area__ha", 0) for data in response["data"]]
-    return geojsons, areas_ha
+    return geojsons
 
 
 def get_geojson_request_for_data_api(aoi):
     value_list = get_sql_in_list(aoi["ids"])
     if aoi["type"] == "key_biodiversity_area":
         url = "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
-        sql = f"select gfw_geojson, gfw_area__ha from data where sitrecid in {value_list} order by sitrecid"
+        sql = f"select gfw_geojson from data where sitrecid in {value_list} order by sitrecid"
     elif aoi["type"] == "protected_area":
         url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-        sql = f"select gfw_geojson, gfw_area__ha from data where wdpa_pid in {value_list} order by wdpa_pid"
+        sql = f"select gfw_geojson from data where wdpa_pid in {value_list} order by wdpa_pid"
     elif aoi["type"] == "indigenous_land":
         url = "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
-        sql = f"select gfw_geojson, gfw_area__ha from data where landmark_id in {value_list} order by landmark_id"
+        sql = f"select gfw_geojson from data where landmark_id in {value_list} order by landmark_id"
     else:
         raise ValueError(f"Unable to retrieve AOI type {aoi['type']} from Data API.")
     return url, {"sql": sql}
@@ -60,10 +59,9 @@ def get_geojson_request_for_data_api(aoi):
 async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_api):
     if aoi["type"] == "feature_collection":
         geojson = aoi["feature_collection"]["features"]
-        areas_ha = None
     else:
-        geojson, areas_ha = await geojsons_from_predefined_aoi(aoi)
-    return geojson, areas_ha
+        geojson = await geojsons_from_predefined_aoi(aoi)
+    return geojson
 
 
 def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):

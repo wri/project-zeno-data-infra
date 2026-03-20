@@ -64,7 +64,7 @@ class CarbonFluxAnalyzer(Analyzer):
 
         else:
             aois = carbon_flux_analytics_in.aoi.model_dump()
-            geojsons, _ = await get_geojson(aois)
+            geojsons = await get_geojson(aois)
             if aois["type"] != "feature_collection":
                 aoi_list = sorted(
                     [{"type": aois["type"], "id": id} for id in aois["ids"]],

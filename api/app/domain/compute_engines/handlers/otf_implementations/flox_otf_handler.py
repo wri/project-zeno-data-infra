@@ -5,6 +5,7 @@ import pandas as pd
 import xarray as xr
 from flox.xarray import xarray_reduce
 from shapely.geometry import shape
+from typing import Optional
 
 from app.analysis.common.geodesic_area import (
     compute_total_feature_collection_area_ha,
@@ -34,7 +35,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         dataset_repository=ZarrDatasetRepository(),
         aoi_geometry_repository=DataApiAoiGeometryRepository(),
         dask_client=None,
-        dask_client_router: DaskClientRouter = None,
+        dask_client_router: Optional[DaskClientRouter] = None,
     ):
         self.dataset_repository = dataset_repository
         self.aoi_geometry_repository = aoi_geometry_repository
