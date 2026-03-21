@@ -14,6 +14,9 @@ from app.domain.models.environment import Environment
 
 
 class ZarrDatasetRepository:
+    # If you want to add an input Zarr, you'll need to also add a dataset in
+    # app/domain/models/dataset.py::Dataset
+
     _ZARR_URIS = {
         Environment.staging: {},
         Environment.production: {

@@ -5,6 +5,9 @@ from app.models.common.base import StrictBaseModel
 
 
 class Dataset(Enum):
+    # If you add a dataset to this enum, you'll probably want to add a URI to
+    # the production env in zarr_dataset_repository.py, and a field name in the
+    # dictionary below
     area_hectares = "area_hectares"
     canopy_cover = "canopy_cover"
     carbon_emissions = "carbon_emissions"
