@@ -13,6 +13,7 @@ from app.domain.analyzers.land_cover_composition_analyzer import (
     LandCoverCompositionAnalyzer,
 )
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -183,12 +184,14 @@ class TestLandCoverCompositionCustomAois:
                 }
             ],
         }
-        self.metadata = LandCoverCompositionAnalyticsIn(
+        metadata = LandCoverCompositionAnalyticsIn(
             aoi={
                 "type": "feature_collection",
                 "feature_collection": feature_collection,
             },
-        ).model_dump()
+        )
+        metadata.set_input_uris(Environment.production)
+        self.metadata = metadata.model_dump()
 
         analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
         await analyzer.analyze(analysis)
@@ -284,6 +287,7 @@ class TestLandCoverChangeAdminAois:
         analytics_in = LandCoverCompositionAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.12.1", "IDN"]},
         )
+        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(),
