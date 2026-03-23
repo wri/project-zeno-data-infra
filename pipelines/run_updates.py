@@ -31,7 +31,7 @@ def create_cluster():
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
         },
     )
-    cluster.adapt(minimum=1, maximum=75)
+    cluster.adapt(minimum=10, maximum=50)
 
     client = cluster.get_client()
     return client
