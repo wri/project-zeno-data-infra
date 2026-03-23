@@ -51,6 +51,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parqu
         "driver",
         "is_primary_forest",
         "natural_forest_class",
+        "is_tree_cover_loss_from_fires",
         "aoi_id",
         "aoi_type",
         "area_ha",
@@ -63,7 +64,8 @@ def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parqu
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 22450
+    assert result_df["is_tree_cover_loss_from_fires"].dtype == bool
+    assert result_df.size == 31383
     mock_qc_write_results.assert_called_once()
 
 
@@ -79,6 +81,7 @@ def test_tcl_flow_with_new_contextual_layers(
     drivers_ds,
     primary_forests_ds,
     natural_forests_ds,
+    tclf_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -92,6 +95,7 @@ def test_tcl_flow_with_new_contextual_layers(
         drivers_ds,
         primary_forests_ds,
         natural_forests_ds,
+        tclf_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -112,6 +116,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "driver",
         "is_primary_forest",
         "natural_forest_class",
+        "is_tree_cover_loss_from_fires",
         "aoi_id",
         "aoi_type",
         "area_ha",
@@ -124,7 +129,8 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 120
+    assert result_df["is_tree_cover_loss_from_fires"].dtype == bool
+    assert result_df.size == 132
 
 
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
@@ -138,6 +144,7 @@ def test_tcl_flow_with_bbox(
     drivers_ds,
     primary_forests_ds,
     natural_forests_ds,
+    tclf_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -152,6 +159,7 @@ def test_tcl_flow_with_bbox(
         drivers_ds,
         primary_forests_ds,
         natural_forests_ds,
+        tclf_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -167,6 +175,7 @@ def test_tcl_flow_with_bbox(
         "is_intact_forest",
         "driver",
         "is_primary_forest",
+        "is_tree_cover_loss_from_fires",
         "natural_forest_class",
         "aoi_id",
         "aoi_type",
@@ -180,4 +189,5 @@ def test_tcl_flow_with_bbox(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 30
+    assert result_df["is_tree_cover_loss_from_fires"].dtype == bool
+    assert result_df.size == 33
