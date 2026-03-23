@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-import numpy as np
 import pandas as pd
 from shapely.geometry import box
 
@@ -83,11 +82,11 @@ def test_tcl_validation_flow():
             is False
         )
 
-    # NaN driver → filtered out by "Unknown" check → should fail
-    result_df_nan_driver = _make_result_df(
+    # "Unknown" driver → filtered out by driver != "Unknown" check → should fail
+    result_df_unknown_driver = _make_result_df(
         [100.0, 200.0],
         ["30", "30"],
-        [np.nan, "Permanent settlement"],
+        ["Unknown", "Permanent settlement"],
         ["Natural Forest", "Non-natural Forest"],
     )
 
@@ -101,7 +100,7 @@ def test_tcl_validation_flow():
         assert (
             bool(
                 stages.qc_against_validation_source(
-                    result_df_nan_driver,
+                    result_df_unknown_driver,
                     qc_feature_repository=FakeQCRepository(),
                 )
             )
