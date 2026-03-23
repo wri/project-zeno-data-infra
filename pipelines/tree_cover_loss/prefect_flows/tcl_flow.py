@@ -90,7 +90,7 @@ def umd_tree_cover_loss_flow(
 
     if not tcl_tasks.qc_against_validation_source.with_options(
         name="area-emissions-by-tcl-qc-validation"
-    )(version=version):
+    )(result_df=result_df, version=version):
         raise AssertionError("TCL did not pass QC validation, stopping job")
 
     return result_uri

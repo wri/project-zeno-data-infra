@@ -11,22 +11,30 @@ from pipelines.test.integration.tree_cover_loss.conftest import (
 from pipelines.tree_cover_loss import stages
 
 
+def _make_result_df(area_ha, canopy_cover, driver, natural_forest_class):
+    return pd.DataFrame(
+        {
+            "area_ha": area_ha,
+            "tree_cover_loss_year": [2021, 2022],
+            "canopy_cover": canopy_cover,
+            "driver": driver,
+            "aoi_id": ["AFG.1.1", "AFG.1.1"],
+            "natural_forest_class": natural_forest_class,
+        }
+    )
+
+
 def test_tcl_validation_flow():
+    result_df = _make_result_df(
+        [100.0, 200.0],
+        ["30", "30"],
+        ["Agriculture", "Permanent settlement"],
+        ["Natural Forest", "Non-natural Forest"],
+    )
+
     with patch(
-        "pipelines.tree_cover_loss.stages.get_sample_statistics"
-    ) as mock_sample, patch(
         "pipelines.tree_cover_loss.stages.get_validation_statistics"
     ) as mock_validation:
-        mock_sample.return_value = pd.DataFrame(
-            {
-                "area_ha": [100.0, 200.0],
-                "tree_cover_loss_year": [2021, 2022],
-                "canopy_cover": ["30", "30"],
-                "driver": ["Agriculture", "Permanent settlement"],
-                "aoi_id": ["AFG.1.1", "AFG.1.1"],
-                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
-            }
-        )
         mock_validation.return_value = {
             "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
             "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
@@ -34,7 +42,8 @@ def test_tcl_validation_flow():
 
         assert (
             stages.qc_against_validation_source(
-                qc_feature_repository=FakeQCRepository()
+                result_df,
+                qc_feature_repository=FakeQCRepository(),
             )
             is True
         )
@@ -45,62 +54,59 @@ def test_tcl_validation_flow():
         }
         assert (
             stages.qc_against_validation_source(
-                qc_feature_repository=FakeQCRepository()
+                result_df,
+                qc_feature_repository=FakeQCRepository(),
             )
             is False
         )
 
-        mock_sample.return_value = pd.DataFrame(
-            {
-                "area_ha": [100.0, 200.0],
-                "tree_cover_loss_year": [2021, 2022],
-                "canopy_cover": ["10", "30"],
-                "driver": ["Agriculture", "Permanent settlement"],
-                "aoi_id": ["AFG.1.1", "AFG.1.1"],
-                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
-            }
-        )
+    # canopy_cover below 30 → driver filter yields less area → should fail
+    result_df_low_canopy = _make_result_df(
+        [100.0, 200.0],
+        ["10", "30"],
+        ["Agriculture", "Permanent settlement"],
+        ["Natural Forest", "Non-natural Forest"],
+    )
+
+    with patch(
+        "pipelines.tree_cover_loss.stages.get_validation_statistics"
+    ) as mock_validation:
+        mock_validation.return_value = {
+            "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+        }
         assert (
             stages.qc_against_validation_source(
-                qc_feature_repository=FakeQCRepository()
+                result_df_low_canopy,
+                qc_feature_repository=FakeQCRepository(),
             )
             is False
         )
 
-        mock_sample.return_value = pd.DataFrame(
-            {
-                "area_ha": [100.0, 200.0],
-                "tree_cover_loss_year": [2021, 2022],
-                "canopy_cover": ["30", "30"],
-                "driver": [np.nan, "Permanent settlement"],
-                "aoi_id": ["AFG.1.1", "AFG.1.1"],
-                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
-            }
-        )
+    # NaN driver → filtered out by "Unknown" check → should fail
+    result_df_nan_driver = _make_result_df(
+        [100.0, 200.0],
+        ["30", "30"],
+        [np.nan, "Permanent settlement"],
+        ["Natural Forest", "Non-natural Forest"],
+    )
+
+    with patch(
+        "pipelines.tree_cover_loss.stages.get_validation_statistics"
+    ) as mock_validation:
+        mock_validation.return_value = {
+            "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+        }
         assert (
             bool(
                 stages.qc_against_validation_source(
-                    qc_feature_repository=FakeQCRepository()
+                    result_df_nan_driver,
+                    qc_feature_repository=FakeQCRepository(),
                 )
             )
             is False
         )
-
-
-def test_get_sample_statistics_accepts_injected_geometry_lookup():
-    geom = box(0, 0, 1, 1)
-    expected = pd.DataFrame({"area_ha": [123.0]})
-
-    with patch("pipelines.tree_cover_loss.stages.compute_tree_cover_loss") as mock_flow:
-        mock_flow.return_value = expected
-
-        result = stages.get_sample_statistics(geom)
-
-        assert result is expected
-
-        mock_flow.assert_called_once()
-        _, kwargs = mock_flow.call_args
-        assert kwargs["bbox"] is geom
 
 
 def test_get_validation_statistics_with_fake_repo():

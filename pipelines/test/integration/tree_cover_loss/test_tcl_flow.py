@@ -1,10 +1,12 @@
 from unittest.mock import patch
 
 import geopandas as gpd
+import numpy as np
 import pytest
 from prefect.testing.utilities import prefect_test_harness
 from shapely.geometry import box, shape
 
+from pipelines.prefect_flows import common_stages
 from pipelines.test.integration.tree_cover_loss.conftest import (
     ARG_1_28,
 )
@@ -91,7 +93,21 @@ def test_tcl_flow_with_new_contextual_layers(
         subregion_ds,
     ]
 
-    result_df = stages.compute_tree_cover_loss()
+    datasets = stages.load_data("tcl")
+    expected_groups = (
+        np.arange(1, 25),
+        np.arange(0, 8),
+        np.arange(0, 2),
+        np.arange(0, 8),
+        np.arange(0, 2),
+        np.arange(0, 3),
+        np.arange(999),
+        np.arange(86),
+        np.arange(854),
+    )
+    compute_input = stages.setup_compute(datasets, expected_groups)
+    result = common_stages.compute(*compute_input, funcname="sum")
+    result_df = stages.postprocess_result(result)
 
     # verify expected cols
     expected_columns = {
@@ -147,7 +163,21 @@ def test_tcl_flow_with_bbox(
     ]
 
     # filter to bottom left pixel
-    result_df = stages.compute_tree_cover_loss(bbox=box(0, 0, 0, 0))
+    datasets = stages.load_data("tcl", bbox=box(0, 0, 0, 0))
+    expected_groups = (
+        np.arange(1, 25),
+        np.arange(0, 8),
+        np.arange(0, 2),
+        np.arange(0, 8),
+        np.arange(0, 2),
+        np.arange(0, 3),
+        np.arange(999),
+        np.arange(86),
+        np.arange(854),
+    )
+    compute_input = stages.setup_compute(datasets, expected_groups)
+    result = common_stages.compute(*compute_input, funcname="sum")
+    result_df = stages.postprocess_result(result)
 
     # verify expected cols
     expected_columns = {

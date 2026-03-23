@@ -6,25 +6,15 @@ import xarray as xr
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
-    carbon_emissions_zarr_uri,
     country_zarr_uri,
-    ifl_intact_forest_lands_zarr_uri,
-    pixel_area_zarr_uri,
     region_zarr_uri,
-    sbtn_natural_forests_zarr_uri,
     subregion_zarr_uri,
-    tree_cover_density_zarr_uri,
-    tree_cover_loss_zarr_uri,
-    umd_primary_forests_zarr_uri,
-    wri_google_1km_drivers_zarr_uri,
 )
-from pipelines.prefect_flows import common_stages
 from pipelines.prefect_flows.common_stages import _load_zarr, numeric_to_alpha3
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
-
 
 # tcd threshold mapping
 thresh_to_pct = {
@@ -348,40 +338,6 @@ def _symmetric_relative_difference(a, b):
     return 0 if avg == 0 else abs(a - b) / avg
 
 
-def compute_tree_cover_loss(bbox: Optional[Polygon] = None) -> pd.DataFrame:
-    """Run the full TCL compute pipeline for a given bounding box.
-
-    Used by QC to get sample statistics for a geometry.
-    """
-    datasets = load_data(
-        tree_cover_loss_zarr_uri,
-        pixel_area_uri=pixel_area_zarr_uri,
-        carbon_emissions_uri=carbon_emissions_zarr_uri,
-        tree_cover_density_uri=tree_cover_density_zarr_uri,
-        ifl_uri=ifl_intact_forest_lands_zarr_uri,
-        drivers_uri=wri_google_1km_drivers_zarr_uri,
-        primary_forests_uri=umd_primary_forests_zarr_uri,
-        natural_forests_uri=sbtn_natural_forests_zarr_uri,
-        bbox=bbox,
-    )
-
-    expected_groups = (
-        np.arange(1, 25),
-        np.arange(0, 8),
-        np.arange(0, 2),
-        np.arange(0, 8),
-        np.arange(0, 2),
-        np.arange(0, 3),
-        np.arange(999),
-        np.arange(86),
-        np.arange(854),
-    )
-
-    compute_input = setup_compute(datasets, expected_groups)
-    result = common_stages.compute(*compute_input, funcname="sum")
-    return postprocess_result(result)
-
-
 # In Justin's original QC feature file (now at
 # s3://lcl-analytics/vectors/qc_features.geojson.orig), only 3 features in the
 # first 55 did not pass. Those GADM2 areas are listed in bug GTC-3496 to
@@ -390,6 +346,7 @@ def compute_tree_cover_loss(bbox: Optional[Polygon] = None) -> pd.DataFrame:
 # GEE processing to run. The result is the first 44 feature should pass (and we
 # are checking the first 20 by default).
 def qc_against_validation_source(
+    result_df: pd.DataFrame,
     version: Optional[str] = None,
     qc_feature_repository=None,
     gee_repository=None,
@@ -404,20 +361,18 @@ def qc_against_validation_source(
 
     def qc_feature(row):
         print(f"Starting QC on GID {row.GID_2}")
-        sample_stats = get_sample_statistics(row.geometry)
         admin2_aoi_id = row.GID_2.split("_")[0]
+        sample_stats = result_df[result_df.aoi_id == admin2_aoi_id]
 
         if sample_stats.size > 0:
             sample_driver_area_ha_total = sample_stats[
                 (sample_stats.canopy_cover.astype(np.int8) >= 30)
                 & (sample_stats.driver != "Unknown")
-                & (sample_stats.aoi_id == admin2_aoi_id)
             ].area_ha.sum()
 
             sample_natural_forests_ha_total = sample_stats[
                 (sample_stats.natural_forest_class != "Unknown")
                 & (sample_stats.tree_cover_loss_year > 2020)
-                & (sample_stats.aoi_id == admin2_aoi_id)
             ].area_ha.sum()
         else:
             sample_driver_area_ha_total = 0
@@ -477,10 +432,6 @@ def qc_against_validation_source(
             qc_features, "admin-tree-cover-loss", version
         )
     return bool(qc_features.qc_pass.all())
-
-
-def get_sample_statistics(geom: Polygon) -> pd.DataFrame:
-    return compute_tree_cover_loss(bbox=geom)
 
 
 def get_validation_statistics(
