@@ -69,6 +69,13 @@ class AnalyticsIn(StrictBaseModel):
         result["_input_uris"] = self._input_uris
         return json.dumps(result)
 
+    def public_metadata(self) -> dict:
+        """Return public metadata
+
+        Bypasses the private field injection in the overridden model_dump* methods
+        """
+        return super().model_dump()
+
     def thumbprint(self) -> uuid.UUID:
         """Generate a deterministic UUID thumbprint."""
         if self._input_uris is None:
