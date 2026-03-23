@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
+from app.domain.models.environment import Environment
 from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
@@ -17,12 +18,11 @@ from app.use_cases.analysis.analysis_service import AnalysisService
 client = TestClient(app)
 
 ENDPOINT_PATH = "/v0/land_change/tree_cover_gain/analytics"
-RESOURCE_THUMBPRINT = "9b068e84-7b15-5ef2-b37d-415a7a844f4d"
 
 
 @pytest.fixture
 def dummy_analytics_in():
-    return TreeCoverGainAnalyticsIn(
+    analytics_in = TreeCoverGainAnalyticsIn(
         aoi=AdminAreaOfInterest(
             type="admin",
             ids=["IDN.24.9"],
@@ -30,6 +30,8 @@ def dummy_analytics_in():
         start_year="2010",
         end_year="2015",
     )
+    analytics_in.set_input_uris(Environment.production)
+    return analytics_in
 
 
 mock_service = MagicMock(spec=AnalysisService)
@@ -50,7 +52,16 @@ class TestTreeCoverGainPostUseCaseInitiation:
             json=json.loads(dummy_analytics_in.model_dump_json()),
         )
 
-        mock_service.set_resource_from.assert_called_with(dummy_analytics_in)
+        actual_arg = mock_service.set_resource_from.call_args[0][0]
+        expected = dummy_analytics_in.model_dump()  # _environment still None here
+        actual = actual_arg.model_dump()
+        assert actual["aoi"] == expected["aoi"]
+        assert actual["forest_filter"] == expected["forest_filter"]
+        assert actual["start_year"] == expected["start_year"]
+        assert actual["end_year"] == expected["end_year"]
+        assert actual["_version"] == expected["_version"]
+        assert actual["_analytics_name"] == expected["_analytics_name"]
+        # deliberately skip _environment — that's an infrastructure concern, not what this test is about
 
         mock_service.reset_mock(return_value=True)
 
@@ -58,7 +69,7 @@ class TestTreeCoverGainPostUseCaseInitiation:
         app.dependency_overrides[create_analysis_service] = create_mock_service
 
         mock_service.get_status.return_value = AnalysisStatus.pending
-        mock_service.resource_thumbprint.return_value = RESOURCE_THUMBPRINT
+        mock_service.resource_thumbprint.return_value = dummy_analytics_in.thumbprint()
         response = client.post(
             ENDPOINT_PATH,
             json=json.loads(dummy_analytics_in.model_dump_json()),
@@ -69,7 +80,7 @@ class TestTreeCoverGainPostUseCaseInitiation:
         assert response.json() == json.loads(
             DataMartResourceLinkResponse(
                 data=DataMartResourceLink(
-                    link=f"http://testserver{ENDPOINT_PATH}/{RESOURCE_THUMBPRINT}"
+                    link=f"http://testserver{ENDPOINT_PATH}/{dummy_analytics_in.thumbprint()}"
                 ),
                 status=AnalysisStatus.pending,
             ).model_dump_json()

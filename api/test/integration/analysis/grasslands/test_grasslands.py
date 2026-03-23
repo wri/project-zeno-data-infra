@@ -8,6 +8,7 @@ from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -55,6 +56,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2015",
             end_year="2020",
         )
+        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -126,6 +128,7 @@ class TestGrasslandsAnalyticsPostWithKba:
             start_year="2015",
             end_year="2020",
         )
+        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
