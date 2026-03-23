@@ -8,16 +8,15 @@ from pipelines.test.integration.tree_cover_loss.conftest import (
     FakeGoogleEarthEngineDatasetRepository,
     FakeQCRepository,
 )
-from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
+from pipelines.tree_cover_loss import stages
 
 
 def test_tcl_validation_flow():
     with patch(
-        "pipelines.tree_cover_loss.stages.TreeCoverLossTasks.get_sample_statistics"
+        "pipelines.tree_cover_loss.stages.get_sample_statistics"
     ) as mock_sample, patch(
-        "pipelines.tree_cover_loss.stages.TreeCoverLossTasks.get_validation_statistics"
+        "pipelines.tree_cover_loss.stages.get_validation_statistics"
     ) as mock_validation:
-        tasks = TreeCoverLossTasks(qc_feature_repository=FakeQCRepository())
         mock_sample.return_value = pd.DataFrame(
             {
                 "area_ha": [100.0, 200.0],
@@ -33,13 +32,23 @@ def test_tcl_validation_flow():
             "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
         }
 
-        assert tasks.qc_against_validation_source() is True
+        assert (
+            stages.qc_against_validation_source(
+                qc_feature_repository=FakeQCRepository()
+            )
+            is True
+        )
 
         mock_validation.return_value = {
             "driver_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
             "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
         }
-        assert tasks.qc_against_validation_source() is False
+        assert (
+            stages.qc_against_validation_source(
+                qc_feature_repository=FakeQCRepository()
+            )
+            is False
+        )
 
         mock_sample.return_value = pd.DataFrame(
             {
@@ -51,7 +60,12 @@ def test_tcl_validation_flow():
                 "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
-        assert tasks.qc_against_validation_source() is False
+        assert (
+            stages.qc_against_validation_source(
+                qc_feature_repository=FakeQCRepository()
+            )
+            is False
+        )
 
         mock_sample.return_value = pd.DataFrame(
             {
@@ -63,7 +77,14 @@ def test_tcl_validation_flow():
                 "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
             }
         )
-        assert bool(tasks.qc_against_validation_source()) is False
+        assert (
+            bool(
+                stages.qc_against_validation_source(
+                    qc_feature_repository=FakeQCRepository()
+                )
+            )
+            is False
+        )
 
 
 def test_get_sample_statistics_accepts_injected_geometry_lookup():
@@ -72,9 +93,8 @@ def test_get_sample_statistics_accepts_injected_geometry_lookup():
 
     with patch("pipelines.tree_cover_loss.stages.compute_tree_cover_loss") as mock_flow:
         mock_flow.return_value = expected
-        tasks = TreeCoverLossTasks()
 
-        result = tasks.get_sample_statistics(geom)
+        result = stages.get_sample_statistics(geom)
 
         assert result is expected
 
@@ -85,9 +105,10 @@ def test_get_sample_statistics_accepts_injected_geometry_lookup():
 
 def test_get_validation_statistics_with_fake_repo():
     geom = box(0, 0, 1, 1)
-    tasks = TreeCoverLossTasks(gee_repository=FakeGoogleEarthEngineDatasetRepository())
 
-    result = tasks.get_validation_statistics(geom)["driver_results"]
+    result = stages.get_validation_statistics(
+        geom, gee_repository=FakeGoogleEarthEngineDatasetRepository()
+    )["driver_results"]
 
     expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
     pd.testing.assert_frame_equal(result, expected, check_dtype=False)

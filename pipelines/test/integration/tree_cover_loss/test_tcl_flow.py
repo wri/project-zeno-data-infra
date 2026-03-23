@@ -7,15 +7,9 @@ from shapely.geometry import box, shape
 
 from pipelines.test.integration.tree_cover_loss.conftest import (
     ARG_1_28,
-    FakeQCRepository,
-    MatchingGoogleEarthEngineDatasetRepository,
 )
-from pipelines.tree_cover_loss.prefect_flows.tcl import (
-    compute_tree_cover_loss,
-    umd_tree_cover_loss,
-)
+from pipelines.tree_cover_loss import stages
 from pipelines.tree_cover_loss.prefect_flows.tcl_flow import umd_tree_cover_loss_flow
-from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 
 
 @pytest.mark.integration
@@ -95,14 +89,9 @@ def test_tcl_flow_with_new_contextual_layers(
         country_ds,
         region_ds,
         subregion_ds,
-    ] * 2
+    ]
 
-    result_df = umd_tree_cover_loss(
-        TreeCoverLossTasks(
-            gee_repository=MatchingGoogleEarthEngineDatasetRepository(),
-            qc_feature_repository=FakeQCRepository(),
-        )
-    )
+    result_df = stages.compute_tree_cover_loss()
 
     # verify expected cols
     expected_columns = {
@@ -158,7 +147,7 @@ def test_tcl_flow_with_bbox(
     ]
 
     # filter to bottom left pixel
-    result_df = compute_tree_cover_loss(TreeCoverLossTasks(), bbox=box(0, 0, 0, 0))
+    result_df = stages.compute_tree_cover_loss(bbox=box(0, 0, 0, 0))
 
     # verify expected cols
     expected_columns = {
