@@ -40,6 +40,13 @@ NATURAL_LANDS_CLASSES = {
     21: "Non-natural bare",
 }
 
+_input_uris = {
+    "natural_lands_zarr_uri": (
+        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+    ),
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
+
 
 class NaturalLandsAnalyzer(Analyzer):
     """Get the natural lands areas by class for the input AOIs"""
@@ -102,12 +109,14 @@ class NaturalLandsAnalyzer(Analyzer):
 
     @staticmethod
     def analyze_area(aoi, geojson) -> dd.DataFrame:
-        natural_lands_obj_name = "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-        pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
+        natural_lands_obj_name = _input_uris["natural_lands_zarr_uri"]
+        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+
         natural_lands = read_zarr_clipped_to_geojson(
             natural_lands_obj_name, geojson
         ).band_data
         natural_lands.name = "natural_lands_class"
+
         pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
 
         groupby_layers = [natural_lands]
