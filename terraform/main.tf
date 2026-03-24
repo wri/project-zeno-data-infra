@@ -336,6 +336,10 @@ module "analytics" {
           value = var.new_relic_license_key
         },
         {
+          name  = "NEW_RELIC_ENVIRONMENT"
+          value = var.new_relic_environment
+        },
+        {
           name  = "LOCAL_CLUSTER_AREA_THRESHOLD_HA"
           value = tostring(var.local_cluster_area_threshold_ha)
         }

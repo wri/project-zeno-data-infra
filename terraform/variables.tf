@@ -47,6 +47,12 @@ variable "new_relic_license_key" {
   description = "New Relic License Key"
 }
 
+variable "new_relic_environment" {
+  type        = string
+  description = "New Relic agent environment (development, test, staging, production)"
+  default     = "production"
+}
+
 variable "prefect_api_key" {
   description = "Prefect Cloud API key"
   type        = string
