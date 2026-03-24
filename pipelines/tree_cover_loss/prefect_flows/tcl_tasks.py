@@ -48,5 +48,7 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
 
 
 @task
-def qc_against_validation_source(result_df: pd.DataFrame, version: Optional[str] = None) -> bool:
+def qc_against_validation_source(
+    result_df: pd.DataFrame, version: Optional[str] = None
+) -> bool:
     return stages.qc_against_validation_source(result_df=result_df, version=version)
