@@ -58,10 +58,12 @@ class TreeCoverLossTasks:
         drivers_uri: Optional[str] = None,
         primary_forests_uri: Optional[str] = None,
         natural_forests_uri: Optional[str] = None,
+        tree_cover_loss_from_fires_uri: Optional[str] = None,
         bbox: Optional[Polygon] = None,
     ) -> Tuple[
         xr.DataArray,
         xr.Dataset,
+        xr.DataArray,
         xr.DataArray,
         xr.DataArray,
         xr.DataArray,
@@ -133,6 +135,15 @@ class TreeCoverLossTasks:
             join="left",
         )[1]
 
+        tclf: xr.DataArray = _load_zarr(tree_cover_loss_from_fires_uri).band_data
+        tclf = xr.align(
+            tcl,
+            tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+            join="left",
+        )[1]
+        # Convert tclf to a simple boolean, since its loss year is the same as TCL.
+        tclf = xr.where(tclf > 0, 1, 0).astype("uint8")
+
         # GADM zarrs
         country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
         country = xr.align(
@@ -166,6 +177,7 @@ class TreeCoverLossTasks:
             drivers,
             primary_forests,
             natural_forests,
+            tclf,
             country,
             region,
             subregion,
@@ -188,6 +200,7 @@ class TreeCoverLossTasks:
             drivers,
             primary_forests,
             natural_forests,
+            tclf,
             country,
             region,
             subregion,
@@ -205,6 +218,7 @@ class TreeCoverLossTasks:
             drivers.rename("driver"),
             primary_forests.rename("is_primary_forest"),
             natural_forests.rename("natural_forest_class"),
+            tclf.rename("is_tree_cover_loss_from_fires"),
             country.rename("country"),
             region.rename("region"),
             subregion.rename("subregion"),
@@ -279,6 +293,8 @@ class TreeCoverLossTasks:
         result_df["natural_forest_class"] = result_df["natural_forest_class"].map(
             natural_forest_class_to_label
         )
+        # convert TCLF to boolean
+        result_df["is_tree_cover_loss_from_fires"] = result_df["is_tree_cover_loss_from_fires"].astype(bool)
 
         result_df["country"] = result_df["country"].map(numeric_to_alpha3)
         result_df.dropna(subset=["country"], inplace=True)
@@ -300,6 +316,7 @@ class TreeCoverLossTasks:
                     "driver",
                     "is_primary_forest",
                     "is_intact_forest",
+                    "is_tree_cover_loss_from_fires",
                 ]
             )
             .sum()
@@ -315,6 +332,7 @@ class TreeCoverLossTasks:
                     "driver",
                     "is_primary_forest",
                     "is_intact_forest",
+                    "is_tree_cover_loss_from_fires",
                 ]
             )
             .sum()

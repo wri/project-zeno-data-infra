@@ -15,6 +15,7 @@ def _create_mock_datasets(shape=(2, 2)):
         drivers_data = [[1]]
         primary_forests_data = [[0]]
         natural_forests_data = [[0]]
+        tclf_data = [[0]]
         country_data = [[1]]
         region_data = [[1]]
         subregion_data = [[1]]
@@ -28,6 +29,7 @@ def _create_mock_datasets(shape=(2, 2)):
         drivers_data = [[1, 2], [3, 4]]
         primary_forests_data = [[0, 1], [0, 0]]
         natural_forests_data = [[1, 1], [0, 0]]
+        tclf_data = [[2, 5], [0, 4]]
         country_data = [[1, 1], [2, 2]]
         region_data = [[1, 1], [2, 2]]
         subregion_data = [[1, 2], [3, 4]]
@@ -51,6 +53,9 @@ def _create_mock_datasets(shape=(2, 2)):
     )
     natural_forests = xr.DataArray(
         da.array(natural_forests_data, dtype=np.uint8), dims=["y", "x"], coords=coords
+    )
+    tclf = xr.DataArray(
+        da.array(tclf_data, dtype=np.uint8), dims=["y", "x"], coords=coords
     )
     country = xr.DataArray(
         da.array(country_data, dtype=np.int16), dims=["y", "x"], coords=coords
@@ -81,6 +86,7 @@ def _create_mock_datasets(shape=(2, 2)):
         drivers,
         primary_forests,
         natural_forests,
+        tclf,
         country,
         region,
         subregion,
@@ -100,9 +106,10 @@ def test_setup_compute_groupby_schema_and_order():
         (3, "driver", np.int16),
         (4, "is_primary_forest", np.uint8),
         (5, "natural_forest_class", np.uint8),
-        (6, "country", np.int16),
-        (7, "region", np.uint8),
-        (8, "subregion", np.int16),
+        (6, "is_tree_cover_loss_from_fires", np.uint8),
+        (7, "country", np.int16),
+        (8, "region", np.uint8),
+        (9, "subregion", np.int16),
     ]
 
     # validate column order, names, and dtypes
