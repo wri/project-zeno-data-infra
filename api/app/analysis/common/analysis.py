@@ -82,9 +82,7 @@ def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
     try:
         clipped = sliced.rio.clip([geojson])
     except NoDataInBounds:
-        raise FeatureTooSmallError(
-            "AOI is too small. Please select a larger AOI "
-        )
+        raise FeatureTooSmallError("AOI is too small. Please select a larger AOI ")
     return clipped
 
 
