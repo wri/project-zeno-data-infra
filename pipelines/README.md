@@ -116,8 +116,17 @@ Make sure the image is up to date and pushed to the container registry before tr
 
 ### Triggering a Run from the Dashboard
 
+There are two deployments available:
+
+| Deployment | Purpose |
+|---|---|
+| **gnw-zonal-stats-update** | Production — runs against production resources. |
+| **gnw-zonal-stats-update-staging** | Staging — runs against staging resources. Allows you to override the Docker image used by the flow runner and Coiled cluster (see below). |
+
+> **⚠ Warning:** The staging deployment is **not fully isolated** from production. It shares the same AWS account and can access production S3 buckets and other resources. Take care when running staging flows — use the **overwrite** and **is_latest** flags with caution, as they can modify or replace production data. Always double-check parameters before submitting a run.
+
 1. Open the [Prefect Cloud Dashboard](https://app.prefect.cloud/).
-2. Navigate to **Deployments** and find **gnw-zonal-stats-update**.
+2. Navigate to **Deployments** and find **gnw-zonal-stats-update** (production) or **gnw-zonal-stats-update-staging** (staging).
 3. Click **Run** → **Custom Run** to configure parameters:
 
 ![Find the deployment and trigger a custom run](prefect_cloud_1.png)
@@ -130,6 +139,23 @@ Make sure the image is up to date and pushed to the container registry before tr
 ![Configure run parameters](prefect_cloud_2.png)
 
 4. Submit the run. The ECS worker will pick it up and execute it on Fargate.
+
+#### Updating the Docker Image for Staging
+
+The **gnw-zonal-stats-update-staging** deployment lets you override the ECR image used by both the ECS flow runner task and the Coiled Dask cluster. This is useful for testing a new image before promoting it to production.
+
+To change the image:
+
+1. Navigate to **Deployments** and find **gnw-zonal-stats-update-staging**.
+2. Click the **three-dot menu (⋯)** in the top-right corner and select **Edit**.
+
+![Edit the deployment](prefect_cloud_3.png)
+
+3. In the **Job Variables** section, update the following values with the desired ECR image URI:
+   - **`image`** — the container image for the ECS flow runner task.
+   - **`PIPELINES_IMAGE`** — the container image passed to the Coiled Dask cluster.
+
+4. Save the deployment. Subsequent runs will use the updated image for both the ECS task and the Coiled cluster.
 
 ### Automatic Triggers
 
