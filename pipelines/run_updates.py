@@ -20,7 +20,7 @@ def create_cluster():
     cluster = coiled.Cluster(
         name="gnw_zonal_stat_count",
         region="us-east-1",
-        n_workers=1,
+        n_workers=10,
         tags={"project": "gnw_zonal_stat"},
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
@@ -31,7 +31,7 @@ def create_cluster():
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
         },
     )
-    cluster.adapt(minimum=10, maximum=50)
+    cluster.adapt(minimum=1, maximum=75)
 
     client = cluster.get_client()
     return client
