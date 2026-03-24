@@ -4,6 +4,8 @@ import rioxarray  # noqa: F401 — needed for .rio accessor
 import xarray as xr
 from shapely.geometry import Polygon, box
 
+from app.domain.models.dataset import Dataset
+from app.domain.models.environment import Environment
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 
 
@@ -153,3 +155,71 @@ class TestClipXarrToGeometryLazyPath:
         # Should still return something valid
         assert result.sizes["x"] > 0
         assert result.sizes["y"] > 0
+
+
+class TestResolveZarrUri:
+    def test_production_returns_correct_uri_for_known_dataset(self):
+        some_uri = "s3://lcl-analytics/zarr/umd_tree_cover_loss/v42/year.zarr"
+        original_production = ZarrDatasetRepository._ZARR_URIS[
+            Environment.production
+        ].copy()
+        try:
+            ZarrDatasetRepository._ZARR_URIS[Environment.production][
+                Dataset.tree_cover_loss
+            ] = some_uri
+            uri = ZarrDatasetRepository.resolve_zarr_uri(
+                Dataset.tree_cover_loss, Environment.production
+            )
+            assert uri == some_uri
+        finally:
+            ZarrDatasetRepository._ZARR_URIS[Environment.production] = (
+                original_production
+            )
+
+    def test_staging_falls_back_to_production_when_no_override(self):
+        # Set staging map to empty so every dataset should fall through.
+        original_staging = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
+        try:
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = {}
+            uri_prod = ZarrDatasetRepository.resolve_zarr_uri(
+                Dataset.tree_cover_loss, Environment.production
+            )
+            uri_staging = ZarrDatasetRepository.resolve_zarr_uri(
+                Dataset.tree_cover_loss, Environment.staging
+            )
+            assert uri_staging == uri_prod
+        finally:
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original_staging
+
+    def test_staging_returns_staging_uri_when_override_present(self):
+        staging_uri = "s3://lcl-analytics/zarr/umd_tree_cover_loss/v1.99/year.zarr"
+        original = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
+        try:
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging][
+                Dataset.tree_cover_loss
+            ] = staging_uri
+            uri = ZarrDatasetRepository.resolve_zarr_uri(
+                Dataset.tree_cover_loss, Environment.staging
+            )
+            assert uri == staging_uri
+        finally:
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original
+
+    def test_staging_override_does_not_affect_other_datasets(self):
+        staging_uri = "s3://lcl-analytics/zarr/umd_tree_cover_loss/v1.99/year.zarr"
+        original = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
+        try:
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging][
+                Dataset.tree_cover_loss
+            ] = staging_uri
+
+            # carbon_emissions has no staging override — should still fall back
+            uri_prod = ZarrDatasetRepository.resolve_zarr_uri(
+                Dataset.carbon_emissions, Environment.production
+            )
+            uri_staging = ZarrDatasetRepository.resolve_zarr_uri(
+                Dataset.carbon_emissions, Environment.staging
+            )
+            assert uri_staging == uri_prod
+        finally:
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original

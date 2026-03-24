@@ -5,29 +5,32 @@ from app.models.common.base import StrictBaseModel
 
 
 class Dataset(Enum):
-    tree_cover_loss = "tree_cover_loss"
-    tree_cover_gain = "tree_cover_gain"
-    canopy_cover = "canopy_cover"
+    # If you add a dataset to this enum, you'll probably want to add a URI to
+    # the production env in zarr_dataset_repository.py, and a field name in the
+    # dictionary below
     area_hectares = "area_hectares"
-    intact_forest = "intact_forest"
-    primary_forest = "primary_forest"
+    canopy_cover = "canopy_cover"
     carbon_emissions = "carbon_emissions"
-    tree_cover_loss_drivers = "tree_cover_loss_driver"
-    natural_lands = "natural_lands"
+    intact_forest = "intact_forest"
     natural_forests = "natural_forests"
+    natural_lands = "natural_lands"
+    primary_forest = "primary_forest"
+    tree_cover_gain = "tree_cover_gain"
+    tree_cover_loss = "tree_cover_loss"
+    tree_cover_loss_drivers = "tree_cover_loss_driver"
 
     def get_field_name(self):
         DATASET_TO_NAMES = {
             Dataset.area_hectares: "area_ha",
-            Dataset.tree_cover_loss: "tree_cover_loss_year",
-            Dataset.tree_cover_gain: "tree_cover_gain_period",
             Dataset.canopy_cover: "canopy_cover",
-            Dataset.intact_forest: "is_intact_forest",
-            Dataset.primary_forest: "is_primary_forest",
-            Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
             Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
-            Dataset.natural_lands: "natural_lands_class",
+            Dataset.intact_forest: "is_intact_forest",
             Dataset.natural_forests: "natural_forests_class",
+            Dataset.natural_lands: "natural_lands_class",
+            Dataset.primary_forest: "is_primary_forest",
+            Dataset.tree_cover_gain: "tree_cover_gain_period",
+            Dataset.tree_cover_loss: "tree_cover_loss_year",
+            Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
         }
 
         return DATASET_TO_NAMES[self]

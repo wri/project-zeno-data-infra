@@ -1,10 +1,11 @@
 import json
 import uuid
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import PrivateAttr
 
+from app.domain.models.environment import Environment
 from app.models.common.areas_of_interest import AreaOfInterest
 from app.models.common.base import StrictBaseModel
 
@@ -19,41 +20,67 @@ class AnalysisStatus(str, Enum):
 
 class AnalyticsIn(StrictBaseModel):
     def __init__(self, **kwargs):
-        kwargs.pop("_version", None)  # remove _version if in serialized data
-        kwargs.pop(
-            "_analytics_name", None
-        )  # remove _analytics_name if in serialized data
+        # Remove private attributes if in serialized data
+        kwargs.pop("_version", None)
+        kwargs.pop("_analytics_name", None)
+        kwargs.pop("_input_uris", None)
+
         super().__init__(**kwargs)
 
     _analytics_name: str = PrivateAttr(default="analytics")
     _version: str = PrivateAttr(default="v0")
+    _input_uris: str | None = PrivateAttr(default=None)
 
     aoi: AreaOfInterest
 
+    def set_input_uris(self, environment: Environment) -> None:
+        """Capture the current input URIs for the given environment and store them.
+
+        Using URIs rather than the environment name means the thumbprint is
+        tied to the actual data, not the label. When a staging dataset is
+        promoted to production its URI stays the same, so cached results
+        remain valid across that promotion. Conversely, two environments that
+        happen to share all the same URIs will correctly share cached results.
+        """
+        from app.domain.models.dataset import Dataset
+        from app.domain.repositories.zarr_dataset_repository import (
+            ZarrDatasetRepository,
+        )
+
+        uris: List = sorted(
+            ZarrDatasetRepository.resolve_zarr_uri(dataset, environment)
+            for dataset in Dataset
+        )
+        self._input_uris = json.dumps(uris)
+
     def model_dump(self, **kwargs):
-        """Add the _version private attribute"""
+        """Generate dictionary representation of object including private attributes"""
         result = super().model_dump(**kwargs)
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
+        result["_input_uris"] = self._input_uris
         return result
 
     def model_dump_json(self, **kwargs):
-        """Add the _version private attribute"""
+        """Generate JSON representation of object including private attributes"""
         result = json.loads(super().model_dump_json(**kwargs))
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
+        result["_input_uris"] = self._input_uris
         return json.dumps(result)
 
     def thumbprint(self) -> uuid.UUID:
-        """
-        Generate a deterministic UUID thumbprint including the version.
-        """
-        # Include version and analytics_name in dump for thumbprint consistency
+        """Generate a deterministic UUID thumbprint."""
+        if self._input_uris is None:
+            raise ValueError("Input URIs not set")
+
         dump_dict = self.model_dump(exclude=set(), mode="json")
-        dump_dict["_version"] = self._version  # Manually include version
-        dump_dict["_analytics_name"] = (
-            self._analytics_name
-        )  # Manually include analytics_name
+
+        # Manually include important private attributes
+        dump_dict["_version"] = self._version
+        dump_dict["_analytics_name"] = self._analytics_name
+        dump_dict["_input_uris"] = self._input_uris
+
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 

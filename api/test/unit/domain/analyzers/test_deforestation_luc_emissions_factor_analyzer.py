@@ -8,6 +8,7 @@ from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -557,6 +558,7 @@ class TestLandCoverChangeAdminAois:
             start_year="2021",
             end_year="2023",
         )
+        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(mode="json"),
