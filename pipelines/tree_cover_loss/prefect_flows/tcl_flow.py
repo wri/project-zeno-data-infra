@@ -13,6 +13,7 @@ from pipelines.globals import (
     sbtn_natural_forests_zarr_uri,
     tree_cover_density_zarr_uri,
     tree_cover_loss_zarr_uri,
+    tree_cover_loss_from_fires_zarr_uri,
     umd_primary_forests_zarr_uri,
     wri_google_1km_drivers_zarr_uri,
 )
@@ -55,6 +56,7 @@ def umd_tree_cover_loss_flow(
         np.arange(0, 8),  # drivers
         np.arange(0, 2),  # primary_forests
         np.arange(0, 3),  # natural forest class (0=unknown, 1=natural, 2=non-natural)
+        np.arange(0, 2),  # is TCL from fires?
         np.arange(999),  # countries
         np.arange(86),  # adm1s
         np.arange(854),  # adm2s
@@ -69,6 +71,7 @@ def umd_tree_cover_loss_flow(
         drivers_uri=wri_google_1km_drivers_zarr_uri,
         primary_forests_uri=umd_primary_forests_zarr_uri,
         natural_forests_uri=sbtn_natural_forests_zarr_uri,
+        tree_cover_loss_from_fires_uri=tree_cover_loss_from_fires_zarr_uri,
         bbox=bbox,
     )
 

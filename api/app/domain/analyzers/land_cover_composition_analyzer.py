@@ -13,6 +13,11 @@ from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
 
+_input_uris = {
+    "land_cover_zarr_uri": "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/",
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
+
 
 class LandCoverCompositionAnalyzer(Analyzer):
     """Get the total area (in hectares) of each land class composition for 2024."""
@@ -41,8 +46,6 @@ class LandCoverCompositionAnalyzer(Analyzer):
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
         self.admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet"
-        self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
-        self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
 
     @nr_agent.function_trace(name="LandCoverCompositionAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
@@ -71,8 +74,8 @@ class LandCoverCompositionAnalyzer(Analyzer):
 
             analysis_partial = partial(
                 self.analyze_area,
-                land_cover_zarr_uri=self.land_cover_zarr_uri,
-                pixel_area_zarr_uri=self.pixel_area_zarr_uri,
+                land_cover_zarr_uri=_input_uris["land_cover_zarr_uri"],
+                pixel_area_zarr_uri=_input_uris["pixel_area_zarr_uri"],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)

@@ -33,7 +33,9 @@ from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 class TestAoiGeometryRepository:
     async def load(self, aoi_type, aoi_ids):
-        return [box(10.1, -0.1, -0.1, 10.1)]
+        geometries = [box(10.1, -0.1, -0.1, 10.1)]
+        areas_ha = [1000.0] * len(geometries)
+        return geometries, areas_ha
 
 
 class TestDatasetRepository(ZarrDatasetRepository):

@@ -106,7 +106,7 @@ async def get_analysis(
         status=analysis.status,
         message=message,
         result=analysis.result,
-        metadata=analysis.metadata,
+        metadata={k: v for k, v in analysis.metadata.items() if not k.startswith("_")},
     )
 
 

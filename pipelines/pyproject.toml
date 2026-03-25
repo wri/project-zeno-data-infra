@@ -5,6 +5,7 @@ description = "Data analytics pipelines for Zeno"
 requires-python = ">=3.12"
 dependencies = [
     "boto3",
+    "click",
     "coiled",
     "dask[array,dataframe,distributed,diagnostics]",
     "fastparquet",
@@ -26,7 +27,7 @@ dependencies = [
     "xarray",
     "zarr",
     "earthengine-api",
-    "xee"
+    "xee",
 ]
 
 [dependency-groups]

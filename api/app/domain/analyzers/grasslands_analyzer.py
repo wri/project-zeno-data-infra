@@ -12,6 +12,13 @@ from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 
+_input_uris = {
+    "grasslands_zarr_uri": (
+        "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
+    ),
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
+
 
 class GrasslandsAnalyzer(Analyzer):
     """Get natural/semi-natural grasslands areas for the input AOIs"""
@@ -84,16 +91,17 @@ class GrasslandsAnalyzer(Analyzer):
 
     @staticmethod
     def analyze_area(aoi, geojson, start_year, end_year) -> DataFrame:
-        grasslands_obj_name = (
-            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
-        )
-        pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
+        grasslands_obj_name = _input_uris["grasslands_zarr_uri"]
+        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+
         grasslands: DataArray = read_zarr_clipped_to_geojson(
             grasslands_obj_name, geojson
         ).sel(year=slice(start_year, end_year))
+
         pixel_area = read_zarr_clipped_to_geojson(
             pixel_area_obj_name, geojson
         ).reindex_like(grasslands, method="nearest", tolerance=1e-5)
+
         grasslands_only = (grasslands == 2).astype(np.uint8)
 
         grasslands_pixel_areas = grasslands_only * pixel_area

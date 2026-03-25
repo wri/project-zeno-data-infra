@@ -18,6 +18,7 @@ def load_data(
     drivers_uri: Optional[str] = None,
     primary_forests_uri: Optional[str] = None,
     natural_forests_uri: Optional[str] = None,
+    tree_cover_loss_from_fires_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
 ) -> Tuple:
     return stages.load_data(
@@ -29,6 +30,7 @@ def load_data(
         drivers_uri,
         primary_forests_uri,
         natural_forests_uri,
+        tree_cover_loss_from_fires_uri,
         bbox,
     )
 

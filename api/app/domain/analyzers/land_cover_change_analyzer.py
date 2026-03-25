@@ -11,6 +11,11 @@ from app.domain.models.analysis import Analysis
 from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
 
+_input_uris = {
+    "land_cover_zarr_uri": "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/",
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
+
 
 class LandCoverChangeAnalyzer(Analyzer):
     """Get the total area (in hectares) of each land class transition from 2015 to 2024."""
@@ -43,8 +48,6 @@ class LandCoverChangeAnalyzer(Analyzer):
         self.admin_results_uri = (
             "s3://lcl-analytics/zonal-statistics/admin-land-cover-change.parquet"
         )
-        self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
-        self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
 
     @nr_agent.function_trace(name="LandCoverChangeAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
@@ -70,8 +73,8 @@ class LandCoverChangeAnalyzer(Analyzer):
 
             analysis_partial = partial(
                 self.analyze_area,
-                land_cover_zarr_uri=self.land_cover_zarr_uri,
-                pixel_area_zarr_uri=self.pixel_area_zarr_uri,
+                land_cover_zarr_uri=_input_uris["land_cover_zarr_uri"],
+                pixel_area_zarr_uri=_input_uris["pixel_area_zarr_uri"],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
