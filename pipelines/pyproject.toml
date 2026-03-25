@@ -7,9 +7,9 @@ dependencies = [
     "boto3",
     "click",
     "coiled",
-    "dask[array,dataframe,diagnostics,distributed]==2026.3.0",
+    "dask[array,dataframe,diagnostics,distributed]==2025.5.1",
     "fastparquet",
-    "flox==0.11.2",
+    "flox==0.10.4",
     "fsspec",
     "geopandas",
     "numba>=0.61.2",
@@ -28,7 +28,7 @@ dependencies = [
     "zarr",
     "earthengine-api",
     "xee",
-    "distributed==2026.3.0",
+    "distributed==2025.5.1",
 ]
 
 [dependency-groups]
