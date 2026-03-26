@@ -8,7 +8,9 @@ from pipelines.globals import (
     subregion_zarr_uri,
 )
 
-from pipelines.prefect_flows.common_stages import create_result_dataframe as common_create_result_dataframe
+from pipelines.prefect_flows.common_stages import (
+    create_result_dataframe as common_create_result_dataframe, rollup_by_gadm_and_convert_to_aoi
+)
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
@@ -156,6 +158,8 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
     df = pd.concat(results, ignore_index=True)
     df = df[['country', 'region', 'subregion', 'tree_cover_density', 'carbontype', 'value']]
+
+    df = rollup_by_gadm_and_convert_to_aoi(df, ["tree_cover_density", "carbontype"])
 
     return df
 

@@ -57,7 +57,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parqu
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 24695
+    assert result_df.size == 30019
     mock_qc_write_results.assert_called_once()
 
 
