@@ -46,6 +46,11 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     return _tasks.create_result_dataframe(result)
 
 
+@task
+def qc_against_validation_source(result_df: pd.DataFrame, version: Optional[str] = None) -> bool:
+    return _tasks.qc_against_validation_source(result_df=result_df, version=version)
+
+
 class CarbonFluxPrefectTasks:
     load_data = load_data.with_options(name="carbon-flux-load-data")
     setup_compute = setup_compute.with_options(
@@ -56,4 +61,7 @@ class CarbonFluxPrefectTasks:
     )
     postprocess_result = postprocess_result.with_options(
         name="carbon-flux-postprocess-result"
+    )
+    qc_against_validation_source = qc_against_validation_source.with_options(
+        name="carbon-flux-qc-validation"
     )

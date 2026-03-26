@@ -13,8 +13,10 @@ from pipelines.utils import s3_uri_exists
 
 
 @flow(name="Carbon flux")
-def gadm_carbon_flux(
-    overwrite=False, bbox: Optional[Tuple[float, float, float, float]] = None
+def gadm_carbon_flux_flow(
+    version: Optional[str] = None,
+    overwrite=False,
+    bbox: Optional[Tuple[float, float, float, float]] = None
 ):
     result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-carbon.parquet"
 
@@ -24,7 +26,7 @@ def gadm_carbon_flux(
     if bbox is not None:
         bbox = box(*bbox)
 
-    result_df = gadm_carbon_flux(carbon_tasks.CarbonFluxPrefectTasks, bbox=bbox)
+    result_df = gadm_carbon_flux(carbon_tasks.CarbonFluxPrefectTasks, version=version, bbox=bbox)
 
     result_uri = common_tasks.save_result.with_options(
         name="carbon-flux-save-result"

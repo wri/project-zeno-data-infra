@@ -9,10 +9,14 @@ from shapely.geometry import Polygon
 def carbon_flux(
     tasks, version: Optional[str] = None, bbox: Optional[Polygon] = None
 ):
-    if not tasks.qc_against_validation_source(version=version):
+    # run global computation first
+    result_df = gadm_carbon_flux(tasks, bbox)
+
+    # validate the computed results
+    if not tasks.qc_against_validation_source(result_df=result_df, version=version):
         raise AssertionError("Carbon analysis did not pass QC validation, stopping job")
 
-    return gadm_carbon_flux(tasks, bbox)
+    return result_df
 
 
 def gadm_carbon_flux(tasks, bbox: Optional[Polygon] = None):

@@ -205,21 +205,22 @@ class CarbonFluxTasks:
 
         return result_df
 
-    def qc_against_validation_source(self, version: Optional[str] = None):
+    def qc_against_validation_source(self, result_df: pd.DataFrame, version: Optional[str] = None):
         qc_features = self.qc_feature_repository.load(limit=20)
 
         def qc_feature(row):
             try:
-                # get pipeline stats for this geom
-                sample_stats = self.get_sample_statistics(row.geometry)
+                print(f"Starting QC on GID {row.GID_2}")
                 admin2_aoi_id = row.GID_2.split("_")[0]
 
-                # filter to tcd >= 30% 
+                # filter the global results instead of recomputing
+                sample_stats = result_df[result_df.aoi_id == admin2_aoi_id]
+
+                # filter to tcd >= 30%
                 if sample_stats.size > 0:
                     sample_gross_emissions_total = sample_stats[
                         (sample_stats.tree_cover_density >= 30)
                         & (sample_stats.carbontype == "carbon_gross_emissions")
-                        & (sample_stats.aoi_id == admin2_aoi_id)
                     ].value.sum()
                 else:
                     sample_gross_emissions_total = 0
@@ -271,12 +272,6 @@ class CarbonFluxTasks:
                 qc_features, "admin-carbon-flux", version
             )
         return bool(qc_features.qc_pass.all())
-
-    def get_sample_statistics(self, geom: Polygon) -> pd.DataFrame:
-        from pipelines.carbon_flux.prefect_flows.carbon import gadm_carbon_flux
-
-        results = gadm_carbon_flux(self, bbox=geom)
-        return results
 
     def get_validation_statistics(self, geom: Polygon) -> dict:
         """
