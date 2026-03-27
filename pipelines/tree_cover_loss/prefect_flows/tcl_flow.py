@@ -97,11 +97,3 @@ def umd_tree_cover_loss_flow(
         raise AssertionError("TCL did not pass QC validation, stopping job")
 
     return result_uri
-
-
-def main(version: str, overwrite=False):
-    umd_tree_cover_loss_flow(version=version, overwrite=overwrite)
-
-
-if __name__ == "__main__":
-    main(overwrite=False)
