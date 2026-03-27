@@ -1,62 +1,43 @@
-import logging
+from typing import Optional, Tuple
 
-import numpy as np
 from prefect import flow
+from shapely.geometry import box
 
-from pipelines.carbon_flux.prefect_flows import carbon_tasks
+from pipelines.globals import (
+    ANALYTICS_BUCKET,
+)
 from pipelines.prefect_flows import common_tasks
+from pipelines.carbon_flux.prefect_flows import carbon_tasks
+from pipelines.carbon_flux.prefect_flows.carbon import gadm_carbon_flux
 from pipelines.utils import s3_uri_exists
 
 
 @flow(name="Carbon flux")
-def gadm_carbon_flux(overwrite: bool = False):
-    logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
-
-    carbon_net_flux_zarr_uri = "s3://lcl-analytics/zarr/gfw_forest_carbon_net_flux/v20250430/Mg_CO2e.zarr/"
-    carbon_gross_removals_zarr_uri = "s3://lcl-analytics/zarr/gfw_forest_carbon_gross_removals/v20250416/Mg_CO2e.zarr/"
-    carbon_gross_emissions_zarr_uri = "s3://lcl-analytics/zarr/gfw_forest_carbon_gross_emissions/v20250430/Mg_CO2e.zarr/"
-
-    mangrove_stock_2000_zarr_uri = "s3://lcl-analytics/zarr/jpl_mangrove_aboveground_biomass_stock_2000/v201902/is_mangrove.zarr/"
-
-    tree_cover_gain_from_height_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
-    tree_cover_density_2000_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr/"
-
-    result_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon.parquet"
-    funcname = "sum"
+def gadm_carbon_flux_flow(
+    version: Optional[str] = None,
+    overwrite=False,
+    bbox: Optional[Tuple[float, float, float, float]] = None
+):
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-carbon.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
-    expected_groups = (
-        np.arange(999),  # country iso codes
-        np.arange(86),  # region codes
-        np.arange(854),  # subregion codes
-        np.arange(8),   # tree cover density
-        [0, 1],           # mangrove boolean
-        [0, 1],         # tree cover gain from height boolean
-    )
+    if bbox is not None:
+        bbox = box(*bbox)
 
-    datasets = carbon_tasks.load_data.with_options(
-        name="carbon-flux-load-data"
-    )(carbon_net_flux_zarr_uri,
-      carbon_gross_removals_zarr_uri,
-      carbon_gross_emissions_zarr_uri,
-      tree_cover_density_2000_zarr_uri,
-      mangrove_stock_2000_zarr_uri,
-      tree_cover_gain_from_height_zarr_uri,
-      )
+    result_df = gadm_carbon_flux(carbon_tasks.CarbonFluxPrefectTasks, version=version, bbox=bbox)
 
-    compute_input = carbon_tasks.setup_compute.with_options(
-        name="carbon-flux-setup-compute"
-    )(datasets, expected_groups)
-
-    result_dataset = common_tasks.compute_zonal_stat.with_options(
-        name="carbon-flux-compute-zonal-stats"
-    )(*compute_input, funcname=funcname)
-    result_df = carbon_tasks.postprocess_result.with_options(
-        name="carbon-flux-postprocess-result"
-    )(result_dataset)
     result_uri = common_tasks.save_result.with_options(
         name="carbon-flux-save-result"
     )(result_df, result_uri)
+
     return result_uri
+
+
+def main(overwrite=False):
+    gadm_carbon_flux_flow(overwrite=overwrite)
+
+
+if __name__ == "__main__":
+    main(overwrite=False)
