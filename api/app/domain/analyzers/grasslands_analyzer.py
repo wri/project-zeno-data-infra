@@ -119,3 +119,6 @@ class GrasslandsAnalyzer(Analyzer):
         )
 
         return grasslands_areas_df
+
+    def input_uris(self) -> list[str]:
+        return sorted(_input_uris.values())

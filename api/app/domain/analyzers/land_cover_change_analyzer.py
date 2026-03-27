@@ -171,3 +171,6 @@ class LandCoverChangeAnalyzer(Analyzer):
         land_cover_change_ddf["area_ha"] = land_cover_change_ddf.pop("change_area")
 
         return land_cover_change_ddf
+
+    def input_uris(self) -> list[str]:
+        return sorted(_input_uris.values())

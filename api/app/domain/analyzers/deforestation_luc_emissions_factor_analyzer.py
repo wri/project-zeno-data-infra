@@ -18,11 +18,13 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         compute_engine=None,
         dataset_repository=None,
         query_service=None,
+        table_uri: str | None = None,
     ):
         self.analysis_repository = analysis_repository
         self.compute_engine = compute_engine
         self.dataset_repository = dataset_repository
         self.query_service = query_service
+        self._table_uri = table_uri
 
     @nr_agent.function_trace(name="DeforestationLUCEmissionsFactorAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
@@ -61,3 +63,9 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
+
+    def input_uris(self) -> list[str]:
+        uris = []
+        if self._table_uri is not None:
+            uris.append(self._table_uri)
+        return sorted(uris)

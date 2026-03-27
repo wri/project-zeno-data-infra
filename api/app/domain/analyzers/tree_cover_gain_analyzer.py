@@ -11,12 +11,25 @@ from app.domain.models.dataset import (
     DatasetFilter,
     DatasetQuery,
 )
+from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
+
+_DATASETS = [
+    Dataset.area_hectares,
+    Dataset.primary_forest,
+    Dataset.tree_cover_gain,
+]
 
 
 class TreeCoverGainAnalyzer(Analyzer):
-    def __init__(self, compute_engine: ComputeEngine):
+    def __init__(
+        self,
+        compute_engine: ComputeEngine,
+        environment: Environment = Environment.production,
+    ):
         self.compute_engine = compute_engine
+        self.environment = environment
 
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
@@ -67,3 +80,9 @@ class TreeCoverGainAnalyzer(Analyzer):
         year_ranges = [f"{year}-{year + 5}" for year in range(start, end, 5)]
 
         return tuple(year_ranges)
+
+    def input_uris(self) -> list[str]:
+        return sorted(
+            ZarrDatasetRepository.resolve_zarr_uri(ds, self.environment)
+            for ds in _DATASETS
+        )

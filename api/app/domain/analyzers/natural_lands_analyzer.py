@@ -145,3 +145,6 @@ class NaturalLandsAnalyzer(Analyzer):
 
         df = df[df.area_ha > 0]
         return df
+
+    def input_uris(self) -> list[str]:
+        return sorted(_input_uris.values())
