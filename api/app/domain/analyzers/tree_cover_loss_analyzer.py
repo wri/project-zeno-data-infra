@@ -14,7 +14,8 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 # Every dataset that this analyzer may reference in a query, regardless of the
-# request parameters.
+# request parameters.  Listing the superset keeps the fingerprint stable across
+# parameter variations — only a *data* change (new URI) should invalidate.
 _DATASETS = [
     Dataset.area_hectares,
     Dataset.canopy_cover,
@@ -38,8 +39,6 @@ class TreeCoverLossAnalyzer(Analyzer):
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         query = DatasetQuery(
             aggregate=DatasetAggregate(

@@ -21,8 +21,6 @@ class DistAlertsAnalyzer(Analyzer):
 
     async def analyze(self, analysis: Analysis):
         dist_analytics_in = DistAlertsAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            dist_analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         # for now we only support one intersection, as enforced by the route
         if dist_analytics_in.intersections:

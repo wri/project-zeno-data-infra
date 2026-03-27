@@ -128,6 +128,8 @@ class AnalysisService:
         return self.analytics_resource.status or AnalysisStatus.pending
 
     async def set_resource_from(self, data: AnalyticsIn):
+        data.set_input_hash(self.analyzer.input_uris())
+
         analysis: Analysis = await self.analysis_repository.load_analysis(
             data.thumbprint()
         )

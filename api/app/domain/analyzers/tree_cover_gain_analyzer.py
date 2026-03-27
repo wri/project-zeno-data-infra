@@ -34,8 +34,6 @@ class TreeCoverGainAnalyzer(Analyzer):
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
     async def analyze(self, analysis: Analysis):
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         filters: List[DatasetFilter] = [
             DatasetFilter(
