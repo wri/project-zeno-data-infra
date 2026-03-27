@@ -31,8 +31,9 @@ def create_cluster():
         environ={
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
         },
+        worker_options={"nthreads": 4},  # to avoid OOMs
     )
-    cluster.adapt(minimum=1, maximum=75)
+    cluster.adapt(minimum=1, maximum=100)
 
     client = cluster.get_client()
     return client
