@@ -3,19 +3,12 @@ from unittest.mock import patch
 import geopandas as gpd
 import pytest
 from prefect.testing.utilities import prefect_test_harness
-from shapely.geometry import box, shape
+from shapely.geometry import shape
 
 from pipelines.test.integration.tree_cover_loss.conftest import (
     ARG_1_28,
-    FakeQCRepository,
-    MatchingGoogleEarthEngineDatasetRepository,
-)
-from pipelines.tree_cover_loss.prefect_flows.tcl import (
-    compute_tree_cover_loss,
-    umd_tree_cover_loss,
 )
 from pipelines.tree_cover_loss.prefect_flows.tcl_flow import umd_tree_cover_loss_flow
-from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
 
 
 @pytest.mark.integration
@@ -70,9 +63,15 @@ def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parqu
 
 
 @pytest.mark.integration
+@patch(
+    "pipelines.tree_cover_loss.stages.qc_against_validation_source", return_value=True
+)
+@patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
 def test_tcl_flow_with_new_contextual_layers(
     mock_load_zarr,
+    mock_save_parquet,
+    mock_qc,
     tcl_ds,
     pixel_area_ds,
     carbon_emissions_ds,
@@ -99,14 +98,12 @@ def test_tcl_flow_with_new_contextual_layers(
         country_ds,
         region_ds,
         subregion_ds,
-    ] * 2
+    ]
 
-    result_df = umd_tree_cover_loss(
-        TreeCoverLossTasks(
-            gee_repository=MatchingGoogleEarthEngineDatasetRepository(),
-            qc_feature_repository=FakeQCRepository(),
-        )
-    )
+    with prefect_test_harness():
+        umd_tree_cover_loss_flow("test", overwrite=True)
+
+    result_df = mock_save_parquet.call_args[0][0]
 
     # verify expected cols
     expected_columns = {
@@ -133,9 +130,15 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df.size == 132
 
 
+@patch(
+    "pipelines.tree_cover_loss.stages.qc_against_validation_source", return_value=True
+)
+@patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
 def test_tcl_flow_with_bbox(
     mock_load_zarr,
+    mock_save_parquet,
+    mock_qc,
     tcl_ds,
     pixel_area_ds,
     carbon_emissions_ds,
@@ -149,7 +152,6 @@ def test_tcl_flow_with_bbox(
     region_ds,
     subregion_ds,
 ):
-
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,
@@ -166,7 +168,10 @@ def test_tcl_flow_with_bbox(
     ]
 
     # filter to bottom left pixel
-    result_df = compute_tree_cover_loss(TreeCoverLossTasks(), bbox=box(0, 0, 0, 0))
+    with prefect_test_harness():
+        umd_tree_cover_loss_flow("test", overwrite=True, bbox=(0, 0, 0, 0))
+
+    result_df = mock_save_parquet.call_args[0][0]
 
     # verify expected cols
     expected_columns = {
