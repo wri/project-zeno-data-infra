@@ -76,8 +76,8 @@ def load_data(
     )[1]
 
     carbon_emissions: xr.DataArray = _load_zarr(
-        carbon_emissions_uri
-    ).carbon_emissions_MgCO2e
+        carbon_emissions_uri, group=group
+    ).band_data
     carbon_emissions = xr.align(
         tcl,
         carbon_emissions.reindex_like(tcl, method="nearest", tolerance=1e-5),

@@ -5,9 +5,9 @@ import numpy as np
 from prefect import flow
 from shapely.geometry import box
 
+from pipelines.carbon_flux.create_zarr import DATASETS as CARBON_FLUX_DATASETS
 from pipelines.globals import (
     ANALYTICS_BUCKET,
-    carbon_emissions_zarr_uri,
     ifl_intact_forest_lands_zarr_uri,
     pixel_area_zarr_uri,
     sbtn_natural_forests_zarr_uri,
@@ -66,7 +66,7 @@ def umd_tree_cover_loss_flow(
     datasets = tcl_tasks.load_data.with_options(name="area-emissions-by-tcl-load-data")(
         tcl_zarr_uris["tree_cover_loss"],
         pixel_area_uri=pixel_area_zarr_uri,
-        carbon_emissions_uri=carbon_emissions_zarr_uri,
+        carbon_emissions_uri=CARBON_FLUX_DATASETS["carbon_gross_emissions"]["zarr_uri"],
         tree_cover_density_uri=tree_cover_density_zarr_uri,
         ifl_uri=ifl_intact_forest_lands_zarr_uri,
         drivers_uri=tcl_zarr_uris["drivers"],
