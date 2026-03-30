@@ -6,26 +6,27 @@ from pipelines.prefect_flows.common_stages import create_zarr_from_tiles
 PIPELINE_CHUNK_SIZE = 10_000
 OTF_CHUNK_SIZE = 4_000
 
+CARBON_NET_FLUX_VERSION = "v20250430"
+CARBON_GROSS_REMOVALS_VERSION = "v20250416"
+CARBON_GROSS_EMISSIONS_VERSION = "v20250430"
+
 DATASETS = {
     "carbon_net_flux": {
-        "tiles_template": "s3://{data_lake_bucket}/gfw_forest_carbon_net_flux/{version}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
-        "zarr_template": "s3://{analytics_bucket}/zarr/gfw-carbon-net-flux/{version}/Mg_CO2e_ha-1.zarr",
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_net_flux/{CARBON_NET_FLUX_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-net-flux/{CARBON_NET_FLUX_VERSION}/Mg_CO2e_ha-1.zarr",
     },
     "carbon_gross_removals": {
-        "tiles_template": "s3://{data_lake_bucket}/gfw_forest_carbon_gross_removals/{version}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
-        "zarr_template": "s3://{analytics_bucket}/zarr/gfw-carbon-gross-removals/{version}/Mg_CO2e_ha-1.zarr",
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_removals/{CARBON_GROSS_REMOVALS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-removals/{CARBON_GROSS_REMOVALS_VERSION}/Mg_CO2e_ha-1.zarr",
     },
     "carbon_gross_emissions": {
-        "tiles_template": "s3://{data_lake_bucket}/gfw_forest_carbon_gross_emissions/{version}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
-        "zarr_template": "s3://{analytics_bucket}/zarr/gfw-carbon-gross-emissions/{version}/Mg_CO2e_ha-1.zarr",
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_emissions/{CARBON_GROSS_EMISSIONS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-emissions/{CARBON_GROSS_EMISSIONS_VERSION}/Mg_CO2e_ha-1.zarr",
     },
 }
 
 
 def create_zarrs(
-    carbon_net_flux_version: str = "v20250430",
-    carbon_gross_removals_version: str = "v20250416",
-    carbon_gross_emissions_version: str = "v20250430",
     overwrite: bool = False,
 ) -> Dict[str, str]:
     """Create zarr stores for carbon flux datasets from tiled GeoTIFFs.
@@ -36,34 +37,23 @@ def create_zarrs(
 
     Returns a dict mapping dataset name to its zarr URI.
     """
-    versions = {
-        "carbon_net_flux": carbon_net_flux_version,
-        "carbon_gross_removals": carbon_gross_removals_version,
-        "carbon_gross_emissions": carbon_gross_emissions_version,
-    }
-
     result_uris: Dict[str, str] = {}
 
     for name, cfg in DATASETS.items():
-        version = versions[name]
-        tiles_uri = cfg["tiles_template"].format(
-            data_lake_bucket=DATA_LAKE_BUCKET, version=version
-        )
-        zarr_uri = cfg["zarr_template"].format(
-            analytics_bucket=ANALYTICS_BUCKET, version=version
-        )
-
         create_zarr_from_tiles(
-            tiles_uri,
-            zarr_uri,
+            cfg["tiles_uri"],
+            cfg["zarr_uri"],
             PIPELINE_CHUNK_SIZE,
             group="pipeline",
             overwrite=overwrite,
         )
         create_zarr_from_tiles(
-            tiles_uri, zarr_uri, OTF_CHUNK_SIZE, group="otf", overwrite=overwrite
+            cfg["tiles_uri"],
+            cfg["zarr_uri"],
+            OTF_CHUNK_SIZE,
+            group="otf",
+            overwrite=overwrite,
         )
-
-        result_uris[name] = zarr_uri
+        result_uris[name] = cfg["zarr_uri"]
 
     return result_uris
