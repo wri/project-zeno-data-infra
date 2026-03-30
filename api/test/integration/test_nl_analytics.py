@@ -45,7 +45,6 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
         ),
         event=ANALYTICS_NAME,
@@ -403,7 +402,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "Natural peat short vegetation",
                     "Cropland",
                     "Built-up",
-                    "Non-natural hhort vegetation",
+                    "Non-natural hhort vegetation",  # FIXME: Typo?
                     "Non-natural peat short vegetation",
                     "Non-natural bare",
                     "Natural forests",
@@ -568,7 +567,6 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
         )
 
         actual_df = pd.DataFrame(data["result"])
-        print(actual_df)
 
         pd.testing.assert_frame_equal(
             expected_df,

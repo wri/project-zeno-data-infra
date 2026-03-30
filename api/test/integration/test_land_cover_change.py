@@ -48,7 +48,6 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandCoverChangeAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-land-cover-change.parquet"

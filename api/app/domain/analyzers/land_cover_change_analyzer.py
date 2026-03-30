@@ -35,12 +35,10 @@ class LandCoverChangeAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         query_service=None,
     ):
-        self.analysis_repository = analysis_repository  # LandCoverChangeRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
@@ -49,7 +47,7 @@ class LandCoverChangeAnalyzer(Analyzer):
         )
 
     @nr_agent.function_trace(name="LandCoverChangeAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis) -> dict:
+    async def analyze(self, analysis: Analysis) -> None:
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             land_cover_change_analytics_in._input_uris = analysis.metadata[
@@ -83,7 +81,7 @@ class LandCoverChangeAnalyzer(Analyzer):
             combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
             results = combined_results_df.to_dict(orient="list")
 
-        return results
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids):
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
