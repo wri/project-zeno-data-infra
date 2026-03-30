@@ -52,16 +52,14 @@ class NaturalLandsAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
     ):
-        self.analysis_repository = analysis_repository  # NaturalLandRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
     @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis) -> dict:
+    async def analyze(self, analysis: Analysis) -> None:
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             natural_lands_analytics_in._input_uris = analysis.metadata["_input_uris"]
@@ -88,7 +86,7 @@ class NaturalLandsAnalyzer(Analyzer):
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
             results = combined_results_df.to_dict(orient="list")
 
-        return results
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids) -> Dict[str, Any]:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
