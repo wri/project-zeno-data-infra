@@ -40,6 +40,7 @@ def load_data(
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
+    group: Optional[str] = None,
 ) -> Tuple[
     xr.DataArray,
     xr.Dataset,
@@ -58,7 +59,7 @@ def load_data(
     Returns xr.DataArray for TCL and contextual layers and xr.Dataset for pixel area/carbon emissions
     """
 
-    tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri).band_data
+    tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri, group=group).band_data
     if bbox is not None:
         min_x, min_y, max_x, max_y = bbox.bounds
         # TODO assumption about zarr coords, wrap in class
@@ -96,7 +97,7 @@ def load_data(
         join="left",
     )[1].astype(np.int16)
 
-    drivers: xr.DataArray = _load_zarr(drivers_uri).band_data
+    drivers: xr.DataArray = _load_zarr(drivers_uri, group=group).band_data
     drivers = xr.align(
         tcl,
         drivers.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
@@ -121,7 +122,9 @@ def load_data(
         join="left",
     )[1]
 
-    tclf: xr.DataArray = _load_zarr(tree_cover_loss_from_fires_uri).band_data
+    tclf: xr.DataArray = _load_zarr(
+        tree_cover_loss_from_fires_uri, group=group
+    ).band_data
     tclf = xr.align(
         tcl,
         tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),

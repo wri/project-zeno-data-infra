@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import pandas as pd
 import xarray as xr
@@ -10,6 +10,7 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
+from pipelines.utils import s3_uri_exists
 
 numeric_to_alpha3 = {
     4: "AFG",
@@ -359,5 +360,45 @@ def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
     df.to_parquet(results_uri, index=False)
 
 
-def _load_zarr(zarr_uri):
-    return xr.open_zarr(zarr_uri, storage_options={"requester_pays": True})
+def _load_zarr(zarr_uri, group=None):
+    return xr.open_zarr(zarr_uri, group=group, storage_options={"requester_pays": True})
+
+
+def _get_tile_uris(tiles_geojson_uri: str) -> List[str]:
+    """Extract S3 URIs from a tiles.geojson file."""
+    tiles = pd.read_json(tiles_geojson_uri, storage_options={"requester_pays": True})
+    return [
+        "/".join(["s3:/"] + f["properties"]["name"].split("/")[2:])
+        for f in tiles.features
+    ]
+
+
+def create_zarr_from_tiles(
+    tiles_geojson_uri: str,
+    zarr_uri: str,
+    chunk_size: int,
+    group: Optional[str] = None,
+    overwrite: bool = False,
+) -> str:
+    """Create a zarr store from tiled GeoTIFFs referenced by a tiles.geojson file.
+
+    Args:
+        tiles_geojson_uri: S3 URI to a tiles.geojson file listing the tile COGs.
+        zarr_uri: Destination S3 URI for the output zarr store.
+        chunk_size: Chunk size (in pixels) for both x and y dimensions.
+        group: Optional zarr group name (e.g. 'pipeline' or 'otf').
+        overwrite: If True, overwrite an existing zarr at the target location.
+
+    Returns:
+        The zarr_uri that was written to.
+    """
+    check_path = f"{zarr_uri}/{group}/zarr.json" if group else f"{zarr_uri}/zarr.json"
+    if not overwrite and s3_uri_exists(check_path):
+        return zarr_uri
+
+    tile_uris = _get_tile_uris(tiles_geojson_uri)
+    dataset = xr.open_mfdataset(
+        tile_uris, parallel=True, chunks={"x": chunk_size, "y": chunk_size}
+    )
+    dataset.to_zarr(zarr_uri, mode="w", group=group)
+    return zarr_uri
