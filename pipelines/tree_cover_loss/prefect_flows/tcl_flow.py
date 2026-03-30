@@ -56,7 +56,6 @@ def umd_tree_cover_loss_flow(
         np.arange(0, 8),  # drivers
         np.arange(0, 2),  # primary_forests
         np.arange(0, 3),  # natural forest class (0=unknown, 1=natural, 2=non-natural)
-        np.arange(0, 2),  # is TCL from fires?
         np.arange(999),  # countries
         np.arange(86),  # adm1s
         np.arange(854),  # adm2s

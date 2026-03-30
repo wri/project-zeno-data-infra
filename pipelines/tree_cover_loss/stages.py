@@ -51,7 +51,6 @@ def load_data(
     xr.DataArray,
     xr.DataArray,
     xr.DataArray,
-    xr.DataArray,
 ]:
     """
     Load in the tree cover loss zarr, pixel area zarr, carbon emissions zarr, tree cover density zarr, and the GADM zarrs
@@ -82,6 +81,17 @@ def load_data(
         carbon_emissions.reindex_like(tcl, method="nearest", tolerance=1e-5),
         join="left",
     )[1]
+
+    tclf: xr.DataArray = _load_zarr(tree_cover_loss_from_fires_uri).band_data
+    tclf = xr.align(
+        tcl,
+        tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        join="left",
+    )[1]
+    # Convert tclf to a non-zero pixel area where there is a loss year, so it can be
+    # used as part of the mask. The value of the loss year doesn't matter, since it
+    # is always the same as the TCL loss year.
+    tclf_area = ((tclf > 0) * pixel_area)
 
     # contextual layers
     tcd: xr.DataArray = _load_zarr(tree_cover_density_uri).band_data
@@ -121,14 +131,6 @@ def load_data(
         join="left",
     )[1]
 
-    tclf: xr.DataArray = _load_zarr(tree_cover_loss_from_fires_uri).band_data
-    tclf = xr.align(
-        tcl,
-        tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
-        join="left",
-    )[1]
-    # Convert tclf to a simple boolean, since its loss year is the same as TCL.
-    tclf = xr.where(tclf > 0, 1, 0).astype("uint8")
     # GADM zarrs
     country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
     country = xr.align(
@@ -151,7 +153,8 @@ def load_data(
 
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset(
-        {"area_ha": pixel_area, "carbon__Mg_CO2e": carbon_emissions}
+        {"area_ha": pixel_area, "carbon__Mg_CO2e": carbon_emissions,
+         "tclf_area_ha": tclf_area}
     )
 
     return (
@@ -162,7 +165,6 @@ def load_data(
         drivers,
         primary_forests,
         natural_forests,
-        tclf,
         country,
         region,
         subregion,
@@ -182,15 +184,15 @@ def setup_compute(
         drivers,
         primary_forests,
         natural_forests,
-        tclf,
         country,
         region,
         subregion,
     ) = datasets
 
     mask = xr.concat(
-        [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"]],
-        pd.Index(["area_ha", "carbon_Mg_CO2e"], name="layer"),
+        [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"],
+         area_and_emissions["tclf_area_ha"]],
+        pd.Index(["area_ha", "carbon_Mg_CO2e", "tclf_area_ha"], name="layer"),
     )
 
     groupbys: Tuple[xr.DataArray, ...] = (
@@ -200,7 +202,6 @@ def setup_compute(
         drivers.rename("driver"),
         primary_forests.rename("is_primary_forest"),
         natural_forests.rename("natural_forest_class"),
-        tclf.rename("is_tree_cover_loss_from_fires"),
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
@@ -277,10 +278,6 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
         natural_forest_class_to_label
     )
 
-    result_df["is_tree_cover_loss_from_fires"] = result_df[
-        "is_tree_cover_loss_from_fires"
-    ].astype(bool)
-
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)
 
@@ -301,7 +298,6 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
                 "driver",
                 "is_primary_forest",
                 "is_intact_forest",
-                "is_tree_cover_loss_from_fires",
             ]
         )
         .sum()
@@ -317,7 +313,6 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
                 "driver",
                 "is_primary_forest",
                 "is_intact_forest",
-                "is_tree_cover_loss_from_fires",
             ]
         )
         .sum()
