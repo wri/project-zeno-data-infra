@@ -38,8 +38,8 @@ def umd_tree_cover_loss_flow(
     """
     result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/tcl/{version}/admin-tree-cover-loss.parquet"
 
-    if not overwrite and s3_uri_exists(result_uri):
-        return result_uri
+    # if not overwrite and s3_uri_exists(result_uri):
+    #     return result_uri
 
     logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
