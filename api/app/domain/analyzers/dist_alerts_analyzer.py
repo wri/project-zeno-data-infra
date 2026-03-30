@@ -18,7 +18,7 @@ class DistAlertsAnalyzer(Analyzer):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> dict:
         dist_analytics_in = DistAlertsAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             dist_analytics_in._input_uris = analysis.metadata["_input_uris"]

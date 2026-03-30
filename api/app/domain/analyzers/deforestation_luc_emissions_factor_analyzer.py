@@ -3,7 +3,6 @@ import newrelic.agent as nr_agent
 from app.analysis.common.analysis import get_sql_in_list
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
@@ -25,7 +24,7 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         self.query_service = query_service
 
     @nr_agent.function_trace(name="DeforestationLUCEmissionsFactorAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> dict:
         deforestation_luc_emissions_factor_analytics_in = (
             DeforestationLUCEmissionsFactorAnalyticsIn(**analysis.metadata)
         )
@@ -41,15 +40,7 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         else:
             raise NotImplementedError()
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            deforestation_luc_emissions_factor_analytics_in.thumbprint(),
-            analyzed_analysis,
-        )
+        return results
 
     async def analyze_admin_areas(self, analytics_in):
         aoi_ids = get_sql_in_list(analytics_in.aoi.ids)

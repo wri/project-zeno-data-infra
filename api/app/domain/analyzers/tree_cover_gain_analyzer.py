@@ -19,7 +19,7 @@ class TreeCoverGainAnalyzer(Analyzer):
         self.compute_engine = compute_engine
 
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> dict:
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             analytics_in._input_uris = analysis.metadata["_input_uris"]

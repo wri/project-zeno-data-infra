@@ -17,7 +17,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.compute_engine = compute_engine
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> dict:
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             analytics_in._input_uris = analysis.metadata["_input_uris"]

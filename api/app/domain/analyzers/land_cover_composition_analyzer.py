@@ -8,7 +8,6 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
@@ -48,7 +47,7 @@ class LandCoverCompositionAnalyzer(Analyzer):
         self.admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet"
 
     @nr_agent.function_trace(name="LandCoverCompositionAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> dict:
         land_cover_change_analytics_in = LandCoverCompositionAnalyticsIn(
             **analysis.metadata
         )
@@ -85,14 +84,7 @@ class LandCoverCompositionAnalyzer(Analyzer):
             combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
             results = combined_results_df.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            land_cover_change_analytics_in.thumbprint(), analyzed_analysis
-        )
+        return results
 
     async def analyze_admin_areas(self, gadm_ids):
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
