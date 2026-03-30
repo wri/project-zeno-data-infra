@@ -154,7 +154,7 @@ def load_data(
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset(
         {"area_ha": pixel_area, "carbon__Mg_CO2e": carbon_emissions,
-         "tclf_area_ha": tclf_area}
+         "tree_cover_loss_from_fires_area_ha": tclf_area}
     )
 
     return (
@@ -191,8 +191,8 @@ def setup_compute(
 
     mask = xr.concat(
         [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"],
-         area_and_emissions["tclf_area_ha"]],
-        pd.Index(["area_ha", "carbon_Mg_CO2e", "tclf_area_ha"], name="layer"),
+         area_and_emissions["tree_cover_loss_from_fires_area_ha"]],
+        pd.Index(["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"], name="layer"),
     )
 
     groupbys: Tuple[xr.DataArray, ...] = (

@@ -72,7 +72,7 @@ def _create_mock_datasets(shape=(2, 2)):
             "carbon__Mg_CO2e": xr.DataArray(
                 da.array(carbon_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
-            "tclf_area_ha": xr.DataArray(
+            "tree_cover_loss_from_fires_area_ha": xr.DataArray(
                 da.array(tclf_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
         }
@@ -132,7 +132,7 @@ def test_setup_compute_creates_concat_dataarray():
     ), f"mask should have 'layer' dimension, got dims: {mask.dims}"
 
     # verify layer coord values
-    expected_layers = ["area_ha", "carbon_Mg_CO2e", "tclf_area_ha"]
+    expected_layers = ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"]
     actual_layers = list(mask.coords["layer"].values)
     assert (
         actual_layers == expected_layers
