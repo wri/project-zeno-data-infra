@@ -18,6 +18,14 @@ client = TestClient(app)
 
 ENDPOINT_PATH = "/v0/land_change/carbon_flux/analytics"
 
+_PLACEHOLDER_URIS = ["s3://test/placeholder.zarr"]
+
+mock_service = MagicMock(spec=AnalysisService)
+
+
+def create_mock_service():
+    return mock_service
+
 
 @pytest.fixture
 def dummy_analytics_in():
@@ -28,15 +36,8 @@ def dummy_analytics_in():
         ),
         canopy_cover=50,
     )
-    analytics_in.set_input_hash([])
+    analytics_in.set_input_hash(_PLACEHOLDER_URIS)
     return analytics_in
-
-
-mock_service = MagicMock(spec=AnalysisService)
-
-
-def create_mock_service():
-    return mock_service
 
 
 class TestCarbonFluxPostUseCaseInitiation:
@@ -51,13 +52,12 @@ class TestCarbonFluxPostUseCaseInitiation:
         )
 
         actual_arg = mock_service.set_resource_from.call_args[0][0]
-        expected = dummy_analytics_in.model_dump()  # _environment still None here
+        expected = dummy_analytics_in.model_dump()
         actual = actual_arg.model_dump()
         assert actual["aoi"] == expected["aoi"]
         assert actual["canopy_cover"] == expected["canopy_cover"]
         assert actual["_version"] == expected["_version"]
         assert actual["_analytics_name"] == expected["_analytics_name"]
-        # deliberately skip _environment — that's an infrastructure concern, not what this test is about
 
         mock_service.reset_mock(return_value=True)
 
@@ -94,3 +94,21 @@ class TestCarbonFluxPostUseCaseInitiation:
         mock_service.reset_mock(return_value=True)
 
         assert response.status_code == 202
+
+
+class TestCarbonFluxAnalyticsIn:
+    def test_thumbprint_is_same_for_same_fields(self, dummy_analytics_in):
+        original_thumb = dummy_analytics_in.thumbprint()
+        model = CarbonFluxAnalyticsIn(**dummy_analytics_in.model_dump())
+        model.set_input_hash(_PLACEHOLDER_URIS)
+        assert model.thumbprint() == original_thumb
+
+    def test_thumbprint_changes_when_aoi_changes(self, dummy_analytics_in):
+        model = CarbonFluxAnalyticsIn(**dummy_analytics_in.model_dump())
+        model.set_input_hash(_PLACEHOLDER_URIS)
+        model.aoi = AdminAreaOfInterest(
+            type="admin",
+            ids=["BRA.12"],
+        )
+
+        assert model.thumbprint() != dummy_analytics_in.thumbprint()

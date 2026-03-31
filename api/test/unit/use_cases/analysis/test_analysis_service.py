@@ -29,7 +29,10 @@ def mock_analysis_repository():
 
 @pytest.fixture
 def mock_analyzer():
-    return AsyncMock()
+    analyzer = MagicMock()
+    analyzer.analyze = AsyncMock()
+    analyzer.input_uris.return_value = ["s3://test/placeholder.zarr"]
+    return analyzer
 
 
 class TestTreeCoverLossServiceCollaborators:
