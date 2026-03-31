@@ -19,7 +19,7 @@ class TreeCoverAnalyzer(Analyzer):
         self.compute_engine = compute_engine
 
     @nr_agent.function_trace(name="TreeCoverAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         tree_cover_analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             tree_cover_analytics_in._input_uris = analysis.metadata["_input_uris"]
@@ -48,4 +48,6 @@ class TreeCoverAnalyzer(Analyzer):
             group_bys=groupbys,
             filters=filters,
         )
-        return await self.compute_engine.compute(tree_cover_analytics_in.aoi, query)
+        analysis.result = await self.compute_engine.compute(
+            tree_cover_analytics_in.aoi, query
+        )

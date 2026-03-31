@@ -9,7 +9,6 @@ from xarray import DataArray
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 
 _input_uris = {
@@ -25,18 +24,16 @@ class GrasslandsAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         duckdb_query_service=None,
     ):
-        self.analysis_repository = analysis_repository  # GrasslandsRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.duckdb_query_service = duckdb_query_service
 
     @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             grasslands_analytics_in._input_uris = analysis.metadata["_input_uris"]
@@ -71,14 +68,7 @@ class GrasslandsAnalyzer(Analyzer):
             combined_results_df = await self.compute_engine.compute(concat(dfs))
             results = combined_results_df.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            grasslands_analytics_in.thumbprint(), analyzed_analysis
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> Dict:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])

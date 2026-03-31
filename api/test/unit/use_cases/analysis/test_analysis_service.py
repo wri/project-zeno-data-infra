@@ -93,13 +93,13 @@ class TestTreeCoverLossServiceCollaborators:
             ),
         )
 
-        # assert that the failed Analysis result is stored at the end
+        # assert that the saved Analysis result is stored at the end
         assert mock_analysis_repository_calls[2] == call(
             stub_analysis_in.thumbprint(),
             Analysis(
                 None,
                 stub_analysis_in.model_dump(),
-                AnalysisStatus.failed,
+                AnalysisStatus.saved,
             ),
         )
 

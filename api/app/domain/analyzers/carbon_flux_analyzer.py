@@ -10,7 +10,6 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
 
 _input_uris = {
@@ -42,18 +41,16 @@ class CarbonFluxAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         query_service=None,
     ):
-        self.analysis_repository = analysis_repository  # CarbonFluxRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
 
     @nr_agent.function_trace(name="CarbonFluxAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         carbon_flux_analytics_in = CarbonFluxAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             carbon_flux_analytics_in._input_uris = analysis.metadata["_input_uris"]
@@ -85,14 +82,7 @@ class CarbonFluxAnalyzer(Analyzer):
             results = await self.compute_engine.compute(dd.concat(dfs))
             results = results.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            carbon_flux_analytics_in.thumbprint(), analyzed_analysis
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids, threshold=30) -> Dict:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])

@@ -3,7 +3,6 @@ import newrelic.agent as nr_agent
 from app.analysis.common.analysis import get_sql_in_list
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
@@ -14,18 +13,16 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         query_service=None,
     ):
-        self.analysis_repository = analysis_repository
         self.compute_engine = compute_engine
         self.dataset_repository = dataset_repository
         self.query_service = query_service
 
     @nr_agent.function_trace(name="DeforestationLUCEmissionsFactorAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         deforestation_luc_emissions_factor_analytics_in = (
             DeforestationLUCEmissionsFactorAnalyticsIn(**analysis.metadata)
         )
@@ -41,15 +38,7 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         else:
             raise NotImplementedError()
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            deforestation_luc_emissions_factor_analytics_in.thumbprint(),
-            analyzed_analysis,
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, analytics_in):
         aoi_ids = get_sql_in_list(analytics_in.aoi.ids)
