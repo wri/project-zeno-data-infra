@@ -12,18 +12,18 @@ CARBON_GROSS_EMISSIONS_VERSION = "v20250430"
 
 DATASETS = {
     "carbon_net_flux": {
-        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_net_flux/{CARBON_NET_FLUX_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
-        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-net-flux/{CARBON_NET_FLUX_VERSION}/Mg_CO2e_ha-1.zarr",
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_net_flux/{CARBON_NET_FLUX_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-net-flux/{CARBON_NET_FLUX_VERSION}/Mg_CO2e.zarr",
         "dtype": "float64",
     },
     "carbon_gross_removals": {
-        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_removals/{CARBON_GROSS_REMOVALS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
-        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-removals/{CARBON_GROSS_REMOVALS_VERSION}/Mg_CO2e_ha-1.zarr",
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_removals/{CARBON_GROSS_REMOVALS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-removals/{CARBON_GROSS_REMOVALS_VERSION}/Mg_CO2e.zarr",
         "dtype": "float64",
     },
     "carbon_gross_emissions": {
-        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_emissions/{CARBON_GROSS_EMISSIONS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_ha-1/gdal-geotiff/tiles.geojson",
-        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-emissions/{CARBON_GROSS_EMISSIONS_VERSION}/Mg_CO2e_ha-1.zarr",
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_emissions/{CARBON_GROSS_EMISSIONS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-emissions/{CARBON_GROSS_EMISSIONS_VERSION}/Mg_CO2e.zarr",
         "dtype": "float64",
     },
 }
