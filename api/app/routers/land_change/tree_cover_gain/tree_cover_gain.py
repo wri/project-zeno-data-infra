@@ -71,7 +71,7 @@ def create_analysis_service(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverGainAnalyzer(compute_engine),
+        analyzer=TreeCoverGainAnalyzer(compute_engine, environment),
         event=ANALYTICS_NAME,
     )
 

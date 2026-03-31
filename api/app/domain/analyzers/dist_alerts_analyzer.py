@@ -1,4 +1,5 @@
 from app.analysis.dist_alerts.analysis import (
+    _input_uris,
     get_precomputed_statistics,
     zonal_statistics_on_aois,
 )
@@ -52,3 +53,6 @@ class DistAlertsAnalyzer(Analyzer):
         alerts_dict = alerts_df.to_dict(orient="list")
 
         analysis.result = alerts_dict
+
+    def input_uris(self) -> list[str]:
+        return sorted(_input_uris.values())

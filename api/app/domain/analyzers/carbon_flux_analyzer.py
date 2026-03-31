@@ -150,3 +150,6 @@ class CarbonFluxAnalyzer(Analyzer):
         carbon_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
         return carbon_df
+
+    def input_uris(self) -> list[str]:
+        return sorted(_input_uris.values())

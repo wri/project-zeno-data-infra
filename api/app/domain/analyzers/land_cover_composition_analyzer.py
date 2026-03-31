@@ -137,3 +137,6 @@ class LandCoverCompositionAnalyzer(Analyzer):
         )
 
         return land_cover_composition_ddf
+
+    def input_uris(self) -> list[str]:
+        return sorted(_input_uris.values())
