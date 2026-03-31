@@ -89,7 +89,6 @@ async def create(
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
-    environment: Environment = Depends(get_environment),
 ):
     return await create_analysis(
         data=data,
@@ -97,7 +96,6 @@ async def create(
         request=request,
         background_tasks=background_tasks,
         resource_link_callback=_datamart_resource_link_response,
-        environment=environment,
     )
 
 

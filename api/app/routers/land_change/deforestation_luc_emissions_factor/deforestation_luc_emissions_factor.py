@@ -37,13 +37,13 @@ def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
 ) -> AnalysisService:
+    table_uri = "s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=DeforestationLUCEmissionsFactorAnalyzer(
             compute_engine=request.app.state.dask_client,
-            query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
-            ),
+            query_service=DuckDbPrecalcQueryService(table_uri=table_uri),
+            table_uri=table_uri,
         ),
         event=ANALYTICS_NAME,
     )
