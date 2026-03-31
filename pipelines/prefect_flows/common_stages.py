@@ -472,7 +472,7 @@ def create_zarr_from_tiles(
     max_chunk_size = max(chunk_size for chunk_size, _ in groups_to_write)
     dataset = xr.open_mfdataset(
         tile_uris, parallel=True, chunks={"x": max_chunk_size, "y": max_chunk_size}
-    )
+    ).persist()
     if dtype:
         dataset = dataset.astype(dtype)
     for chunk_size, group in groups_to_write:
