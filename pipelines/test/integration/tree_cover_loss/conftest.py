@@ -46,7 +46,7 @@ def pixel_area_ds():
 def carbon_emissions_ds():
     carbon = xr.Dataset(
         data_vars={
-            "carbon_emissions_MgCO2e": (
+            "band_data": (
                 ("band", "y", "x"),
                 da.array([[[1000.0, 1500.0], [2000.0, 2500.0]]], dtype=np.float32),
             )
