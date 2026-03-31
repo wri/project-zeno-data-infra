@@ -8,7 +8,6 @@ from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -16,14 +15,6 @@ from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
-
-
-class DummyAnalysisRepository:
-    def __init__(self):
-        self.analysis = None
-
-    async def store_analysis(self, resource_id, analysis):
-        self.analysis = analysis
 
 
 class TestLandCoverChangeAdminAois:
@@ -533,13 +524,11 @@ class TestLandCoverChangeAdminAois:
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data):
-        self.analysis_repo = DummyAnalysisRepository()
         table_name = "/tmp/test.parquet"
         parquet_mock_data.to_parquet("/tmp/test.parquet", index=False)
 
         query_service = DuckDbPrecalcQueryService(table_name)
         analyzer = DeforestationLUCEmissionsFactorAnalyzer(
-            analysis_repository=self.analysis_repo,
             compute_engine=None,
             query_service=query_service,
         )
@@ -558,7 +547,6 @@ class TestLandCoverChangeAdminAois:
             start_year="2021",
             end_year="2023",
         )
-        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(mode="json"),
@@ -567,11 +555,11 @@ class TestLandCoverChangeAdminAois:
         )
 
         await analyzer_with_test_data.analyze(analysis)
+        self.result = analysis.result
 
     def test_analysis_result(self):
         try:
-            results = self.analysis_repo.analysis.result
-            df = pd.DataFrame(results)
+            df = pd.DataFrame(self.result)
 
             assert len(df.columns) == 8
         finally:

@@ -10,7 +10,11 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
-from pipelines.prefect_flows.common_stages import _load_zarr, numeric_to_alpha3
+from pipelines.prefect_flows.common_stages import (
+    _load_zarr,
+    numeric_to_alpha3,
+    rollup_by_gadm_and_convert_to_aoi,
+)
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
@@ -52,7 +56,6 @@ def load_data(
     xr.DataArray,
     xr.DataArray,
     xr.DataArray,
-    xr.DataArray,
 ]:
     """
     Load in the tree cover loss zarr, pixel area zarr, carbon emissions zarr, tree cover density zarr, and the GADM zarrs
@@ -83,6 +86,19 @@ def load_data(
         carbon_emissions.reindex_like(tcl, method="nearest", tolerance=1e-5),
         join="left",
     )[1]
+
+    tclf: xr.DataArray = _load_zarr(
+        tree_cover_loss_from_fires_uri, group="pipeline"
+    ).band_data
+    tclf = xr.align(
+        tcl,
+        tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        join="left",
+    )[1]
+    # Convert tclf to a non-zero pixel area where there is a loss year, so it can be
+    # used as part of the mask. The value of the loss year doesn't matter, since it
+    # is always the same as the TCL loss year.
+    tclf_area = (tclf > 0) * pixel_area
 
     # contextual layers
     tcd: xr.DataArray = _load_zarr(tree_cover_density_uri).band_data
@@ -122,16 +138,6 @@ def load_data(
         join="left",
     )[1]
 
-    tclf: xr.DataArray = _load_zarr(
-        tree_cover_loss_from_fires_uri, group=group
-    ).band_data
-    tclf = xr.align(
-        tcl,
-        tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
-        join="left",
-    )[1]
-    # Convert tclf to a simple boolean, since its loss year is the same as TCL.
-    tclf = xr.where(tclf > 0, 1, 0).astype("uint8")
     # GADM zarrs
     country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
     country = xr.align(
@@ -154,7 +160,11 @@ def load_data(
 
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset(
-        {"area_ha": pixel_area, "carbon__Mg_CO2e": carbon_emissions}
+        {
+            "area_ha": pixel_area,
+            "carbon__Mg_CO2e": carbon_emissions,
+            "tree_cover_loss_from_fires_area_ha": tclf_area,
+        }
     )
 
     return (
@@ -165,7 +175,6 @@ def load_data(
         drivers,
         primary_forests,
         natural_forests,
-        tclf,
         country,
         region,
         subregion,
@@ -185,15 +194,21 @@ def setup_compute(
         drivers,
         primary_forests,
         natural_forests,
-        tclf,
         country,
         region,
         subregion,
     ) = datasets
 
     mask = xr.concat(
-        [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"]],
-        pd.Index(["area_ha", "carbon_Mg_CO2e"], name="layer"),
+        [
+            area_and_emissions["area_ha"],
+            area_and_emissions["carbon__Mg_CO2e"],
+            area_and_emissions["tree_cover_loss_from_fires_area_ha"],
+        ],
+        pd.Index(
+            ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"],
+            name="layer",
+        ),
     )
 
     groupbys: Tuple[xr.DataArray, ...] = (
@@ -203,7 +218,6 @@ def setup_compute(
         drivers.rename("driver"),
         primary_forests.rename("is_primary_forest"),
         natural_forests.rename("natural_forest_class"),
-        tclf.rename("is_tree_cover_loss_from_fires"),
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
@@ -280,77 +294,20 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
         natural_forest_class_to_label
     )
 
-    result_df["is_tree_cover_loss_from_fires"] = result_df[
-        "is_tree_cover_loss_from_fires"
-    ].astype(bool)
-
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)
 
-    if result_df.size == 0:
-        result_df = result_df.drop(columns=["country", "region", "subregion"])
-        result_df["aoi_id"] = pd.Series(dtype="object")
-        result_df["aoi_type"] = pd.Series(dtype="object")
-        return result_df
-
-    region_df = (
-        result_df.drop(columns=["subregion"])
-        .groupby(
-            [
-                "country",
-                "region",
-                "canopy_cover",
-                "tree_cover_loss_year",
-                "driver",
-                "is_primary_forest",
-                "is_intact_forest",
-                "is_tree_cover_loss_from_fires",
-            ]
-        )
-        .sum()
-        .reset_index()
+    results_with_ids = rollup_by_gadm_and_convert_to_aoi(
+        result_df,
+        [
+            "tree_cover_loss_year",
+            "canopy_cover",
+            "is_intact_forest",
+            "driver",
+            "is_primary_forest",
+            "natural_forest_class",
+        ],
     )
-    country_df = (
-        region_df.drop(columns=["region"])
-        .groupby(
-            [
-                "country",
-                "canopy_cover",
-                "tree_cover_loss_year",
-                "driver",
-                "is_primary_forest",
-                "is_intact_forest",
-                "is_tree_cover_loss_from_fires",
-            ]
-        )
-        .sum()
-        .reset_index()
-    )
-
-    subregion_df = result_df.copy()
-    region_df = region_df.copy()
-    country_df = country_df.copy()
-
-    if subregion_df.size > 0:
-        subregion_df["aoi_id"] = (
-            subregion_df[["country", "region", "subregion"]]
-            .astype(str)
-            .agg(".".join, axis=1)
-        )
-
-    if region_df.size > 0:
-        region_df["aoi_id"] = (
-            region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
-        )
-
-    country_df["aoi_id"] = country_df["country"]
-
-    subregion_df = subregion_df.drop(columns=["country", "region", "subregion"])
-    region_df = region_df.drop(columns=["country", "region"])
-    country_df = country_df.drop(columns=["country"])
-
-    results_with_ids = pd.concat([country_df, region_df, subregion_df])
-    results_with_ids["aoi_type"] = "admin"
 
     return results_with_ids
 

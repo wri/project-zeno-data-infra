@@ -40,7 +40,6 @@ def create_analysis_service(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandCoverCompositionAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet"

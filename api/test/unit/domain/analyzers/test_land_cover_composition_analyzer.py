@@ -13,7 +13,6 @@ from app.domain.analyzers.land_cover_composition_analyzer import (
     LandCoverCompositionAnalyzer,
 )
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -42,14 +41,6 @@ async def async_dask_client():
         asynchronous=True,
     ) as client:
         yield client
-
-
-class DummyAnalysisRepository:
-    def __init__(self):
-        self.analysis = None
-
-    async def store_analysis(self, resource_id, analysis):
-        self.analysis = analysis
 
 
 class TestLandCoverCompositionCustomAois:
@@ -158,10 +149,7 @@ class TestLandCoverCompositionCustomAois:
             land_cover_composition_datacube,
             pixel_area,
         ]
-        self.analysis_repo = DummyAnalysisRepository()
-        analyzer = LandCoverCompositionAnalyzer(
-            analysis_repository=self.analysis_repo, compute_engine=async_dask_client
-        )
+        analyzer = LandCoverCompositionAnalyzer(compute_engine=async_dask_client)
 
         feature_collection = {
             "type": "FeatureCollection",
@@ -190,17 +178,15 @@ class TestLandCoverCompositionCustomAois:
                 "feature_collection": feature_collection,
             },
         )
-        metadata.set_input_uris(Environment.production)
         self.metadata = metadata.model_dump()
 
-        analysis = Analysis(None, self.metadata, AnalysisStatus.saved)
+        analysis = Analysis(None, self.metadata, AnalysisStatus.pending)
         await analyzer.analyze(analysis)
+        self.result = analysis.result
 
     @pytest.mark.asyncio
     async def test_analysis_result(self):
-        assert self.analysis_repo.analysis is not None
-        assert self.analysis_repo.analysis.status == AnalysisStatus.saved
-        assert self.analysis_repo.analysis.metadata == self.metadata
+        assert self.result is not None
 
         expected = pd.DataFrame(
             {
@@ -224,7 +210,7 @@ class TestLandCoverCompositionCustomAois:
         )
 
         pd.testing.assert_frame_equal(
-            pd.DataFrame(self.analysis_repo.analysis.result),
+            pd.DataFrame(self.result),
             expected,
             check_like=True,
             check_exact=False,  # Allow approximate comparison for numbers
@@ -264,13 +250,11 @@ class TestLandCoverChangeAdminAois:
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data, async_dask_client):
-        self.analysis_repo = DummyAnalysisRepository()
         table_name = "/tmp/test.parquet"
         parquet_mock_data.to_parquet("/tmp/test.parquet", index=False)
 
         query_service = DuckDbPrecalcQueryService(table_name)
         analyzer = LandCoverCompositionAnalyzer(
-            analysis_repository=self.analysis_repo,
             compute_engine=async_dask_client,
             query_service=query_service,
         )
@@ -287,7 +271,6 @@ class TestLandCoverChangeAdminAois:
         analytics_in = LandCoverCompositionAnalyticsIn(
             aoi={"type": "admin", "ids": ["BRA.12.1", "IDN"]},
         )
-        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(),
@@ -296,6 +279,7 @@ class TestLandCoverChangeAdminAois:
         )
 
         await analyzer_with_test_data.analyze(analysis)
+        self.result = analysis.result
 
     def test_analysis_result(self):
         try:
@@ -361,7 +345,7 @@ class TestLandCoverChangeAdminAois:
             )
 
             pd.testing.assert_frame_equal(
-                pd.DataFrame(self.analysis_repo.analysis.result),
+                pd.DataFrame(self.result),
                 expected,
                 check_like=True,
                 rtol=1e-4,
