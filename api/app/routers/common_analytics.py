@@ -34,7 +34,7 @@ async def create_analysis(
             {
                 "event": f"{service.event_name()}_analytics_request",
                 "analytics_in": data.model_dump(),
-                "resource_id": data.thumbprint(),
+                "resource_id": service.resource_thumbprint(),
             }
         )
 
