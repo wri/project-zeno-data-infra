@@ -4,7 +4,6 @@ import pytest
 
 from app.analysis.common.analysis import FeatureTooSmallError
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
@@ -19,7 +18,7 @@ def stub_analysis_in():
             ids=["1234"],
         )
     )
-    analytics_in.set_input_uris(Environment.production)
+    analytics_in.set_input_hash(["s3://test/placeholder.zarr"])
     return analytics_in
 
 

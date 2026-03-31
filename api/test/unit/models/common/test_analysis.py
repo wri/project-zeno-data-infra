@@ -14,6 +14,21 @@ from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 from app.routers.common_analytics import get_analysis
 
+# A fixed set of URIs to use for test thumbprints — mirrors what
+# TreeCoverLossAnalyzer.input_uris() would return for production.
+_TEST_INPUT_URIS = sorted(
+    ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+    for ds in [
+        Dataset.area_hectares,
+        Dataset.canopy_cover,
+        Dataset.carbon_emissions,
+        Dataset.natural_forests,
+        Dataset.primary_forest,
+        Dataset.tree_cover_loss,
+        Dataset.tree_cover_loss_drivers,
+    ]
+)
+
 
 def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
     defaults = dict(
@@ -24,7 +39,7 @@ def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
         intersections=[],
     )
     analytics_in = TreeCoverLossAnalyticsIn(**{**defaults, **kwargs})
-    analytics_in.set_input_uris(Environment.production)
+    analytics_in.set_input_hash(_TEST_INPUT_URIS)
     return analytics_in
 
 
@@ -51,7 +66,7 @@ _STORED_METADATA = {
     "intersections": [],
     "_version": "20250912",
     "_analytics_name": "tree_cover_loss",
-    "_input_uris": '["s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr"]',
+    "_input_hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 }
 
 # The public subset clients should see.
@@ -59,7 +74,7 @@ _PUBLIC_METADATA = {k: v for k, v in _STORED_METADATA.items() if not k.startswit
 
 
 class TestThumbprint:
-    def test_thumbprint_without_set_input_uris_raises(self):
+    def test_thumbprint_without_set_input_hash_raises(self):
         defaults = dict(
             aoi=AdminAreaOfInterest(type="admin", ids=["BRA.1"]),
             start_year="2020",
@@ -71,61 +86,28 @@ class TestThumbprint:
         with pytest.raises(ValueError):
             _ = analytics_in.thumbprint()
 
-    def test_thumbprint_without_set_input_uris_defaults_to_production(self):
+    def test_identical_inputs_same_thumbprint(self):
         a = _make_analytics_in()
         b = _make_analytics_in()
-        b.set_input_uris(Environment.production)
         assert a.thumbprint() == b.thumbprint()
 
-    def test_identical_requests_same_environment_same_thumbprint(self):
+    def test_different_input_uris_different_thumbprints(self):
         a = _make_analytics_in()
         b = _make_analytics_in()
-        a.set_input_uris(Environment.production)
-        b.set_input_uris(Environment.production)
+        b.set_input_hash(["s3://different-bucket/different.zarr"])
+        assert a.thumbprint() != b.thumbprint()
+
+    def test_same_uris_regardless_of_environment_label_same_thumbprint(self):
+        """The thumbprint is based on URI content, not environment names.
+        Two sets of identical URIs must produce the same hash."""
+        a = _make_analytics_in()
+        b = _make_analytics_in()
+        # Both use the same _TEST_INPUT_URIS via _make_analytics_in
         assert a.thumbprint() == b.thumbprint()
-
-    def test_different_environments_with_different_uris_different_thumbprints(self):
-        staging_uri = "s3://lcl-analytics/zarr/umd_tree_cover_loss/v1.99/year.zarr"
-        original = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
-        try:
-            ZarrDatasetRepository._ZARR_URIS[Environment.staging][
-                Dataset.tree_cover_loss
-            ] = staging_uri
-
-            a = _make_analytics_in()
-            b = _make_analytics_in()
-            a.set_input_uris(Environment.production)
-            b.set_input_uris(Environment.staging)
-            assert a.thumbprint() != b.thumbprint()
-        finally:
-            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original
-
-    def test_promoting_staging_uri_to_production_makes_thumbprints_equal(self):
-        """When staging is promoted (URIs become identical), cached results
-        should be shared — thumbprints must match."""
-        prod_uri = ZarrDatasetRepository.resolve_zarr_uri(
-            Dataset.tree_cover_loss, Environment.production
-        )
-        original = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
-        try:
-            # Simulate promotion: staging now points to the same URI as production
-            ZarrDatasetRepository._ZARR_URIS[Environment.staging][
-                Dataset.tree_cover_loss
-            ] = prod_uri
-
-            a = _make_analytics_in()
-            b = _make_analytics_in()
-            a.set_input_uris(Environment.production)
-            b.set_input_uris(Environment.staging)
-            assert a.thumbprint() == b.thumbprint()
-        finally:
-            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = original
 
     def test_different_request_params_different_thumbprints(self):
         a = _make_analytics_in(start_year="2015")
         b = _make_analytics_in(start_year="2020")
-        a.set_input_uris(Environment.production)
-        b.set_input_uris(Environment.production)
         assert a.thumbprint() != b.thumbprint()
 
 
@@ -140,7 +122,7 @@ class TestGetAnalysisPrivateFieldFiltering:
         result = await get_analysis(RESOURCE_ID, repo, _make_response())
         assert "_version" not in result.metadata
         assert "_analytics_name" not in result.metadata
-        assert "_input_uris" not in result.metadata
+        assert "_input_hash" not in result.metadata
 
     @pytest.mark.asyncio
     async def test_public_fields_are_preserved_in_response_metadata(self):
@@ -160,7 +142,7 @@ class TestGetAnalysisPrivateFieldFiltering:
             )
         )
         result = await get_analysis(RESOURCE_ID, repo, _make_response())
-        assert "_input_uris" not in result.metadata
+        assert "_input_hash" not in result.metadata
         assert result.metadata == _PUBLIC_METADATA
 
     @pytest.mark.asyncio
@@ -173,7 +155,7 @@ class TestGetAnalysisPrivateFieldFiltering:
             )
         )
         result = await get_analysis(RESOURCE_ID, repo, _make_response())
-        assert "_input_uris" not in result.metadata
+        assert "_input_hash" not in result.metadata
         assert result.metadata == _PUBLIC_METADATA
 
     @pytest.mark.asyncio
