@@ -59,8 +59,8 @@ def run_dist_update(version=None, overwrite=False, is_latest=False) -> list[str]
 def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
     result_uris = []
 
-    # carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
-    # result_uris.append(carbon_result)
+    carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
+    result_uris.append(carbon_result)
 
     tcl_result = tcl_flow.umd_tree_cover_loss_flow(version, overwrite=overwrite)
     result_uris.append(tcl_result)
