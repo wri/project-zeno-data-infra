@@ -376,29 +376,49 @@ def _get_tile_uris(tiles_geojson_uri: str) -> List[str]:
 def create_zarr_from_tiles(
     tiles_geojson_uri: str,
     zarr_uri: str,
-    chunk_size: int,
-    group: Optional[str] = None,
+    groups: List[Tuple[int, Optional[str]]],
     overwrite: bool = False,
+    dtype: Optional[str] = None,
 ) -> str:
-    """Create a zarr store from tiled GeoTIFFs referenced by a tiles.geojson file.
+    """Create zarr groups from tiled GeoTIFFs referenced by a tiles.geojson file.
+
+    Tiles are fetched once and written to each requested group, avoiding
+    redundant S3 reads when producing multiple chunk-size variants.
 
     Args:
         tiles_geojson_uri: S3 URI to a tiles.geojson file listing the tile COGs.
         zarr_uri: Destination S3 URI for the output zarr store.
-        chunk_size: Chunk size (in pixels) for both x and y dimensions.
-        group: Optional zarr group name (e.g. 'pipeline' or 'otf').
-        overwrite: If True, overwrite an existing zarr at the target location.
+        groups: List of (chunk_size, group) pairs describing each zarr group to
+            write.  ``chunk_size`` is in pixels; ``group`` is the zarr group
+            name (e.g. ``'pipeline'`` or ``'otf'``), or ``None`` for the root.
+        overwrite: If True, overwrite existing zarr groups at the target
+            location.
+        dtype: Optional numpy dtype string (e.g. ``'uint8'``, ``'float64'``) to
+            cast all variables to before writing.
 
     Returns:
         The zarr_uri that was written to.
     """
-    check_path = f"{zarr_uri}/{group}/zarr.json" if group else f"{zarr_uri}/zarr.json"
-    if not overwrite and s3_uri_exists(check_path):
+    groups_to_write = [
+        (chunk_size, group)
+        for chunk_size, group in groups
+        if overwrite
+        or not s3_uri_exists(
+            f"{zarr_uri}/{group}/zarr.json" if group else f"{zarr_uri}/zarr.json"
+        )
+    ]
+    if not groups_to_write:
         return zarr_uri
 
     tile_uris = _get_tile_uris(tiles_geojson_uri)
+    max_chunk_size = max(chunk_size for chunk_size, _ in groups_to_write)
     dataset = xr.open_mfdataset(
-        tile_uris, parallel=True, chunks={"x": chunk_size, "y": chunk_size}
+        tile_uris, parallel=True, chunks={"x": max_chunk_size, "y": max_chunk_size}
     )
-    dataset.to_zarr(zarr_uri, mode="w", group=group)
+    if dtype:
+        dataset = dataset.astype(dtype)
+    for chunk_size, group in groups_to_write:
+        dataset.chunk({"x": chunk_size, "y": chunk_size}).to_zarr(
+            zarr_uri, mode="w", group=group
+        )
     return zarr_uri

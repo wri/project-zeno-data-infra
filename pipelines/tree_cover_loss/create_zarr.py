@@ -14,14 +14,17 @@ DATASETS = {
     "tree_cover_loss": {
         "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss/{TCL_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
         "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/{TCL_VERSION}/year.zarr",
+        "dtype": "uint8",
     },
     "tree_cover_loss_from_fires": {
         "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss_from_fires/{TCLF_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
         "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss-from-fires/{TCLF_VERSION}/year.zarr",
+        "dtype": "uint8",
     },
     "drivers": {
         "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/wri_google_tree_cover_loss_drivers/{DRIVERS_VERSION}/raster/epsg-4326/10/40000/category/gdal-geotiff/tiles.geojson",
         "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/wri-google-tree-cover-loss-drivers/{DRIVERS_VERSION}/category.zarr",
+        "dtype": "uint8",
     },
 }
 
@@ -43,16 +46,9 @@ def create_zarrs(
         create_zarr_from_tiles(
             cfg["tiles_uri"],
             cfg["zarr_uri"],
-            PIPELINE_CHUNK_SIZE,
-            group="pipeline",
+            [(PIPELINE_CHUNK_SIZE, "pipeline"), (OTF_CHUNK_SIZE, "otf")],
             overwrite=overwrite,
-        )
-        create_zarr_from_tiles(
-            cfg["tiles_uri"],
-            cfg["zarr_uri"],
-            OTF_CHUNK_SIZE,
-            group="otf",
-            overwrite=overwrite,
+            dtype=cfg["dtype"],
         )
         result_uris[name] = cfg["zarr_uri"]
 
