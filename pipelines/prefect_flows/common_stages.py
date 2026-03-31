@@ -444,7 +444,7 @@ def create_zarr_from_tiles(
     redundant S3 reads when producing multiple chunk-size variants.
 
     Args:
-        tiles_geojson_uri: S3 URI to a tiles.geojson file listing the tile COGs.
+        tiles_geojson_uri: S3 URI to a tiles.geojson file listing the geotiff tiles.
         zarr_uri: Destination S3 URI for the output zarr store.
         groups: List of (chunk_size, group) pairs describing each zarr group to
             write.  ``chunk_size`` is in pixels; ``group`` is the zarr group

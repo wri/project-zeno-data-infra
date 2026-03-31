@@ -15,6 +15,7 @@ PIPELINE_CHUNK_SIZE = 4096
 def test_writes_multiple_groups(mock_open_mfdataset, mock_get_tiles, mock_s3_exists):
     """Writes multiple groups, each rechunked to its own chunk size, in a single open_mfdataset call."""
     mock_dataset = MagicMock()
+    persisted_dataset = mock_dataset.persist.return_value
     mock_open_mfdataset.return_value = mock_dataset
 
     result = create_zarr_from_tiles(
@@ -30,13 +31,13 @@ def test_writes_multiple_groups(mock_open_mfdataset, mock_get_tiles, mock_s3_exi
         parallel=True,
         chunks={"x": PIPELINE_CHUNK_SIZE, "y": PIPELINE_CHUNK_SIZE},
     )
-    # Each group is rechunked to its own size before writing
-    mock_dataset.chunk.assert_any_call({"x": OTF_CHUNK_SIZE, "y": OTF_CHUNK_SIZE})
-    mock_dataset.chunk.assert_any_call(
+    # Each group is rechunked to its own size before writing (on the persisted dataset)
+    persisted_dataset.chunk.assert_any_call({"x": OTF_CHUNK_SIZE, "y": OTF_CHUNK_SIZE})
+    persisted_dataset.chunk.assert_any_call(
         {"x": PIPELINE_CHUNK_SIZE, "y": PIPELINE_CHUNK_SIZE}
     )
     # to_zarr is called on the rechunked dataset, not the original
-    rechunked = mock_dataset.chunk.return_value
+    rechunked = persisted_dataset.chunk.return_value
     assert rechunked.to_zarr.call_count == 2
     rechunked.to_zarr.assert_any_call(ZARR_URI, mode="w", group="otf")
     rechunked.to_zarr.assert_any_call(ZARR_URI, mode="w", group="pipeline")
