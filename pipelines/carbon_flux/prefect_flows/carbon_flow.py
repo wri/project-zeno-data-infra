@@ -8,7 +8,7 @@ from pipelines.globals import (
 )
 from pipelines.prefect_flows import common_tasks
 from pipelines.carbon_flux.prefect_flows import carbon_tasks
-from pipelines.carbon_flux.prefect_flows.carbon import gadm_carbon_flux
+from pipelines.carbon_flux.prefect_flows.carbon import carbon_flux
 from pipelines.utils import s3_uri_exists
 
 
@@ -26,7 +26,7 @@ def gadm_carbon_flux_flow(
     if bbox is not None:
         bbox = box(*bbox)
 
-    result_df = gadm_carbon_flux(carbon_tasks.CarbonFluxPrefectTasks, version=version, bbox=bbox)
+    result_df = carbon_flux(carbon_tasks.CarbonFluxPrefectTasks, version=version, bbox=bbox)
 
     result_uri = common_tasks.save_result.with_options(
         name="carbon-flux-save-result"
