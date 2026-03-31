@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -43,7 +44,6 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=CarbonFluxAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-carbon-flux.parquet"
@@ -60,6 +60,7 @@ class TestCarbonDataAdmin:
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
             canopy_cover=30,
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -154,6 +155,7 @@ class TestCarbonDataFeature:
             ),
             canopy_cover=50,
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

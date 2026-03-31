@@ -10,16 +10,16 @@ from app.models.land_change.dist_alerts import DistAlertsAnalyticsIn
 class DistAlertsAnalyzer(Analyzer):
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
     ):
-        self.analysis_repository = analysis_repository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         dist_analytics_in = DistAlertsAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            dist_analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         # for now we only support one intersection, as enforced by the route
         if dist_analytics_in.intersections:
@@ -51,4 +51,4 @@ class DistAlertsAnalyzer(Analyzer):
             ]
         alerts_dict = alerts_df.to_dict(orient="list")
 
-        return alerts_dict
+        analysis.result = alerts_dict

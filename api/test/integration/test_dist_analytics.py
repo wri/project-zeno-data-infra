@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -46,7 +47,6 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=DistAlertsAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=getattr(request.app.state, "dask_client", None),
         ),
         event=ANALYTICS_NAME,
@@ -67,6 +67,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -122,6 +123,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -173,6 +175,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -226,6 +229,7 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -259,6 +263,7 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -314,6 +319,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -395,7 +401,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in._version = TEST_VERSION
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -469,6 +475,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
             end_date="2025-04-30",
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -581,6 +588,7 @@ async def test_gadm_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
+    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
@@ -644,6 +652,7 @@ async def test_kba_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
+    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
@@ -700,6 +709,7 @@ async def test_admin_dist_analytics_by_grasslands():
         end_date="2024-08-16",
         intersections=["grasslands"],
     )
+    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
@@ -759,6 +769,7 @@ async def test_admin_dist_analytics_by_land_cover():
         end_date="2024-08-16",
         intersections=["land_cover"],
     )
+    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests

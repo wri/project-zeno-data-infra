@@ -52,6 +52,12 @@ class TestAdminAreaOfInterest:
         with pytest.raises(ValueError):
             _ = AdminAreaOfInterest(type="admin", ids=["USA.1.lizard"])
 
+    def test_over_max_admin_aois(self):
+        with pytest.raises(ValueError):
+            _ = AdminAreaOfInterest(
+                type="admin", ids=[f"BRA.14.{i}" for i in range(1200)]
+            )
+
 
 class TestCustomAreaOfInterestHash:
     def test_compute_geometry_hash_is_deterministic(self):
@@ -104,3 +110,15 @@ class TestCustomAreaOfInterestHash:
         h = aoi.compute_geometry_hash()
         assert len(h) == 64
         assert all(c in "0123456789abcdef" for c in h)
+
+    def test_over_max_custom_aois(self):
+        with pytest.raises(ValueError):
+            big_fc = {
+                "type": "FeatureCollection",
+                "features": [
+                    SAMPLE_FEATURE_COLLECTION["features"][0].copy() for i in range(60)
+                ],
+            }
+            _ = CustomAreaOfInterest(
+                feature_collection=big_fc,
+            )

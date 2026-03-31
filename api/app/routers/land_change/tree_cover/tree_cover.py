@@ -3,6 +3,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
+from app.dependencies import get_environment
 from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
@@ -14,11 +15,11 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
-from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -46,7 +47,9 @@ def get_analysis_repository(request: Request) -> AnalysisRepository:
 
 
 def create_analysis_service(
-    request: Request, analysis_repository=Depends(get_analysis_repository)
+    request: Request,
+    analysis_repository=Depends(get_analysis_repository),
+    environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverPrecalcHandler(
@@ -55,9 +58,9 @@ def create_analysis_service(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet"
             ),
             next_handler=FloxOTFHandler(
-                dataset_repository=ZarrDatasetRepository(),
+                environment=environment,
                 aoi_geometry_repository=DataApiAoiGeometryRepository(),
-                dask_client=request.app.state.dask_client,
+                dask_client_router=request.app.state.dask_client_router,
             ),
         )
     )
@@ -82,6 +85,7 @@ async def create(
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
+    environment: Environment = Depends(get_environment),
 ):
     return await create_analysis(
         data=data,
@@ -89,6 +93,7 @@ async def create(
         request=request,
         background_tasks=background_tasks,
         resource_link_callback=_datamart_resource_link_response,
+        environment=environment,
     )
 
 

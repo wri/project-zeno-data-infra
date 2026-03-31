@@ -3912,8 +3912,10 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "boto3" },
+    { name = "click" },
     { name = "coiled" },
     { name = "dask", extra = ["array", "dataframe", "diagnostics", "distributed"] },
+    { name = "distributed" },
     { name = "earthengine-api" },
     { name = "fastparquet" },
     { name = "flox" },
@@ -3947,11 +3949,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "boto3" },
+    { name = "click" },
     { name = "coiled" },
-    { name = "dask", extras = ["array", "dataframe", "distributed", "diagnostics"] },
+    { name = "dask", extras = ["array", "dataframe", "diagnostics", "distributed"], specifier = "==2025.5.1" },
+    { name = "distributed", specifier = "==2025.5.1" },
     { name = "earthengine-api" },
     { name = "fastparquet" },
-    { name = "flox" },
+    { name = "flox", specifier = "==0.10.4" },
     { name = "fsspec" },
     { name = "geopandas" },
     { name = "numba", specifier = ">=0.61.2" },

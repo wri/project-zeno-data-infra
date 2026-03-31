@@ -17,8 +17,10 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.compute_engine = compute_engine
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         query = DatasetQuery(
             aggregate=DatasetAggregate(
@@ -72,4 +74,4 @@ class TreeCoverLossAnalyzer(Analyzer):
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:
             results[Dataset.carbon_emissions.get_field_name()] = np.nan
 
-        return results
+        analysis.result = results

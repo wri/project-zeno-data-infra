@@ -17,14 +17,6 @@ from app.models.land_change.deforestation_luc_emissions_factor import (
 )
 
 
-class DummyAnalysisRepository:
-    def __init__(self):
-        self.analysis = None
-
-    async def store_analysis(self, resource_id, analysis):
-        self.analysis = analysis
-
-
 class TestLandCoverChangeAdminAois:
     @pytest.fixture
     def parquet_mock_data(self):
@@ -532,13 +524,11 @@ class TestLandCoverChangeAdminAois:
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data):
-        self.analysis_repo = DummyAnalysisRepository()
         table_name = "/tmp/test.parquet"
         parquet_mock_data.to_parquet("/tmp/test.parquet", index=False)
 
         query_service = DuckDbPrecalcQueryService(table_name)
         analyzer = DeforestationLUCEmissionsFactorAnalyzer(
-            analysis_repository=self.analysis_repo,
             compute_engine=None,
             query_service=query_service,
         )
@@ -565,11 +555,11 @@ class TestLandCoverChangeAdminAois:
         )
 
         await analyzer_with_test_data.analyze(analysis)
+        self.result = analysis.result
 
     def test_analysis_result(self):
         try:
-            results = self.analysis_repo.analysis.result
-            df = pd.DataFrame(results)
+            df = pd.DataFrame(self.result)
 
             assert len(df.columns) == 8
         finally:

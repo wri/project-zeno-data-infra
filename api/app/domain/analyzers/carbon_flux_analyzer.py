@@ -10,25 +10,23 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
 
-# These are zarrs with total emissions (not per-hectare)
-carbon_net_flux_zarr_uri = "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/"
-carbon_gross_removals_zarr_uri = "s3://gfw-data-lake/gfw_forest_carbon_gross_removals/v20250416/raster/epsg-4326/zarr/Mg_CO2e.zarr/"
-carbon_gross_emissions_zarr_uri = "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/"
+_input_uris = {
+    # These are zarrs with total emissions (not per-hectare)
+    "carbon_net_flux_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
+    "carbon_gross_removals_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_gross_removals/v20250416/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
+    "carbon_gross_emissions_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
+    # Boolean value (0, 1)
+    "mangrove_stock_2000_zarr_uri": "s3://gfw-data-lake/jpl_mangrove_aboveground_biomass_stock_2000/v201902/raster/epsg-4326/zarr/is_mangrove.zarr/",
+    # Value 1, 2, 3, 4, which means 2001, 2005, 2010, 2015 periods
+    "tree_cover_gain_from_height_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/",
+    # Value [0, 100] inclusive.
+    "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
+    # Value [1,24] inclusive
+    "tree_cover_loss_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr/",
+}
 
-# Boolean value (0, 1)
-mangrove_stock_2000_zarr_uri = "s3://gfw-data-lake/jpl_mangrove_aboveground_biomass_stock_2000/v201902/raster/epsg-4326/zarr/is_mangrove.zarr/"
-
-# Value 1, 2, 3, 4, which means 2001, 2005, 2010, 2015 periods
-tree_cover_gain_from_height_zarr_uri = "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/"
-# Value [0, 100] inclusive.
-tree_cover_density_2000_zarr_uri = "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/"
-# Value [1,24] inclusive
-tree_cover_loss_zarr_uri = (
-    "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr/"
-)
 # Parquet location
 # admin_results_uri = "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/tabular/zonal_stats/gadm/gadm_adm2.parquet"
 
@@ -39,23 +37,23 @@ admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet"
 
 
 class CarbonFluxAnalyzer(Analyzer):
-    """Get the carbon emissions, removal, flux for 2000-2024 for different canopy densitys"""
+    """Get the carbon emissions, removal, flux for 2000-2024 for different canopy densities"""
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         query_service=None,
     ):
-        self.analysis_repository = analysis_repository  # CarbonFluxRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
 
     @nr_agent.function_trace(name="CarbonFluxAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         carbon_flux_analytics_in = CarbonFluxAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            carbon_flux_analytics_in._input_uris = analysis.metadata["_input_uris"]
         if carbon_flux_analytics_in.aoi.type == "admin":
             gadm_ids = carbon_flux_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(
@@ -84,14 +82,7 @@ class CarbonFluxAnalyzer(Analyzer):
             results = await self.compute_engine.compute(dd.concat(dfs))
             results = results.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            carbon_flux_analytics_in.thumbprint(), analyzed_analysis
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids, threshold=30) -> Dict:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
@@ -108,24 +99,24 @@ class CarbonFluxAnalyzer(Analyzer):
             Dataset.canopy_cover, threshold
         )
         carbon_net_flux = read_zarr_clipped_to_geojson(
-            carbon_net_flux_zarr_uri, geojson
+            _input_uris["carbon_net_flux_zarr_uri"], geojson
         )
         carbon_gross_removals = read_zarr_clipped_to_geojson(
-            carbon_gross_removals_zarr_uri, geojson
+            _input_uris["carbon_gross_removals_zarr_uri"], geojson
         )
         carbon_gross_emissions = read_zarr_clipped_to_geojson(
-            carbon_gross_emissions_zarr_uri, geojson
+            _input_uris["carbon_gross_emissions_zarr_uri"], geojson
         )
         mangrove_stock_2000 = read_zarr_clipped_to_geojson(
-            mangrove_stock_2000_zarr_uri, geojson
+            _input_uris["mangrove_stock_2000_zarr_uri"], geojson
         ).band_data
         mangrove_stock_2000.name = "is_mangrove_stock_2000"
         tree_cover_gain_from_height = read_zarr_clipped_to_geojson(
-            tree_cover_gain_from_height_zarr_uri, geojson
+            _input_uris["tree_cover_gain_from_height_zarr_uri"], geojson
         ).band_data
         tree_cover_gain_from_height.name = "tree_cover_gain_from_height"
         tree_cover_density_2000 = read_zarr_clipped_to_geojson(
-            tree_cover_density_2000_zarr_uri, geojson
+            _input_uris["tree_cover_density_2000_zarr_uri"], geojson
         ).band_data
         tree_cover_density_2000.name = "tree_cover_density_2000"
 
@@ -159,5 +150,3 @@ class CarbonFluxAnalyzer(Analyzer):
         carbon_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
         return carbon_df
-
-

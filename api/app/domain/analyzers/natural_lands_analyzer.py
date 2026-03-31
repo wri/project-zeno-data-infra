@@ -12,7 +12,6 @@ from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.natural_lands import NaturalLandsAnalyticsIn
 
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet"
@@ -40,23 +39,30 @@ NATURAL_LANDS_CLASSES = {
     21: "Non-natural bare",
 }
 
+_input_uris = {
+    "natural_lands_zarr_uri": (
+        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+    ),
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
+
 
 class NaturalLandsAnalyzer(Analyzer):
     """Get the natural lands areas by class for the input AOIs"""
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
     ):
-        self.analysis_repository = analysis_repository  # NaturalLandRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
 
     @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            natural_lands_analytics_in._input_uris = analysis.metadata["_input_uris"]
         if natural_lands_analytics_in.aoi.type == "admin":
             gadm_ids = natural_lands_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)
@@ -80,14 +86,7 @@ class NaturalLandsAnalyzer(Analyzer):
             combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
             results = combined_results_df.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            natural_lands_analytics_in.thumbprint(), analyzed_analysis
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids) -> Dict[str, Any]:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
@@ -100,12 +99,14 @@ class NaturalLandsAnalyzer(Analyzer):
 
     @staticmethod
     def analyze_area(aoi, geojson) -> dd.DataFrame:
-        natural_lands_obj_name = "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-        pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
+        natural_lands_obj_name = _input_uris["natural_lands_zarr_uri"]
+        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+
         natural_lands = read_zarr_clipped_to_geojson(
             natural_lands_obj_name, geojson
         ).band_data
         natural_lands.name = "natural_lands_class"
+
         pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
 
         groupby_layers = [natural_lands]

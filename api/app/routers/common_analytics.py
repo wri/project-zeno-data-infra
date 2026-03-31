@@ -9,6 +9,7 @@ from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
@@ -26,8 +27,11 @@ async def create_analysis(
     background_tasks: BackgroundTasks,
     request: Request,
     resource_link_callback: Callable,
+    environment: Environment = Environment.production,
 ) -> DataMartResourceLinkResponse:
     try:
+        data.set_input_uris(environment)
+
         logging.info(
             {
                 "event": f"{service.event_name()}_analytics_request",
@@ -102,7 +106,7 @@ async def get_analysis(
         status=analysis.status,
         message=message,
         result=analysis.result,
-        metadata=analysis.metadata,
+        metadata={k: v for k, v in analysis.metadata.items() if not k.startswith("_")},
     )
 
 
@@ -146,6 +150,7 @@ async def test_dynamodb_s3_repository():
             canopy_cover=30,
             intersections=[],
         )
+        analytics_in.set_input_uris(Environment.production)
         thumbprint = analytics_in.thumbprint()
         await repo.store_analysis(
             thumbprint,

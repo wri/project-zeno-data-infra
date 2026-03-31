@@ -33,7 +33,9 @@ from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 class TestAoiGeometryRepository:
     async def load(self, aoi_type, aoi_ids):
-        return [box(10.1, -0.1, -0.1, 10.1)]
+        geometries = [box(10.1, -0.1, -0.1, 10.1)]
+        areas_ha = [1000.0] * len(geometries)
+        return geometries, areas_ha
 
 
 class TestDatasetRepository(ZarrDatasetRepository):
@@ -111,7 +113,8 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     assert "BRA" in results.aoi_id.to_list()
     assert 2020 in results.tree_cover_loss_year.to_list()
@@ -146,7 +149,8 @@ async def test_flox_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),
@@ -190,7 +194,8 @@ async def test_flox_handler_natural_forests():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),
@@ -254,7 +259,8 @@ async def test_flox_handler_custom_area():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),

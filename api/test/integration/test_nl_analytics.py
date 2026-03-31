@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -44,7 +45,6 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
         ),
         event=ANALYTICS_NAME,
@@ -57,6 +57,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -104,6 +105,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -150,6 +152,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -197,6 +200,7 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -224,6 +228,7 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -271,6 +276,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -336,6 +342,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                 type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
             )
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -395,7 +402,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "Natural peat short vegetation",
                     "Cropland",
                     "Built-up",
-                    "Non-natural hhort vegetation",
+                    "Non-natural hhort vegetation",  # FIXME: Typo?
                     "Non-natural peat short vegetation",
                     "Non-natural bare",
                     "Natural forests",
@@ -560,7 +567,6 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
         )
 
         actual_df = pd.DataFrame(data["result"])
-        print(actual_df)
 
         pd.testing.assert_frame_equal(
             expected_df,
@@ -580,6 +586,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                 type="key_biodiversity_area", ids=["18392", "46942", "18407"]
             )
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -700,6 +707,7 @@ async def test_gadm_dist_analytics_no_intersection():
     analytics_in = NaturalLandsAnalyticsIn(
         aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
     )
+    analytics_in.set_input_uris(Environment.production)
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -807,6 +815,7 @@ async def test_kba_dist_analytics_no_intersection():
     analytics_in = NaturalLandsAnalyticsIn(
         aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
     )
+    analytics_in.set_input_uris(Environment.production)
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )

@@ -8,8 +8,12 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.land_cover_change import LandCoverChangeAnalyticsIn
+
+_input_uris = {
+    "land_cover_zarr_uri": "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/",
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
 
 
 class LandCoverChangeAnalyzer(Analyzer):
@@ -31,24 +35,24 @@ class LandCoverChangeAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         query_service=None,
     ):
-        self.analysis_repository = analysis_repository  # LandCoverChangeRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
         self.admin_results_uri = (
             "s3://lcl-analytics/zonal-statistics/admin-land-cover-change.parquet"
         )
-        self.land_cover_zarr_uri = "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
-        self.pixel_area_zarr_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
 
     @nr_agent.function_trace(name="LandCoverChangeAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            land_cover_change_analytics_in._input_uris = analysis.metadata[
+                "_input_uris"
+            ]
         if land_cover_change_analytics_in.aoi.type == "admin":
             gadm_ids = land_cover_change_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)
@@ -66,8 +70,8 @@ class LandCoverChangeAnalyzer(Analyzer):
 
             analysis_partial = partial(
                 self.analyze_area,
-                land_cover_zarr_uri=self.land_cover_zarr_uri,
-                pixel_area_zarr_uri=self.pixel_area_zarr_uri,
+                land_cover_zarr_uri=_input_uris["land_cover_zarr_uri"],
+                pixel_area_zarr_uri=_input_uris["pixel_area_zarr_uri"],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
@@ -77,14 +81,7 @@ class LandCoverChangeAnalyzer(Analyzer):
             combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
             results = combined_results_df.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            land_cover_change_analytics_in.thumbprint(), analyzed_analysis
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids):
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])

@@ -47,6 +47,12 @@ variable "new_relic_license_key" {
   description = "New Relic License Key"
 }
 
+variable "new_relic_environment" {
+  type        = string
+  description = "New Relic agent environment (development, test, staging, production)"
+  default     = "production"
+}
+
 variable "prefect_api_key" {
   description = "Prefect Cloud API key"
   type        = string
@@ -103,6 +109,12 @@ variable "flow_memory" {
   description = "Default memory for flow run tasks in MB"
   type        = number
   default     = 61440 # 60 GB
+}
+
+variable "local_cluster_area_threshold_ha" {
+  description = "Total AOI area (hectares) below which the API routes compute to the local dask cluster"
+  type    = number
+  default = 5000000
 }
 
 variable "coiled_token" {

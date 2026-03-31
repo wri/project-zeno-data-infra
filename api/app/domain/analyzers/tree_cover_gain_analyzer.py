@@ -19,8 +19,10 @@ class TreeCoverGainAnalyzer(Analyzer):
         self.compute_engine = compute_engine
 
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         filters: List[DatasetFilter] = [
             DatasetFilter(
@@ -46,7 +48,7 @@ class TreeCoverGainAnalyzer(Analyzer):
             filters=filters,
         )
 
-        return await self.compute_engine.compute(analytics_in.aoi, query)
+        analysis.result = await self.compute_engine.compute(analytics_in.aoi, query)
 
     def _build_years(self, start_year: str, end_year: str):
         """

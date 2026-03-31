@@ -2,7 +2,7 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 
-from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
+from pipelines.tree_cover_loss import stages
 
 
 def _create_mock_datasets(shape=(2, 2)):
@@ -15,6 +15,7 @@ def _create_mock_datasets(shape=(2, 2)):
         drivers_data = [[1]]
         primary_forests_data = [[0]]
         natural_forests_data = [[0]]
+        tclf_data = [[0]]
         country_data = [[1]]
         region_data = [[1]]
         subregion_data = [[1]]
@@ -28,6 +29,7 @@ def _create_mock_datasets(shape=(2, 2)):
         drivers_data = [[1, 2], [3, 4]]
         primary_forests_data = [[0, 1], [0, 0]]
         natural_forests_data = [[1, 1], [0, 0]]
+        tclf_data = [[2, 5], [0, 4]]
         country_data = [[1, 1], [2, 2]]
         region_data = [[1, 1], [2, 2]]
         subregion_data = [[1, 2], [3, 4]]
@@ -70,6 +72,9 @@ def _create_mock_datasets(shape=(2, 2)):
             "carbon__Mg_CO2e": xr.DataArray(
                 da.array(carbon_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
+            "tree_cover_loss_from_fires_area_ha": xr.DataArray(
+                da.array(tclf_data, dtype=np.float32), dims=["y", "x"], coords=coords
+            ),
         }
     )
 
@@ -90,8 +95,7 @@ def _create_mock_datasets(shape=(2, 2)):
 def test_setup_compute_groupby_schema_and_order():
     """Test that groupby has correct column names, order, and dtypes"""
     datasets = _create_mock_datasets()
-    tasks = TreeCoverLossTasks()
-    mask, groupbys, _ = tasks.setup_compute(datasets, expected_groups=None)
+    mask, groupbys, _ = stages.setup_compute(datasets, expected_groups=None)
 
     expected_schema = [
         (0, "tree_cover_loss_year", np.uint8),
@@ -120,8 +124,7 @@ def test_setup_compute_groupby_schema_and_order():
 
 def test_setup_compute_creates_concat_dataarray():
     datasets = _create_mock_datasets()
-    tasks = TreeCoverLossTasks()
-    mask, groupbys, _ = tasks.setup_compute(datasets, expected_groups=None)
+    mask, groupbys, _ = stages.setup_compute(datasets, expected_groups=None)
 
     # verify layer dimension exists
     assert (
@@ -129,19 +132,20 @@ def test_setup_compute_creates_concat_dataarray():
     ), f"mask should have 'layer' dimension, got dims: {mask.dims}"
 
     # verify layer coord values
-    expected_layers = ["area_ha", "carbon_Mg_CO2e"]
+    expected_layers = ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"]
     actual_layers = list(mask.coords["layer"].values)
     assert (
         actual_layers == expected_layers
     ), f"expected layers {expected_layers}, got {actual_layers}"
 
-    # verify shape is 2 (for area and emissions)
+    # verify shape is 3 (for area and emissions)
     assert (
-        mask.shape[0] == 2
-    ), f"first dimension should be 2 (area & emissions), got {mask.shape[0]}"
+        mask.shape[0] == 3
+    ), f"first dimension should be 3 (area & emissions), got {mask.shape[0]}"
 
     # verify dtype is float
     assert mask.dtype in [
         np.float32,
         np.float64,
+        np.float32
     ], f"mask should be float type, got {mask.dtype}"

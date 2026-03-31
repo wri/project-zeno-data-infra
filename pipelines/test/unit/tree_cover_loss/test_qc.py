@@ -1,6 +1,5 @@
 from unittest.mock import patch
 
-import numpy as np
 import pandas as pd
 from shapely.geometry import box
 
@@ -8,86 +7,113 @@ from pipelines.test.integration.tree_cover_loss.conftest import (
     FakeGoogleEarthEngineDatasetRepository,
     FakeQCRepository,
 )
-from pipelines.tree_cover_loss.stages import TreeCoverLossTasks
+from pipelines.tree_cover_loss import stages
+
+
+def _make_result_df(area_ha, canopy_cover, driver, natural_forest_class):
+    return pd.DataFrame(
+        {
+            "area_ha": area_ha,
+            "tree_cover_loss_year": [2021, 2022],
+            "canopy_cover": canopy_cover,
+            "driver": driver,
+            "aoi_id": ["AFG.1.1", "AFG.1.1"],
+            "natural_forest_class": natural_forest_class,
+        }
+    )
 
 
 def test_tcl_validation_flow():
+    result_df = _make_result_df(
+        [100.0, 200.0],
+        ["30", "30"],
+        ["Agriculture", "Permanent settlement"],
+        ["Natural Forest", "Non-natural Forest"],
+    )
+
     with patch(
-        "pipelines.tree_cover_loss.stages.TreeCoverLossTasks.get_sample_statistics"
-    ) as mock_sample, patch(
-        "pipelines.tree_cover_loss.stages.TreeCoverLossTasks.get_validation_statistics"
+        "pipelines.tree_cover_loss.stages.get_validation_statistics"
     ) as mock_validation:
-        tasks = TreeCoverLossTasks(qc_feature_repository=FakeQCRepository())
-        mock_sample.return_value = pd.DataFrame(
-            {
-                "area_ha": [100.0, 200.0],
-                "tree_cover_loss_year": [2021, 2022],
-                "canopy_cover": ["30", "30"],
-                "driver": ["Agriculture", "Permanent settlement"],
-                "aoi_id": ["AFG.1.1", "AFG.1.1"],
-                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
-            }
-        )
         mock_validation.return_value = {
             "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
             "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
         }
 
-        assert tasks.qc_against_validation_source() is True
+        assert (
+            stages.qc_against_validation_source(
+                result_df,
+                qc_feature_repository=FakeQCRepository(),
+            )
+            is True
+        )
 
         mock_validation.return_value = {
             "driver_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
             "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 150.0]}),
         }
-        assert tasks.qc_against_validation_source() is False
-
-        mock_sample.return_value = pd.DataFrame(
-            {
-                "area_ha": [100.0, 200.0],
-                "tree_cover_loss_year": [2021, 2022],
-                "canopy_cover": ["10", "30"],
-                "driver": ["Agriculture", "Permanent settlement"],
-                "aoi_id": ["AFG.1.1", "AFG.1.1"],
-                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
-            }
+        assert (
+            stages.qc_against_validation_source(
+                result_df,
+                qc_feature_repository=FakeQCRepository(),
+            )
+            is False
         )
-        assert tasks.qc_against_validation_source() is False
 
-        mock_sample.return_value = pd.DataFrame(
-            {
-                "area_ha": [100.0, 200.0],
-                "tree_cover_loss_year": [2021, 2022],
-                "canopy_cover": ["30", "30"],
-                "driver": [np.nan, "Permanent settlement"],
-                "aoi_id": ["AFG.1.1", "AFG.1.1"],
-                "natural_forest_class": ["Natural Forest", "Non-natural Forest"],
-            }
+    # canopy_cover below 30 → driver filter yields less area → should fail
+    result_df_low_canopy = _make_result_df(
+        [100.0, 200.0],
+        ["10", "30"],
+        ["Agriculture", "Permanent settlement"],
+        ["Natural Forest", "Non-natural Forest"],
+    )
+
+    with patch(
+        "pipelines.tree_cover_loss.stages.get_validation_statistics"
+    ) as mock_validation:
+        mock_validation.return_value = {
+            "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+        }
+        assert (
+            stages.qc_against_validation_source(
+                result_df_low_canopy,
+                qc_feature_repository=FakeQCRepository(),
+            )
+            is False
         )
-        assert bool(tasks.qc_against_validation_source()) is False
 
+    # "Unknown" driver → filtered out by driver != "Unknown" check → should fail
+    result_df_unknown_driver = _make_result_df(
+        [100.0, 200.0],
+        ["30", "30"],
+        ["Unknown", "Permanent settlement"],
+        ["Natural Forest", "Non-natural Forest"],
+    )
 
-def test_get_sample_statistics_accepts_injected_geometry_lookup():
-    geom = box(0, 0, 1, 1)
-    expected = pd.DataFrame({"area_ha": [123.0]})
-
-    with patch("pipelines.tree_cover_loss.stages.compute_tree_cover_loss") as mock_flow:
-        mock_flow.return_value = expected
-        tasks = TreeCoverLossTasks()
-
-        result = tasks.get_sample_statistics(geom)
-
-        assert result is expected
-
-        mock_flow.assert_called_once()
-        _, kwargs = mock_flow.call_args
-        assert kwargs["bbox"] is geom
+    with patch(
+        "pipelines.tree_cover_loss.stages.get_validation_statistics"
+    ) as mock_validation:
+        mock_validation.return_value = {
+            "driver_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+            "natural_forests_results": pd.DataFrame({"area_ha": [100.0, 200.0]}),
+        }
+        assert (
+            bool(
+                stages.qc_against_validation_source(
+                    result_df_unknown_driver,
+                    qc_feature_repository=FakeQCRepository(),
+                )
+            )
+            is False
+        )
 
 
 def test_get_validation_statistics_with_fake_repo():
     geom = box(0, 0, 1, 1)
-    tasks = TreeCoverLossTasks(gee_repository=FakeGoogleEarthEngineDatasetRepository())
 
-    result = tasks.get_validation_statistics(geom)["driver_results"]
+    result = stages.get_validation_statistics(
+        geom, gee_repository=FakeGoogleEarthEngineDatasetRepository()
+    )["driver_results"]
 
     expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
     pd.testing.assert_frame_equal(result, expected, check_dtype=False)

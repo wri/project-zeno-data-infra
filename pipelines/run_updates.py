@@ -2,6 +2,7 @@ import logging
 import os
 from enum import Enum
 
+import click
 import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
@@ -30,8 +31,9 @@ def create_cluster():
         environ={
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
         },
+        worker_options={"nthreads": 4},  # to avoid OOMs
     )
-    cluster.adapt(minimum=1, maximum=75)
+    cluster.adapt(minimum=1, maximum=100)
 
     client = cluster.get_client()
     return client
@@ -127,5 +129,27 @@ def run_updates(
     return result_uris
 
 
+@click.command()
+@click.option(
+    "--flow",
+    "flow_name",
+    type=click.Choice([e.value for e in UpdateFlow], case_sensitive=False),
+    default=UpdateFlow.DIST_UPDATE.value,
+    help="Which update flow to run.",
+)
+@click.option(
+    "--version", default=None, help="Dataset version (required for tcl_update)."
+)
+@click.option("--overwrite", is_flag=True, help="Overwrite existing outputs.")
+@click.option("--is-latest", is_flag=True, help="Mark this version as latest.")
+def cli(flow_name, version, overwrite, is_latest):
+    run_updates(
+        version=version,
+        overwrite=overwrite,
+        is_latest=is_latest,
+        flow_name=UpdateFlow(flow_name),
+    )
+
+
 if __name__ == "__main__":
-    run_updates(overwrite=False)
+    cli()

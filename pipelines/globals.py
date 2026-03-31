@@ -22,6 +22,9 @@ land_cover_zarr_uri = (
 tree_cover_loss_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/v1.12/year.zarr"
 )
+tree_cover_loss_from_fires_zarr_uri = (
+    f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss-from-fires/v1.12/year.zarr"
+)
 tree_cover_density_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr"
 )

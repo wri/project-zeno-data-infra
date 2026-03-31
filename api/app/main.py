@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
+from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .routers import land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
@@ -49,19 +50,47 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load the dask cluster
-    if not os.getenv("DASK_SCHEDULER_ADDRESS"):
-        logging.warning(
-            "DASK_SCHEDULER_ADDRESS not set, starting local cluster. "
-            "This is the intended behavior for local development only."
-        )
-        cluster = LocalCluster(n_workers=8, threads_per_worker=2)
-        os.environ["DASK_SCHEDULER_ADDRESS"] = cluster.scheduler_address
+    local_cluster = None
+    local_client = None
+    remote_client = None
 
-    app.state.dask_client = await Client(
-        os.environ["DASK_SCHEDULER_ADDRESS"],
-        asynchronous=True,
+    # we have one uvicorn worker so using the remaining cpus for the local dask cluster
+    local_n_workers = int(os.environ.get("LOCAL_DASK_WORKERS", 7))
+
+    # Create a local in-process cluster when LOCAL_DASK_WORKERS > 0.
+    # Tests set this to 0 and provide a shared cluster via
+    # DASK_SCHEDULER_ADDRESS instead.
+    if local_n_workers > 0:
+        local_threads = int(os.environ.get("LOCAL_DASK_THREADS_PER_WORKER", 1))
+        local_cluster = await LocalCluster(
+            n_workers=local_n_workers,
+            threads_per_worker=local_threads,
+            asynchronous=True,
+        )
+        local_client = await Client(local_cluster, asynchronous=True)
+
+    # Connect to an external scheduler when available (prod / tests).
+    scheduler_addr = os.getenv("DASK_SCHEDULER_ADDRESS")
+    if scheduler_addr:
+        remote_client = await Client(scheduler_addr, asynchronous=True)
+
+    # Ensure that at least one Dask client is available.
+    # This prevents downstream attribute errors when both LOCAL_DASK_WORKERS=0
+    # and DASK_SCHEDULER_ADDRESS is not set.
+    if not (local_client or remote_client):
+        raise RuntimeError(
+            "Dask client configuration error: neither a local client nor a remote "
+            "client could be created. Set LOCAL_DASK_WORKERS > 0 to start a local "
+            "cluster, or provide DASK_SCHEDULER_ADDRESS to use a remote scheduler."
+        )
+
+    app.state.dask_client_router = DaskClientRouter(
+        local_client=local_client or remote_client,
+        remote_client=remote_client or local_client,
     )
+
+    # Expose a single client for routers that don't use the router yet.
+    app.state.dask_client = remote_client or local_client
 
     # Create an AWS Session and connections to DyamoDb and S3
     session = aioboto3.Session()

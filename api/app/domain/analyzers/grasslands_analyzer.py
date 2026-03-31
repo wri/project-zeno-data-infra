@@ -9,8 +9,14 @@ from xarray import DataArray
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
+
+_input_uris = {
+    "grasslands_zarr_uri": (
+        "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
+    ),
+    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+}
 
 
 class GrasslandsAnalyzer(Analyzer):
@@ -18,19 +24,19 @@ class GrasslandsAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
         dataset_repository=None,
         duckdb_query_service=None,
     ):
-        self.analysis_repository = analysis_repository  # GrasslandsRepository
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.duckdb_query_service = duckdb_query_service
 
     @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
+        if analysis.metadata.get("_input_uris") is not None:
+            grasslands_analytics_in._input_uris = analysis.metadata["_input_uris"]
         if grasslands_analytics_in.aoi.type == "admin":
             gadm_ids: List = grasslands_analytics_in.aoi.ids
             results: Dict = await self.analyze_admin_areas(
@@ -62,14 +68,7 @@ class GrasslandsAnalyzer(Analyzer):
             combined_results_df = await self.compute_engine.compute(concat(dfs))
             results = combined_results_df.to_dict(orient="list")
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            grasslands_analytics_in.thumbprint(), analyzed_analysis
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> Dict:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
@@ -82,16 +81,17 @@ class GrasslandsAnalyzer(Analyzer):
 
     @staticmethod
     def analyze_area(aoi, geojson, start_year, end_year) -> DataFrame:
-        grasslands_obj_name = (
-            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
-        )
-        pixel_area_obj_name = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/"
+        grasslands_obj_name = _input_uris["grasslands_zarr_uri"]
+        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+
         grasslands: DataArray = read_zarr_clipped_to_geojson(
             grasslands_obj_name, geojson
         ).sel(year=slice(start_year, end_year))
+
         pixel_area = read_zarr_clipped_to_geojson(
             pixel_area_obj_name, geojson
         ).reindex_like(grasslands, method="nearest", tolerance=1e-5)
+
         grasslands_only = (grasslands == 2).astype(np.uint8)
 
         grasslands_pixel_areas = grasslands_only * pixel_area

@@ -3,12 +3,12 @@ import os
 from typing import Iterable, List
 
 import httpx
-from shapely import Geometry, wkb
+from shapely import wkb
 from shapely.geometry import shape
 
 
 class DataApiAoiGeometryRepository:
-    async def load(self, aoi_type: str, aoi_ids: List[str]) -> List[Geometry]:
+    async def load(self, aoi_type: str, aoi_ids: List[str]):
         return await self._get_geojsons_from_data_api(aoi_type, aoi_ids)
 
     async def _get_geojsons_from_data_api(self, aoi_type, aoi_ids):
@@ -24,19 +24,20 @@ class DataApiAoiGeometryRepository:
         geometries = [
             shape(wkb.loads(bytes.fromhex(data["geom"]))) for data in response["data"]
         ]
-        return geometries
+        areas_ha = [data.get("gfw_area__ha", 0) for data in response["data"]]
+        return geometries, areas_ha
 
     def _get_geojson_request_for_data_api(self, aoi_type, aoi_ids):
         value_list = self._get_sql_in_list(aoi_ids)
         if aoi_type == "key_biodiversity_area":
             url = "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
-            sql = f"select geom from data where sitrecid in {value_list} order by sitrecid"
+            sql = f"select geom, gfw_area__ha from data where sitrecid in {value_list} order by sitrecid"
         elif aoi_type == "protected_area":
             url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-            sql = f"select geom from data where wdpa_pid in {value_list} order by wdpa_pid"
+            sql = f"select geom, gfw_area__ha from data where wdpa_pid in {value_list} order by wdpa_pid"
         elif aoi_type == "indigenous_land":
             url = "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
-            sql = f"select geom from data where landmark_id in {value_list} order by landmark_id"
+            sql = f"select geom, gfw_area__ha from data where landmark_id in {value_list} order by landmark_id"
         else:
             raise ValueError(f"Unable to retrieve AOI type {aoi_type} from Data API.")
         return url, {"sql": sql}

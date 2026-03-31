@@ -8,6 +8,7 @@ from pydantic import Field, StringConstraints, field_validator, model_validator
 from .base import StrictBaseModel
 
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
+MAX_OTF_FEATURES = 50
 AdminStr = Annotated[str, StringConstraints(pattern=ADMIN_REGEX)]
 
 
@@ -20,10 +21,7 @@ class AreaOfInterest(StrictBaseModel):
 class AdminAreaOfInterest(AreaOfInterest):
     type: Literal["admin"] = "admin"
     ids: List[AdminStr] = Field(
-        ...,
-        min_length=1,
-        title="List of Dot-delimited identifiers",
-        examples=[["BRA.12.3"], ["BRA.12.3", "IND", "IDN.12"]],
+        ..., min_length=1, max_length=1000, title="List of Dot-delimited identifiers"
     )
     provider: str = Field("gadm", title="Administrative Boundary Provider")
     version: str = Field("4.1", title="Administrative Boundary Version")
@@ -67,6 +65,7 @@ class KeyBiodiversityAreaOfInterest(AreaOfInterest):
     ids: List[str] = Field(
         ...,
         min_length=1,
+        max_length=MAX_OTF_FEATURES,
         title="List of Key Biodiversity Area site codes",
         examples=[["36"], ["18", "8111"]],
     )
@@ -77,6 +76,7 @@ class ProtectedAreaOfInterest(AreaOfInterest):
     ids: List[str] = Field(
         ...,
         min_length=1,
+        max_length=MAX_OTF_FEATURES,
         title="List of WDPA protected area IDs",
         examples=[["555625448"], ["148322", "555737674"]],
     )
@@ -87,6 +87,7 @@ class IndigenousAreaOfInterest(AreaOfInterest):
     ids: List[str] = Field(
         ...,
         min_length=1,
+        max_length=MAX_OTF_FEATURES,
         title="List of Landmark Indigenous lands object ID",
         examples=[["MEX11287"], ["CAN1", "CAN2"]],
     )
@@ -96,7 +97,7 @@ class CustomAreaOfInterest(AreaOfInterest):
     type: Literal["feature_collection"] = "feature_collection"
     feature_collection: Dict[str, Any] = Field(
         ...,
-        title="Feature collection of one or more features",
+        title=f"Feature collection of 1-{MAX_OTF_FEATURES} features",
     )
     ids: List[str] = Field(default_factory=list)
 
@@ -110,6 +111,11 @@ class CustomAreaOfInterest(AreaOfInterest):
         features = fc.get("features")
         if not isinstance(features, list) or not features:
             raise ValueError("feature_collection.features must be a non-empty list")
+
+        if len(features) > MAX_OTF_FEATURES:
+            raise ValueError(
+                f"feature_collection.features can have a maxmimum of {MAX_OTF_FEATURES} features."
+            )
 
         ids: List[str] = []
         missing_at: List[int] = []

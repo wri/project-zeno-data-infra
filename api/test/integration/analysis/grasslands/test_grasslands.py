@@ -8,6 +8,7 @@ from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -37,7 +38,6 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=GrasslandsAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
@@ -55,6 +55,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2015",
             end_year="2020",
         )
+        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -126,6 +127,7 @@ class TestGrasslandsAnalyticsPostWithKba:
             start_year="2015",
             end_year="2020",
         )
+        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 

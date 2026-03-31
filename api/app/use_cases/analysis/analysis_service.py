@@ -70,10 +70,10 @@ class AnalysisService:
                 self.analytics_resource_id, analysis
             )
 
-            results = await self.analyzer.analyze(analysis)
+            await self.analyzer.analyze(analysis)
 
             self.analytics_resource.status = AnalysisStatus.saved
-            self.analytics_resource.result = results
+            self.analytics_resource.result = analysis.result
             await self.analysis_repository.store_analysis(
                 self.analytics_resource_id,
                 Analysis(

@@ -18,6 +18,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
+from app.domain.models.environment import Environment
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
@@ -57,7 +58,7 @@ def create_analysis_service_for_tests(
             next_handler=FloxOTFHandler(
                 dataset_repository=ZarrDatasetRepository(),
                 aoi_geometry_repository=DataApiAoiGeometryRepository(),
-                dask_client=request.app.state.dask_client,
+                dask_client_router=request.app.state.dask_client_router,
             ),
         )
     )
@@ -76,6 +77,8 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             canopy_cover=15,
         )
+        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -141,6 +144,7 @@ class TestTreeCoverAnalyticsPostWithKba:
             ),
             canopy_cover=15,
         )
+        analytics_in.set_input_uris(Environment.production)
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

@@ -35,7 +35,6 @@ def create_analysis_service(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
-            analysis_repository=analysis_repository,
             compute_engine=request.app.state.dask_client,
         ),
         event=ANALYTICS_NAME,
