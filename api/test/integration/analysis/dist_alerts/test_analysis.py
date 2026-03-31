@@ -306,7 +306,7 @@ class TestDistAlertsZonalStats:
                 ],
             }
         )
-        print(computed_df)
+
         pd.testing.assert_frame_equal(
             expected_df,
             computed_df,

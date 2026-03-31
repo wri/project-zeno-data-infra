@@ -8,7 +8,6 @@ from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
-from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -49,13 +48,14 @@ def create_analysis_service_for_tests(
 
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = GrasslandsAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            GrasslandsAnalyticsIn,
+            GrasslandsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
@@ -119,15 +119,16 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
 class TestGrasslandsAnalyticsPostWithKba:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = GrasslandsAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            GrasslandsAnalyticsIn,
+            GrasslandsAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 

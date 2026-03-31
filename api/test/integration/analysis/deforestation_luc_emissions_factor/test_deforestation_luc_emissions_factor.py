@@ -10,7 +10,6 @@ from httpx import ASGITransport, AsyncClient
 from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
-from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -50,15 +49,16 @@ def create_analysis_service_for_tests(
 
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = DeforestationLUCEmissionsFactorAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            DeforestationLUCEmissionsFactorAnalyticsIn,
+            DeforestationLUCEmissionsFactorAnalyzer,
             aoi={"type": "admin", "ids": ["BRA.14", "IDN.24.9"]},
             gas_types=["CO2e", "CH4"],
             crop_types=["Banana"],
             start_year="2021",
             end_year="2023",
         )
-        analytics_in.set_input_uris(Environment.production)
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 

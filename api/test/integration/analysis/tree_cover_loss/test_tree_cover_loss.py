@@ -18,7 +18,6 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
-from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -77,16 +76,17 @@ def create_analysis_service_for_tests(
 
 class TestTclAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverLossAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverLossAnalyticsIn,
+            TreeCoverLossAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "IDN.14", "BRA"]),
             start_year="2015",
             end_year="2022",
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -149,9 +149,11 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
 
 class TestTclAnalyticsPostWithKba:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverLossAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverLossAnalyticsIn,
+            TreeCoverLossAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
@@ -160,7 +162,7 @@ class TestTclAnalyticsPostWithKba:
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -222,16 +224,18 @@ class TestTclAnalyticsPostWithKba:
 
 class TestTclAnalyticsAdminAOIWithDriver:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverLossAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverLossAnalyticsIn,
+            TreeCoverLossAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_year="2015",
             end_year="2022",
             canopy_cover=30,
             intersections=["driver"],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -290,9 +294,11 @@ class TestTclAnalyticsAdminAOIWithDriver:
 
 class TestTclAnalyticsPostWithKbaWithDriver:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverLossAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverLossAnalyticsIn,
+            TreeCoverLossAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
@@ -301,7 +307,7 @@ class TestTclAnalyticsPostWithKbaWithDriver:
             canopy_cover=30,
             intersections=["driver"],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -361,9 +367,11 @@ class TestTclAnalyticsPostWithKbaWithDriver:
 
 class TestTclAnalyticsWithForestFilters:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverLossAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverLossAnalyticsIn,
+            TreeCoverLossAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["COL.1", "BRA.1"]),
             start_year="2020",
             end_year="2023",
@@ -371,7 +379,7 @@ class TestTclAnalyticsWithForestFilters:
             forest_filter="primary_forest",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

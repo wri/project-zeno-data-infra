@@ -18,7 +18,6 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
-from app.domain.models.environment import Environment
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
@@ -72,12 +71,13 @@ def create_analysis_service_for_tests(
 
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture()
-    async def setup(self):
-        analytics_in = TreeCoverAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            TreeCoverAnalyticsIn,
+            TreeCoverAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             canopy_cover=15,
         )
-        analytics_in.set_input_uris(Environment.production)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -137,14 +137,16 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
 class TestTreeCoverAnalyticsPostWithKba:
     @pytest_asyncio.fixture()
-    async def setup(self):
-        analytics_in = TreeCoverAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            TreeCoverAnalyticsIn,
+            TreeCoverAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
             canopy_cover=15,
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )

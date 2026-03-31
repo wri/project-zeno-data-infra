@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
-from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -53,11 +52,13 @@ def create_analysis_service_for_tests(
 
 class TestNLAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -101,11 +102,13 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
 
 class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -148,11 +151,13 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
 
 class TestNLAnalyticsPostWhenPreviousRequestComplete:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -196,11 +201,15 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
 
 class TestNLAnalyticsGetWithNoPreviousRequest:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         )
-        analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(compute_engine=None)
+        analytics_in.set_input_hash(analyzer.input_uris())
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -224,11 +233,13 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
 
 class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -271,12 +282,14 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
 
 class TestNLAnalyticsGetWithPreviousRequestComplete:
     @pytest_asyncio.fixture
-    def setup(self):
+    def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = NaturalLandsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
+            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -336,13 +349,15 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
 
 class TestNLAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
             aoi=AdminAreaOfInterest(
                 type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
-            )
+            ),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -580,13 +595,15 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
 class TestNLAnalyticsPostWithMultipleKBAAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = NaturalLandsAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            NaturalLandsAnalyticsIn,
+            NaturalLandsAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["18392", "46942", "18407"]
-            )
+            ),
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -703,11 +720,13 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
 
 
 @pytest.mark.asyncio
-async def test_gadm_dist_analytics_no_intersection():
-    analytics_in = NaturalLandsAnalyticsIn(
-        aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
+async def test_gadm_dist_analytics_no_intersection(make_analytics_in):
+    analytics_in = make_analytics_in(
+        NaturalLandsAnalyticsIn,
+        NaturalLandsAnalyzer,
+        aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
     )
-    analytics_in.set_input_uris(Environment.production)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -811,11 +830,13 @@ async def test_gadm_dist_analytics_no_intersection():
 
 
 @pytest.mark.asyncio
-async def test_kba_dist_analytics_no_intersection():
-    analytics_in = NaturalLandsAnalyticsIn(
-        aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
+async def test_kba_dist_analytics_no_intersection(make_analytics_in):
+    analytics_in = make_analytics_in(
+        NaturalLandsAnalyticsIn,
+        NaturalLandsAnalyzer,
+        aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"]),
     )
-    analytics_in.set_input_uris(Environment.production)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )

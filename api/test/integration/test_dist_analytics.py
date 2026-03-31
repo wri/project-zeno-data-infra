@@ -14,7 +14,6 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
-from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -59,16 +58,19 @@ async def get_latest_dist_version_for_test(request: Request) -> str:
 
 class TestDistAnalyticsPostWithNoPreviousRequest:
     @pytest_asyncio.fixture(autouse=True)
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -115,16 +117,19 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
 
 class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
     @pytest.fixture
-    def setup(self):
+    def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -167,15 +172,17 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
 
 class TestDistAnalyticsPostWhenPreviousRequestComplete:
     @pytest.fixture
-    def setup(self):
+    def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -221,15 +228,17 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
 
 class TestDistAnalyticsGetWithNoPreviousRequest:
     @pytest.fixture
-    def setup(self):
+    def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -255,15 +264,17 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
 
 class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
     @pytest.fixture
-    def setup(self):
+    def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -311,15 +322,17 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
 
 class TestDistAnalyticsGetWithPreviousRequestComplete:
     @pytest.fixture
-    def setup(self):
+    def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
 
         app.dependency_overrides[create_analysis_service] = (
@@ -391,9 +404,11 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
 
 class TestDistAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=AdminAreaOfInterest(
                 type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
             ),
@@ -401,8 +416,9 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -464,9 +480,11 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
 class TestDistAnalyticsPostWithMultipleKBAAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = DistAlertsAnalyticsIn(
+        analytics_in = make_analytics_in(
+            DistAlertsAnalyticsIn,
+            DistAlertsAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area",
                 ids=["18392", "46942", "18407"],
@@ -475,8 +493,9 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
             end_date="2025-04-30",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
+
         analytics_in._version = TEST_VERSION
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -581,15 +600,18 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
 
 @pytest.mark.asyncio
-async def test_gadm_dist_analytics_no_intersection():
-    analytics_in = DistAlertsAnalyticsIn(
+async def test_gadm_dist_analytics_no_intersection(make_analytics_in):
+    analytics_in = make_analytics_in(
+        DistAlertsAnalyticsIn,
+        DistAlertsAnalyzer,
         aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         start_date="2024-08-15",
         end_date="2024-08-16",
         intersections=[],
     )
-    analytics_in.set_input_uris(Environment.production)
+
     analytics_in._version = TEST_VERSION
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -642,8 +664,10 @@ async def test_gadm_dist_analytics_no_intersection():
 
 
 @pytest.mark.asyncio
-async def test_kba_dist_analytics_no_intersection():
-    analytics_in = DistAlertsAnalyticsIn(
+async def test_kba_dist_analytics_no_intersection(make_analytics_in):
+    analytics_in = make_analytics_in(
+        DistAlertsAnalyticsIn,
+        DistAlertsAnalyzer,
         aoi=KeyBiodiversityAreaOfInterest(
             type="key_biodiversity_area",
             ids=["8111"],
@@ -652,8 +676,9 @@ async def test_kba_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    analytics_in.set_input_uris(Environment.production)
+
     analytics_in._version = TEST_VERSION
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -688,7 +713,6 @@ async def test_kba_dist_analytics_no_intersection():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,
@@ -702,15 +726,18 @@ async def test_kba_dist_analytics_no_intersection():
 
 
 @pytest.mark.asyncio
-async def test_admin_dist_analytics_by_grasslands():
-    analytics_in = DistAlertsAnalyticsIn(
+async def test_admin_dist_analytics_by_grasslands(make_analytics_in):
+    analytics_in = make_analytics_in(
+        DistAlertsAnalyticsIn,
+        DistAlertsAnalyzer,
         aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
         start_date="2024-08-15",
         end_date="2024-08-16",
         intersections=["grasslands"],
     )
-    analytics_in.set_input_uris(Environment.production)
+
     analytics_in._version = TEST_VERSION
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -749,7 +776,6 @@ async def test_admin_dist_analytics_by_grasslands():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,
@@ -762,15 +788,18 @@ async def test_admin_dist_analytics_by_grasslands():
 
 
 @pytest.mark.asyncio
-async def test_admin_dist_analytics_by_land_cover():
-    analytics_in = DistAlertsAnalyticsIn(
+async def test_admin_dist_analytics_by_land_cover(make_analytics_in):
+    analytics_in = make_analytics_in(
+        DistAlertsAnalyticsIn,
+        DistAlertsAnalyzer,
         aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
         start_date="2024-08-15",
         end_date="2024-08-16",
         intersections=["land_cover"],
     )
-    analytics_in.set_input_uris(Environment.production)
+
     analytics_in._version = TEST_VERSION
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -873,7 +902,6 @@ async def test_admin_dist_analytics_by_land_cover():
 
     actual_df = pd.DataFrame(data["result"])
     pd.set_option("display.max_columns", None)
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,

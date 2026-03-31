@@ -75,9 +75,11 @@ def create_analysis_service_for_tests(
 
 class TestGainAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverGainAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverGainAnalyticsIn,
+            TreeCoverGainAnalyzer,
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "IDN.14", "BRA"]),
             start_year="2005",
             end_year="2020",
@@ -142,16 +144,18 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
 
 class TestGainAnalyticsPostWithKba:
     @pytest_asyncio.fixture
-    async def setup(self):
+    async def setup(self, make_analytics_in):
         """Runs before each test in this class"""
-        analytics_in = TreeCoverGainAnalyticsIn(
+        analytics_in = make_analytics_in(
+            TreeCoverGainAnalyticsIn,
+            TreeCoverGainAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
             start_year="2005",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -213,15 +217,17 @@ class TestGainAnalyticsPostWithKba:
 
 class TestGainAnalyticsKeyErrorFix:
     @pytest_asyncio.fixture
-    async def setup(self):
-        analytics_in = TreeCoverGainAnalyticsIn(
+    async def setup(self, make_analytics_in):
+        analytics_in = make_analytics_in(
+            TreeCoverGainAnalyticsIn,
+            TreeCoverGainAnalyzer,
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
