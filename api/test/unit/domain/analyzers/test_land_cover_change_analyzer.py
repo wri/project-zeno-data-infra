@@ -177,7 +177,7 @@ class TestLandCoverChangeCustomAois:
             },
         )
         analysis = Analysis(None, metadata.model_dump(), AnalysisStatus.pending)
-        _ = await analyzer.analyze(analysis)
+        await analyzer.analyze(analysis)
         self.result = analysis.result
 
     @pytest.mark.asyncio

@@ -181,7 +181,7 @@ class TestLandCoverCompositionCustomAois:
         self.metadata = metadata.model_dump()
 
         analysis = Analysis(None, self.metadata, AnalysisStatus.pending)
-        _ = await analyzer.analyze(analysis)
+        await analyzer.analyze(analysis)
         self.result = analysis.result
 
     @pytest.mark.asyncio
@@ -278,7 +278,7 @@ class TestLandCoverChangeAdminAois:
             status=AnalysisStatus.pending,
         )
 
-        _ = await analyzer_with_test_data.analyze(analysis)
+        await analyzer_with_test_data.analyze(analysis)
         self.result = analysis.result
 
     def test_analysis_result(self):

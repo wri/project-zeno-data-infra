@@ -554,7 +554,7 @@ class TestLandCoverChangeAdminAois:
             status=AnalysisStatus.pending,
         )
 
-        _ = await analyzer_with_test_data.analyze(analysis)
+        await analyzer_with_test_data.analyze(analysis)
         self.result = analysis.result
 
     def test_analysis_result(self):

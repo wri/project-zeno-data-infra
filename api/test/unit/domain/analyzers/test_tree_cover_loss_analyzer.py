@@ -113,7 +113,7 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    _ = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
     results = analysis.result
 
     assert "BRA" in results.aoi_id.to_list()
@@ -149,7 +149,7 @@ async def test_flox_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    _ = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
     results = analysis.result
 
     pd.testing.assert_frame_equal(
@@ -194,7 +194,7 @@ async def test_flox_handler_natural_forests():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    _ = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
     results = analysis.result
 
     pd.testing.assert_frame_equal(
@@ -259,7 +259,7 @@ async def test_flox_handler_custom_area():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    _ = await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
     results = analysis.result
 
     pd.testing.assert_frame_equal(
