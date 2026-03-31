@@ -42,11 +42,9 @@ class CarbonFluxAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
         query_service=None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
 
     @nr_agent.function_trace(name="CarbonFluxAnalyzer.analyze")
