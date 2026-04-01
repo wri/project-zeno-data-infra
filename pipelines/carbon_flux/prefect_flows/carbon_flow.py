@@ -61,4 +61,7 @@ def gadm_carbon_flux(overwrite: bool = False):
     result_uri = common_tasks.save_result.with_options(name="carbon-flux-save-result")(
         result_df, result_uri
     )
+    carbon_tasks.qc_against_validation_source.with_options(
+        name="carbon-flux-qc"
+    )(result_df)
     return result_uri

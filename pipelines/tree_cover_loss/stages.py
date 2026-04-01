@@ -19,6 +19,7 @@ from pipelines.prefect_flows.common_stages import create_zarrs as common_create_
 from pipelines.prefect_flows.common_stages import (
     numeric_to_alpha3,
     rollup_by_gadm_and_convert_to_aoi,
+    symmetric_relative_difference,
 )
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
@@ -352,11 +353,6 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     return results_with_ids
 
 
-def _symmetric_relative_difference(a, b):
-    avg = (abs(a) + abs(b)) / 2
-    return 0 if avg == 0 else abs(a - b) / avg
-
-
 # In Justin's original QC feature file (now at
 # s3://lcl-analytics/vectors/qc_features.geojson.orig), only 3 features in the
 # first 55 did not pass. Those GADM2 areas are listed in bug GTC-3496 to
@@ -412,10 +408,10 @@ def qc_against_validation_source(
         else:
             validation_natural_forests_ha_total = 0
 
-        diff_driver = _symmetric_relative_difference(
+        diff_driver = symmetric_relative_difference(
             validation_driver_area_ha_total, sample_driver_area_ha_total
         )
-        diff_natural_forest = _symmetric_relative_difference(
+        diff_natural_forest = symmetric_relative_difference(
             validation_natural_forests_ha_total, sample_natural_forests_ha_total
         )
 
