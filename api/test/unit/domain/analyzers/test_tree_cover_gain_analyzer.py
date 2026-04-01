@@ -12,7 +12,6 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_que
     PrecalcSqlQueryBuilder,
 )
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -89,7 +88,8 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             start_year="2000",
             end_year="2010",
         )
-        metadata.set_input_uris(Environment.production)
+        metadata.set_input_hash([])
+
         analysis = Analysis(
             result=None, metadata=metadata.model_dump(), status=AnalysisStatus.pending
         )

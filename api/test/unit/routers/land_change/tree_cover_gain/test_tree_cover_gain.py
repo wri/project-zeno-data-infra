@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.models.environment import Environment
 from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
@@ -30,7 +29,7 @@ def dummy_analytics_in():
         start_year="2010",
         end_year="2015",
     )
-    analytics_in.set_input_uris(Environment.production)
+    analytics_in.set_input_hash([])
     return analytics_in
 
 

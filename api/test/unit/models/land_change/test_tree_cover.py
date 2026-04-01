@@ -1,6 +1,5 @@
 import pytest
 
-from app.domain.models.environment import Environment
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
 
@@ -13,7 +12,7 @@ def base_config():
         canopy_cover=30,
         forest_filter=None,
     )
-    analytics_in.set_input_uris(Environment.production)
+    analytics_in.set_input_hash([])
     return analytics_in
 
 
@@ -22,13 +21,13 @@ class TestTreeCoverAnalyticsIn:
         original_thumb = base_config.thumbprint()
 
         model = TreeCoverAnalyticsIn(**base_config.model_dump())
-        model.set_input_uris(Environment.production)
+        model.set_input_hash([])
 
         assert model.thumbprint() == original_thumb
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = TreeCoverAnalyticsIn(**base_config.model_dump())
-        model.set_input_uris(Environment.production)
+        model.set_input_hash([])
 
         model.aoi = AdminAreaOfInterest(
             type="admin",
@@ -39,7 +38,7 @@ class TestTreeCoverAnalyticsIn:
 
     def test_thumbprint_changes_when_cc_changes(self, base_config):
         model = TreeCoverAnalyticsIn(**base_config.model_dump())
-        model.set_input_uris(Environment.production)
+        model.set_input_hash([])
 
         model.canopy_cover = 15
 
@@ -47,7 +46,7 @@ class TestTreeCoverAnalyticsIn:
 
     def test_thumbprint_changes_when_ff_changes(self, base_config):
         model = TreeCoverAnalyticsIn(**base_config.model_dump())
-        model.set_input_uris(Environment.production)
+        model.set_input_hash([])
 
         model.forest_filter = "primary_forest"
 
