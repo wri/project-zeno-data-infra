@@ -28,9 +28,9 @@ from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
 PIPELINE_CHUNK_SIZE = 10_000
 OTF_CHUNK_SIZE = 4_000
 
-TCL_VERSION = "v1.12"
-TCLF_VERSION = "v1.12"
-DRIVERS_VERSION = "v1.12"
+TCL_VERSION = "v1.13"
+TCLF_VERSION = "v1.13"
+DRIVERS_VERSION = "v1.13"
 
 DATASETS = {
     "tree_cover_loss": {
