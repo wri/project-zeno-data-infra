@@ -128,13 +128,12 @@ class AnalysisService:
         return self.analytics_resource.status or AnalysisStatus.pending
 
     async def set_resource_from(self, data: AnalyticsIn):
-        data.set_input_hash(self.analyzer.input_uris())
+        self.analytics_resource_id = data.thumbprint()
 
         analysis: Analysis = await self.analysis_repository.load_analysis(
-            data.thumbprint()
+            self.resource_thumbprint()
         )
 
-        self.analytics_resource_id = data.thumbprint()
         self.analytics_resource = AnalyticsOut(
             metadata=analysis.metadata or data.model_dump(),
             result=analysis.result,
@@ -143,11 +142,14 @@ class AnalysisService:
 
         if self.analytics_resource.status is None:  # store placeholder immediately
             await self.analysis_repository.store_analysis(
-                data.thumbprint(),
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata, result=None, status=None
                 ),
             )
 
     def resource_thumbprint(self) -> uuid.UUID:
-        return self.analytics_resource_id
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS,
+            f"{self.analytics_resource_id}{self.analyzer.thumbprint()}",
+        )

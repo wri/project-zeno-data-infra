@@ -1,3 +1,5 @@
+import json
+import uuid
 from functools import partial
 from typing import Dict, List
 
@@ -9,13 +11,19 @@ from xarray import DataArray
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 
-_input_uris = {
-    "grasslands_zarr_uri": (
-        "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
-    ),
-    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+# We want to move this into configuration, but will tolerate it being here for now.
+# Note that it actually gets passed in to the constructor for easy moving later.
+# Please DO NOT directly reference in constructor.
+INPUT_URIS = {
+    Environment.production: {
+        "grasslands_zarr_uri": (
+            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
+        ),
+        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+    }
 }
 
 
@@ -27,10 +35,12 @@ class GrasslandsAnalyzer(Analyzer):
         compute_engine=None,
         dataset_repository=None,
         duckdb_query_service=None,
+        input_uris: Dict[str, str] = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.duckdb_query_service = duckdb_query_service
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -78,10 +88,9 @@ class GrasslandsAnalyzer(Analyzer):
 
         return data
 
-    @staticmethod
-    def analyze_area(aoi, geojson, start_year, end_year) -> DataFrame:
-        grasslands_obj_name = _input_uris["grasslands_zarr_uri"]
-        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+    def analyze_area(self, aoi, geojson, start_year, end_year) -> DataFrame:
+        grasslands_obj_name = self.input_uris["grasslands_zarr_uri"]
+        pixel_area_obj_name = self.input_uris["pixel_area_zarr_uri"]
 
         grasslands: DataArray = read_zarr_clipped_to_geojson(
             grasslands_obj_name, geojson
@@ -109,5 +118,8 @@ class GrasslandsAnalyzer(Analyzer):
 
         return grasslands_areas_df
 
-    def input_uris(self) -> list[str]:
-        return sorted(_input_uris.values())
+    def thumbprint(self):
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS,
+            json.dumps(self.input_uris, sort_keys=True),
+        )
