@@ -506,7 +506,7 @@ def create_zarrs(
     result_uris: Dict[str, str] = {}
 
     for name, cfg in datasets.items():
-        create_zarr_from_tiles(
+        result_uris[name] = create_zarr_from_tiles(
             cfg["tiles_uri"],
             cfg["zarr_uri"],
             [
@@ -516,6 +516,5 @@ def create_zarrs(
             overwrite=overwrite,
             dtype=cfg["dtype"],
         )
-        result_uris[name] = cfg["zarr_uri"]
 
     return result_uris
