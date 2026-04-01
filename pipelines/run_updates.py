@@ -21,11 +21,11 @@ def create_cluster():
     cluster = coiled.Cluster(
         name="gnw_zonal_stat_count",
         region="us-east-1",
-        n_workers=1,
+        n_workers=10,
         tags={"project": "gnw_zonal_stat"},
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
-        compute_purchase_option="spot_with_fallback",
+        compute_purchase_option="on-demand",
         no_client_timeout="5 seconds",
         container=os.getenv("PIPELINES_IMAGE"),
         environ={
