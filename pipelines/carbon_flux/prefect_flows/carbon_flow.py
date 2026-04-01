@@ -12,17 +12,19 @@ from pipelines.utils import s3_uri_exists
 def gadm_carbon_flux(overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
-    carbon_net_flux_zarr_uri = "s3://lcl-analytics/zarr/gfw_forest_carbon_net_flux/v20250430/Mg_CO2e.zarr/"
-    carbon_gross_removals_zarr_uri = "s3://lcl-analytics/zarr/gfw_forest_carbon_gross_removals/v20250416/Mg_CO2e.zarr/"
-    carbon_gross_emissions_zarr_uri = "s3://lcl-analytics/zarr/gfw_forest_carbon_gross_emissions/v20250430/Mg_CO2e.zarr/"
+    carbon_zarr_uris = carbon_tasks.create_zarrs.with_options(
+        name="create-carbon-zarrs"
+    )(overwrite=overwrite)
 
     mangrove_stock_2000_zarr_uri = "s3://lcl-analytics/zarr/jpl_mangrove_aboveground_biomass_stock_2000/v201902/is_mangrove.zarr/"
-
-    tree_cover_gain_from_height_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
-    tree_cover_density_2000_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr/"
+    tree_cover_gain_from_height_zarr_uri = (
+        "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
+    )
+    tree_cover_density_2000_zarr_uri = (
+        "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr/"
+    )
 
     result_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon.parquet"
-    funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
@@ -31,20 +33,20 @@ def gadm_carbon_flux(overwrite: bool = False):
         np.arange(999),  # country iso codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
-        np.arange(8),   # tree cover density
-        [0, 1],           # mangrove boolean
-        [0, 1],         # tree cover gain from height boolean
+        np.arange(8),  # tree cover density
+        [0, 1],  # mangrove boolean
+        [0, 1],  # tree cover gain from height boolean
     )
 
-    datasets = carbon_tasks.load_data.with_options(
-        name="carbon-flux-load-data"
-    )(carbon_net_flux_zarr_uri,
-      carbon_gross_removals_zarr_uri,
-      carbon_gross_emissions_zarr_uri,
-      tree_cover_density_2000_zarr_uri,
-      mangrove_stock_2000_zarr_uri,
-      tree_cover_gain_from_height_zarr_uri,
-      )
+    datasets = carbon_tasks.load_data.with_options(name="carbon-flux-load-data")(
+        carbon_zarr_uris["carbon_net_flux"],
+        carbon_zarr_uris["carbon_gross_removals"],
+        carbon_zarr_uris["carbon_gross_emissions"],
+        tree_cover_density_2000_zarr_uri,
+        mangrove_stock_2000_zarr_uri,
+        tree_cover_gain_from_height_zarr_uri,
+        group="pipeline",
+    )
 
     compute_input = carbon_tasks.setup_compute.with_options(
         name="carbon-flux-setup-compute"
@@ -52,11 +54,11 @@ def gadm_carbon_flux(overwrite: bool = False):
 
     result_dataset = common_tasks.compute_zonal_stat.with_options(
         name="carbon-flux-compute-zonal-stats"
-    )(*compute_input, funcname=funcname)
+    )(*compute_input, funcname="sum")
     result_df = carbon_tasks.postprocess_result.with_options(
         name="carbon-flux-postprocess-result"
     )(result_dataset)
-    result_uri = common_tasks.save_result.with_options(
-        name="carbon-flux-save-result"
-    )(result_df, result_uri)
+    result_uri = common_tasks.save_result.with_options(name="carbon-flux-save-result")(
+        result_df, result_uri
+    )
     return result_uri
