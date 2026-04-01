@@ -483,6 +483,7 @@ def create_zarr_from_tiles(
     if dtype:
         dataset = dataset.astype(dtype)
     for chunk_size, group in groups_to_write:
+        # `mode` applies to group, so `w` won't overwrite the whole store if the group already exists, just that group.
         dataset.chunk({"x": chunk_size, "y": chunk_size}).to_zarr(
             zarr_uri, mode="w", group=group
         )
