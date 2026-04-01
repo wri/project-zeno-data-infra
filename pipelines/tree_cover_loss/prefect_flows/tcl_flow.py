@@ -51,7 +51,7 @@ def umd_tree_cover_loss_flow(
         bbox = box(*bbox)
 
     expected_groups = (
-        np.arange(1, 25),  # tcl years
+        np.arange(1, 31),  # tcl years
         np.arange(0, 8),  # tcd threshold
         np.arange(0, 2),  # ifl
         np.arange(0, 8),  # drivers
