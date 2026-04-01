@@ -21,3 +21,7 @@ class Analyzer(ABC):
     #     is deterministic.
     #     """
     #     pass
+
+    @abstractmethod
+    def thumbprint(self):
+        pass
