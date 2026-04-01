@@ -18,9 +18,17 @@ from pipelines.tree_cover_loss.prefect_flows.tcl_flow import umd_tree_cover_loss
     "pipelines.repositories.qc_feature_repository.QCFeaturesRepository.write_results"
 )
 @patch("pipelines.repositories.qc_feature_repository.QCFeaturesRepository.load")
-def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parquet):
+@patch("pipelines.tree_cover_loss.prefect_flows.tcl_tasks.create_zarrs_func")
+def test_tcl_flow_real_data(
+    mock_create_zarrs, mock_qc_load, mock_qc_write_results, mock_save_parquet
+):
     test_geom = shape(ARG_1_28)
 
+    mock_create_zarrs.return_value = {
+        "tree_cover_loss": "s3://lcl-analytics/zarr/umd-tree-cover-loss/v1.12/year.zarr",
+        "tree_cover_loss_from_fires": "s3://lcl-analytics/zarr/umd-tree-cover-loss-from-fires/v1.12/year.zarr",
+        "drivers": "s3://lcl-analytics/zarr/wri-google-tree-cover-loss-drivers/v1.12/category.zarr",
+    }
     mock_qc_load.return_value = gpd.GeoDataFrame(
         {"geometry": [test_geom], "GID_2": "ARG.1.28_1"}
     )
@@ -57,7 +65,7 @@ def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parqu
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 24695
+    assert result_df.size == 30019
     mock_qc_write_results.assert_called_once()
 
 
@@ -67,7 +75,9 @@ def test_tcl_flow_real_data(mock_qc_load, mock_qc_write_results, mock_save_parqu
 )
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
+@patch("pipelines.tree_cover_loss.prefect_flows.tcl_tasks.create_zarrs_func")
 def test_tcl_flow_with_new_contextual_layers(
+    mock_create_zarrs,
     mock_load_zarr,
     mock_save_parquet,
     mock_qc,
@@ -84,6 +94,11 @@ def test_tcl_flow_with_new_contextual_layers(
     region_ds,
     subregion_ds,
 ):
+    mock_create_zarrs.return_value = {
+        "tree_cover_loss": "s3://mock/tcl.zarr",
+        "tree_cover_loss_from_fires": "s3://mock/tclf.zarr",
+        "drivers": "s3://mock/drivers.zarr",
+    }
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,
@@ -133,7 +148,9 @@ def test_tcl_flow_with_new_contextual_layers(
 )
 @patch("pipelines.prefect_flows.common_stages._save_parquet")
 @patch("pipelines.tree_cover_loss.stages._load_zarr")
+@patch("pipelines.tree_cover_loss.prefect_flows.tcl_tasks.create_zarrs_func")
 def test_tcl_flow_with_bbox(
+    mock_create_zarrs,
     mock_load_zarr,
     mock_save_parquet,
     mock_qc,
@@ -150,6 +167,11 @@ def test_tcl_flow_with_bbox(
     region_ds,
     subregion_ds,
 ):
+    mock_create_zarrs.return_value = {
+        "tree_cover_loss": "s3://mock/tcl.zarr",
+        "tree_cover_loss_from_fires": "s3://mock/tclf.zarr",
+        "drivers": "s3://mock/drivers.zarr",
+    }
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,

@@ -28,9 +28,6 @@ tree_cover_loss_from_fires_zarr_uri = (
 tree_cover_density_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr"
 )
-carbon_emissions_zarr_uri = (
-    f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-emissions/v20250430/Mg_CO2e_float64.zarr"
-)
 wri_google_1km_drivers_zarr_uri = "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr"
 ifl_intact_forest_lands_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/ifl-intact-forest-landscapes-2000/v2021/is.zarr/"

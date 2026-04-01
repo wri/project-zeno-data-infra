@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import xarray as xr
@@ -10,6 +10,7 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
+from pipelines.utils import s3_uri_exists
 
 numeric_to_alpha3 = {
     4: "AFG",
@@ -268,7 +269,7 @@ def load_data(
     base_zarr_uri: str,
     contextual_uri: Optional[str] = None,
 ) -> Tuple[xr.DataArray, ...]:
-    """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
+    """Load in the base zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
     base_layer = _load_zarr(base_zarr_uri)
 
@@ -346,6 +347,71 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     return df
 
 
+def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
+    """Add in extra rows which are aggregates (roll-ups) of the rows over regions and
+    countries. groupby_list specifies the contextual layers that are still
+    grouped-by. All other columns are aggregated by sum.
+
+    Also convert country/region/subregion columns to an aoi_id field."""
+
+    if df.size == 0:
+        df = df.drop(columns=["country", "region", "subregion"])
+        df["aoi_id"] = pd.Series(dtype="object")
+        df["aoi_type"] = pd.Series(dtype="object")
+        return df
+
+    # subregion_df is all the rows which have a subregion. rows that don't have
+    # subregion will be covered by region_df and country_df.
+    subregion_df = df[df.subregion != 0]
+
+    # Create a dataframe which aggregates by the same groupbys after the subregion
+    # column is eliminated - so it is the same grouped results but at the
+    # country/region level only. It drops out all rows that don't have a region,
+    # since that will be covered by country_df.
+    region_df = df.drop(columns=["subregion"])
+    region_df = region_df[region_df.region != 0]
+    region_df = (
+        region_df.groupby(["country", "region"] + groupby_list).sum().reset_index()
+    )
+
+    # Create a dataframe which aggregates by the same groupbys after subregion and
+    # region area are eliminated - so it is the same grouped results but at the country
+    # level only.
+    country_df = df.drop(columns=["subregion", "region"])
+    country_df = country_df.groupby(["country"] + groupby_list).sum().reset_index()
+
+    # Create aoi_id for rows with country/region/subregion
+    if subregion_df.size > 0:
+        subregion_df["aoi_id"] = (
+            subregion_df[["country", "region", "subregion"]]
+            .astype(str)
+            .agg(".".join, axis=1)
+        )
+
+    # Create aoi_id for rows with only country/region
+    if region_df.size > 0:
+        region_df["aoi_id"] = (
+            region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
+        )
+
+    # Create aoi_id for rows with only country.
+    country_df["aoi_id"] = country_df["country"]
+
+    subregion_df = subregion_df.drop(columns=["country", "region", "subregion"])
+    region_df = region_df.drop(columns=["country", "region"])
+    country_df = country_df.drop(columns=["country"])
+
+    # pd.concat will deal fine if region_df or subregion_df are empty, even though
+    # they are missing the aoi_id column.
+    results_with_ids = pd.concat([country_df, region_df, subregion_df])
+    results_with_ids["aoi_type"] = "admin"
+    print(
+        f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, {len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} -> {len(results_with_ids)}/{results_with_ids.size}"
+    )
+
+    return results_with_ids
+
+
 def save_results(df: pd.DataFrame, results_uri: str) -> str:
     print("Starting parquet")
 
@@ -359,5 +425,96 @@ def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
     df.to_parquet(results_uri, index=False)
 
 
-def _load_zarr(zarr_uri):
-    return xr.open_zarr(zarr_uri, storage_options={"requester_pays": True})
+def _load_zarr(zarr_uri, group=None):
+    return xr.open_zarr(zarr_uri, group=group, storage_options={"requester_pays": True})
+
+
+def _get_tile_uris(tiles_geojson_uri: str) -> List[str]:
+    """Extract S3 URIs from a tiles.geojson file."""
+    tiles = pd.read_json(tiles_geojson_uri, storage_options={"requester_pays": True})
+    return [
+        "/".join(["s3:/"] + f["properties"]["name"].split("/")[2:])
+        for f in tiles.features
+    ]
+
+
+def create_zarr_from_tiles(
+    tiles_geojson_uri: str,
+    zarr_uri: str,
+    groups: List[Tuple[int, Optional[str]]],
+    overwrite: bool = False,
+    dtype: Optional[str] = None,
+) -> str:
+    """Create zarr groups from tiled GeoTIFFs referenced by a tiles.geojson file.
+
+    Tiles are fetched once and written to each requested group, avoiding
+    redundant S3 reads when producing multiple chunk-size variants.
+
+    Args:
+        tiles_geojson_uri: S3 URI to a tiles.geojson file listing the geotiff tiles.
+        zarr_uri: Destination S3 URI for the output zarr store.
+        groups: List of (chunk_size, group) pairs describing each zarr group to
+            write.  ``chunk_size`` is in pixels; ``group`` is the zarr group
+            name (e.g. ``'pipeline'`` or ``'otf'``), or ``None`` for the root.
+        overwrite: If True, overwrite existing zarr groups at the target
+            location.
+        dtype: Optional numpy dtype string (e.g. ``'uint8'``, ``'float64'``) to
+            cast all variables to before writing.
+
+    Returns:
+        The zarr_uri that was written to.
+    """
+    groups_to_write = [
+        (chunk_size, group)
+        for chunk_size, group in groups
+        if overwrite
+        or not s3_uri_exists(
+            f"{zarr_uri}/{group}/zarr.json" if group else f"{zarr_uri}/zarr.json"
+        )
+    ]
+    if not groups_to_write:
+        return zarr_uri
+
+    tile_uris = _get_tile_uris(tiles_geojson_uri)
+    max_chunk_size = max(chunk_size for chunk_size, _ in groups_to_write)
+    dataset = xr.open_mfdataset(
+        tile_uris, parallel=True, chunks={"x": max_chunk_size, "y": max_chunk_size}
+    ).persist()
+    if dtype:
+        dataset = dataset.astype(dtype)
+    for chunk_size, group in groups_to_write:
+        # `mode` applies to group, so `w` won't overwrite the whole store if the group already exists, just that group.
+        dataset.chunk({"x": chunk_size, "y": chunk_size}).to_zarr(
+            zarr_uri, mode="w", group=group
+        )
+    return zarr_uri
+
+
+def create_zarrs(
+    datasets: Dict[str, Dict[str, str]],
+    overwrite: bool = False,
+    pipeline_chunk_size: int = 10_000,
+    otf_chunk_size: int = 4_000,
+) -> Dict[str, str]:
+    """Create zarr stores for multiple datasets from tiled GeoTIFFs.
+
+    Each dataset config must include:
+      - ``tiles_uri``: source tiles.geojson URI
+      - ``zarr_uri``: destination zarr URI
+      - ``dtype``: dtype used before writing
+    """
+    result_uris: Dict[str, str] = {}
+
+    for name, cfg in datasets.items():
+        result_uris[name] = create_zarr_from_tiles(
+            cfg["tiles_uri"],
+            cfg["zarr_uri"],
+            [
+                (pipeline_chunk_size, "pipeline"),
+                (otf_chunk_size, "otf"),
+            ],
+            overwrite=overwrite,
+            dtype=cfg["dtype"],
+        )
+
+    return result_uris

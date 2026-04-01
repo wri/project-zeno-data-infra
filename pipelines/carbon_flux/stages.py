@@ -1,36 +1,85 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
+
 import pandas as pd
 import xarray as xr
 
 from pipelines.globals import (
+    ANALYTICS_BUCKET,
+    DATA_LAKE_BUCKET,
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
 )
+from pipelines.prefect_flows.common_stages import (
+    create_result_dataframe as common_create_result_dataframe,
+)
+from pipelines.prefect_flows.common_stages import create_zarrs as common_create_zarrs
+from pipelines.prefect_flows.common_stages import (
+    rollup_by_gadm_and_convert_to_aoi,
+)
 
-from pipelines.prefect_flows.common_stages import create_result_dataframe as common_create_result_dataframe
+PIPELINE_CHUNK_SIZE = 10_000
+OTF_CHUNK_SIZE = 4_000
+
+CARBON_NET_FLUX_VERSION = "v20250430"
+CARBON_GROSS_REMOVALS_VERSION = "v20250416"
+CARBON_GROSS_EMISSIONS_VERSION = "v20250430"
+
+DATASETS = {
+    "carbon_net_flux": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_net_flux/{CARBON_NET_FLUX_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-net-flux/{CARBON_NET_FLUX_VERSION}/Mg_CO2e.zarr",
+        "dtype": "float64",
+    },
+    "carbon_gross_removals": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_removals/{CARBON_GROSS_REMOVALS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-removals/{CARBON_GROSS_REMOVALS_VERSION}/Mg_CO2e.zarr",
+        "dtype": "float64",
+    },
+    "carbon_gross_emissions": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_emissions/{CARBON_GROSS_EMISSIONS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-emissions/{CARBON_GROSS_EMISSIONS_VERSION}/Mg_CO2e.zarr",
+        "dtype": "float64",
+    },
+}
+
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
 
 
+def create_zarrs(overwrite: bool = False) -> Dict[str, str]:
+    """Create zarr stores for carbon flux datasets from tiled GeoTIFFs."""
+    return common_create_zarrs(
+        datasets=DATASETS,
+        overwrite=overwrite,
+        pipeline_chunk_size=PIPELINE_CHUNK_SIZE,
+        otf_chunk_size=OTF_CHUNK_SIZE,
+    )
+
+
 def load_data(
-        carbon_net_flux_zarr_uri,
-        carbon_gross_removals_zarr_uri,
-        carbon_gross_emissions_zarr_uri,
-        tree_cover_density_2000_zarr_uri,
-        mangrove_stock_2000_zarr_uri,
-        tree_cover_gain_from_height_zarr_uri,
+    carbon_net_flux_zarr_uri,
+    carbon_gross_removals_zarr_uri,
+    carbon_gross_emissions_zarr_uri,
+    tree_cover_density_2000_zarr_uri,
+    mangrove_stock_2000_zarr_uri,
+    tree_cover_gain_from_height_zarr_uri,
+    group: Optional[str] = None,
 ) -> Tuple[xr.DataArray, ...]:
     """Load in the layers needed for carbon flux analysis"""
 
-    base_layer = _load_zarr(carbon_net_flux_zarr_uri).astype("float64")
-    carbon_gross_removals = _load_zarr(carbon_gross_removals_zarr_uri).reindex_like(
-        base_layer, method="nearest", tolerance=1e-5
-    ).astype("float64")
-    carbon_gross_emissions = _load_zarr(carbon_gross_emissions_zarr_uri).reindex_like(
-        base_layer, method="nearest", tolerance=1e-5
-    ).astype("float64")
+    base_layer = _load_zarr(carbon_net_flux_zarr_uri, group=group).astype("float64")
+    carbon_gross_removals = (
+        _load_zarr(carbon_gross_removals_zarr_uri, group=group)
+        .reindex_like(base_layer, method="nearest", tolerance=1e-5)
+        .astype("float64")
+    )
+    carbon_gross_emissions = (
+        _load_zarr(carbon_gross_emissions_zarr_uri, group=group)
+        .reindex_like(base_layer, method="nearest", tolerance=1e-5)
+        .astype("float64")
+    )
 
     # reindex to dist alerts to avoid floating point precision issues
     # when aligning the datasets
@@ -57,23 +106,32 @@ def load_data(
     mangrove_stock_2000 = _load_zarr(mangrove_stock_2000_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5, fill_value=0
     )
-    mangrove_stock_2000_aligned = xr.align(base_layer, mangrove_stock_2000, join="left")[1].band_data
+    mangrove_stock_2000_aligned = xr.align(
+        base_layer, mangrove_stock_2000, join="left"
+    )[1].band_data
 
-    tree_cover_gain_from_height = _load_zarr(tree_cover_gain_from_height_zarr_uri).reindex_like(
-        base_layer, method="nearest", tolerance=1e-5
-    )
-    tree_cover_gain_from_height_aligned = xr.align(base_layer, tree_cover_gain_from_height, join="left")[1].band_data
+    tree_cover_gain_from_height = _load_zarr(
+        tree_cover_gain_from_height_zarr_uri
+    ).reindex_like(base_layer, method="nearest", tolerance=1e-5)
+    tree_cover_gain_from_height_aligned = xr.align(
+        base_layer, tree_cover_gain_from_height, join="left"
+    )[1].band_data
     # Map tree_cover_gain_from_height to 1 if any gain, 0 otherwise.
-    tree_cover_gain_from_height_aligned = xr.where(tree_cover_gain_from_height_aligned > 0, 1, 0).astype("uint8")
+    tree_cover_gain_from_height_aligned = xr.where(
+        tree_cover_gain_from_height_aligned > 0, 1, 0
+    ).astype("uint8")
 
     tree_cover_density_2000 = _load_zarr(tree_cover_density_2000_zarr_uri).reindex_like(
         base_layer, method="nearest", tolerance=1e-5
     )
-    tree_cover_density_2000_aligned = xr.align(base_layer, tree_cover_density_2000, join="left")[1].band_data
+    tree_cover_density_2000_aligned = xr.align(
+        base_layer, tree_cover_density_2000, join="left"
+    )[1].band_data
     # Only keep the 30/50/75 densities (codes 5, 6, and 7), map the rest (10, 15, 20,
     # 25) to 0, which means less than 30% density.
     tree_cover_density_2000_aligned = tree_cover_density_2000_aligned.where(
-        tree_cover_density_2000_aligned >= 5, other=0)
+        tree_cover_density_2000_aligned >= 5, other=0
+    )
 
     return (
         base_layer,
@@ -94,16 +152,33 @@ def setup_compute(
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xrarray reduce on natural lands by area"""
-    carbon_net_flux, carbon_gross_removals, carbon_gross_emissions, country, region, subregion, mangrove_stock_2000, tree_cover_gain_from_height, tree_cover_density_2000 = datasets
+    (
+        carbon_net_flux,
+        carbon_gross_removals,
+        carbon_gross_emissions,
+        country,
+        region,
+        subregion,
+        mangrove_stock_2000,
+        tree_cover_gain_from_height,
+        tree_cover_density_2000,
+    ) = datasets
 
     # I created a data array with the multiple data inputs on a "carbontype"
     # dimension, rather than a dataset with multiple data variables, because only a
     # data array result works with the create_result_dataframe() post-processing of the
     # sparse data.
-    ds = xr.concat([carbon_net_flux.band_data,
-                    carbon_gross_removals.band_data,
-                    carbon_gross_emissions.band_data],
-                   pd.Index(["carbon_net_flux", "carbon_gross_removals", "carbon_gross_emissions"], name="carbontype"))
+    ds = xr.concat(
+        [
+            carbon_net_flux.band_data,
+            carbon_gross_removals.band_data,
+            carbon_gross_emissions.band_data,
+        ],
+        pd.Index(
+            ["carbon_net_flux", "carbon_gross_removals", "carbon_gross_emissions"],
+            name="carbontype",
+        ),
+    )
 
     groupbys: Tuple[xr.DataArray, ...] = (
         country.rename("country"),
@@ -142,23 +217,31 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     results = []
 
     for T in thresholds:
-        mask = ((df['tree_cover_density'] >= T)
-                | (df['mangrove_stock_2000'] == 1)
-                | (df['tree_cover_gain_from_height'] == 1)
-                )
+        mask = (
+            (df["tree_cover_density"] >= T)
+            | (df["mangrove_stock_2000"] == 1)
+            | (df["tree_cover_gain_from_height"] == 1)
+        )
 
-        temp_df = df[mask].groupby(
-            ['country', 'region', 'subregion', 'carbontype'],
-            as_index=False
-        )['value'].sum()
-        temp_df['tree_cover_density'] = T
+        temp_df = (
+            df[mask]
+            .groupby(["country", "region", "subregion", "carbontype"], as_index=False)[
+                "value"
+            ]
+            .sum()
+        )
+        temp_df["tree_cover_density"] = T
         results.append(temp_df)
 
     df = pd.concat(results, ignore_index=True)
-    df = df[['country', 'region', 'subregion', 'tree_cover_density', 'carbontype', 'value']]
+    df = df[
+        ["country", "region", "subregion", "tree_cover_density", "carbontype", "value"]
+    ]
+
+    df = rollup_by_gadm_and_convert_to_aoi(df, ["tree_cover_density", "carbontype"])
 
     return df
 
 
-def _load_zarr(zarr_uri):
-    return xr.open_zarr(zarr_uri)
+def _load_zarr(zarr_uri, group=None):
+    return xr.open_zarr(zarr_uri, group=group)
