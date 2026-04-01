@@ -84,31 +84,6 @@ class AnalyticsIn(StrictBaseModel):
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)
 
-    # ------------------------------------------------------------------
-    # Backwards-compatibility shim — used by existing tests that haven't
-    # been migrated to set_input_hash() yet.  Remove once all
-    # call-sites are updated.
-    # ------------------------------------------------------------------
-    def set_input_uris(self, environment: str) -> None:  # noqa: D401
-        """Deprecated — prefer ``set_input_hash(uris)``."""
-        import warnings
-
-        from app.domain.models.dataset import Dataset
-        from app.domain.repositories.zarr_dataset_repository import (
-            ZarrDatasetRepository,
-        )
-
-        warnings.warn(
-            "set_input_uris() is deprecated, use set_input_hash()",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        uris: list[str] = sorted(
-            ZarrDatasetRepository.resolve_zarr_uri(dataset, environment)
-            for dataset in Dataset
-        )
-        self.set_input_hash(uris)
-
 
 class AnalyticsOut(StrictBaseModel):
     result: Optional[dict] = None
