@@ -5,7 +5,7 @@ import numpy as np
 from prefect import flow
 from shapely.geometry import box
 
-from pipelines.carbon_flux.create_zarr import DATASETS as CARBON_FLUX_DATASETS
+from pipelines.carbon_flux.stages import DATASETS as CARBON_FLUX_DATASETS
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     ifl_intact_forest_lands_zarr_uri,

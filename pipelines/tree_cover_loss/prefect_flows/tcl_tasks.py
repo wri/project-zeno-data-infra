@@ -6,7 +6,8 @@ from prefect import task
 from shapely import Polygon
 
 from pipelines.tree_cover_loss import stages
-from pipelines.tree_cover_loss.create_zarr import create_zarrs as create_zarrs_func
+
+create_zarrs_func = stages.create_zarrs
 
 
 @task

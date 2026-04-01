@@ -1,21 +1,61 @@
-from typing import Callable, Optional, Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import pandas as pd
 import xarray as xr
 
 from pipelines.globals import (
+    ANALYTICS_BUCKET,
+    DATA_LAKE_BUCKET,
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
+)
+from pipelines.prefect_flows.common_stages import create_zarrs as common_create_zarrs
+from pipelines.prefect_flows.common_stages import (
     rollup_by_gadm_and_convert_to_aoi,
 )
+
+PIPELINE_CHUNK_SIZE = 10_000
+OTF_CHUNK_SIZE = 4_000
+
+CARBON_NET_FLUX_VERSION = "v20250430"
+CARBON_GROSS_REMOVALS_VERSION = "v20250416"
+CARBON_GROSS_EMISSIONS_VERSION = "v20250430"
+
+DATASETS = {
+    "carbon_net_flux": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_net_flux/{CARBON_NET_FLUX_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-net-flux/{CARBON_NET_FLUX_VERSION}/Mg_CO2e.zarr",
+        "dtype": "float64",
+    },
+    "carbon_gross_removals": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_removals/{CARBON_GROSS_REMOVALS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-removals/{CARBON_GROSS_REMOVALS_VERSION}/Mg_CO2e.zarr",
+        "dtype": "float64",
+    },
+    "carbon_gross_emissions": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/gfw_forest_carbon_gross_emissions/{CARBON_GROSS_EMISSIONS_VERSION}/raster/epsg-4326/10/40000/Mg_CO2e_px-1/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/gfw-carbon-gross-emissions/{CARBON_GROSS_EMISSIONS_VERSION}/Mg_CO2e.zarr",
+        "dtype": "float64",
+    },
+}
 
 LoaderType = Callable[[str, Optional[str]], Tuple[xr.Dataset, ...]]
 ExpectedGroupsType = Tuple
 SaverType = Callable[[pd.DataFrame, str], None]
+
+
+def create_zarrs(overwrite: bool = False) -> Dict[str, str]:
+    """Create zarr stores for carbon flux datasets from tiled GeoTIFFs."""
+    return common_create_zarrs(
+        datasets=DATASETS,
+        overwrite=overwrite,
+        pipeline_chunk_size=PIPELINE_CHUNK_SIZE,
+        otf_chunk_size=OTF_CHUNK_SIZE,
+    )
 
 
 def load_data(

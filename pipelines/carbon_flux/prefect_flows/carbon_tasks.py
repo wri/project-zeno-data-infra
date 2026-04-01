@@ -4,12 +4,11 @@ import xarray as xr
 from prefect import task
 
 from pipelines.carbon_flux import stages
-from pipelines.carbon_flux.create_zarr import create_zarrs as create_zarrs_func
 
 
 @task
 def create_zarrs(overwrite=False):
-    return create_zarrs_func(overwrite=overwrite)
+    return stages.create_zarrs(overwrite=overwrite)
 
 
 @task

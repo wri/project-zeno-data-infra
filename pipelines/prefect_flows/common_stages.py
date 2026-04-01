@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import xarray as xr
@@ -346,6 +346,7 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
     return df
 
+
 def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     """Add in extra rows which are aggregates (roll-ups) of the rows over regions and
     countries. groupby_list specifies the contextual layers that are still
@@ -369,7 +370,9 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     # since that will be covered by country_df.
     region_df = df.drop(columns=["subregion"])
     region_df = region_df[region_df.region != 0]
-    region_df = region_df.groupby(["country", "region"] + groupby_list).sum().reset_index()
+    region_df = (
+        region_df.groupby(["country", "region"] + groupby_list).sum().reset_index()
+    )
 
     # Create a dataframe which aggregates by the same groupbys after subregion and
     # region area are eliminated - so it is the same grouped results but at the country
@@ -380,7 +383,9 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     # Create aoi_id for rows with country/region/subregion
     if subregion_df.size > 0:
         subregion_df["aoi_id"] = (
-            subregion_df[["country", "region", "subregion"]].astype(str).agg(".".join, axis=1)
+            subregion_df[["country", "region", "subregion"]]
+            .astype(str)
+            .agg(".".join, axis=1)
         )
 
     # Create aoi_id for rows with only country/region
@@ -400,7 +405,9 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     # they are missing the aoi_id column.
     results_with_ids = pd.concat([country_df, region_df, subregion_df])
     results_with_ids["aoi_type"] = "admin"
-    print(f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, {len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} -> {len(results_with_ids)}/{results_with_ids.size}")
+    print(
+        f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, {len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} -> {len(results_with_ids)}/{results_with_ids.size}"
+    )
 
     return results_with_ids
 
@@ -480,3 +487,34 @@ def create_zarr_from_tiles(
             zarr_uri, mode="w", group=group
         )
     return zarr_uri
+
+
+def create_zarrs(
+    datasets: Dict[str, Dict[str, str]],
+    overwrite: bool = False,
+    pipeline_chunk_size: int = 10_000,
+    otf_chunk_size: int = 4_000,
+) -> Dict[str, str]:
+    """Create zarr stores for multiple datasets from tiled GeoTIFFs.
+
+    Each dataset config must include:
+      - ``tiles_uri``: source tiles.geojson URI
+      - ``zarr_uri``: destination zarr URI
+      - ``dtype``: dtype used before writing
+    """
+    result_uris: Dict[str, str] = {}
+
+    for name, cfg in datasets.items():
+        create_zarr_from_tiles(
+            cfg["tiles_uri"],
+            cfg["zarr_uri"],
+            [
+                (pipeline_chunk_size, "pipeline"),
+                (otf_chunk_size, "otf"),
+            ],
+            overwrite=overwrite,
+            dtype=cfg["dtype"],
+        )
+        result_uris[name] = cfg["zarr_uri"]
+
+    return result_uris

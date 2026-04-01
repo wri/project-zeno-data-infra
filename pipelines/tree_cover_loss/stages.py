@@ -6,12 +6,17 @@ import xarray as xr
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
+    ANALYTICS_BUCKET,
+    DATA_LAKE_BUCKET,
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
 )
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
+)
+from pipelines.prefect_flows.common_stages import create_zarrs as common_create_zarrs
+from pipelines.prefect_flows.common_stages import (
     numeric_to_alpha3,
     rollup_by_gadm_and_convert_to_aoi,
 )
@@ -19,6 +24,31 @@ from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
+
+PIPELINE_CHUNK_SIZE = 10_000
+OTF_CHUNK_SIZE = 4_000
+
+TCL_VERSION = "v1.12"
+TCLF_VERSION = "v1.12"
+DRIVERS_VERSION = "v1.12"
+
+DATASETS = {
+    "tree_cover_loss": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss/{TCL_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/{TCL_VERSION}/year.zarr",
+        "dtype": "uint8",
+    },
+    "tree_cover_loss_from_fires": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss_from_fires/{TCLF_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss-from-fires/{TCLF_VERSION}/year.zarr",
+        "dtype": "uint8",
+    },
+    "drivers": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/wri_google_tree_cover_loss_drivers/{DRIVERS_VERSION}/raster/epsg-4326/10/40000/category/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/wri-google-tree-cover-loss-drivers/{DRIVERS_VERSION}/category.zarr",
+        "dtype": "uint8",
+    },
+}
 
 # tcd threshold mapping
 thresh_to_pct = {
@@ -31,6 +61,16 @@ thresh_to_pct = {
     6: "50",
     7: "75",
 }
+
+
+def create_zarrs(overwrite: bool = False) -> Dict[str, str]:
+    """Create zarr stores for TCL pipeline datasets from tiled GeoTIFFs."""
+    return common_create_zarrs(
+        datasets=DATASETS,
+        overwrite=overwrite,
+        pipeline_chunk_size=PIPELINE_CHUNK_SIZE,
+        otf_chunk_size=OTF_CHUNK_SIZE,
+    )
 
 
 def load_data(
