@@ -6,15 +6,49 @@ import xarray as xr
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
+    ANALYTICS_BUCKET,
+    DATA_LAKE_BUCKET,
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
 )
-from pipelines.prefect_flows.common_stages import _load_zarr, numeric_to_alpha3, rollup_by_gadm_and_convert_to_aoi
+from pipelines.prefect_flows.common_stages import (
+    _load_zarr,
+)
+from pipelines.prefect_flows.common_stages import create_zarrs as common_create_zarrs
+from pipelines.prefect_flows.common_stages import (
+    numeric_to_alpha3,
+    rollup_by_gadm_and_convert_to_aoi,
+)
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
+
+PIPELINE_CHUNK_SIZE = 10_000
+OTF_CHUNK_SIZE = 4_000
+
+TCL_VERSION = "v1.12"
+TCLF_VERSION = "v1.12"
+DRIVERS_VERSION = "v1.12"
+
+DATASETS = {
+    "tree_cover_loss": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss/{TCL_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/{TCL_VERSION}/year.zarr",
+        "dtype": "uint8",
+    },
+    "tree_cover_loss_from_fires": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss_from_fires/{TCLF_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss-from-fires/{TCLF_VERSION}/year.zarr",
+        "dtype": "uint8",
+    },
+    "drivers": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/wri_google_tree_cover_loss_drivers/{DRIVERS_VERSION}/raster/epsg-4326/10/40000/category/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/wri-google-tree-cover-loss-drivers/{DRIVERS_VERSION}/category.zarr",
+        "dtype": "uint8",
+    },
+}
 
 # tcd threshold mapping
 thresh_to_pct = {
@@ -29,6 +63,16 @@ thresh_to_pct = {
 }
 
 
+def create_zarrs(overwrite: bool = False) -> Dict[str, str]:
+    """Create zarr stores for TCL pipeline datasets from tiled GeoTIFFs."""
+    return common_create_zarrs(
+        datasets=DATASETS,
+        overwrite=overwrite,
+        pipeline_chunk_size=PIPELINE_CHUNK_SIZE,
+        otf_chunk_size=OTF_CHUNK_SIZE,
+    )
+
+
 def load_data(
     tree_cover_loss_uri: str,
     pixel_area_uri: Optional[str] = None,
@@ -40,6 +84,7 @@ def load_data(
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
+    group: Optional[str] = None,
 ) -> Tuple[
     xr.DataArray,
     xr.Dataset,
@@ -57,7 +102,7 @@ def load_data(
     Returns xr.DataArray for TCL and contextual layers and xr.Dataset for pixel area/carbon emissions
     """
 
-    tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri).band_data
+    tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri, group=group).band_data
     if bbox is not None:
         min_x, min_y, max_x, max_y = bbox.bounds
         # TODO assumption about zarr coords, wrap in class
@@ -74,15 +119,17 @@ def load_data(
     )[1]
 
     carbon_emissions: xr.DataArray = _load_zarr(
-        carbon_emissions_uri
-    ).carbon_emissions_MgCO2e
+        carbon_emissions_uri, group=group
+    ).band_data
     carbon_emissions = xr.align(
         tcl,
         carbon_emissions.reindex_like(tcl, method="nearest", tolerance=1e-5),
         join="left",
     )[1]
 
-    tclf: xr.DataArray = _load_zarr(tree_cover_loss_from_fires_uri).band_data
+    tclf: xr.DataArray = _load_zarr(
+        tree_cover_loss_from_fires_uri, group="pipeline"
+    ).band_data
     tclf = xr.align(
         tcl,
         tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
@@ -91,7 +138,7 @@ def load_data(
     # Convert tclf to a non-zero pixel area where there is a loss year, so it can be
     # used as part of the mask. The value of the loss year doesn't matter, since it
     # is always the same as the TCL loss year.
-    tclf_area = ((tclf > 0) * pixel_area)
+    tclf_area = (tclf > 0) * pixel_area
 
     # contextual layers
     tcd: xr.DataArray = _load_zarr(tree_cover_density_uri).band_data
@@ -106,7 +153,7 @@ def load_data(
         join="left",
     )[1].astype(np.int16)
 
-    drivers: xr.DataArray = _load_zarr(drivers_uri).band_data
+    drivers: xr.DataArray = _load_zarr(drivers_uri, group=group).band_data
     drivers = xr.align(
         tcl,
         drivers.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
@@ -153,8 +200,11 @@ def load_data(
 
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset(
-        {"area_ha": pixel_area, "carbon__Mg_CO2e": carbon_emissions,
-         "tree_cover_loss_from_fires_area_ha": tclf_area}
+        {
+            "area_ha": pixel_area,
+            "carbon__Mg_CO2e": carbon_emissions,
+            "tree_cover_loss_from_fires_area_ha": tclf_area,
+        }
     )
 
     return (
@@ -190,9 +240,15 @@ def setup_compute(
     ) = datasets
 
     mask = xr.concat(
-        [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"],
-         area_and_emissions["tree_cover_loss_from_fires_area_ha"]],
-        pd.Index(["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"], name="layer"),
+        [
+            area_and_emissions["area_ha"],
+            area_and_emissions["carbon__Mg_CO2e"],
+            area_and_emissions["tree_cover_loss_from_fires_area_ha"],
+        ],
+        pd.Index(
+            ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"],
+            name="layer",
+        ),
     )
 
     groupbys: Tuple[xr.DataArray, ...] = (
@@ -281,8 +337,17 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)
 
-    results_with_ids = rollup_by_gadm_and_convert_to_aoi(result_df,
-                                                         ["tree_cover_loss_year", "canopy_cover", "is_intact_forest", "driver", "is_primary_forest", "natural_forest_class"])
+    results_with_ids = rollup_by_gadm_and_convert_to_aoi(
+        result_df,
+        [
+            "tree_cover_loss_year",
+            "canopy_cover",
+            "is_intact_forest",
+            "driver",
+            "is_primary_forest",
+            "natural_forest_class",
+        ],
+    )
 
     return results_with_ids
 
