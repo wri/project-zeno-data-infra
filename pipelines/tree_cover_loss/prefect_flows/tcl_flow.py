@@ -81,7 +81,7 @@ def umd_tree_cover_loss_flow(
     )(datasets, expected_groups)
 
     result = common_tasks.compute_zonal_stat.with_options(
-        name="area-emissions-by-tcl-compute-zonal-stats"
+        name="area-emissions-by-tcl-compute-zonal-stats", retries=2
     )(*compute_input, funcname="sum")
 
     result_df = tcl_tasks.postprocess_result.with_options(
