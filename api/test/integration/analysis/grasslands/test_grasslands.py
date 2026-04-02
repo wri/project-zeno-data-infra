@@ -1,3 +1,4 @@
+import uuid
 from test.integration import delete_resource_files, retry_getting_resource
 
 import pandas as pd
@@ -7,7 +8,8 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -41,8 +43,18 @@ def create_analysis_service_for_tests(
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
+    )
+
+
+def _resource_thumbprint(analytics_in: GrasslandsAnalyticsIn) -> uuid.UUID:
+    """Mirrors AnalysisService.resource_thumbprint() for use in test assertions."""
+    analyzer = GrasslandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    return uuid.uuid5(
+        uuid.NAMESPACE_DNS,
+        f"{analytics_in.thumbprint()}{analyzer.thumbprint()}",
     )
 
 
@@ -54,9 +66,9 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_input_hash(["foo"])
+        resource_tp = _resource_thumbprint(analytics_in)
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -75,7 +87,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
                         json=analytics_in.model_dump(),
                     )
 
-                    yield request, client, analytics_in
+                    yield request, client, resource_tp
         finally:
             app.dependency_overrides.clear()
 
@@ -87,11 +99,11 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -101,10 +113,8 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        _, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 
@@ -118,18 +128,17 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
 class TestGrasslandsAnalyticsPostWithKba:
     @pytest_asyncio.fixture
-    async def setup(self, make_analytics_in):
-        analytics_in = make_analytics_in(
-            GrasslandsAnalyticsIn,
-            GrasslandsAnalyzer,
+    async def setup(self):
+        analytics_in = GrasslandsAnalyticsIn(
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["20401", "19426"]
             ),
             start_year="2015",
             end_year="2020",
         )
+        resource_tp = _resource_thumbprint(analytics_in)
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -148,7 +157,7 @@ class TestGrasslandsAnalyticsPostWithKba:
                         json=analytics_in.model_dump(),
                     )
 
-                    yield request, client, analytics_in
+                    yield request, client, resource_tp
         finally:
             app.dependency_overrides.clear()
 
@@ -160,11 +169,11 @@ class TestGrasslandsAnalyticsPostWithKba:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -174,10 +183,8 @@ class TestGrasslandsAnalyticsPostWithKba:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        _, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 

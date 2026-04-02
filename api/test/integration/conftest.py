@@ -29,23 +29,8 @@ def dask_test_cluster():
 
 
 @pytest.fixture(scope="session")
-def input_uris_for():
-    """Generate input URIs for an Analyzer class, for us in integration tests."""
-    cache = {}
-
-    def _get(analyzer_class):
-        if analyzer_class not in cache:
-            cache[analyzer_class] = analyzer_class(compute_engine=None).input_uris()
-        return cache[analyzer_class]
-
-    return _get
-
-
-@pytest.fixture(scope="session")
-def make_analytics_in(input_uris_for):
-    def _make(analytics_class, analyzer_class, **kwargs):
-        analytics_in = analytics_class(**kwargs)
-        analytics_in.set_input_hash(input_uris_for(analyzer_class))
-        return analytics_in
+def make_analytics_in():
+    def _make(analytics_class, **kwargs):
+        return analytics_class(**kwargs)
 
     return _make
