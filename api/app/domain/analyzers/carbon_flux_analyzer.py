@@ -34,6 +34,7 @@ _input_uris = {
 # carbontype, value columns. Use equality on the tree_cover_density column, which has
 # values 30/50/75..
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet"
+OTF_ZARR_GROUP = "otf"
 
 
 class CarbonFluxAnalyzer(Analyzer):
@@ -99,13 +100,19 @@ class CarbonFluxAnalyzer(Analyzer):
             Dataset.canopy_cover, threshold
         )
         carbon_net_flux = read_zarr_clipped_to_geojson(
-            _input_uris["carbon_net_flux_zarr_uri"], geojson
+            _input_uris["carbon_net_flux_zarr_uri"],
+            geojson,
+            group=OTF_ZARR_GROUP,
         )
         carbon_gross_removals = read_zarr_clipped_to_geojson(
-            _input_uris["carbon_gross_removals_zarr_uri"], geojson
+            _input_uris["carbon_gross_removals_zarr_uri"],
+            geojson,
+            group=OTF_ZARR_GROUP,
         )
         carbon_gross_emissions = read_zarr_clipped_to_geojson(
-            _input_uris["carbon_gross_emissions_zarr_uri"], geojson
+            _input_uris["carbon_gross_emissions_zarr_uri"],
+            geojson,
+            group=OTF_ZARR_GROUP,
         )
         mangrove_stock_2000 = read_zarr_clipped_to_geojson(
             _input_uris["mangrove_stock_2000_zarr_uri"], geojson

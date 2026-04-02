@@ -66,6 +66,7 @@ class ZarrDatasetRepository:
         uri = self.resolve_zarr_uri(dataset, self.environment)
         return xr.open_zarr(
             uri,
+            group="otf",
             storage_options={"requester_pays": True},
         ).band_data
 
