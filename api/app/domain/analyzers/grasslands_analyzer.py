@@ -19,9 +19,7 @@ from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 # Please DO NOT directly reference in constructor.
 INPUT_URIS = {
     Environment.production: {
-        "grasslands_zarr_uri": (
-            "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
-        ),
+        "grasslands_zarr_uri": "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/",
         "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
     }
 }
@@ -33,12 +31,10 @@ class GrasslandsAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
         duckdb_query_service=None,
         input_uris: Dict[str, str] = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.duckdb_query_service = duckdb_query_service
         self.input_uris = input_uris
 
