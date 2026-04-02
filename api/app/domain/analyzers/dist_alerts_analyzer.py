@@ -1,5 +1,8 @@
+import json
+import uuid
+from typing import Dict
+
 from app.analysis.dist_alerts.analysis import (
-    _input_uris,
     get_precomputed_statistics,
     zonal_statistics_on_aois,
 )
@@ -12,10 +15,10 @@ class DistAlertsAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
+        input_uris: Dict[str, str] = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.input_uris = input_uris
 
     async def analyze(self, analysis: Analysis) -> None:
         dist_analytics_in = DistAlertsAnalyticsIn(**analysis.metadata)
@@ -37,7 +40,11 @@ class DistAlertsAnalyzer(Analyzer):
             )
         else:
             alerts_df = await zonal_statistics_on_aois(
-                aoi_dict, self.compute_engine, version, intersection
+                aoi_dict,
+                self.compute_engine,
+                version,
+                intersection,
+                input_uris=self.input_uris,
             )
 
         if dist_analytics_in.start_date is not None:
@@ -52,5 +59,7 @@ class DistAlertsAnalyzer(Analyzer):
 
         analysis.result = alerts_dict
 
-    def input_uris(self) -> list[str]:
-        return sorted(_input_uris.values())
+    def thumbprint(self):
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS, json.dumps(self.input_uris, sort_keys=True)
+        )

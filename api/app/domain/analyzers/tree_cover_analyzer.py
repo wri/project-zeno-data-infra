@@ -1,4 +1,6 @@
-from typing import List
+import json
+import uuid
+from typing import Dict, List
 
 import newrelic.agent as nr_agent
 
@@ -11,11 +13,9 @@ from app.domain.models.dataset import (
     DatasetFilter,
     DatasetQuery,
 )
-from app.domain.models.environment import Environment
-from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
 
-_DATASETS = [
+DATASETS = [
     Dataset.area_hectares,
     Dataset.canopy_cover,
     Dataset.primary_forest,
@@ -26,10 +26,10 @@ class TreeCoverAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine: ComputeEngine,
-        environment: Environment = Environment.production,
+        input_uris: Dict[str, str] = None,
     ):
         self.compute_engine = compute_engine
-        self.environment = environment
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -64,8 +64,7 @@ class TreeCoverAnalyzer(Analyzer):
             tree_cover_analytics_in.aoi, query
         )
 
-    def input_uris(self) -> list[str]:
-        return sorted(
-            ZarrDatasetRepository.resolve_zarr_uri(ds, self.environment)
-            for ds in _DATASETS
+    def thumbprint(self):
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS, json.dumps(self.input_uris, sort_keys=True)
         )

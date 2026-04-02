@@ -3,9 +3,12 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
+from app.dependencies import get_environment
 from app.domain.analyzers.land_cover_composition_analyzer import (
+    INPUT_URIS,
     LandCoverCompositionAnalyzer,
 )
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -36,6 +39,7 @@ def get_analysis_repository(request: Request) -> AnalysisRepository:
 def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
+    environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
@@ -44,6 +48,7 @@ def create_analysis_service(
             query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet"
             ),
+            input_uris=INPUT_URIS[environment],
         ),
         event=ANALYTICS_NAME,
     )

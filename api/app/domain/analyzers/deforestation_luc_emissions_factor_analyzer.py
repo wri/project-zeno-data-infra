@@ -1,3 +1,6 @@
+import json
+import uuid
+
 import newrelic.agent as nr_agent
 
 from app.analysis.common.analysis import get_sql_in_list
@@ -14,12 +17,10 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
         query_service=None,
         table_uri: str | None = None,
     ):
         self.compute_engine = compute_engine
-        self.dataset_repository = dataset_repository
         self.query_service = query_service
         self._table_uri = table_uri
 
@@ -50,8 +51,6 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
 
         return df
 
-    def input_uris(self) -> list[str]:
-        uris = []
-        if self._table_uri is not None:
-            uris.append(self._table_uri)
-        return sorted(uris)
+    def thumbprint(self):
+        uris = sorted(u for u in [self._table_uri] if u is not None)
+        return uuid.uuid5(uuid.NAMESPACE_DNS, json.dumps(uris))

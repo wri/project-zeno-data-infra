@@ -1,4 +1,7 @@
+import json
+import uuid
 from functools import partial
+from typing import Dict
 
 import dask.dataframe as dd
 import newrelic.agent as nr_agent
@@ -8,13 +11,16 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
 
-_input_uris = {
-    "land_cover_zarr_uri": "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/",
-    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+INPUT_URIS = {
+    Environment.production: {
+        "land_cover_zarr_uri": "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/",
+        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+    }
 }
 
 
@@ -36,13 +42,13 @@ class LandCoverCompositionAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
         query_service=None,
+        input_uris: Dict[str, str] = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
         self.query_service = query_service
         self.admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet"
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="LandCoverCompositionAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -68,8 +74,8 @@ class LandCoverCompositionAnalyzer(Analyzer):
 
             analysis_partial = partial(
                 self.analyze_area,
-                land_cover_zarr_uri=_input_uris["land_cover_zarr_uri"],
-                pixel_area_zarr_uri=_input_uris["pixel_area_zarr_uri"],
+                land_cover_zarr_uri=self.input_uris["land_cover_zarr_uri"],
+                pixel_area_zarr_uri=self.input_uris["pixel_area_zarr_uri"],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
@@ -135,5 +141,7 @@ class LandCoverCompositionAnalyzer(Analyzer):
 
         return land_cover_composition_ddf
 
-    def input_uris(self) -> list[str]:
-        return sorted(_input_uris.values())
+    def thumbprint(self):
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS, json.dumps(self.input_uris, sort_keys=True)
+        )

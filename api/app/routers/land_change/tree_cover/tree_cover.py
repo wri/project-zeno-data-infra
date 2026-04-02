@@ -4,7 +4,7 @@ from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.dependencies import get_environment
-from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
+from app.domain.analyzers.tree_cover_analyzer import DATASETS, TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -20,6 +20,7 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -65,10 +66,14 @@ def create_analysis_service(
         )
     )
 
+    input_uris = {
+        ds: ZarrDatasetRepository.resolve_zarr_uri(ds, environment) for ds in DATASETS
+    }
+
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=TreeCoverAnalyzer(
-            compute_engine=compute_engine, environment=environment
+            compute_engine=compute_engine, input_uris=input_uris
         ),
         event=ANALYTICS_NAME,
     )

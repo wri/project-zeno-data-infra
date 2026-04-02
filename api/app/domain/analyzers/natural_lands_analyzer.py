@@ -1,3 +1,5 @@
+import json
+import uuid
 from functools import partial
 from typing import Any, Dict
 
@@ -9,6 +11,7 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -39,11 +42,11 @@ NATURAL_LANDS_CLASSES = {
     21: "Non-natural bare",
 }
 
-_input_uris = {
-    "natural_lands_zarr_uri": (
-        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-    ),
-    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+INPUT_URIS = {
+    Environment.production: {
+        "natural_lands_zarr_uri": "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr",
+        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+    }
 }
 
 
@@ -53,10 +56,10 @@ class NaturalLandsAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
+        input_uris: Dict[str, str] = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -96,10 +99,9 @@ class NaturalLandsAnalyzer(Analyzer):
 
         return df
 
-    @staticmethod
-    def analyze_area(aoi, geojson) -> dd.DataFrame:
-        natural_lands_obj_name = _input_uris["natural_lands_zarr_uri"]
-        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+    def analyze_area(self, aoi, geojson) -> dd.DataFrame:
+        natural_lands_obj_name = self.input_uris["natural_lands_zarr_uri"]
+        pixel_area_obj_name = self.input_uris["pixel_area_zarr_uri"]
 
         natural_lands = read_zarr_clipped_to_geojson(
             natural_lands_obj_name, geojson
@@ -135,5 +137,7 @@ class NaturalLandsAnalyzer(Analyzer):
         df = df[df.area_ha > 0]
         return df
 
-    def input_uris(self) -> list[str]:
-        return sorted(_input_uris.values())
+    def thumbprint(self):
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS, json.dumps(self.input_uris, sort_keys=True)
+        )
