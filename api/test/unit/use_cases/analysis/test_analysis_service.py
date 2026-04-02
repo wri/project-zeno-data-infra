@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
@@ -9,17 +10,27 @@ from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
 from app.use_cases.analysis.analysis_service import AnalysisService
 
+# A fixed analyzer thumbprint so that expected resource thumbprints are
+# deterministic across all tests in this module.
+_ANALYZER_THUMBPRINT = uuid.uuid5(uuid.NAMESPACE_DNS, "test-analyzer-thumbprint")
+
+
+def _expected_resource_thumbprint(data: AnalyticsIn) -> uuid.UUID:
+    """Mirror the combining logic in AnalysisService.resource_thumbprint()."""
+    return uuid.uuid5(
+        uuid.NAMESPACE_DNS,
+        f"{data.thumbprint()}{_ANALYZER_THUMBPRINT}",
+    )
+
 
 @pytest.fixture
 def stub_analysis_in():
-    analytics_in = AnalyticsIn(
+    return AnalyticsIn(
         aoi=ProtectedAreaOfInterest(
             type="protected_area",
             ids=["1234"],
         )
     )
-    analytics_in.set_input_hash(["s3://test/placeholder.zarr"])
-    return analytics_in
 
 
 @pytest.fixture
@@ -31,7 +42,7 @@ def mock_analysis_repository():
 def mock_analyzer():
     analyzer = MagicMock()
     analyzer.analyze = AsyncMock()
-    analyzer.input_uris.return_value = ["s3://test/placeholder.zarr"]
+    analyzer.thumbprint.return_value = _ANALYZER_THUMBPRINT
     return analyzer
 
 
@@ -56,6 +67,8 @@ class TestTreeCoverLossServiceCollaborators:
             event="test_endpoint_name",
         )
 
+        expected_tp = _expected_resource_thumbprint(stub_analysis_in)
+
         ############
         # Act      #
         ############
@@ -64,11 +77,9 @@ class TestTreeCoverLossServiceCollaborators:
         await analysis_service.do()
 
         ############
-        # Assert  #
+        # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(
-            stub_analysis_in.thumbprint()
-        )
+        mock_analysis_repository.load_analysis.assert_called_once_with(expected_tp)
 
         mock_analysis_repository_calls = (
             mock_analysis_repository.store_analysis.mock_calls
@@ -77,35 +88,23 @@ class TestTreeCoverLossServiceCollaborators:
 
         # assert that the new Analysis is stored so it's available to clients immediately
         assert mock_analysis_repository_calls[0] == call(
-            stub_analysis_in.thumbprint(),
-            Analysis(
-                None,
-                stub_analysis_in.model_dump(),
-                None,
-            ),
+            expected_tp,
+            Analysis(None, stub_analysis_in.model_dump(), None),
         )
 
         # assert that the new Analysis is stored as pending before analysis starts
         assert mock_analysis_repository_calls[1] == call(
-            stub_analysis_in.thumbprint(),
-            Analysis(
-                None,
-                stub_analysis_in.model_dump(),
-                AnalysisStatus.pending,
-            ),
+            expected_tp,
+            Analysis(None, stub_analysis_in.model_dump(), AnalysisStatus.pending),
         )
 
         # assert that the saved Analysis result is stored at the end
         assert mock_analysis_repository_calls[2] == call(
-            stub_analysis_in.thumbprint(),
-            Analysis(
-                None,
-                stub_analysis_in.model_dump(),
-                AnalysisStatus.saved,
-            ),
+            expected_tp,
+            Analysis(None, stub_analysis_in.model_dump(), AnalysisStatus.saved),
         )
 
-        assert result_thumbprint == stub_analysis_in.thumbprint()
+        assert result_thumbprint == expected_tp
         mock_analyzer.analyze.assert_called_once_with(
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
@@ -138,6 +137,8 @@ class TestTreeCoverLossServiceCollaborators:
             event="test_endpoint_name",
         )
 
+        expected_tp = _expected_resource_thumbprint(stub_analysis_in)
+
         ############
         # Act      #
         ############
@@ -146,12 +147,10 @@ class TestTreeCoverLossServiceCollaborators:
         await analysis_service.do()
 
         ############
-        # Assert  #
+        # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(
-            stub_analysis_in.thumbprint()
-        )
-        assert result_thumbprint == stub_analysis_in.thumbprint()
+        mock_analysis_repository.load_analysis.assert_called_once_with(expected_tp)
+        assert result_thumbprint == expected_tp
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -179,6 +178,8 @@ class TestTreeCoverLossServiceCollaborators:
             event="test_endpoint_name",
         )
 
+        expected_tp = _expected_resource_thumbprint(stub_analysis_in)
+
         ############
         # Act      #
         ############
@@ -189,10 +190,8 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(
-            stub_analysis_in.thumbprint()
-        )
-        assert result_thumbprint == stub_analysis_in.thumbprint()
+        mock_analysis_repository.load_analysis.assert_called_once_with(expected_tp)
+        assert result_thumbprint == expected_tp
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -220,6 +219,8 @@ class TestTreeCoverLossServiceCollaborators:
             event="test_endpoint_name",
         )
 
+        expected_tp = _expected_resource_thumbprint(stub_analysis_in)
+
         ############
         # Act      #
         ############
@@ -230,10 +231,8 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(
-            stub_analysis_in.thumbprint()
-        )
-        assert result_thumbprint == stub_analysis_in.thumbprint()
+        mock_analysis_repository.load_analysis.assert_called_once_with(expected_tp)
+        assert result_thumbprint == expected_tp
         mock_analysis_repository.store_analysis.assert_not_called()
         mock_analyzer.analyze.assert_not_called()
 
@@ -259,6 +258,8 @@ class TestTreeCoverLossServiceCollaborators:
             event="test_endpoint_name",
         )
 
+        expected_tp = _expected_resource_thumbprint(stub_analysis_in)
+
         ############
         # Act      #
         ############
@@ -269,13 +270,11 @@ class TestTreeCoverLossServiceCollaborators:
         ############
         # Assert   #
         ############
-        mock_analysis_repository.load_analysis.assert_called_once_with(
-            stub_analysis_in.thumbprint()
-        )
-        assert result_thumbprint == stub_analysis_in.thumbprint()
+        mock_analysis_repository.load_analysis.assert_called_once_with(expected_tp)
+        assert result_thumbprint == expected_tp
         mock_analyzer.analyze.assert_called()
         mock_analysis_repository.store_analysis.assert_called_with(
-            stub_analysis_in.thumbprint(),
+            expected_tp,
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
                 result=None,
@@ -307,6 +306,8 @@ class TestTreeCoverLossServiceCollaborators:
             event="test_endpoint_name",
         )
 
+        expected_tp = _expected_resource_thumbprint(stub_analysis_in)
+
         ############
         # Act      #
         ############
@@ -319,7 +320,7 @@ class TestTreeCoverLossServiceCollaborators:
         mock_analyzer.analyze.assert_called()
         assert analysis_service.get_status() == AnalysisStatus.failed
         mock_analysis_repository.store_analysis.assert_called_with(
-            stub_analysis_in.thumbprint(),
+            expected_tp,
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
                 result={"error": error_message},

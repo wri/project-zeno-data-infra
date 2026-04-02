@@ -67,7 +67,7 @@ class AnalysisService:
                 status=self.analytics_resource.status,
             )
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id, analysis
+                self.resource_thumbprint(), analysis
             )
 
             await self.analyzer.analyze(analysis)
@@ -75,7 +75,7 @@ class AnalysisService:
             self.analytics_resource.status = AnalysisStatus.saved
             self.analytics_resource.result = analysis.result
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id,
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
@@ -94,7 +94,7 @@ class AnalysisService:
             self.analytics_resource.status = AnalysisStatus.failed
             self.analytics_resource.result = {"error": str(e)}
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id,
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
@@ -116,7 +116,7 @@ class AnalysisService:
             )
             self.analytics_resource.status = AnalysisStatus.failed
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id,
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
@@ -149,6 +149,13 @@ class AnalysisService:
             )
 
     def resource_thumbprint(self) -> uuid.UUID:
+        """Combine the request fingerprint with the analyzer's dataset fingerprint.
+
+        This means the cache key changes when either the request parameters
+        change (via data.thumbprint()) or the input datasets change (via
+        analyzer.thumbprint()).  Neither fingerprint needs to be stored
+        separately — recomputing on each request is cheap and correct.
+        """
         return uuid.uuid5(
             uuid.NAMESPACE_DNS,
             f"{self.analytics_resource_id}{self.analyzer.thumbprint()}",
