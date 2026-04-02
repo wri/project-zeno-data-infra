@@ -48,14 +48,13 @@ def create_analysis_service_for_tests(
 
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
-    async def setup(self, make_analytics_in):
-        analytics_in = make_analytics_in(
-            GrasslandsAnalyticsIn,
-            GrasslandsAnalyzer,
+    async def setup(self):
+        analytics_in = GrasslandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             start_year="2015",
             end_year="2020",
         )
+        analytics_in.set_input_hash(["foo"])
 
         delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
