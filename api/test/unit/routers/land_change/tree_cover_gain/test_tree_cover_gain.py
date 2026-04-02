@@ -29,7 +29,6 @@ def dummy_analytics_in():
         start_year="2010",
         end_year="2015",
     )
-    analytics_in.set_input_hash([])
     return analytics_in
 
 

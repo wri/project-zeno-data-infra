@@ -25,7 +25,6 @@ def dummy_analytics_in():
             ids=["IDN.24.9"],
         ),
     )
-    analytics_in.set_input_hash([])
     return analytics_in
 
 

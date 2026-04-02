@@ -88,7 +88,6 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             start_year="2000",
             end_year="2010",
         )
-        metadata.set_input_hash([])
 
         analysis = Analysis(
             result=None, metadata=metadata.model_dump(), status=AnalysisStatus.pending

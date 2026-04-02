@@ -8,15 +8,13 @@ from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
-from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
-from app.routers.land_change.carbon_flux.carbon_flux import (
-    create_analysis_service,
-)
+from app.models.land_change.grasslands import GrasslandsAnalyticsIn
+from app.routers.land_change.grasslands.grasslands import create_analysis_service
 from app.use_cases.analysis.analysis_service import AnalysisService
 
 client = TestClient(app)
 
-ENDPOINT_PATH = "/v0/land_change/carbon_flux/analytics"
+ENDPOINT_PATH = "/v0/land_change/grasslands/analytics"
 
 mock_service = MagicMock(spec=AnalysisService)
 
@@ -27,16 +25,17 @@ def create_mock_service():
 
 @pytest.fixture
 def dummy_analytics_in():
-    return CarbonFluxAnalyticsIn(
+    return GrasslandsAnalyticsIn(
         aoi=AdminAreaOfInterest(
             type="admin",
-            ids=["IDN.24.9"],
+            ids=["BRA.1.12"],
         ),
-        canopy_cover=50,
+        start_year="2020",
+        end_year="2022",
     )
 
 
-class TestCarbonFluxPostUseCaseInitiation:
+class TestGrasslandsPostUseCaseInitiation:
     @pytest.mark.asyncio
     async def test_router_sets_the_resource_in_the_service(self, dummy_analytics_in):
         app.dependency_overrides[create_analysis_service] = create_mock_service
@@ -51,7 +50,8 @@ class TestCarbonFluxPostUseCaseInitiation:
         expected = dummy_analytics_in.model_dump()
         actual = actual_arg.model_dump()
         assert actual["aoi"] == expected["aoi"]
-        assert actual["canopy_cover"] == expected["canopy_cover"]
+        assert actual["start_year"] == expected["start_year"]
+        assert actual["end_year"] == expected["end_year"]
         assert actual["_version"] == expected["_version"]
         assert actual["_analytics_name"] == expected["_analytics_name"]
 
@@ -59,9 +59,9 @@ class TestCarbonFluxPostUseCaseInitiation:
 
     def test_router_returns_DataMartResourceLinkResponse(self, dummy_analytics_in):
         app.dependency_overrides[create_analysis_service] = create_mock_service
-
         mock_service.get_status.return_value = AnalysisStatus.pending
         mock_service.resource_thumbprint.return_value = dummy_analytics_in.thumbprint()
+
         response = client.post(
             ENDPOINT_PATH,
             json=json.loads(dummy_analytics_in.model_dump_json()),
@@ -90,19 +90,3 @@ class TestCarbonFluxPostUseCaseInitiation:
         mock_service.reset_mock(return_value=True)
 
         assert response.status_code == 202
-
-
-class TestCarbonFluxAnalyticsIn:
-    def test_thumbprint_is_same_for_same_fields(self, dummy_analytics_in):
-        original_thumb = dummy_analytics_in.thumbprint()
-        model = CarbonFluxAnalyticsIn(**dummy_analytics_in.model_dump())
-        assert model.thumbprint() == original_thumb
-
-    def test_thumbprint_changes_when_aoi_changes(self, dummy_analytics_in):
-        model = CarbonFluxAnalyticsIn(**dummy_analytics_in.model_dump())
-        model.aoi = AdminAreaOfInterest(
-            type="admin",
-            ids=["BRA.12"],
-        )
-
-        assert model.thumbprint() != dummy_analytics_in.thumbprint()

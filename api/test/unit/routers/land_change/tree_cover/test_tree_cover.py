@@ -28,7 +28,6 @@ def dummy_analytics_in():
         ),
         canopy_cover=30,
     )
-    analytics_in.set_input_hash([])
     return analytics_in
 
 

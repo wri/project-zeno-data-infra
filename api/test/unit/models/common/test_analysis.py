@@ -6,28 +6,10 @@ from fastapi import HTTPException
 from fastapi.responses import Response
 
 from app.domain.models.analysis import Analysis
-from app.domain.models.dataset import Dataset
-from app.domain.models.environment import Environment
-from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 from app.routers.common_analytics import get_analysis
-
-# A fixed set of URIs to use for test thumbprints — mirrors what
-# TreeCoverLossAnalyzer.input_uris() would return for production.
-_TEST_INPUT_URIS = sorted(
-    ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
-    for ds in [
-        Dataset.area_hectares,
-        Dataset.canopy_cover,
-        Dataset.carbon_emissions,
-        Dataset.natural_forests,
-        Dataset.primary_forest,
-        Dataset.tree_cover_loss,
-        Dataset.tree_cover_loss_drivers,
-    ]
-)
 
 
 def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
@@ -38,9 +20,7 @@ def _make_analytics_in(**kwargs) -> TreeCoverLossAnalyticsIn:
         canopy_cover=30,
         intersections=[],
     )
-    analytics_in = TreeCoverLossAnalyticsIn(**{**defaults, **kwargs})
-    analytics_in.set_input_hash(_TEST_INPUT_URIS)
-    return analytics_in
+    return TreeCoverLossAnalyticsIn(**{**defaults, **kwargs})
 
 
 def _make_repository(analysis: Analysis) -> AsyncMock:
@@ -57,13 +37,15 @@ def _make_response() -> MagicMock:
 
 RESOURCE_ID = uuid.uuid4()
 
-# Metadata as it would be stored internally — includes all private fields.
+# Metadata as it would be stored internally — includes private fields.
+# _input_hash is a legacy field that may appear in old persisted analyses.
 _STORED_METADATA = {
     "aoi": {"type": "admin", "ids": ["BRA.1"], "provider": "gadm", "version": "4.1"},
     "start_year": "2020",
     "end_year": "2021",
     "canopy_cover": 30,
     "intersections": [],
+    "forest_filter": None,
     "_version": "20250912",
     "_analytics_name": "tree_cover_loss",
     "_input_hash": "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
@@ -74,41 +56,21 @@ _PUBLIC_METADATA = {k: v for k, v in _STORED_METADATA.items() if not k.startswit
 
 
 class TestThumbprint:
-    def test_thumbprint_without_set_input_hash_raises(self):
-        defaults = dict(
-            aoi=AdminAreaOfInterest(type="admin", ids=["BRA.1"]),
-            start_year="2020",
-            end_year="2021",
-            canopy_cover=30,
-            intersections=[],
-        )
-        analytics_in = TreeCoverLossAnalyticsIn(**defaults)
-        with pytest.raises(ValueError):
-            _ = analytics_in.thumbprint()
-
     def test_identical_inputs_same_thumbprint(self):
         a = _make_analytics_in()
         b = _make_analytics_in()
-        assert a.thumbprint() == b.thumbprint()
-
-    def test_different_input_uris_different_thumbprints(self):
-        a = _make_analytics_in()
-        b = _make_analytics_in()
-        b.set_input_hash(["s3://different-bucket/different.zarr"])
-        assert a.thumbprint() != b.thumbprint()
-
-    def test_same_uris_regardless_of_environment_label_same_thumbprint(self):
-        """The thumbprint is based on URI content, not environment names.
-        Two sets of identical URIs must produce the same hash."""
-        a = _make_analytics_in()
-        b = _make_analytics_in()
-        # Both use the same _TEST_INPUT_URIS via _make_analytics_in
         assert a.thumbprint() == b.thumbprint()
 
     def test_different_request_params_different_thumbprints(self):
         a = _make_analytics_in(start_year="2015")
         b = _make_analytics_in(start_year="2020")
         assert a.thumbprint() != b.thumbprint()
+
+    def test_thumbprint_is_stable_across_instances(self):
+        """Reconstructing from model_dump() produces the same thumbprint."""
+        original = _make_analytics_in()
+        reconstructed = TreeCoverLossAnalyticsIn(**original.model_dump())
+        assert original.thumbprint() == reconstructed.thumbprint()
 
 
 class TestGetAnalysisPrivateFieldFiltering:

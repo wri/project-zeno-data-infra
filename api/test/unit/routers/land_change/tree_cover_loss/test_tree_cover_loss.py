@@ -30,7 +30,6 @@ def dummy_analytics_in():
         forest_filter="primary_forest",
         intersections=["driver"],
     )
-    analytics_in.set_input_hash([])
     return analytics_in
 
 

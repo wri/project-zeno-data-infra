@@ -10,7 +10,6 @@ def base_config():
     analytics_in = CarbonFluxAnalyticsIn(
         aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]), canopy_cover=30
     )
-    analytics_in.set_input_hash([])
 
     return analytics_in
 
@@ -19,13 +18,11 @@ class TestCarbonFluxAnalyticsIn:
     def test_thumbprint_is_same_for_same_fields(self, base_config):
         original_thumb = base_config.thumbprint()
         model = CarbonFluxAnalyticsIn(**base_config.model_dump())
-        model.set_input_hash([])
 
         assert model.thumbprint() == original_thumb
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = CarbonFluxAnalyticsIn(**base_config.model_dump())
-        model.set_input_hash([])
 
         model.aoi = AdminAreaOfInterest(
             type="admin",

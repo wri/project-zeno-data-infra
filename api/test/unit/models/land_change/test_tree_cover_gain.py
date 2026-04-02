@@ -12,7 +12,6 @@ def base_config():
         start_year="2015",
         end_year="2020",
     )
-    analytics_in.set_input_hash([])
     return analytics_in
 
 
@@ -21,13 +20,11 @@ class TestTreeCoverGainAnalyticsIn:
         original_thumbprint = base_config.thumbprint()
 
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
-        model.set_input_hash([])
 
         assert model.thumbprint() == original_thumbprint
 
     def test_thumbprint_changes_when_aoi_changes(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
-        model.set_input_hash([])
 
         model.aoi = AdminAreaOfInterest(
             type="admin",
@@ -38,7 +35,6 @@ class TestTreeCoverGainAnalyticsIn:
 
     def test_thumbprint_changes_when_start_year_changes(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
-        model.set_input_hash([])
 
         model.start_year = "2010"
 
@@ -46,7 +42,6 @@ class TestTreeCoverGainAnalyticsIn:
 
     def test_thumbprint_changes_when_end_year_changes(self, base_config):
         model = TreeCoverGainAnalyticsIn(**base_config.model_dump())
-        model.set_input_hash([])
 
         model.end_year = "2025"
 
