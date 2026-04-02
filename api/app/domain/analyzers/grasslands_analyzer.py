@@ -80,7 +80,7 @@ class GrasslandsAnalyzer(Analyzer):
         query = f"select year, area_ha, aoi_id from data_source where aoi_id in ({id_str}) and year >= {start_year} and year <= {end_year} order by aoi_id, year"
 
         data: Dict = await self.duckdb_query_service.execute(query)
-        data["aoi_type"] = "admin" * len(gadm_ids)
+        data["aoi_type"] = ["admin"] * len(data["aoi_id"])
 
         return data
 
