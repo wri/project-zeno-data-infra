@@ -35,8 +35,7 @@ class GrasslandsAnalyzer(Analyzer):
     @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            grasslands_analytics_in._input_uris = analysis.metadata["_input_uris"]
+
         if grasslands_analytics_in.aoi.type == "admin":
             gadm_ids: List = grasslands_analytics_in.aoi.ids
             results: Dict = await self.analyze_admin_areas(
