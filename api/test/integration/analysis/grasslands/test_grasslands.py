@@ -8,7 +8,8 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -42,6 +43,7 @@ def create_analysis_service_for_tests(
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -49,7 +51,8 @@ def create_analysis_service_for_tests(
 
 def _resource_thumbprint(analytics_in: GrasslandsAnalyticsIn) -> uuid.UUID:
     """Mirrors AnalysisService.resource_thumbprint() for use in test assertions."""
-    analyzer = GrasslandsAnalyzer()
+    analyzer = GrasslandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+
     return uuid.uuid5(
         uuid.NAMESPACE_DNS,
         f"{analytics_in.thumbprint()}{analyzer.thumbprint()}",
