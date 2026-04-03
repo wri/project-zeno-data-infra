@@ -2,10 +2,10 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, call
 
 import pytest
-from domain.models.environment import Environment
 
 from app.analysis.common.analysis import FeatureTooSmallError
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import ProtectedAreaOfInterest
@@ -317,4 +317,70 @@ class TestTreeCoverLossServiceCollaborators:
                 result={"error": error_message},
                 status=AnalysisStatus.failed,
             ),
+        )
+
+
+class TestResourceIDChangesWithAnalyzers:
+    @pytest.mark.asyncio
+    async def test_foo(
+        self,
+        stub_analysis_in,
+        mock_analysis_repository,
+        mock_analyzer,
+    ):
+        ############
+        # Arrange  #
+        ############
+        mock_analysis_repository.load_analysis.side_effect = [
+            Analysis(result=None, metadata=None, status=None)
+        ]
+
+        analysis_service = AnalysisService(
+            analysis_repository=mock_analysis_repository,
+            analyzer=mock_analyzer,
+            event="test_endpoint_name",
+        )
+
+        ############
+        # Act      #
+        ############
+        await analysis_service.set_resource_from(stub_analysis_in)
+        expected_tp = analysis_service.resource_thumbprint()
+        await analysis_service.do()
+
+        ############
+        # Assert   #
+        ############
+        mock_analysis_repository.load_analysis.assert_called_once_with(expected_tp)
+
+        mock_analysis_repository_calls = (
+            mock_analysis_repository.store_analysis.mock_calls
+        )
+        assert mock_analysis_repository.store_analysis.call_count == 3
+
+        # assert that the new Analysis is
+        # stored so it's available to clients immediately
+        assert mock_analysis_repository_calls[0] == call(
+            expected_tp,
+            Analysis(None, stub_analysis_in.model_dump(), None),
+        )
+
+        # assert that the new Analysis is stored as pending before analysis starts
+        assert mock_analysis_repository_calls[1] == call(
+            expected_tp,
+            Analysis(None, stub_analysis_in.model_dump(), AnalysisStatus.pending),
+        )
+
+        # assert that the saved Analysis result is stored at the end
+        assert mock_analysis_repository_calls[2] == call(
+            expected_tp,
+            Analysis(None, stub_analysis_in.model_dump(), AnalysisStatus.saved),
+        )
+
+        mock_analyzer.analyze.assert_called_once_with(
+            Analysis(
+                metadata=stub_analysis_in.model_dump(),
+                result=None,
+                status=AnalysisStatus.pending,
+            )
         )
