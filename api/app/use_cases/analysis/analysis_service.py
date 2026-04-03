@@ -67,7 +67,7 @@ class AnalysisService:
                 status=self.analytics_resource.status,
             )
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id, analysis
+                self.resource_thumbprint(), analysis
             )
 
             await self.analyzer.analyze(analysis)
@@ -75,7 +75,7 @@ class AnalysisService:
             self.analytics_resource.status = AnalysisStatus.saved
             self.analytics_resource.result = analysis.result
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id,
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
@@ -94,7 +94,7 @@ class AnalysisService:
             self.analytics_resource.status = AnalysisStatus.failed
             self.analytics_resource.result = {"error": str(e)}
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id,
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
@@ -116,7 +116,7 @@ class AnalysisService:
             )
             self.analytics_resource.status = AnalysisStatus.failed
             await self.analysis_repository.store_analysis(
-                self.analytics_resource_id,
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata,
                     result=self.analytics_resource.result,
@@ -128,11 +128,12 @@ class AnalysisService:
         return self.analytics_resource.status or AnalysisStatus.pending
 
     async def set_resource_from(self, data: AnalyticsIn):
+        self.analytics_resource_id = data.thumbprint()
+
         analysis: Analysis = await self.analysis_repository.load_analysis(
-            data.thumbprint()
+            self.resource_thumbprint()
         )
 
-        self.analytics_resource_id = data.thumbprint()
         self.analytics_resource = AnalyticsOut(
             metadata=analysis.metadata or data.model_dump(),
             result=analysis.result,
@@ -141,11 +142,21 @@ class AnalysisService:
 
         if self.analytics_resource.status is None:  # store placeholder immediately
             await self.analysis_repository.store_analysis(
-                data.thumbprint(),
+                self.resource_thumbprint(),
                 Analysis(
                     metadata=self.analytics_resource.metadata, result=None, status=None
                 ),
             )
 
     def resource_thumbprint(self) -> uuid.UUID:
-        return self.analytics_resource_id
+        """Combine the request fingerprint with the analyzer's dataset fingerprint.
+
+        This means the cache key changes when either the request parameters
+        change (via data.thumbprint()) or the input datasets change (via
+        analyzer.thumbprint()).  Neither fingerprint needs to be stored
+        separately — recomputing on each request is cheap and correct.
+        """
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS,
+            f"{self.analytics_resource_id}{self.analyzer.thumbprint()}",
+        )
