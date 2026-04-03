@@ -12,19 +12,21 @@ from app.domain.models.dataset import Dataset
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
 
+CARBON_NET_FLUX_VERSION = "v20260327"
+CARBON_GROSS_REMOVALS_VERSION = "v20260327"
+CARBON_GROSS_EMISSIONS_VERSION = "v20260327"
+
 _input_uris = {
-    # These are zarrs with total emissions (not per-hectare)
-    "carbon_net_flux_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
-    "carbon_gross_removals_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_gross_removals/v20250416/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
-    "carbon_gross_emissions_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
-    # Boolean value (0, 1)
+    # These are zarrs with total emissions (not per-hectare).
+    "carbon_net_flux_zarr_uri": f"s3://lcl-analytics/zarr/gfw-carbon-net-flux/{CARBON_NET_FLUX_VERSION}/Mg_CO2e.zarr/",
+    "carbon_gross_removals_zarr_uri": f"s3://lcl-analytics/zarr/gfw-carbon-gross-removals/{CARBON_GROSS_REMOVALS_VERSION}/Mg_CO2e.zarr/",
+    "carbon_gross_emissions_zarr_uri": f"s3://lcl-analytics/zarr/gfw-carbon-gross-emissions/{CARBON_GROSS_EMISSIONS_VERSION}/Mg_CO2e.zarr/",
+    # Boolean value (0, 1).
     "mangrove_stock_2000_zarr_uri": "s3://gfw-data-lake/jpl_mangrove_aboveground_biomass_stock_2000/v201902/raster/epsg-4326/zarr/is_mangrove.zarr/",
-    # Value 1, 2, 3, 4, which means 2001, 2005, 2010, 2015 periods
+    # Value 1, 2, 3, 4 means 2001, 2005, 2010, 2015 periods.
     "tree_cover_gain_from_height_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/",
     # Value [0, 100] inclusive.
     "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
-    # Value [1,24] inclusive
-    "tree_cover_loss_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr/",
 }
 
 # Parquet location
@@ -34,7 +36,6 @@ _input_uris = {
 # carbontype, value columns. Use equality on the tree_cover_density column, which has
 # values 30/50/75..
 admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet"
-OTF_ZARR_GROUP = "otf"
 
 
 class CarbonFluxAnalyzer(Analyzer):
@@ -100,19 +101,13 @@ class CarbonFluxAnalyzer(Analyzer):
             Dataset.canopy_cover, threshold
         )
         carbon_net_flux = read_zarr_clipped_to_geojson(
-            _input_uris["carbon_net_flux_zarr_uri"],
-            geojson,
-            group=OTF_ZARR_GROUP,
+            _input_uris["carbon_net_flux_zarr_uri"], geojson, group="otf"
         )
         carbon_gross_removals = read_zarr_clipped_to_geojson(
-            _input_uris["carbon_gross_removals_zarr_uri"],
-            geojson,
-            group=OTF_ZARR_GROUP,
+            _input_uris["carbon_gross_removals_zarr_uri"], geojson, group="otf"
         )
         carbon_gross_emissions = read_zarr_clipped_to_geojson(
-            _input_uris["carbon_gross_emissions_zarr_uri"],
-            geojson,
-            group=OTF_ZARR_GROUP,
+            _input_uris["carbon_gross_emissions_zarr_uri"], geojson, group="otf"
         )
         mangrove_stock_2000 = read_zarr_clipped_to_geojson(
             _input_uris["mangrove_stock_2000_zarr_uri"], geojson
