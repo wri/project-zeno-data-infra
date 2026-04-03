@@ -76,15 +76,12 @@ class AnalyticsIn(StrictBaseModel):
 
     def thumbprint(self) -> uuid.UUID:
         """Generate a deterministic UUID thumbprint."""
-        if self._input_uris is None:
-            raise ValueError("Input URIs not set")
 
         dump_dict = self.model_dump(exclude=set(), mode="json")
 
         # Manually include important private attributes
         dump_dict["_version"] = self._version
         dump_dict["_analytics_name"] = self._analytics_name
-        dump_dict["_input_uris"] = self._input_uris
 
         payload_json = json.dumps(dump_dict, sort_keys=True)
         return uuid.uuid5(uuid.NAMESPACE_DNS, payload_json)

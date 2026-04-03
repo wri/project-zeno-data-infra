@@ -7,3 +7,7 @@ class Analyzer(ABC):
     @abstractmethod
     async def analyze(self, analysis: Analysis) -> None:
         pass
+
+    # FIXME: Make this abstract
+    def thumbprint(self):
+        pass
