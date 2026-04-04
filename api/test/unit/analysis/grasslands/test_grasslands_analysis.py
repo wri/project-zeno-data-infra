@@ -1,3 +1,4 @@
+from typing import Dict
 from unittest.mock import patch
 
 import dask
@@ -6,7 +7,6 @@ import pandas as pd
 import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
-from dask.dataframe import DataFrame as DaskDataFrame
 
 from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
 from app.domain.models.environment import Environment
@@ -78,7 +78,7 @@ class TestGrasslandsPreComputedAnalysis:
                 table_uri=precomputed_gadm_results
             )
         )
-        result_df: DaskDataFrame = await grasslands_analyzer.analyze_admin_areas(
+        result: Dict = await grasslands_analyzer.analyze_admin_areas(
             [gadm_id], 2000, 2022
         )
 
@@ -116,7 +116,7 @@ class TestGrasslandsPreComputedAnalysis:
 
         pd.testing.assert_frame_equal(
             expected_df,
-            pd.DataFrame(result_df),
+            pd.DataFrame(result),
             check_like=True,
             check_dtype=False,
             check_exact=False,  # Allow approximate comparison for numbers
