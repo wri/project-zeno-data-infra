@@ -41,6 +41,9 @@ class GrasslandsAnalyzer(Analyzer):
 
     @nr_agent.function_trace(name="GrasslandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
+
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
 
         if grasslands_analytics_in.aoi.type == "admin":
@@ -66,6 +69,8 @@ class GrasslandsAnalyzer(Analyzer):
                 self.analyze_area,
                 start_year=grasslands_analytics_in.start_year,
                 end_year=grasslands_analytics_in.end_year,
+                grasslands_obj_name=self.input_uris["grasslands_zarr_uri"],
+                pixel_area_obj_name=self.input_uris["pixel_area_zarr_uri"],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
@@ -85,13 +90,12 @@ class GrasslandsAnalyzer(Analyzer):
 
         return data
 
-    def analyze_area(self, aoi, geojson, start_year, end_year) -> DataFrame:
-        if self.input_uris is None:
-            raise Exception("Please set input_uris if you intend to analyze")
-
-        grasslands_obj_name = self.input_uris["grasslands_zarr_uri"]
-        pixel_area_obj_name = self.input_uris["pixel_area_zarr_uri"]
-
+    @staticmethod
+    def analyze_area(
+        aoi, geojson, start_year, end_year, grasslands_obj_name, pixel_area_obj_name
+    ) -> DataFrame:
+        # Sadly, this method must be static because Dask can't serialize compute_engine
+        # (a live Dask Task) in self
         grasslands: DataArray = read_zarr_clipped_to_geojson(
             grasslands_obj_name, geojson
         ).sel(year=slice(start_year, end_year))
