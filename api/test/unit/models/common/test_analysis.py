@@ -6,9 +6,7 @@ from fastapi import HTTPException
 from fastapi.responses import Response
 
 from app.domain.models.analysis import Analysis
-from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
-from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
