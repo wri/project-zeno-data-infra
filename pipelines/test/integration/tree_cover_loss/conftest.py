@@ -169,6 +169,42 @@ def tclf_ds():
 
 
 @pytest.fixture
+def mangrove_ds():
+    tclf = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[1, 0], [0, 1]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
+    )
+    return tclf
+
+
+@pytest.fixture
+def gain_from_height_ds():
+    tclf = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[10, 6], [5, 2]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
+    )
+    return tclf
+
+
+@pytest.fixture
 def country_ds():
     country = xr.Dataset(
         data_vars={
