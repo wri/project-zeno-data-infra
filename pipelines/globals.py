@@ -19,7 +19,7 @@ dist_driver_zarr_uri = (
 land_cover_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-cover/umd_lcl_land_cover_2015-2024.zarr"
 )
-tree_cover_density_zarr_uri = (
+tree_cover_density_2000_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr"
 )
 ifl_intact_forest_lands_zarr_uri = (
@@ -28,3 +28,5 @@ ifl_intact_forest_lands_zarr_uri = (
 umd_primary_forests_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-regional-primary-forest-2001/v201901/is.zarr/"
 )
+mangrove_stock_2000_zarr_uri = "s3://lcl-analytics/zarr/jpl_mangrove_aboveground_biomass_stock_2000/v201902/is_mangrove.zarr/"
+tree_cover_gain_from_height_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
