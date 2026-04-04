@@ -1,11 +1,21 @@
+import json
+import uuid
+
 import newrelic.agent as nr_agent
 
 from app.analysis.common.analysis import get_sql_in_list
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
+
+TABLE_URI = {
+    Environment.production: (
+        "s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
+    ),
+}
 
 
 class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
@@ -14,12 +24,12 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
         query_service=None,
+        table_uri: str | None = None,
     ):
         self.compute_engine = compute_engine
-        self.dataset_repository = dataset_repository
         self.query_service = query_service
+        self._table_uri = table_uri
 
     @nr_agent.function_trace(name="DeforestationLUCEmissionsFactorAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -31,7 +41,6 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
             results = await self.analyze_admin_areas(
                 deforestation_luc_emissions_factor_analytics_in
             )
-
         else:
             raise NotImplementedError()
 
@@ -47,3 +56,7 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
+
+    def thumbprint(self):
+        uris = sorted(u for u in [self._table_uri] if u is not None)
+        return uuid.uuid5(uuid.NAMESPACE_DNS, json.dumps(uris))
