@@ -26,6 +26,8 @@ def load_data(
     primary_forests_uri: Optional[str] = None,
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
+    mangrove_stock_2000_uri: Optional[str] = None,
+    tree_cover_gain_from_height_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
     group: Optional[str] = None,
 ) -> Tuple:
@@ -39,6 +41,8 @@ def load_data(
         primary_forests_uri,
         natural_forests_uri,
         tree_cover_loss_from_fires_uri,
+        mangrove_stock_2000_uri,
+        tree_cover_gain_from_height_uri,
         bbox,
         group=group,
     )
