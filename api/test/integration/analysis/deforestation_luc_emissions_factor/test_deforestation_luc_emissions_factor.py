@@ -1,5 +1,8 @@
-import uuid
-from test.integration import delete_resource_files, retry_getting_resource
+from test.integration import (
+    delete_resource_files,
+    resource_thumbprint,
+    retry_getting_resource,
+)
 
 import pandas as pd
 import pytest
@@ -51,20 +54,6 @@ def create_analysis_service_for_tests(
     )
 
 
-def _resource_thumbprint(
-    analytics_in: DeforestationLUCEmissionsFactorAnalyticsIn,
-) -> uuid.UUID:
-    """Mirrors AnalysisService.resource_thumbprint() for use in test assertions."""
-    analyzer = DeforestationLUCEmissionsFactorAnalyzer(
-        table_uri=TABLE_URI[Environment.production]
-    )
-
-    return uuid.uuid5(
-        uuid.NAMESPACE_DNS,
-        f"{analytics_in.thumbprint()}{analyzer.thumbprint()}",
-    )
-
-
 class TestAnalyticsPostWithMultipleAdminAOIs:
     @pytest_asyncio.fixture
     async def setup(self):
@@ -75,7 +64,10 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2021",
             end_year="2023",
         )
-        resource_tp = _resource_thumbprint(analytics_in)
+        analyzer = DeforestationLUCEmissionsFactorAnalyzer(
+            table_uri=TABLE_URI[Environment.production],
+        )
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         delete_resource_files(ANALYTICS_NAME, resource_tp)
 
