@@ -165,3 +165,8 @@ class CarbonFluxAnalyzer(Analyzer):
         carbon_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
         return carbon_df
+
+    def thumbprint(self):
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS, json.dumps(self.input_uris, sort_keys=True)
+        )
