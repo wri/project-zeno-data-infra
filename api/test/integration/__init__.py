@@ -1,9 +1,13 @@
 import json
 import os
 import time
+import uuid
 from pathlib import Path
 
 import pytest
+
+from app.domain.analyzers.analyzer import Analyzer
+from app.models.common.analysis import AnalyticsIn
 
 
 ##################################################################
@@ -61,3 +65,12 @@ async def retry_getting_resource(router: str, resource_id: str, client):
     if attempts >= 10:
         pytest.fail("Resource stuck on 'pending' status")
     return data
+
+
+def resource_thumbprint(analytics_in: AnalyticsIn, analyzer: Analyzer) -> uuid.UUID:
+    """Mirrors AnalysisService.resource_thumbprint() for use in test assertions."""
+    # TODO: Make this break loudly if AnalysisService.resource_thumbprint changes
+    return uuid.uuid5(
+        uuid.NAMESPACE_DNS,
+        f"{analytics_in.thumbprint()}{analyzer.thumbprint()}",
+    )
