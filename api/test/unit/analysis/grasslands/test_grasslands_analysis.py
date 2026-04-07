@@ -1,3 +1,4 @@
+from typing import Dict
 from unittest.mock import patch
 
 import dask
@@ -6,9 +7,9 @@ import pandas as pd
 import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
-from dask.dataframe import DataFrame as DaskDataFrame
 
-from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -77,7 +78,7 @@ class TestGrasslandsPreComputedAnalysis:
                 table_uri=precomputed_gadm_results
             )
         )
-        result_df: DaskDataFrame = await grasslands_analyzer.analyze_admin_areas(
+        result: Dict = await grasslands_analyzer.analyze_admin_areas(
             [gadm_id], 2000, 2022
         )
 
@@ -115,7 +116,7 @@ class TestGrasslandsPreComputedAnalysis:
 
         pd.testing.assert_frame_equal(
             expected_df,
-            pd.DataFrame(result_df),
+            pd.DataFrame(result),
             check_like=True,
             check_dtype=False,
             check_exact=False,  # Allow approximate comparison for numbers
@@ -203,7 +204,16 @@ class TestGrasslandsOTFAnalysis:
 
         with dask.config.set(scheduler="synchronous"):
             result_df = GrasslandsAnalyzer.analyze_area(
-                aoi, aoi["geometry"], 2000, 2022
+                aoi,
+                aoi["geometry"],
+                2000,
+                2022,
+                grasslands_obj_name=INPUT_URIS[Environment.production][
+                    "grasslands_zarr_uri"
+                ],
+                pixel_area_obj_name=INPUT_URIS[Environment.production][
+                    "pixel_area_zarr_uri"
+                ],
             )
             computed_df = result_df.compute()
 
