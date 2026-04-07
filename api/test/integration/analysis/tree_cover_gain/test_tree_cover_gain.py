@@ -1,4 +1,8 @@
-from test.integration import delete_resource_files, retry_getting_resource
+from test.integration import (
+    delete_resource_files,
+    resource_thumbprint,
+    retry_getting_resource,
+)
 
 import pandas as pd
 import pytest
@@ -83,13 +87,16 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = TreeCoverGainAnalyzer(compute_engine=None)
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -100,7 +107,7 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -110,11 +117,11 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -124,10 +131,8 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 
@@ -152,13 +157,16 @@ class TestGainAnalyticsPostWithKba:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = TreeCoverGainAnalyzer(compute_engine=None)
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -169,7 +177,7 @@ class TestGainAnalyticsPostWithKba:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -179,11 +187,11 @@ class TestGainAnalyticsPostWithKba:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -193,10 +201,8 @@ class TestGainAnalyticsPostWithKba:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 
@@ -222,13 +228,16 @@ class TestGainAnalyticsKeyErrorFix:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = TreeCoverGainAnalyzer(compute_engine=None)
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -239,7 +248,7 @@ class TestGainAnalyticsKeyErrorFix:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -249,11 +258,11 @@ class TestGainAnalyticsKeyErrorFix:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -263,10 +272,8 @@ class TestGainAnalyticsKeyErrorFix:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 
