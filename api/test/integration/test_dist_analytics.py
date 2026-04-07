@@ -1,5 +1,6 @@
 from test.integration import (
     delete_resource_files,
+    resource_thumbprint,
     retry_getting_resource,
     write_data_file,
     write_metadata_file,
@@ -67,8 +68,12 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
+        analytics_in.set_input_uris(Environment.production)
+
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -79,7 +84,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
             get_latest_dist_version_for_test
         )
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -90,7 +95,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, analytics_in
+                yield test_request, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -100,11 +105,11 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, analysis_params = setup
+        test_request, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -125,6 +130,10 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
+
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -135,7 +144,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
             get_latest_dist_version_for_test
         )
 
-        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        dir_path = delete_resource_files(ANALYTICS_NAME, resource_tp)
         write_metadata_file(dir_path)
 
         # now, the resource is already processing...make another post
@@ -144,7 +153,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
             json=analytics_in.model_dump(),
         )
 
-        yield test_request, analytics_in
+        yield test_request, resource_tp
 
     def test_post_returns_pending_status(self, setup):
         test_request, _ = setup
@@ -152,11 +161,11 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
         assert resource["status"] == "pending"
 
     def test_post_returns_resource_link(self, setup):
-        test_request, analysis_params = setup
+        test_request, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     def test_post_202_accepted_response_code(self, setup):
@@ -178,6 +187,10 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
+        analyzer = DistAlertsAnalyzer()
+
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -188,7 +201,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
             get_latest_dist_version_for_test
         )
 
-        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        dir_path = delete_resource_files(ANALYTICS_NAME, resource_tp)
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
@@ -198,7 +211,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
             json=analytics_in.model_dump(),
         )
 
-        yield test_request, analytics_in
+        yield test_request, resource_tp
 
     def test_post_returns_saved_status(self, setup):
         test_request, _ = setup
@@ -206,11 +219,11 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         assert resource["status"] == "saved"
 
     def test_post_returns_resource_link(self, setup):
-        test_request, analysis_params = setup
+        test_request, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     def test_post_202_accepted_response_code(self, setup):
@@ -232,6 +245,9 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -239,10 +255,10 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
             get_file_system_analysis_repository
         )
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         test_request = client.get(
-            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
         yield test_request, analytics_in
@@ -266,6 +282,9 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -276,11 +295,11 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
             get_latest_dist_version_for_test
         )
 
-        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        dir_path = delete_resource_files(ANALYTICS_NAME, resource_tp)
         write_metadata_file(dir_path)
 
         test_request = client.get(
-            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
         yield test_request, analytics_in
@@ -321,6 +340,8 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -332,7 +353,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             get_latest_dist_version_for_test
         )
 
-        dir_path = delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        dir_path = delete_resource_files(ANALYTICS_NAME, resource_tp)
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -347,7 +368,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
 
         test_request = client.get(
-            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
         yield test_request, analytics_in
@@ -403,6 +424,9 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -413,7 +437,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             get_latest_dist_version_for_test
         )
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -424,7 +448,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -434,11 +458,11 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -448,10 +472,8 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert len(data["result"].keys()) == 8
         assert "2024-08-15" in data["result"]["dist_alert_date"]
@@ -477,6 +499,9 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
+        analyzer = DistAlertsAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -487,7 +512,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
             get_latest_dist_version_for_test
         )
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -498,7 +523,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -508,11 +533,11 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -522,10 +547,8 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
         result = pd.DataFrame(data["result"])
 
         # 1. Validate expected columns
@@ -590,6 +613,9 @@ async def test_gadm_dist_analytics_no_intersection():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
+    analyzer = DistAlertsAnalyzer()
+    resource_tp = resource_thumbprint(analytics_in, analyzer)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -598,7 +624,7 @@ async def test_gadm_dist_analytics_no_intersection():
     )
     app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
-    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+    delete_resource_files(ANALYTICS_NAME, resource_tp)
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -609,9 +635,7 @@ async def test_gadm_dist_analytics_no_intersection():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(
-                ANALYTICS_NAME, analytics_in.thumbprint(), client
-            )
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -654,6 +678,9 @@ async def test_kba_dist_analytics_no_intersection():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
+    analyzer = DistAlertsAnalyzer()
+    resource_tp = resource_thumbprint(analytics_in, analyzer)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -662,7 +689,7 @@ async def test_kba_dist_analytics_no_intersection():
     )
     app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
-    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+    delete_resource_files(ANALYTICS_NAME, resource_tp)
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -673,9 +700,7 @@ async def test_kba_dist_analytics_no_intersection():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(
-                ANALYTICS_NAME, analytics_in.thumbprint(), client
-            )
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -688,7 +713,6 @@ async def test_kba_dist_analytics_no_intersection():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,
@@ -711,6 +735,9 @@ async def test_admin_dist_analytics_by_grasslands():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
+    analyzer = DistAlertsAnalyzer()
+    resource_tp = resource_thumbprint(analytics_in, analyzer)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -719,7 +746,7 @@ async def test_admin_dist_analytics_by_grasslands():
     )
     app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
-    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+    delete_resource_files(ANALYTICS_NAME, resource_tp)
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -730,9 +757,7 @@ async def test_admin_dist_analytics_by_grasslands():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(
-                ANALYTICS_NAME, analytics_in.thumbprint(), client
-            )
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -749,7 +774,6 @@ async def test_admin_dist_analytics_by_grasslands():
     )
 
     actual_df = pd.DataFrame(data["result"])
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,
@@ -771,6 +795,9 @@ async def test_admin_dist_analytics_by_land_cover():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
+    analyzer = DistAlertsAnalyzer()
+    resource_tp = resource_thumbprint(analytics_in, analyzer)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
@@ -779,7 +806,7 @@ async def test_admin_dist_analytics_by_land_cover():
     )
     app.dependency_overrides[get_latest_dist_version] = get_latest_dist_version_for_test
 
-    delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+    delete_resource_files(ANALYTICS_NAME, resource_tp)
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -790,9 +817,7 @@ async def test_admin_dist_analytics_by_land_cover():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(
-                ANALYTICS_NAME, analytics_in.thumbprint(), client
-            )
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -873,7 +898,6 @@ async def test_admin_dist_analytics_by_land_cover():
 
     actual_df = pd.DataFrame(data["result"])
     pd.set_option("display.max_columns", None)
-    print(actual_df)
 
     pd.testing.assert_frame_equal(
         expected_df,
