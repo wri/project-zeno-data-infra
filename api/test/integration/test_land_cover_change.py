@@ -1,5 +1,6 @@
 from test.integration import (  # write_data_file,; write_metadata_file,
     delete_resource_files,
+    resource_thumbprint,
     retry_getting_resource,
 )
 
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -65,13 +67,16 @@ class TestLandCoverChangeData:
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = LandCoverChangeAnalyzer()
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -82,15 +87,15 @@ class TestLandCoverChangeData:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, client, analytics_in
+                yield test_request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -101,10 +106,8 @@ class TestLandCoverChangeData:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        resource = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        resource = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         expected = pd.DataFrame(
             {

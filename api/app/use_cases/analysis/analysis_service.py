@@ -11,6 +11,13 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn, AnalyticsOut
 
 
+def resource_thumbprint(analytics_in: AnalyticsIn, analyzer: Analyzer) -> uuid.UUID:
+    return uuid.uuid5(
+        uuid.NAMESPACE_DNS,
+        f"{analytics_in.thumbprint()}{analyzer.thumbprint()}",
+    )
+
+
 class AnalysisService:
     def __init__(
         self, analysis_repository: AnalysisRepository, analyzer: Analyzer, event: str
@@ -19,9 +26,7 @@ class AnalysisService:
         self.analyzer = analyzer
         self.event = event
         self.analytics_resource: AnalyticsOut = AnalyticsOut()  # Dummy
-        self.analytics_resource_id: uuid.UUID = uuid.uuid5(
-            uuid.NAMESPACE_OID, self.event
-        )  # Dummy
+        self.analytics_resource_id: uuid.UUID | None = None  # Dummy
 
     def event_name(self) -> str:
         return self.event
@@ -30,7 +35,7 @@ class AnalysisService:
     async def do(self) -> None:
         try:
             if self.analytics_resource.metadata is None:
-                raise Exception("Set analysis resource before calling this method")
+                raise Exception("Set analytics_resource before calling this method")
 
             if self.analytics_resource.status is not None:
                 return  # analysis is in progress, complete, or failed
@@ -128,11 +133,12 @@ class AnalysisService:
         return self.analytics_resource.status or AnalysisStatus.pending
 
     async def set_resource_from(self, data: AnalyticsIn):
+        self.analytics_resource_id = resource_thumbprint(data, self.analyzer)
+
         analysis: Analysis = await self.analysis_repository.load_analysis(
-            data.thumbprint()
+            self.analytics_resource_id
         )
 
-        self.analytics_resource_id = data.thumbprint()
         self.analytics_resource = AnalyticsOut(
             metadata=analysis.metadata or data.model_dump(),
             result=analysis.result,
@@ -141,11 +147,13 @@ class AnalysisService:
 
         if self.analytics_resource.status is None:  # store placeholder immediately
             await self.analysis_repository.store_analysis(
-                data.thumbprint(),
+                self.analytics_resource_id,
                 Analysis(
                     metadata=self.analytics_resource.metadata, result=None, status=None
                 ),
             )
 
     def resource_thumbprint(self) -> uuid.UUID:
+        if self.analytics_resource_id is None:
+            raise Exception("Set analytics_resource before calling this method")
         return self.analytics_resource_id
