@@ -1,4 +1,3 @@
-import uuid
 from test.integration import (
     delete_resource_files,
     resource_thumbprint,
@@ -13,6 +12,7 @@ from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+    INPUT_URIS,
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.environment import Environment
@@ -46,8 +46,9 @@ def create_analysis_service_for_tests(
         analyzer=DeforestationLUCEmissionsFactorAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_table_uri"],
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -64,7 +65,9 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             end_year="2023",
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = DeforestationLUCEmissionsFactorAnalyzer()
+        analyzer = DeforestationLUCEmissionsFactorAnalyzer(
+            input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         delete_resource_files(ANALYTICS_NAME, resource_tp)
