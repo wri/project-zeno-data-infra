@@ -10,13 +10,16 @@ import xarray as xr
 from dask.distributed import Client
 
 from app.domain.analyzers.land_cover_composition_analyzer import (
+    INPUT_URIS,
     LandCoverCompositionAnalyzer,
 )
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.common.analysis import AnalysisStatus
+from app.models.common.areas_of_interest import CustomAreaOfInterest
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
@@ -149,7 +152,10 @@ class TestLandCoverCompositionCustomAois:
             land_cover_composition_datacube,
             pixel_area,
         ]
-        analyzer = LandCoverCompositionAnalyzer(compute_engine=async_dask_client)
+        analyzer = LandCoverCompositionAnalyzer(
+            compute_engine=async_dask_client,
+            input_uris=INPUT_URIS[Environment.production],
+        )
 
         feature_collection = {
             "type": "FeatureCollection",
@@ -173,10 +179,12 @@ class TestLandCoverCompositionCustomAois:
             ],
         }
         metadata = LandCoverCompositionAnalyticsIn(
-            aoi={
-                "type": "feature_collection",
-                "feature_collection": feature_collection,
-            },
+            aoi=CustomAreaOfInterest(
+                **{
+                    "type": "feature_collection",
+                    "feature_collection": feature_collection,
+                }
+            ),
         )
         self.metadata = metadata.model_dump()
 
@@ -257,6 +265,7 @@ class TestLandCoverChangeAdminAois:
         analyzer = LandCoverCompositionAnalyzer(
             compute_engine=async_dask_client,
             query_service=query_service,
+            input_uris=INPUT_URIS[Environment.production],
         )
 
         analyzer.admin_results_uri = table_name
