@@ -3,7 +3,9 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
+from app.dependencies import get_environment
+from app.domain.analyzers.natural_lands_analyzer import INPUT_URIS, NaturalLandsAnalyzer
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
@@ -31,11 +33,13 @@ def get_analysis_repository(request: Request) -> AnalysisRepository:
 def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
+    environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
             compute_engine=request.app.state.dask_client,
+            input_uris=INPUT_URIS[environment],
         ),
         event=ANALYTICS_NAME,
     )

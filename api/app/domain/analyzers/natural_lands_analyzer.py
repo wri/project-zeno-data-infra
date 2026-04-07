@@ -9,12 +9,11 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.land_change.natural_lands import NaturalLandsAnalyticsIn
-
-admin_results_uri = "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet"
 
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
@@ -39,11 +38,14 @@ NATURAL_LANDS_CLASSES = {
     21: "Non-natural bare",
 }
 
-_input_uris = {
-    "natural_lands_zarr_uri": (
-        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-    ),
-    "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+INPUT_URIS = {
+    Environment.production: {
+        "natural_lands_zarr_uri": (
+            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+        ),
+        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet",
+    }
 }
 
 
@@ -53,13 +55,16 @@ class NaturalLandsAnalyzer(Analyzer):
     def __init__(
         self,
         compute_engine=None,
-        dataset_repository=None,
+        input_uris: Dict[str, str] | None = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
-        self.dataset_repository = dataset_repository  # AWS-S3 for zarrs, etc.
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
+
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             natural_lands_analytics_in._input_uris = analysis.metadata["_input_uris"]
@@ -78,7 +83,7 @@ class NaturalLandsAnalyzer(Analyzer):
                 aoi_list = aois["feature_collection"]["features"]
                 geojsons = [geojson["geometry"] for geojson in geojsons]
 
-            analysis_partial = partial(self.analyze_area)
+            analysis_partial = partial(self.analyze_area, self.input_uris)
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)
             )
@@ -89,18 +94,21 @@ class NaturalLandsAnalyzer(Analyzer):
         analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids) -> Dict[str, Any]:
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
+
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])
         query = f"select natural_lands_class, area_ha, aoi_id from data_source where aoi_id in ({id_str})"
-        query_service = DuckDbPrecalcQueryService(admin_results_uri)
+        query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
         df = await query_service.execute(query)
         df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
 
     @staticmethod
-    def analyze_area(aoi, geojson) -> dd.DataFrame:
-        natural_lands_obj_name = _input_uris["natural_lands_zarr_uri"]
-        pixel_area_obj_name = _input_uris["pixel_area_zarr_uri"]
+    def analyze_area(input_uris: Dict[str, str], aoi, geojson) -> dd.DataFrame:
+        natural_lands_obj_name = input_uris["natural_lands_zarr_uri"]
+        pixel_area_obj_name = input_uris["pixel_area_zarr_uri"]
 
         natural_lands = read_zarr_clipped_to_geojson(
             natural_lands_obj_name, geojson
