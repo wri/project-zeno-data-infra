@@ -1,6 +1,3 @@
-import uuid
-
-from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import DeforestationLUCEmissionsFactorAnalyzer
 from test.integration import delete_resource_files, retry_getting_resource
 
 import pandas as pd
@@ -10,7 +7,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
+from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -45,7 +42,6 @@ def create_analysis_service_for_tests(
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri="s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
             ),
-            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
