@@ -7,7 +7,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -40,8 +40,9 @@ def create_analysis_service_for_tests(
         analyzer=GrasslandsAnalyzer(
             compute_engine=request.app.state.dask_client,
             duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_table_uri"]
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -56,7 +57,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = GrasslandsAnalyzer()
+        analyzer = GrasslandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         delete_resource_files(ANALYTICS_NAME, resource_tp)
@@ -127,7 +128,7 @@ class TestGrasslandsAnalyticsPostWithKba:
             start_year="2015",
             end_year="2020",
         )
-        analyzer = GrasslandsAnalyzer()
+        analyzer = GrasslandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         analytics_in.set_input_uris(Environment.production)
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
