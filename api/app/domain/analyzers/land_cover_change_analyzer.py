@@ -59,10 +59,7 @@ class LandCoverChangeAnalyzer(Analyzer):
             raise RuntimeError("Input URIs must be provided for actual analysis")
 
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            land_cover_change_analytics_in._input_uris = analysis.metadata[
-                "_input_uris"
-            ]
+
         if land_cover_change_analytics_in.aoi.type == "admin":
             gadm_ids = land_cover_change_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)

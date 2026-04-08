@@ -72,8 +72,7 @@ class NaturalLandsAnalyzer(Analyzer):
             raise Exception("Input URIs must be provided for actual analysis")
 
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            natural_lands_analytics_in._input_uris = analysis.metadata["_input_uris"]
+
         if natural_lands_analytics_in.aoi.type == "admin":
             gadm_ids = natural_lands_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)

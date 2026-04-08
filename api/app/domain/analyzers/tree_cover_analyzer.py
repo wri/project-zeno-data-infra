@@ -44,8 +44,7 @@ class TreeCoverAnalyzer(Analyzer):
             raise Exception("Input URIs must be provided for actual analysis")
 
         analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            analytics_in._input_uris = analysis.metadata["_input_uris"]
+
         groupbys: List[Dataset] = []
 
         filters: List[DatasetFilter] = [
