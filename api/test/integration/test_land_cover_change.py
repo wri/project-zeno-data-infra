@@ -1,4 +1,4 @@
-from test.integration import (  # write_data_file,; write_metadata_file,
+from test.integration import (
     delete_resource_files,
     resource_thumbprint,
     retry_getting_resource,
@@ -12,8 +12,10 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
-from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
+from app.domain.analyzers.land_cover_change_analyzer import (
+    INPUT_URIS,
+    LandCoverChangeAnalyzer,
+)
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -52,8 +54,9 @@ def create_analysis_service_for_tests(
         analyzer=LandCoverChangeAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-land-cover-change.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"],
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
