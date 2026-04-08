@@ -5,6 +5,7 @@ from pydantic import UUID5
 
 from app.dependencies import get_environment
 from app.domain.analyzers.tree_cover_gain_analyzer import (
+    INPUT_URIS,
     TreeCoverGainAnalyzer,
 )
 from app.domain.compute_engines.compute_engine import (
@@ -59,7 +60,7 @@ def create_analysis_service(
         handler=TreeCoverGainPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet"
+                table_uri=INPUT_URIS[environment]["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
                 environment=environment,
@@ -71,7 +72,7 @@ def create_analysis_service(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverGainAnalyzer(compute_engine),
+        analyzer=TreeCoverGainAnalyzer(compute_engine, INPUT_URIS[environment]),
         event=ANALYTICS_NAME,
     )
 

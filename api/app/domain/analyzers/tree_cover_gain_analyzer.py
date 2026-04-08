@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import newrelic.agent as nr_agent
 
@@ -11,15 +11,32 @@ from app.domain.models.dataset import (
     DatasetFilter,
     DatasetQuery,
 )
+from app.domain.models.environment import Environment
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
+
+INPUT_URIS = {
+    Environment.staging: {},
+    Environment.production: {
+        "area_hectares": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr",
+        "tree_cover_gain": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr",
+        "primary_forest": "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet",
+    },
+}
 
 
 class TreeCoverGainAnalyzer(Analyzer):
-    def __init__(self, compute_engine: ComputeEngine):
+    def __init__(
+        self, compute_engine: ComputeEngine, input_uris: Dict[str, str] | None = None
+    ):
         self.compute_engine = compute_engine
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for actual analysis")
+
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
         if analysis.metadata.get("_input_uris") is not None:
             analytics_in._input_uris = analysis.metadata["_input_uris"]

@@ -11,7 +11,10 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.tree_cover_gain_analyzer import TreeCoverGainAnalyzer
+from app.domain.analyzers.tree_cover_gain_analyzer import (
+    INPUT_URIS,
+    TreeCoverGainAnalyzer,
+)
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -60,10 +63,10 @@ def create_analysis_service_for_tests(
         handler=TreeCoverGainPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
-                dataset_repository=ZarrDatasetRepository(),
+                dataset_repository=ZarrDatasetRepository(Environment.production),
                 aoi_geometry_repository=DataApiAoiGeometryRepository(),
                 dask_client_router=request.app.state.dask_client_router,
             ),
@@ -72,7 +75,9 @@ def create_analysis_service_for_tests(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverGainAnalyzer(compute_engine),
+        analyzer=TreeCoverGainAnalyzer(
+            compute_engine, input_uris=INPUT_URIS[Environment.production]
+        ),
         event=ANALYTICS_NAME,
     )
 
@@ -87,7 +92,10 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverGainAnalyzer(compute_engine=None)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=None,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -157,7 +165,10 @@ class TestGainAnalyticsPostWithKba:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverGainAnalyzer(compute_engine=None)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=None,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -228,7 +239,10 @@ class TestGainAnalyticsKeyErrorFix:
             end_year="2020",
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverGainAnalyzer(compute_engine=None)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=None,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
