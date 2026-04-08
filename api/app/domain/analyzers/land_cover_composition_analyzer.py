@@ -1,3 +1,5 @@
+import json
+import uuid
 from functools import partial
 from typing import Dict
 
@@ -150,3 +152,12 @@ class LandCoverCompositionAnalyzer(Analyzer):
         )
 
         return land_cover_composition_ddf
+
+    def thumbprint(self) -> uuid.UUID:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for thumbprinting")
+
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS,
+            json.dumps(self.input_uris),
+        )
