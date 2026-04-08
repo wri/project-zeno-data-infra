@@ -1,3 +1,5 @@
+import json
+import uuid
 from typing import Dict
 
 from app.analysis.dist_alerts.analysis import (
@@ -79,3 +81,12 @@ class DistAlertsAnalyzer(Analyzer):
         alerts_dict = alerts_df.to_dict(orient="list")
 
         analysis.result = alerts_dict
+
+    def thumbprint(self) -> uuid.UUID:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for thumbprinting")
+
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS,
+            json.dumps(self.input_uris),
+        )
