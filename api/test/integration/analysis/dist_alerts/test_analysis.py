@@ -6,6 +6,8 @@ import pytest
 from dask.dataframe import DataFrame as DaskDataFrame
 
 from app.analysis.dist_alerts.analysis import zonal_statistics
+from app.domain.analyzers.dist_alerts_analyzer import INPUT_URIS
+from app.domain.models.environment import Environment
 
 
 class TestDistAlertsZonalStats:
@@ -25,6 +27,7 @@ class TestDistAlertsZonalStats:
         }
 
         _: DaskDataFrame = await zonal_statistics(
+            input_uris=INPUT_URIS[Environment.production],
             aoi={"type": "indigenous_land", "id": "1918"},
             geojson=geojson,
             version="v20251004",
@@ -55,7 +58,11 @@ class TestDistAlertsZonalStats:
             "geometry": geojson,
         }
         result_df: DaskDataFrame = await zonal_statistics(
-            aoi, aoi["geometry"], version="v20251004", intersection="grasslands"
+            INPUT_URIS[Environment.production],
+            aoi,
+            aoi["geometry"],
+            version="v20251004",
+            intersection="grasslands",
         )
 
         loop = asyncio.get_event_loop()
@@ -188,7 +195,7 @@ class TestDistAlertsZonalStats:
                 ],
             }
         )
-        print(computed_df)
+
         pd.testing.assert_frame_equal(
             expected_df,
             computed_df,
@@ -221,7 +228,11 @@ class TestDistAlertsZonalStats:
             "geometry": geojson,
         }
         result_df: DaskDataFrame = await zonal_statistics(
-            aoi, aoi["geometry"], version="v20251004", intersection="land_cover"
+            INPUT_URIS[Environment.production],
+            aoi,
+            aoi["geometry"],
+            version="v20251004",
+            intersection="land_cover",
         )
 
         loop = asyncio.get_event_loop()
@@ -306,7 +317,7 @@ class TestDistAlertsZonalStats:
                 ],
             }
         )
-        print(computed_df)
+
         pd.testing.assert_frame_equal(
             expected_df,
             computed_df,

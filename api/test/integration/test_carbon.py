@@ -12,7 +12,7 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
+from app.domain.analyzers.carbon_flux_analyzer import INPUT_URIS, CarbonFluxAnalyzer
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -47,8 +47,10 @@ def create_analysis_service_for_tests(
         analyzer=CarbonFluxAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-carbon-flux.parquet"
+                # FIXME: Why not use production URI?
+                table_uri=INPUT_URIS[Environment.test]["admin_results_uri"]
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -62,7 +64,7 @@ class TestCarbonDataAdmin:
             canopy_cover=30,
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = CarbonFluxAnalyzer()
+        analyzer = CarbonFluxAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
         delete_resource_files(ANALYTICS_NAME, resource_tp)
 
@@ -158,7 +160,7 @@ class TestCarbonDataFeature:
             canopy_cover=50,
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = CarbonFluxAnalyzer()
+        analyzer = CarbonFluxAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
         delete_resource_files(ANALYTICS_NAME, resource_tp)
 

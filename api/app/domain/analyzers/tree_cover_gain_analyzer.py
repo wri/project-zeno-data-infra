@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import newrelic.agent as nr_agent
 
@@ -11,18 +11,39 @@ from app.domain.models.dataset import (
     DatasetFilter,
     DatasetQuery,
 )
+from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
+
+INPUT_URIS = {
+    Environment.staging: {},
+    Environment.production: {
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.primary_forest,
+                Dataset.tree_cover_gain,
+            ]
+        },
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet",
+    },
+}
 
 
 class TreeCoverGainAnalyzer(Analyzer):
-    def __init__(self, compute_engine: ComputeEngine):
+    def __init__(
+        self, compute_engine: ComputeEngine, input_uris: Dict[str, str] | None = None
+    ):
         self.compute_engine = compute_engine
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverGainAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for actual analysis")
+
         analytics_in = TreeCoverGainAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         filters: List[DatasetFilter] = [
             DatasetFilter(

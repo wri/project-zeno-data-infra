@@ -9,8 +9,12 @@ import pytest_asyncio
 import xarray as xr
 from dask.distributed import Client
 
-from app.domain.analyzers.land_cover_change_analyzer import LandCoverChangeAnalyzer
+from app.domain.analyzers.land_cover_change_analyzer import (
+    INPUT_URIS,
+    LandCoverChangeAnalyzer,
+)
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -147,7 +151,10 @@ class TestLandCoverChangeCustomAois:
             land_cover_change_datacube,
             pixel_area,
         ]
-        analyzer = LandCoverChangeAnalyzer(compute_engine=async_dask_client)
+        analyzer = LandCoverChangeAnalyzer(
+            compute_engine=async_dask_client,
+            input_uris=INPUT_URIS[Environment.production],
+        )
 
         feature_collection = {
             "type": "FeatureCollection",
@@ -264,6 +271,7 @@ class TestLandCoverChangeAdminAois:
         analyzer = LandCoverChangeAnalyzer(
             compute_engine=async_dask_client,
             query_service=query_service,
+            input_uris=INPUT_URIS[Environment.production],
         )
         analyzer.admin_results_uri = table_name
 

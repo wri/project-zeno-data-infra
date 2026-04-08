@@ -1,8 +1,7 @@
 import json
 import os
-import time
 from pathlib import Path
-from test.integration import resource_thumbprint
+from test.integration import resource_thumbprint, retry_getting_resource
 
 import pandas as pd
 import pytest
@@ -12,7 +11,7 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
+from app.domain.analyzers.natural_lands_analyzer import INPUT_URIS, NaturalLandsAnalyzer
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -47,6 +46,7 @@ def create_analysis_service_for_tests(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
             compute_engine=request.app.state.dask_client,
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -59,7 +59,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -110,7 +110,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -160,7 +160,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -211,7 +211,7 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -242,7 +242,7 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -292,7 +292,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -361,7 +361,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
             )
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -407,7 +407,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
     async def test_resource_calculate_results(self, setup):
         test_request, client, resource_tp = setup
 
-        data = await retry_getting_resource(resource_tp, client)
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         expected_df = pd.DataFrame(
             {
@@ -607,7 +607,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
             )
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = NaturalLandsAnalyzer()
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -652,7 +652,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
         test_request, client, resource_tp = setup
-        data = await retry_getting_resource(resource_tp, client)
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
         actual_df = pd.DataFrame(data["result"])
 
         # 1. Validate expected columns
@@ -730,7 +730,7 @@ async def test_gadm_dist_analytics_no_intersection():
         aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
     )
     analytics_in.set_input_uris(Environment.production)
-    analyzer = NaturalLandsAnalyzer()
+    analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     app.dependency_overrides[create_analysis_service] = (
@@ -750,7 +750,7 @@ async def test_gadm_dist_analytics_no_intersection():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(resource_tp, client)
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -840,7 +840,7 @@ async def test_kba_dist_analytics_no_intersection():
         aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
     )
     analytics_in.set_input_uris(Environment.production)
-    analyzer = NaturalLandsAnalyzer()
+    analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     app.dependency_overrides[create_analysis_service] = (
@@ -860,7 +860,7 @@ async def test_kba_dist_analytics_no_intersection():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(resource_tp, client)
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -940,23 +940,3 @@ def write_metadata_file(dir_path):
 def write_data_file(dir_path, data):
     data_file = dir_path / "data.json"
     data_file.write_text(json.dumps(data))
-
-
-async def retry_getting_resource(resource_id: str, client):
-    resource = await client.get(
-        f"/v0/land_change/natural_lands/analytics/{resource_id}"
-    )
-    data = resource.json()["data"]
-    status = data["status"]
-    attempts = 1
-    while status == "pending" and attempts < 10:
-        resp = await client.get(
-            f"/v0/land_change/natural_lands/analytics/{resource_id}"
-        )
-        data = resp.json()["data"]
-        status = data["status"]
-        time.sleep(1)
-        attempts += 1
-    if attempts >= 10:
-        pytest.fail("Resource stuck on 'pending' status")
-    return data

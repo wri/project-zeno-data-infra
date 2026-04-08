@@ -14,7 +14,7 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.dist_alerts_analyzer import DistAlertsAnalyzer
+from app.domain.analyzers.dist_alerts_analyzer import INPUT_URIS, DistAlertsAnalyzer
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -49,6 +49,7 @@ def create_analysis_service_for_tests(
         analysis_repository=analysis_repository,
         analyzer=DistAlertsAnalyzer(
             compute_engine=getattr(request.app.state, "dask_client", None),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -71,7 +72,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
         analytics_in._version = TEST_VERSION
         analytics_in.set_input_uris(Environment.production)
 
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -131,7 +132,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -187,7 +188,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
 
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -245,7 +246,7 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -282,7 +283,7 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
 
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -340,7 +341,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -424,7 +425,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -499,7 +500,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
         )
         analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-        analyzer = DistAlertsAnalyzer()
+        analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -613,7 +614,7 @@ async def test_gadm_dist_analytics_no_intersection():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
-    analyzer = DistAlertsAnalyzer()
+    analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     app.dependency_overrides[create_analysis_service] = (
@@ -678,7 +679,7 @@ async def test_kba_dist_analytics_no_intersection():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
-    analyzer = DistAlertsAnalyzer()
+    analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     app.dependency_overrides[create_analysis_service] = (
@@ -735,7 +736,7 @@ async def test_admin_dist_analytics_by_grasslands():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
-    analyzer = DistAlertsAnalyzer()
+    analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     app.dependency_overrides[create_analysis_service] = (
@@ -795,7 +796,7 @@ async def test_admin_dist_analytics_by_land_cover():
     )
     analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
-    analyzer = DistAlertsAnalyzer()
+    analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     app.dependency_overrides[create_analysis_service] = (
