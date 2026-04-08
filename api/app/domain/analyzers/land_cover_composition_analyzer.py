@@ -9,17 +9,26 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.land_cover_composition import (
     LandCoverCompositionAnalyticsIn,
 )
 
 INPUT_URIS = {
+    Environment.staging: {},
     Environment.production: {
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.natural_lands,
+            ]
+        },
         "land_cover_zarr_uri": "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/",
-        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
         "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-land-cover-composition-2024.parquet",
-    }
+    },
 }
 
 
@@ -79,7 +88,7 @@ class LandCoverCompositionAnalyzer(Analyzer):
             analysis_partial = partial(
                 self.analyze_area,
                 land_cover_zarr_uri=self.input_uris["land_cover_zarr_uri"],
-                pixel_area_zarr_uri=self.input_uris["pixel_area_zarr_uri"],
+                pixel_area_zarr_uri=self.input_uris[str(Dataset.area_hectares)],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)

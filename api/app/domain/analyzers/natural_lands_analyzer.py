@@ -9,7 +9,9 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -39,13 +41,17 @@ NATURAL_LANDS_CLASSES = {
 }
 
 INPUT_URIS = {
+    Environment.staging: {},
     Environment.production: {
-        "natural_lands_zarr_uri": (
-            "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
-        ),
-        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.natural_lands,
+            ]
+        },
         "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet",
-    }
+    },
 }
 
 
@@ -107,8 +113,8 @@ class NaturalLandsAnalyzer(Analyzer):
 
     @staticmethod
     def analyze_area(input_uris: Dict[str, str], aoi, geojson) -> dd.DataFrame:
-        natural_lands_obj_name = input_uris["natural_lands_zarr_uri"]
-        pixel_area_obj_name = input_uris["pixel_area_zarr_uri"]
+        natural_lands_obj_name = input_uris[str(Dataset.natural_lands)]
+        pixel_area_obj_name = input_uris[str(Dataset.area_hectares)]
 
         natural_lands = read_zarr_clipped_to_geojson(
             natural_lands_obj_name, geojson

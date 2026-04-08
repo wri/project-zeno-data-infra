@@ -6,11 +6,17 @@ from app.analysis.dist_alerts.analysis import (
 )
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.dist_alerts import DistAlertsAnalyticsIn
 
 INPUT_URIS = {
+    Environment.staging: {},
     Environment.production: {
+        str(Dataset.area_hectares): ZarrDatasetRepository.resolve_zarr_uri(
+            Dataset.area_hectares, Environment.production
+        ),
         "dist_drivers_zarr_uri": (
             "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr/"
         ),
@@ -23,8 +29,7 @@ INPUT_URIS = {
         "natural_lands_zarr_uri": (
             "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr/"
         ),
-        "pixel_area_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
-    }
+    },
 }
 
 

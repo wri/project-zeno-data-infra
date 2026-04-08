@@ -12,14 +12,20 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
 
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
-        "area_hectares": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr",
-        "tree_cover_gain": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr",
-        "primary_forest": "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.primary_forest,
+                Dataset.tree_cover_gain,
+            ]
+        },
         "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-tree-cover-gain.parquet",
     },
 }

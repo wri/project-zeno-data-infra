@@ -9,7 +9,9 @@ from xarray import DataArray
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
 
 # We want to move this into configuration, but will tolerate it being here for now.
@@ -19,7 +21,9 @@ INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
         "grasslands_zarr_uri": "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/",
-        "pixel_area_zarr_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
+        str(Dataset.area_hectares): ZarrDatasetRepository.resolve_zarr_uri(
+            Dataset.area_hectares, Environment.production
+        ),
         "admin_results_table_uri": "s3://lcl-analytics/zonal-statistics/admin-grasslands.parquet",
     },
 }
@@ -69,7 +73,7 @@ class GrasslandsAnalyzer(Analyzer):
                 start_year=grasslands_analytics_in.start_year,
                 end_year=grasslands_analytics_in.end_year,
                 grasslands_obj_name=self.input_uris["grasslands_zarr_uri"],
-                pixel_area_obj_name=self.input_uris["pixel_area_zarr_uri"],
+                pixel_area_obj_name=self.input_uris[str(Dataset.area_hectares)],
             )
             dd_df_futures = await self.compute_engine.gather(
                 self.compute_engine.map(analysis_partial, aoi_list, geojsons)

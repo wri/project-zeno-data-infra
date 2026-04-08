@@ -9,6 +9,7 @@ import xarray as xr
 from dask.dataframe import DataFrame as DaskDataFrame
 from flox.xarray import xarray_reduce
 
+from ...domain.models.dataset import Dataset
 from ..common.analysis import (
     JULIAN_DATE_2021,
     get_geojson,
@@ -99,7 +100,7 @@ async def zonal_statistics(
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     pixel_area = read_zarr_clipped_to_geojson(
-        input_uris["pixel_area_uri"], geojson
+        input_uris[str(Dataset.area_hectares)], geojson
     ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]

@@ -11,11 +11,12 @@ from app.models.land_change.deforestation_luc_emissions_factor import (
 )
 
 INPUT_URIS = {
+    Environment.staging: {},
     Environment.production: {
         "admin_results_table_uri": (
             "s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
         )
-    }
+    },
 }
 
 
