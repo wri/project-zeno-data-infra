@@ -11,7 +11,10 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.analyzers.tree_cover_loss_analyzer import (
+    INPUT_URIS,
+    TreeCoverLossAnalyzer,
+)
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -62,7 +65,7 @@ def create_analysis_service_for_tests(
         handler=TreeCoverLossPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal_statistics/admin-tree-cover-loss-emissions-by-driver.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
                 dataset_repository=ZarrDatasetRepository(),
@@ -74,7 +77,9 @@ def create_analysis_service_for_tests(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverLossAnalyzer(compute_engine),
+        analyzer=TreeCoverLossAnalyzer(
+            compute_engine, INPUT_URIS[Environment.production]
+        ),
         event=ANALYTICS_NAME,
     )
 
@@ -91,7 +96,9 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
             intersections=[],
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverLossAnalyzer(compute_engine=None)
+        analyzer = TreeCoverLossAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -165,7 +172,9 @@ class TestTclAnalyticsPostWithKba:
             intersections=[],
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverLossAnalyzer(compute_engine=None)
+        analyzer = TreeCoverLossAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -237,7 +246,9 @@ class TestTclAnalyticsAdminAOIWithDriver:
             intersections=["driver"],
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverLossAnalyzer(compute_engine=None)
+        analyzer = TreeCoverLossAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -308,7 +319,9 @@ class TestTclAnalyticsPostWithKbaWithDriver:
             intersections=["driver"],
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverLossAnalyzer(compute_engine=None)
+        analyzer = TreeCoverLossAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
@@ -379,7 +392,9 @@ class TestTclAnalyticsWithForestFilters:
             intersections=[],
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = TreeCoverLossAnalyzer(compute_engine=None)
+        analyzer = TreeCoverLossAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
