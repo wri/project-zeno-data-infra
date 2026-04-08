@@ -9,6 +9,6 @@ class Analyzer(ABC):
     async def analyze(self, analysis: Analysis) -> None:
         pass
 
+    @abstractmethod
     def thumbprint(self) -> uuid.UUID:
-        # FIXME: Make this method abstract once all Analyzers implement it
-        return uuid.uuid5(uuid.NAMESPACE_DNS, "dummy")
+        pass
