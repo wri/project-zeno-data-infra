@@ -1,3 +1,5 @@
+import json
+import uuid
 from typing import Dict, List
 
 import newrelic.agent as nr_agent
@@ -71,3 +73,12 @@ class TreeCoverAnalyzer(Analyzer):
             filters=filters,
         )
         analysis.result = await self.compute_engine.compute(analytics_in.aoi, query)
+
+    def thumbprint(self) -> uuid.UUID:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for thumbprinting")
+
+        return uuid.uuid5(
+            uuid.NAMESPACE_DNS,
+            json.dumps(self.input_uris),
+        )
