@@ -1,5 +1,3 @@
-import json
-import uuid
 from functools import partial
 from typing import Dict
 
@@ -170,12 +168,3 @@ class CarbonFluxAnalyzer(Analyzer):
         carbon_df["aoi_id"] = aoi["id"] if "id" in aoi else aoi["properties"]["id"]
 
         return carbon_df
-
-    def thumbprint(self) -> uuid.UUID:
-        if self.input_uris is None:
-            raise RuntimeError("Input URIs must be provided for thumbprinting")
-
-        return uuid.uuid5(
-            uuid.NAMESPACE_DNS,
-            json.dumps(self.input_uris),
-        )

@@ -1,5 +1,3 @@
-import json
-import uuid
 from typing import Dict, List
 
 import newrelic.agent as nr_agent
@@ -90,12 +88,3 @@ class TreeCoverGainAnalyzer(Analyzer):
         year_ranges = [f"{year}-{year + 5}" for year in range(start, end, 5)]
 
         return tuple(year_ranges)
-
-    def thumbprint(self) -> uuid.UUID:
-        if self.input_uris is None:
-            raise RuntimeError("Input URIs must be provided for thumbprinting")
-
-        return uuid.uuid5(
-            uuid.NAMESPACE_DNS,
-            json.dumps(self.input_uris),
-        )

@@ -1,5 +1,3 @@
-import json
-import uuid
 from typing import Dict
 
 import newrelic.agent as nr_agent
@@ -63,12 +61,3 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
         df["aoi_type"] = ["admin"] * len(df["aoi_id"])
 
         return df
-
-    def thumbprint(self) -> uuid.UUID:
-        if self.input_uris is None:
-            raise RuntimeError("Input URIs must be provided for thumbprinting")
-
-        return uuid.uuid5(
-            uuid.NAMESPACE_DNS,
-            json.dumps(self.input_uris),
-        )
