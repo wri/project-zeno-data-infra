@@ -70,7 +70,9 @@ class TestLandCoverChangeData:
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = LandCoverChangeAnalyzer()
+        analyzer = LandCoverChangeAnalyzer(
+            input_uris=INPUT_URIS[Environment.production]
+        )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
