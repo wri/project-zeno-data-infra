@@ -14,9 +14,6 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
 
 INPUT_URIS = {
-    Environment.test: {
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-carbon-flux.parquet"
-    },
     Environment.staging: {},
     Environment.production: {
         # These are zarrs with total emissions (not per-hectare)
@@ -34,8 +31,7 @@ INPUT_URIS = {
         # This is a simpler parquet with just country, region, subregion, tree_cover_density,
         # carbontype, value columns. Use equality on the tree_cover_density column, which has
         # values 30/50/75...
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-carbon2.parquet",
-        # "admin_results_uri": "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/tabular/zonal_stats/gadm/gadm_adm2.parquet"
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/forest-carbon/v1.12/admin-carbon.parquet",
     },
 }
 
