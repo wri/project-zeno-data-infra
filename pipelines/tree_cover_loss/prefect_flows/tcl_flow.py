@@ -9,11 +9,9 @@ from pipelines.carbon_flux.stages import DATASETS as CARBON_FLUX_DATASETS
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     ifl_intact_forest_lands_zarr_uri,
-    mangrove_stock_2000_zarr_uri,
     pixel_area_zarr_uri,
     sbtn_natural_forests_zarr_uri,
     tree_cover_density_2000_zarr_uri,
-    tree_cover_gain_from_height_zarr_uri,
     umd_primary_forests_zarr_uri,
 )
 from pipelines.prefect_flows import common_tasks
@@ -74,8 +72,6 @@ def umd_tree_cover_loss_flow(
         primary_forests_uri=umd_primary_forests_zarr_uri,
         natural_forests_uri=sbtn_natural_forests_zarr_uri,
         tree_cover_loss_from_fires_uri=tcl_zarr_uris["tree_cover_loss_from_fires"],
-        mangrove_stock_2000_zarr_uri=mangrove_stock_2000_zarr_uri,
-        tree_cover_gain_from_height_zarr_uri=tree_cover_gain_from_height_zarr_uri,
         bbox=bbox,
         group="pipeline",
     )

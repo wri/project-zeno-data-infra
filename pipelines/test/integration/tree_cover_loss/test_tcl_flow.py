@@ -69,7 +69,6 @@ def test_tcl_flow_real_data(
     mock_qc_write_results.assert_called_once()
 
 
-@pytest.mark.skip("TODO")
 @pytest.mark.integration
 @patch(
     "pipelines.tree_cover_loss.stages.qc_against_validation_source", return_value=True
@@ -91,8 +90,6 @@ def test_tcl_flow_with_new_contextual_layers(
     primary_forests_ds,
     natural_forests_ds,
     tclf_ds,
-    mangrove_stock_2000_ds,
-    tree_cover_gain_from_height_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -112,8 +109,6 @@ def test_tcl_flow_with_new_contextual_layers(
         primary_forests_ds,
         natural_forests_ds,
         tclf_ds,
-        mangrove_stock_2000_ds,
-        tree_cover_gain_from_height_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -148,7 +143,6 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df.size == 33
 
 
-@pytest.mark.skip("TODO")
 @patch(
     "pipelines.tree_cover_loss.stages.qc_against_validation_source", return_value=True
 )
@@ -169,8 +163,6 @@ def test_tcl_flow_with_bbox(
     primary_forests_ds,
     natural_forests_ds,
     tclf_ds,
-    mangrove_stock_2000_ds,
-    tree_cover_gain_from_height_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -190,8 +182,6 @@ def test_tcl_flow_with_bbox(
         primary_forests_ds,
         natural_forests_ds,
         tclf_ds,
-        mangrove_stock_2000_ds,
-        tree_cover_gain_from_height_ds,
         country_ds,
         region_ds,
         subregion_ds,

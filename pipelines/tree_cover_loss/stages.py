@@ -83,8 +83,6 @@ def load_data(
     primary_forests_uri: Optional[str] = None,
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
-    mangrove_stock_2000_zarr_uri: Optional[str] = None,
-    tree_cover_gain_from_height_zarr_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
     group: Optional[str] = None,
 ) -> Tuple[
@@ -141,19 +139,6 @@ def load_data(
     # used as part of the mask. The value of the loss year doesn't matter, since it
     # is always the same as the TCL loss year.
     tclf_area = (tclf > 0) * pixel_area
-
-    mangrove: xr.DataArray = _load_zarr(mangrove_stock_2000_zarr_uri).band_data
-    mangrove = xr.align(
-        tcl,
-        mangrove.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
-        join="left",
-    )[1]
-    height: xr.DataArray = _load_zarr(tree_cover_gain_from_height_zarr_uri).band_data
-    height = xr.align(
-        tcl,
-        height.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
-        join="left",
-    )[1]
 
     # contextual layers
     tcd: xr.DataArray = _load_zarr(tree_cover_density_uri).band_data
@@ -213,7 +198,6 @@ def load_data(
         join="left",
     )[1].astype(np.int16)
 
-    carbon_emissions = carbon_emissions * ((tcd >= 30) | (mangrove == 1) | (height > 0))
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset(
         {
