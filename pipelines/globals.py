@@ -28,3 +28,18 @@ ifl_intact_forest_lands_zarr_uri = (
 umd_primary_forests_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-regional-primary-forest-2001/v201901/is.zarr/"
 )
+mangrove_stock_2000_zarr_uri = "s3://lcl-analytics/zarr/jpl_mangrove_aboveground_biomass_stock_2000/v201902/is_mangrove.zarr/"
+tree_cover_gain_from_height_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
+
+
+# tcd threshold mapping
+thresh_to_pct = {
+    0: 0,
+    1: 10,
+    2: 15,
+    3: 20,
+    4: 25,
+    5: 30,
+    6: 50,
+    7: 75,
+}

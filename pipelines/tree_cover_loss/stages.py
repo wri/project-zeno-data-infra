@@ -11,6 +11,7 @@ from pipelines.globals import (
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
+    thresh_to_pct
 )
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
@@ -50,18 +51,6 @@ DATASETS = {
     },
 }
 
-# tcd threshold mapping
-thresh_to_pct = {
-    0: "0",
-    1: "10",
-    2: "15",
-    3: "20",
-    4: "25",
-    5: "30",
-    6: "50",
-    7: "75",
-}
-
 
 def create_zarrs(overwrite: bool = False) -> Dict[str, str]:
     """Create zarr stores for TCL pipeline datasets from tiled GeoTIFFs."""
@@ -83,6 +72,8 @@ def load_data(
     primary_forests_uri: Optional[str] = None,
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
+    mangrove_stock_2000_zarr_uri: Optional[str] = None,
+    tree_cover_gain_from_height_zarr_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
     group: Optional[str] = None,
 ) -> Tuple[
@@ -96,6 +87,8 @@ def load_data(
     xr.DataArray,
     xr.DataArray,
     xr.DataArray,
+    xr.DataArray,
+    xr.DataArray
 ]:
     """
     Load in the tree cover loss zarr, pixel area zarr, carbon emissions zarr, tree cover density zarr, and the GADM zarrs
@@ -178,6 +171,24 @@ def load_data(
         join="left",
     )[1]
 
+    mangrove_stock_2000: xr.DataArray = _load_zarr(mangrove_stock_2000_zarr_uri).band_data
+    mangrove_stock_2000_aligned = xr.align(
+        tcl,
+        mangrove_stock_2000.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        join="left",
+    )[1]
+
+    tree_cover_gain_from_height: xr.DataArray = _load_zarr(tree_cover_gain_from_height_zarr_uri).band_data
+    tree_cover_gain_from_height_aligned = xr.align(
+        tcl,
+        tree_cover_gain_from_height.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        join="left",
+    )[1]
+    # Map tree_cover_gain_from_height to 1 if any gain, 0 otherwise.
+    tree_cover_gain_from_height_aligned = xr.where(
+        tree_cover_gain_from_height_aligned > 0, 1, 0
+    ).astype("uint8")
+
     # GADM zarrs
     country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
     country = xr.align(
@@ -215,6 +226,8 @@ def load_data(
         drivers,
         primary_forests,
         natural_forests,
+        mangrove_stock_2000_aligned,
+        tree_cover_gain_from_height_aligned,
         country,
         region,
         subregion,
@@ -234,6 +247,8 @@ def setup_compute(
         drivers,
         primary_forests,
         natural_forests,
+        mangrove,
+        height,
         country,
         region,
         subregion,
@@ -258,6 +273,8 @@ def setup_compute(
         drivers.rename("driver"),
         primary_forests.rename("is_primary_forest"),
         natural_forests.rename("natural_forest_class"),
+        mangrove.rename("mangrove_stock_2000"),
+        height.rename("tree_cover_gain_from_height"),
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
@@ -337,17 +354,49 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)
 
-    results_with_ids = rollup_by_gadm_and_convert_to_aoi(
-        result_df,
-        [
-            "tree_cover_loss_year",
-            "canopy_cover",
-            "is_intact_forest",
-            "driver",
-            "is_primary_forest",
-            "natural_forest_class",
-        ],
-    )
+    # Now calculate the carbon for canopy_cover 30, 50, 70.
+    value_cols = ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"]
+    contextual_cols = [
+        "tree_cover_loss_year", "canopy_cover", "is_intact_forest",
+        "driver", "is_primary_forest", "natural_forest_class"
+    ]
+    gadm_cols = ["country", "region", "subregion"]
+    groupby_cols = contextual_cols + gadm_cols
+
+    thresholds = [30, 50, 75]
+    results = []
+
+    # For canopy_cover 30, 50, 75, add in the extra carbon from mangroves and
+    # gain_from_height. The groupby drops out mangroves and gain_from_height in the
+    # process, since not included in groupby_cols.
+    for T in thresholds:
+        mask = (
+            (result_df['canopy_cover'] >= T)
+            | (result_df['mangrove_stock_2000'] == 1)
+            | (result_df['tree_cover_gain_from_height'] == 1)
+        )
+        temp_df = result_df[mask].groupby(groupby_cols, as_index=False)["carbon_Mg_CO2e"].sum()
+        temp_df["canopy_cover"] = T
+        results.append(temp_df)
+
+    # Count zero carbon for any canopy_cover below 30
+    below30_df = result_df[result_df['canopy_cover'] < 30].groupby(groupby_cols, as_index=False)["carbon_Mg_CO2e"].sum()
+    below30_df["carbon_Mg_CO2e"] = 0.0
+    results.append(below30_df)
+
+    carbon_df = pd.concat(results, ignore_index=True)
+    # Do another groupby to combine any rows with duplicated groupbys because of
+    # setting canopy_cover to T above.
+    carbon_df = carbon_df.groupby(groupby_cols, as_index=False)["carbon_Mg_CO2e"].sum()
+
+    # Do groupby only with the TCL results to similarly drop out the mangroves and gain_from_height.
+    tcl_df = result_df.groupby(groupby_cols, as_index=False)[["area_ha", "tree_cover_loss_from_fires_area_ha"]].sum()
+    # Now do an outer join to combine the TCL results with special carbon results
+    # calculated above with the same set of group-by columns.
+    final_df = pd.merge(carbon_df, tcl_df, on=groupby_cols, how='outer', validate="one_to_one")
+    final_df[value_cols] = final_df[value_cols].fillna(0)
+
+    results_with_ids = rollup_by_gadm_and_convert_to_aoi(final_df, contextual_cols)
 
     return results_with_ids
 

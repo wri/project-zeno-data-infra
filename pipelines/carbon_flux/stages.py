@@ -9,6 +9,7 @@ from pipelines.globals import (
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
+    thresh_to_pct
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -190,19 +191,6 @@ def setup_compute(
     )
 
     return (ds, groupbys, expected_groups)
-
-
-# tcd threshold mapping
-thresh_to_pct = {
-    0: 0,
-    1: 10,
-    2: 15,
-    3: 20,
-    4: 25,
-    5: 30,
-    6: 50,
-    7: 75,
-}
 
 
 def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:

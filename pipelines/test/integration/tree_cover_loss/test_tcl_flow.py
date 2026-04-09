@@ -65,7 +65,7 @@ def test_tcl_flow_real_data(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 30019
+    assert result_df.size == 37455
     mock_qc_write_results.assert_called_once()
 
 
@@ -90,6 +90,8 @@ def test_tcl_flow_with_new_contextual_layers(
     primary_forests_ds,
     natural_forests_ds,
     tclf_ds,
+    mangrove_ds,
+    gain_from_height_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -99,16 +101,20 @@ def test_tcl_flow_with_new_contextual_layers(
         "tree_cover_loss_from_fires": "s3://mock/tclf.zarr",
         "drivers": "s3://mock/drivers.zarr",
     }
+    # These datasets should be listed in the order they are loaded in
+    # tree_cover_loss/stages.py:load_data()
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,
         carbon_emissions_ds,
+        tclf_ds,
         tcd_ds,
         ifl_ds,
         drivers_ds,
         primary_forests_ds,
         natural_forests_ds,
-        tclf_ds,
+        mangrove_ds,
+        gain_from_height_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -140,7 +146,7 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 33
+    assert result_df.size == 396
 
 
 @patch(
@@ -163,6 +169,8 @@ def test_tcl_flow_with_bbox(
     primary_forests_ds,
     natural_forests_ds,
     tclf_ds,
+    mangrove_ds,
+    gain_from_height_ds,
     country_ds,
     region_ds,
     subregion_ds,
@@ -172,16 +180,20 @@ def test_tcl_flow_with_bbox(
         "tree_cover_loss_from_fires": "s3://mock/tclf.zarr",
         "drivers": "s3://mock/drivers.zarr",
     }
+    # These datasets should be listed in the order they are loaded in
+    # tree_cover_loss/stages.py:load_data()
     mock_load_zarr.side_effect = [
         tcl_ds,
         pixel_area_ds,
         carbon_emissions_ds,
+        tclf_ds,
         tcd_ds,
         ifl_ds,
         drivers_ds,
         primary_forests_ds,
         natural_forests_ds,
-        tclf_ds,
+        mangrove_ds,
+        gain_from_height_ds,
         country_ds,
         region_ds,
         subregion_ds,
@@ -214,4 +226,4 @@ def test_tcl_flow_with_bbox(
     assert result_df["driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
-    assert result_df.size == 33
+    assert result_df.size == 99
