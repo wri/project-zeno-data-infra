@@ -77,7 +77,9 @@ class ZarrDatasetRepository:
         uri = self.resolve_zarr_uri(dataset, self.environment)
         return xr.open_zarr(
             uri,
-            group="otf",
+            group=(
+                "otf" if self.environment == Environment.staging else None
+            ),  # TODO: remove the staging check once the current staging datasets that all have otf group are promoted to production, or find a more robust way to determine if "otf" should be used,  # noqa: E501
             storage_options={"requester_pays": True},
         ).band_data
 
