@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import newrelic.agent as nr_agent
 
@@ -11,29 +11,51 @@ from app.domain.models.dataset import (
     DatasetFilter,
     DatasetQuery,
 )
+from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
+
+INPUT_URIS = {
+    Environment.staging: {},
+    Environment.production: {
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.canopy_cover,
+                Dataset.primary_forest,
+            ]
+        },
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet",
+    },
+}
 
 
 class TreeCoverAnalyzer(Analyzer):
-    def __init__(self, compute_engine: ComputeEngine):
+    def __init__(
+        self, compute_engine: ComputeEngine, input_uris: Dict[str, str]
+    ) -> None:
         self.compute_engine = compute_engine
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
-        tree_cover_analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            tree_cover_analytics_in._input_uris = analysis.metadata["_input_uris"]
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
+
+        analytics_in = TreeCoverAnalyticsIn(**analysis.metadata)
+
         groupbys: List[Dataset] = []
 
         filters: List[DatasetFilter] = [
             DatasetFilter(
                 dataset=Dataset.canopy_cover,
                 op=">=",
-                value=tree_cover_analytics_in.canopy_cover,
+                value=analytics_in.canopy_cover,
             ),
         ]
 
-        if tree_cover_analytics_in.forest_filter is not None:
+        if analytics_in.forest_filter is not None:
             forest_filter = Dataset.primary_forest
             filters.append(
                 DatasetFilter(
@@ -48,6 +70,4 @@ class TreeCoverAnalyzer(Analyzer):
             group_bys=groupbys,
             filters=filters,
         )
-        analysis.result = await self.compute_engine.compute(
-            tree_cover_analytics_in.aoi, query
-        )
+        analysis.result = await self.compute_engine.compute(analytics_in.aoi, query)

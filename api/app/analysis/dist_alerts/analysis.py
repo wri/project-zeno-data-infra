@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Optional
+from typing import Dict, Optional
 
 import dask.dataframe as dd
 import duckdb
@@ -9,6 +9,7 @@ import xarray as xr
 from dask.dataframe import DataFrame as DaskDataFrame
 from flox.xarray import xarray_reduce
 
+from ...domain.models.dataset import Dataset
 from ..common.analysis import (
     JULIAN_DATE_2021,
     get_geojson,
@@ -16,22 +17,6 @@ from ..common.analysis import (
     read_zarr_clipped_to_geojson,
 )
 from .query import create_gadm_dist_query
-
-_input_uris = {
-    "dist_drivers_zarr_uri": (
-        "s3://gfw-data-lake/umd_glad_dist_alerts_driver/zarr/umd_dist_alerts_drivers.zarr/"
-    ),
-    "land_cover_zarr_uri": (
-        "s3://gfw-data-lake/umd_lcl_land_cover/v2/raster/epsg-4326/zarr/umd_lcl_land_cover_2015-2024.zarr/"
-    ),
-    "natural_grasslands_zarr_uri": (
-        "s3://gfw-data-lake/gfw_grasslands/v1/zarr/natural_grasslands_4kchunk.zarr/"
-    ),
-    "natural_lands_zarr_uri": (
-        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes_clipped_to_dist.zarr/"
-    ),
-    "pixel_area_uri": "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr/",
-}
 
 NATURAL_LANDS_CLASSES = {
     2: "Natural forests",
@@ -77,7 +62,9 @@ LAND_COVER_MAPPING = {
 }
 
 
-async def zonal_statistics_on_aois(aois, dask_client, version, intersection=None):
+async def zonal_statistics_on_aois(
+    input_uris: Dict[str, str], aois, dask_client, version, intersection=None
+):
     geojsons = await get_geojson(aois)
 
     if aois["type"] != "feature_collection":
@@ -90,7 +77,7 @@ async def zonal_statistics_on_aois(aois, dask_client, version, intersection=None
         geojsons = [geojson["geometry"] for geojson in geojsons]
 
     precompute_partial = partial(
-        zonal_statistics, version=version, intersection=intersection
+        zonal_statistics, input_uris, version=version, intersection=intersection
     )
     futures = dask_client.map(precompute_partial, aois, geojsons)
     dd_df_futures = await dask_client.gather(futures)
@@ -101,7 +88,11 @@ async def zonal_statistics_on_aois(aois, dask_client, version, intersection=None
 
 
 async def zonal_statistics(
-    aoi, geojson, version: Optional[str] = None, intersection: Optional[str] = None
+    input_uris: Dict[str, str],
+    aoi,
+    geojson,
+    version: Optional[str] = None,
+    intersection: Optional[str] = None,
 ) -> DaskDataFrame:
     dist_obj_name = (
         f"s3://lcl-analytics/zarr/dist-alerts/{version}/umd_glad_dist_alerts.zarr"
@@ -109,14 +100,14 @@ async def zonal_statistics(
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     pixel_area = read_zarr_clipped_to_geojson(
-        _input_uris["pixel_area_uri"], geojson
+        input_uris[str(Dataset.area_hectares)], geojson
     ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
     expected_groups = [np.arange(731, 2000), [1, 2, 3]]
     if intersection == "natural_lands":
         natural_lands = read_zarr_clipped_to_geojson(
-            _input_uris["natural_lands_zarr_uri"],
+            input_uris["natural_lands_zarr_uri"],
             geojson,
         ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
         natural_lands.name = "natural_lands_class"
@@ -128,7 +119,7 @@ async def zonal_statistics(
         # when aligning the datasets
         # See https://github.com/pydata/xarray/issues/2217
         dist_drivers = read_zarr_clipped_to_geojson(
-            _input_uris["dist_drivers_zarr_uri"],
+            input_uris["dist_drivers_zarr_uri"],
             geojson,
         ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
         dist_drivers.name = "driver"
@@ -137,7 +128,7 @@ async def zonal_statistics(
         expected_groups.append(np.arange(5))
     elif intersection == "grasslands":
         grasslands = read_zarr_clipped_to_geojson(
-            _input_uris["natural_grasslands_zarr_uri"],
+            input_uris["natural_grasslands_zarr_uri"],
             geojson,
         ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
@@ -150,7 +141,7 @@ async def zonal_statistics(
         expected_groups.append([0, 1])
     elif intersection == "land_cover":
         land_cover = read_zarr_clipped_to_geojson(
-            _input_uris["land_cover_zarr_uri"],
+            input_uris["land_cover_zarr_uri"],
             geojson,
         ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
