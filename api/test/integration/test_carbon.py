@@ -198,7 +198,7 @@ class TestCarbonDataFeature:
                 "aoi_id": ["test_aoi"],
                 "aoi_type": ["feature"],
                 "carbon_net_flux_Mg_CO2e": [32997.52734375],
-                "carbon_gross_removals_Mg_CO2e": [11069.26929435134],
+                "carbon_gross_removals_Mg_CO2e": [10810.841796875],
                 "carbon_gross_emissions_Mg_CO2e": [43808.37109375],
             }
         )
