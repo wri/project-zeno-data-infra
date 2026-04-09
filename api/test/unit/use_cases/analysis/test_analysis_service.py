@@ -6,7 +6,6 @@ import pytest
 from app.analysis.common.analysis import FeatureTooSmallError
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
@@ -25,7 +24,6 @@ def stub_analysis_in():
             ids=["1234"],
         )
     )
-    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 
@@ -327,7 +325,6 @@ def _make_analytics_in(**overrides) -> TreeCoverLossAnalyticsIn:
         intersections=[],
     )
     analytics_in = TreeCoverLossAnalyticsIn(**{**defaults, **overrides})
-    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 

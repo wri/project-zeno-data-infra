@@ -58,7 +58,6 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -109,7 +108,6 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -159,7 +157,6 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -210,7 +207,6 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -241,7 +237,6 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -291,7 +286,6 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
         analytics_in = NaturalLandsAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -360,7 +354,6 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                 type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
             )
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -606,7 +599,6 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                 type="key_biodiversity_area", ids=["18392", "46942", "18407"]
             )
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -729,7 +721,6 @@ async def test_gadm_dist_analytics_no_intersection():
     analytics_in = NaturalLandsAnalyticsIn(
         aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
     )
-    analytics_in.set_input_uris(Environment.production)
     analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -839,7 +830,6 @@ async def test_kba_dist_analytics_no_intersection():
     analytics_in = NaturalLandsAnalyticsIn(
         aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
     )
-    analytics_in.set_input_uris(Environment.production)
     analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 

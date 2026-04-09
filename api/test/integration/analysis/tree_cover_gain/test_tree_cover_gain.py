@@ -91,7 +91,6 @@ class TestGainAnalyticsPostWithMultipleAdminAOIs:
             start_year="2005",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverGainAnalyzer(
             compute_engine=None,
             input_uris=INPUT_URIS[Environment.production],
@@ -164,7 +163,6 @@ class TestGainAnalyticsPostWithKba:
             start_year="2005",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverGainAnalyzer(
             compute_engine=None,
             input_uris=INPUT_URIS[Environment.production],
@@ -238,7 +236,6 @@ class TestGainAnalyticsKeyErrorFix:
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverGainAnalyzer(
             compute_engine=None,
             input_uris=INPUT_URIS[Environment.production],

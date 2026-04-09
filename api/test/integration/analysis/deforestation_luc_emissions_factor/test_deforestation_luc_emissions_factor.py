@@ -64,7 +64,6 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2021",
             end_year="2023",
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = DeforestationLUCEmissionsFactorAnalyzer(
             input_uris=INPUT_URIS[Environment.production]
         )

@@ -69,7 +69,6 @@ class TestLandCoverCompositionData:
         analytics_in = LandCoverCompositionAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = LandCoverCompositionAnalyzer(
             input_uris=INPUT_URIS[Environment.production]
         )
