@@ -25,7 +25,6 @@ INPUT_URIS = {
         "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
         "admin_results_uri": "s3://lcl-analytics/zonal-statistics/forest-carbon/v1.12/admin-carbon.parquet",
     },
-    Environment.staging: {},
     Environment.production: {
         # These are zarrs with total emissions (not per-hectare)
         "carbon_net_flux_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
