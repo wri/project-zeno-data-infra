@@ -13,6 +13,8 @@ from pipelines.globals import (
     sbtn_natural_forests_zarr_uri,
     tree_cover_density_2000_zarr_uri,
     umd_primary_forests_zarr_uri,
+    mangrove_stock_2000_zarr_uri,
+    tree_cover_gain_from_height_zarr_uri,
 )
 from pipelines.prefect_flows import common_tasks
 from pipelines.tree_cover_loss.prefect_flows import tcl_tasks
@@ -57,6 +59,8 @@ def umd_tree_cover_loss_flow(
         np.arange(0, 8),  # drivers
         np.arange(0, 2),  # primary_forests
         np.arange(0, 3),  # natural forest class (0=unknown, 1=natural, 2=non-natural)
+        [0, 1],  # mangrove boolean
+        [0, 1],  # tree cover gain from height boolean
         np.arange(999),  # countries
         np.arange(86),  # adm1s
         np.arange(854),  # adm2s
@@ -72,6 +76,8 @@ def umd_tree_cover_loss_flow(
         primary_forests_uri=umd_primary_forests_zarr_uri,
         natural_forests_uri=sbtn_natural_forests_zarr_uri,
         tree_cover_loss_from_fires_uri=tcl_zarr_uris["tree_cover_loss_from_fires"],
+        mangrove_stock_2000_zarr_uri=mangrove_stock_2000_zarr_uri,
+        tree_cover_gain_from_height_zarr_uri=tree_cover_gain_from_height_zarr_uri,
         bbox=bbox,
         group="pipeline",
     )
