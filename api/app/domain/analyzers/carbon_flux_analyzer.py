@@ -39,6 +39,11 @@ INPUT_URIS = {
         "tree_cover_gain_from_height_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/",
         # Value [0, 100] inclusive.
         "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
+<<<<<<< tcl-v1.13-pipeline
+=======
+        # Value [1,24] inclusive
+        "tree_cover_loss_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr/",
+>>>>>>> main
         # This is a simpler parquet with just country, region, subregion, tree_cover_density,
         # carbontype, value columns. Use equality on the tree_cover_density column, which has
         # values 30/50/75...
