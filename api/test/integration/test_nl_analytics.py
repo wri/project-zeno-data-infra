@@ -1,7 +1,7 @@
 import json
 import os
-import time
 from pathlib import Path
+from test.integration import resource_thumbprint, retry_getting_resource
 
 import pandas as pd
 import pytest
@@ -11,7 +11,7 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.natural_lands_analyzer import NaturalLandsAnalyzer
+from app.domain.analyzers.natural_lands_analyzer import INPUT_URIS, NaturalLandsAnalyzer
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -46,6 +46,7 @@ def create_analysis_service_for_tests(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
             compute_engine=request.app.state.dask_client,
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -58,13 +59,16 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(analytics_in.thumbprint())
+        delete_resource_files(resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -75,7 +79,7 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, analytics_in
+                yield test_request, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -85,11 +89,11 @@ class TestNLAnalyticsPostWithNoPreviousRequest:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, analysis_params = setup
+        test_request, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -106,14 +110,17 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        dir_path = delete_resource_files(resource_tp)
 
-        dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
 
         async with LifespanManager(app):
@@ -125,7 +132,7 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, analytics_in
+                yield test_request, resource_tp
 
     def test_post_returns_pending_status(self, setup):
         test_request, _ = setup
@@ -133,11 +140,11 @@ class TestNLAnalyticsPostWhenPreviousRequestStillProcessing:
         assert resource["status"] == "pending"
 
     def test_post_returns_resource_link(self, setup):
-        test_request, analysis_params = setup
+        test_request, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     def test_post_202_accepted_response_code(self, setup):
@@ -153,14 +160,17 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        dir_path = delete_resource_files(resource_tp)
 
-        dir_path = delete_resource_files(analytics_in.thumbprint())
         write_metadata_file(dir_path)
         write_data_file(dir_path, {})
 
@@ -173,7 +183,7 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, analytics_in
+                yield test_request, resource_tp
 
     def test_post_returns_saved_status(self, setup):
         test_request, _ = setup
@@ -181,11 +191,11 @@ class TestNLAnalyticsPostWhenPreviousRequestComplete:
         assert resource["status"] == "saved"
 
     def test_post_returns_resource_link(self, setup):
-        test_request, analysis_params = setup
+        test_request, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     def test_post_202_accepted_response_code(self, setup):
@@ -201,6 +211,9 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -208,13 +221,13 @@ class TestNLAnalyticsGetWithNoPreviousRequest:
             get_file_system_analysis_repository
         )
 
-        delete_resource_files(analytics_in.thumbprint())
+        delete_resource_files(resource_tp)
 
         test_request = client.get(
-            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
-        yield test_request, analytics_in
+        yield test_request, resource_tp
 
     def test_returns_404_not_found_response_code(self, setup):
         test_request, _ = setup
@@ -229,18 +242,20 @@ class TestNLAnalyticsGetWithPreviousRequestStillProcessing:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-
-        dir_path = delete_resource_files(analytics_in.thumbprint())
+        dir_path = delete_resource_files(resource_tp)
         write_metadata_file(dir_path)
 
         self.test_request = client.get(
-            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
         yield self.test_request, analytics_in
@@ -277,6 +292,9 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
@@ -284,7 +302,7 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
             get_file_system_analysis_repository
         )
 
-        dir_path = delete_resource_files(analytics_in.thumbprint())
+        dir_path = delete_resource_files(resource_tp)
         write_metadata_file(dir_path)
         write_data_file(
             dir_path,
@@ -297,10 +315,10 @@ class TestNLAnalyticsGetWithPreviousRequestComplete:
         )
 
         test_request = client.get(
-            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{analytics_in.thumbprint()}"
+            f"/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
-        yield test_request, analytics_in
+        yield test_request, resource_tp
 
     def test_returns_saved_status(self, setup):
         test_request, _ = setup
@@ -343,14 +361,16 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
             )
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-
-        delete_resource_files(analytics_in.thumbprint())
+        _ = delete_resource_files(resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -361,7 +381,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -371,11 +391,11 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_param = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_param.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -385,9 +405,9 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
+        test_request, client, resource_tp = setup
 
-        data = await retry_getting_resource(analysis_params.thumbprint(), client)
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         expected_df = pd.DataFrame(
             {
@@ -587,14 +607,16 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
             )
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-
-        delete_resource_files(analytics_in.thumbprint())
+        _ = delete_resource_files(resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -605,7 +627,7 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
                     json=analytics_in.model_dump(),
                 )
 
-                yield request, client, analytics_in
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -615,11 +637,11 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -629,8 +651,8 @@ class TestNLAnalyticsPostWithMultipleKBAAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(analysis_params.thumbprint(), client)
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
         actual_df = pd.DataFrame(data["result"])
 
         # 1. Validate expected columns
@@ -708,14 +730,16 @@ async def test_gadm_dist_analytics_no_intersection():
         aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"])
     )
     analytics_in.set_input_uris(Environment.production)
+    analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    resource_tp = resource_thumbprint(analytics_in, analyzer)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
-
-    delete_resource_files(analytics_in.thumbprint())
+    _ = delete_resource_files(resource_tp)
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -726,7 +750,7 @@ async def test_gadm_dist_analytics_no_intersection():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(analytics_in.thumbprint(), client)
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -816,14 +840,16 @@ async def test_kba_dist_analytics_no_intersection():
         aoi=KeyBiodiversityAreaOfInterest(type="key_biodiversity_area", ids=["8111"])
     )
     analytics_in.set_input_uris(Environment.production)
+    analyzer = NaturalLandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    resource_tp = resource_thumbprint(analytics_in, analyzer)
+
     app.dependency_overrides[create_analysis_service] = (
         create_analysis_service_for_tests
     )
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
-
-    delete_resource_files(analytics_in.thumbprint())
+    _ = delete_resource_files(resource_tp)
 
     async with LifespanManager(app):
         async with AsyncClient(
@@ -834,7 +860,7 @@ async def test_kba_dist_analytics_no_intersection():
                 json=analytics_in.model_dump(),
             )
 
-            data = await retry_getting_resource(analytics_in.thumbprint(), client)
+            data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
     expected_df = pd.DataFrame(
         {
@@ -914,23 +940,3 @@ def write_metadata_file(dir_path):
 def write_data_file(dir_path, data):
     data_file = dir_path / "data.json"
     data_file.write_text(json.dumps(data))
-
-
-async def retry_getting_resource(resource_id: str, client):
-    resource = await client.get(
-        f"/v0/land_change/natural_lands/analytics/{resource_id}"
-    )
-    data = resource.json()["data"]
-    status = data["status"]
-    attempts = 1
-    while status == "pending" and attempts < 10:
-        resp = await client.get(
-            f"/v0/land_change/natural_lands/analytics/{resource_id}"
-        )
-        data = resp.json()["data"]
-        status = data["status"]
-        time.sleep(1)
-        attempts += 1
-    if attempts >= 10:
-        pytest.fail("Resource stuck on 'pending' status")
-    return data

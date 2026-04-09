@@ -18,8 +18,7 @@ class ZarrDatasetRepository:
     # app/domain/models/dataset.py::Dataset
 
     _ZARR_URIS = {
-        Environment.staging: {},
-        Environment.production: {
+        Environment.staging: {
             Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/pixel_area_ha.zarr",  # noqa: E501
             Dataset.canopy_cover: "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr",  # noqa: E501
             Dataset.carbon_emissions: "s3://lcl-analytics/zarr/gfw-carbon-gross-emissions/v20260327/Mg_CO2e.zarr",  # noqa: E501
@@ -30,6 +29,18 @@ class ZarrDatasetRepository:
             Dataset.tree_cover_gain: "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/",  # noqa: E501
             Dataset.tree_cover_loss: "s3://lcl-analytics/zarr/umd-tree-cover-loss/v1.13/year.zarr",  # noqa: E501
             Dataset.tree_cover_loss_drivers: "s3://lcl-analytics/zarr/wri-google-tree-cover-loss-drivers/v1.13/category.zarr",  # noqa: E501
+        },
+        Environment.production: {
+            Dataset.area_hectares: "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr",  # noqa: E501
+            Dataset.canopy_cover: "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr",  # noqa: E501
+            Dataset.carbon_emissions: "s3://gfw-data-lake/gfw_forest_carbon_gross_emissions/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr",  # noqa: E501
+            Dataset.intact_forest: "s3://gfw-data-lake/ifl_intact_forest_landscapes_2000/v2021/raster/epsg-4326/zarr/is.zarr",  # noqa: E501
+            Dataset.natural_forests: "s3://gfw-data-lake/sbtn_natural_forests_map/v202504/raster/epsg-4326/zarr/class.zarr",  # noqa: E501
+            Dataset.natural_lands: "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr",  # noqa: E501
+            Dataset.primary_forest: "s3://gfw-data-lake/umd_regional_primary_forest_2001/v201901/raster/epsg-4326/zarr/is.zarr",  # noqa: E501
+            Dataset.tree_cover_gain: "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr",  # noqa: E501
+            Dataset.tree_cover_loss: "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr",  # noqa: E501
+            Dataset.tree_cover_loss_drivers: "s3://gfw-data-lake/wri_google_tree_cover_loss_drivers/v1.12/raster/epsg-4326/zarr/category.zarr",  # noqa: E501
         },
     }
 
@@ -66,7 +77,9 @@ class ZarrDatasetRepository:
         uri = self.resolve_zarr_uri(dataset, self.environment)
         return xr.open_zarr(
             uri,
-            group="otf",
+            group=(
+                "otf" if self.environment == Environment.staging else None
+            ),  # TODO: remove the staging check once the current staging datasets that all have otf group are promoted to production, or find a more robust way to determine if "otf" should be used,  # noqa: E501
             storage_options={"requester_pays": True},
         ).band_data
 

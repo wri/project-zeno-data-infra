@@ -4,7 +4,7 @@ from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.dependencies import get_environment
-from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
+from app.domain.analyzers.tree_cover_analyzer import INPUT_URIS, TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -55,7 +55,7 @@ def create_analysis_service(
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet"
+                table_uri=INPUT_URIS[environment]["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
                 environment=environment,
@@ -67,7 +67,9 @@ def create_analysis_service(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverAnalyzer(compute_engine=compute_engine),
+        analyzer=TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[environment]
+        ),
         event=ANALYTICS_NAME,
     )
 
