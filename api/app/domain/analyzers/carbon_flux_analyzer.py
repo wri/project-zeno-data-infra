@@ -14,7 +14,17 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
 
 INPUT_URIS = {
-    Environment.staging: {},
+    Environment.staging: {
+        "carbon_net_flux_zarr_uri": "s3://lcl-analytics/zarr/gfw-carbon-net-flux/v20260327/Mg_CO2e.zarr/",
+        "carbon_gross_removals_zarr_uri": "s3://lcl-analytics/zarr/gfw-carbon-gross-removals/v20260327/Mg_CO2e.zarr/",
+        "carbon_gross_emissions_zarr_uri": "s3://lcl-analytics/zarr/gfw-carbon-gross-emissions/v20260327/Mg_CO2e.zarr/",
+        "mangrove_stock_2000_zarr_uri": "s3://gfw-data-lake/jpl_mangrove_aboveground_biomass_stock_2000/v201902/raster/epsg-4326/zarr/is_mangrove.zarr/",
+        # Value 1, 2, 3, 4, which means 2001, 2005, 2010, 2015 periods
+        "tree_cover_gain_from_height_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/",
+        # Value [0, 100] inclusive.
+        "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/forest-carbon/v1.12/admin-carbon.parquet",
+    },
     Environment.production: {
         # These are zarrs with total emissions (not per-hectare)
         "carbon_net_flux_zarr_uri": "s3://gfw-data-lake/gfw_forest_carbon_net_flux/v20250430/raster/epsg-4326/zarr/Mg_CO2e.zarr/",
@@ -26,8 +36,6 @@ INPUT_URIS = {
         "tree_cover_gain_from_height_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/",
         # Value [0, 100] inclusive.
         "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
-        # Value [1,24] inclusive
-        "tree_cover_loss_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr/",
         # This is a simpler parquet with just country, region, subregion, tree_cover_density,
         # carbontype, value columns. Use equality on the tree_cover_density column, which has
         # values 30/50/75...

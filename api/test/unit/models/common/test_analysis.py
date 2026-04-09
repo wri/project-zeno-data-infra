@@ -102,15 +102,12 @@ class TestThumbprint:
     def test_promoting_staging_uri_to_production_makes_thumbprints_equal(self):
         """When staging is promoted (URIs become identical), cached results
         should be shared — thumbprints must match."""
-        prod_uri = ZarrDatasetRepository.resolve_zarr_uri(
-            Dataset.tree_cover_loss, Environment.production
-        )
         original = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
         try:
-            # Simulate promotion: staging now points to the same URI as production
-            ZarrDatasetRepository._ZARR_URIS[Environment.staging][
-                Dataset.tree_cover_loss
-            ] = prod_uri
+            # Simulate promotion: staging now points to the same URIs as production
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = (
+                ZarrDatasetRepository._ZARR_URIS[Environment.production].copy()
+            )
 
             a = _make_analytics_in()
             b = _make_analytics_in()
