@@ -441,7 +441,7 @@ def qc_against_validation_source(
         if sample_stats.size > 0:
             sample_driver_area_ha_total = sample_stats[
                 (sample_stats.canopy_cover.astype(np.int8) >= 30)
-                & (sample_stats.driver != "Unknown")
+                & (sample_stats.tree_cover_loss_driver != "Unknown")
             ].area_ha.sum()
 
             sample_natural_forests_ha_total = sample_stats[
