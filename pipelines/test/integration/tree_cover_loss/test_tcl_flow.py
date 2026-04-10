@@ -49,20 +49,20 @@ def test_tcl_flow_real_data(
         "tree_cover_loss_year",
         "canopy_cover",
         "is_intact_forest",
-        "driver",
+        "tree_cover_loss_driver",
         "is_primary_forest",
         "natural_forest_class",
         "aoi_id",
         "aoi_type",
         "area_ha",
-        "carbon_Mg_CO2e",
+        "carbon_emissions_MgCO2e",
         "tree_cover_loss_from_fires_area_ha",
     }
     assert set(result_df.columns) == expected_columns
 
     # verify dtypes
     assert result_df["is_intact_forest"].dtype == bool
-    assert result_df["driver"].dtype == object
+    assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 37455
@@ -130,20 +130,20 @@ def test_tcl_flow_with_new_contextual_layers(
         "tree_cover_loss_year",
         "canopy_cover",
         "is_intact_forest",
-        "driver",
+        "tree_cover_loss_driver",
         "is_primary_forest",
         "natural_forest_class",
         "aoi_id",
         "aoi_type",
         "area_ha",
-        "carbon_Mg_CO2e",
+        "carbon_emissions_MgCO2e",
         "tree_cover_loss_from_fires_area_ha",
     }
     assert set(result_df.columns) == expected_columns
 
     # verify dtypes
     assert result_df["is_intact_forest"].dtype == bool
-    assert result_df["driver"].dtype == object
+    assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 396
@@ -210,20 +210,20 @@ def test_tcl_flow_with_bbox(
         "tree_cover_loss_year",
         "canopy_cover",
         "is_intact_forest",
-        "driver",
+        "tree_cover_loss_driver",
         "is_primary_forest",
         "natural_forest_class",
         "aoi_id",
         "aoi_type",
         "area_ha",
-        "carbon_Mg_CO2e",
+        "carbon_emissions_MgCO2e",
         "tree_cover_loss_from_fires_area_ha",
     }
     assert set(result_df.columns) == expected_columns
 
     # verify dtypes
     assert result_df["is_intact_forest"].dtype == bool
-    assert result_df["driver"].dtype == object
+    assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forest_class"].dtype == object
     assert result_df.size == 99

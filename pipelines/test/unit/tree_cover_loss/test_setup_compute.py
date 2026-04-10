@@ -80,7 +80,7 @@ def _create_mock_datasets(shape=(2, 2)):
             "area_ha": xr.DataArray(
                 da.array(area_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
-            "carbon__Mg_CO2e": xr.DataArray(
+            "carbon_emissions_MgCO2e": xr.DataArray(
                 da.array(carbon_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
             "tree_cover_loss_from_fires_area_ha": xr.DataArray(
@@ -114,7 +114,7 @@ def test_setup_compute_groupby_schema_and_order():
         (0, "tree_cover_loss_year", np.uint8),
         (1, "canopy_cover", np.uint8),
         (2, "is_intact_forest", np.int16),
-        (3, "driver", np.int16),
+        (3, "tree_cover_loss_driver", np.int16),
         (4, "is_primary_forest", np.uint8),
         (5, "natural_forest_class", np.uint8),
         (6, "mangrove_stock_2000", np.uint8),
@@ -147,7 +147,11 @@ def test_setup_compute_creates_concat_dataarray():
     ), f"mask should have 'layer' dimension, got dims: {mask.dims}"
 
     # verify layer coord values
-    expected_layers = ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"]
+    expected_layers = [
+        "area_ha",
+        "carbon_emissions_MgCO2e",
+        "tree_cover_loss_from_fires_area_ha",
+    ]
     actual_layers = list(mask.coords["layer"].values)
     assert (
         actual_layers == expected_layers
