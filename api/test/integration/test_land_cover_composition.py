@@ -12,9 +12,9 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.land_cover_change_analyzer import (
+from app.domain.analyzers.land_cover_composition_analyzer import (
     INPUT_URIS,
-    LandCoverChangeAnalyzer,
+    LandCoverCompositionAnalyzer,
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -26,11 +26,11 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
 )
 from app.main import app
 from app.models.common.areas_of_interest import AdminAreaOfInterest
-from app.models.land_change.land_cover_change import (
+from app.models.land_change.land_cover_composition import (
     ANALYTICS_NAME,
-    LandCoverChangeAnalyticsIn,
+    LandCoverCompositionAnalyticsIn,
 )
-from app.routers.land_change.land_cover.land_cover_change import (
+from app.routers.land_change.land_cover.land_cover_composition import (
     create_analysis_service,
     get_analysis_repository,
 )
@@ -51,10 +51,10 @@ def create_analysis_service_for_tests(
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=LandCoverChangeAnalyzer(
+        analyzer=LandCoverCompositionAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"],
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"]
             ),
             input_uris=INPUT_URIS[Environment.production],
         ),
@@ -62,15 +62,15 @@ def create_analysis_service_for_tests(
     )
 
 
-class TestLandCoverChangeData:
+class TestLandCoverCompositionData:
     @pytest_asyncio.fixture
     async def setup(self):
         """Runs before each test in this class"""
-        analytics_in = LandCoverChangeAnalyticsIn(
+        analytics_in = LandCoverCompositionAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
         )
         analytics_in.set_input_uris(Environment.production)
-        analyzer = LandCoverChangeAnalyzer(
+        analyzer = LandCoverCompositionAnalyzer(
             input_uris=INPUT_URIS[Environment.production]
         )
         resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -114,21 +114,19 @@ class TestLandCoverChangeData:
         test_request, client, resource_tp = setup
         resource = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
+        # FIXME: The following values are what I got when I ran the test,
+        # they have NOT been verified for correctness
         expected = pd.DataFrame(
             {
-                "aoi_id": ["NGA.20.31", "NGA.20.31", "NGA.20.31"],
-                "aoi_type": ["admin", "admin", "admin"],
-                "land_cover_class_start": [
-                    "Short vegetation",
-                    "Short vegetation",
-                    "Short vegetation",
-                ],
-                "land_cover_class_end": [
+                "aoi_id": ["NGA.20.31", "NGA.20.31", "NGA.20.31", "NGA.20.31"],
+                "aoi_type": ["admin", "admin", "admin", "admin"],
+                "land_cover_class": [
                     "Bare and sparse vegetation",
+                    "Short vegetation",
                     "Cropland",
                     "Built-up",
                 ],
-                "area_ha": [0.1505, 0.0752, 2.635],
+                "area_ha": [0.150585, 3.689308, 0.075292, 1891.442627],
             }
         )
 

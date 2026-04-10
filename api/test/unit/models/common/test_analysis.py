@@ -51,7 +51,6 @@ _STORED_METADATA = {
     "intersections": [],
     "_version": "20250912",
     "_analytics_name": "tree_cover_loss",
-    "_input_uris": '["s3://gfw-data-lake/umd_tree_cover_loss/v1.12/raster/epsg-4326/zarr/year.zarr"]',
 }
 
 # The public subset clients should see.
@@ -103,15 +102,12 @@ class TestThumbprint:
     def test_promoting_staging_uri_to_production_makes_thumbprints_equal(self):
         """When staging is promoted (URIs become identical), cached results
         should be shared — thumbprints must match."""
-        prod_uri = ZarrDatasetRepository.resolve_zarr_uri(
-            Dataset.tree_cover_loss, Environment.production
-        )
         original = ZarrDatasetRepository._ZARR_URIS[Environment.staging].copy()
         try:
-            # Simulate promotion: staging now points to the same URI as production
-            ZarrDatasetRepository._ZARR_URIS[Environment.staging][
-                Dataset.tree_cover_loss
-            ] = prod_uri
+            # Simulate promotion: staging now points to the same URIs as production
+            ZarrDatasetRepository._ZARR_URIS[Environment.staging] = (
+                ZarrDatasetRepository._ZARR_URIS[Environment.production].copy()
+            )
 
             a = _make_analytics_in()
             b = _make_analytics_in()
@@ -242,3 +238,23 @@ class TestGetAnalysisStatusBehaviour:
         with pytest.raises(HTTPException) as exc_info:
             await get_analysis(RESOURCE_ID, repo, _make_response())
         assert exc_info.value.status_code == 500
+
+
+class TestModelDump:
+    def test_model_dump_does_not_include_input_uris(self):
+        analytics_in = _make_analytics_in()
+        assert "_input_uris" not in analytics_in.model_dump()
+
+    def test_model_dump_still_includes_version_and_analytics_name(self):
+        """_version and _analytics_name are private too, but they ARE storage-worthy."""
+        analytics_in = _make_analytics_in()
+        dumped = analytics_in.model_dump()
+        assert "_version" in dumped
+        assert "_analytics_name" in dumped
+
+    def test_thumbprint_still_works_without_input_uris_in_model_dump(self):
+        """thumbprint() builds its own payload and adds _input_uris directly;
+        it must not depend on model_dump() including it."""
+        analytics_in = _make_analytics_in()
+        result = analytics_in.thumbprint()
+        assert isinstance(result, uuid.UUID)

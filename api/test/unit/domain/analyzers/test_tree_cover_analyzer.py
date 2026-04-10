@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
+from app.domain.analyzers.tree_cover_analyzer import INPUT_URIS, TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
     TreeCoverPrecalcHandler,
@@ -11,6 +11,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_que
     PrecalcSqlQueryBuilder,
 )
 from app.domain.models.analysis import Analysis
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -31,7 +32,9 @@ class TestTreeCoverAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        )
         metadata = TreeCoverAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.10"]),
             canopy_cover=15,
@@ -62,7 +65,9 @@ class TestTreeCoverAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        )
         metadata = TreeCoverAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.10"]),
             canopy_cover=15,
@@ -92,7 +97,9 @@ class TestTreeCoverAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        )
         metadata = TreeCoverAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.10"]),
             canopy_cover=15,
@@ -121,7 +128,9 @@ class TestTreeCoverAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        )
         metadata = TreeCoverAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.10"]),
             canopy_cover=15,
@@ -150,7 +159,9 @@ class TestTreeCoverAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        )
         metadata = TreeCoverAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.10"]),
             canopy_cover=15,

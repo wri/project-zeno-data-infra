@@ -1,3 +1,5 @@
+from typing import Dict
+
 import newrelic.agent as nr_agent
 import numpy as np
 
@@ -9,18 +11,55 @@ from app.domain.models.dataset import (
     DatasetFilter,
     DatasetQuery,
 )
+from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
+
+INPUT_URIS: Dict[Environment, Dict[str, str]] = {
+    Environment.staging: {
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.staging)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.canopy_cover,
+                Dataset.carbon_emissions,
+                Dataset.natural_forests,
+                Dataset.primary_forest,
+                Dataset.tree_cover_loss,
+                Dataset.tree_cover_loss_drivers,
+            ]
+        },
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss.parquet",
+    },
+    Environment.production: {
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.canopy_cover,
+                Dataset.carbon_emissions,
+                Dataset.natural_forests,
+                Dataset.primary_forest,
+                Dataset.tree_cover_loss,
+                Dataset.tree_cover_loss_drivers,
+            ]
+        },
+        "admin_results_uri": "s3://lcl-analytics/zonal_statistics/admin-tree-cover-loss-emissions-by-driver.parquet",
+    },
+}
 
 
 class TreeCoverLossAnalyzer(Analyzer):
-    def __init__(self, compute_engine):
+    def __init__(self, compute_engine, input_uris: Dict[str, str] | None = None):
         self.compute_engine = compute_engine
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
+
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
-        if analysis.metadata.get("_input_uris") is not None:
-            analytics_in._input_uris = analysis.metadata["_input_uris"]
 
         query = DatasetQuery(
             aggregate=DatasetAggregate(

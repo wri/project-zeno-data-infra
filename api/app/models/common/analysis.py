@@ -58,7 +58,6 @@ class AnalyticsIn(StrictBaseModel):
         result = super().model_dump(**kwargs)
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
-        result["_input_uris"] = self._input_uris
         return result
 
     def model_dump_json(self, **kwargs):
@@ -66,7 +65,6 @@ class AnalyticsIn(StrictBaseModel):
         result = json.loads(super().model_dump_json(**kwargs))
         result["_version"] = self._version
         result["_analytics_name"] = self._analytics_name
-        result["_input_uris"] = self._input_uris
         return json.dumps(result)
 
     def public_metadata(self) -> dict:

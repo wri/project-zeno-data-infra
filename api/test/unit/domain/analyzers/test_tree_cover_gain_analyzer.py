@@ -3,7 +3,10 @@ from unittest.mock import MagicMock
 import pytest
 import pytest_asyncio
 
-from app.domain.analyzers.tree_cover_gain_analyzer import TreeCoverGainAnalyzer
+from app.domain.analyzers.tree_cover_gain_analyzer import (
+    INPUT_URIS,
+    TreeCoverGainAnalyzer,
+)
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
     TreeCoverGainPrecalcHandler,
@@ -52,7 +55,10 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=compute_engine,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         metadata = TreeCoverGainAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
             start_year="2000",
@@ -83,7 +89,10 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=compute_engine,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         metadata = TreeCoverGainAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
             start_year="2000",
@@ -116,7 +125,10 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=compute_engine,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         metadata = TreeCoverGainAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
             start_year="2000",
@@ -148,7 +160,10 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=compute_engine,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         metadata = TreeCoverGainAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
             start_year="2000",
@@ -180,7 +195,10 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             )
         )
 
-        analyzer = TreeCoverGainAnalyzer(compute_engine=compute_engine)
+        analyzer = TreeCoverGainAnalyzer(
+            compute_engine=compute_engine,
+            input_uris=INPUT_URIS[Environment.production],
+        )
         metadata = TreeCoverGainAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
             start_year="2000",

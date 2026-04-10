@@ -1,4 +1,8 @@
-from test.integration import delete_resource_files, retry_getting_resource
+from test.integration import (
+    delete_resource_files,
+    resource_thumbprint,
+    retry_getting_resource,
+)
 
 import pandas as pd
 import pytest
@@ -8,6 +12,7 @@ from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
+    INPUT_URIS,
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.environment import Environment
@@ -41,8 +46,9 @@ def create_analysis_service_for_tests(
         analyzer=DeforestationLUCEmissionsFactorAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_table_uri"],
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -59,8 +65,12 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             end_year="2023",
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = DeforestationLUCEmissionsFactorAnalyzer(
+            input_uris=INPUT_URIS[Environment.production]
+        )
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
 
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -79,7 +89,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
                         json=analytics_in.model_dump(mode="json"),
                     )
 
-                    yield request, client, analytics_in
+                    yield request, client, resource_tp
         finally:
             app.dependency_overrides.clear()
 
@@ -91,11 +101,11 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -105,10 +115,8 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 

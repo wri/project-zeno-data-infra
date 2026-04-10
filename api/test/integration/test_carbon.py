@@ -1,5 +1,6 @@
 from test.integration import (  # write_data_file,; write_metadata_file,
     delete_resource_files,
+    resource_thumbprint,
     retry_getting_resource,
 )
 
@@ -11,7 +12,7 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.carbon_flux_analyzer import CarbonFluxAnalyzer
+from app.domain.analyzers.carbon_flux_analyzer import INPUT_URIS, CarbonFluxAnalyzer
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -46,28 +47,32 @@ def create_analysis_service_for_tests(
         analyzer=CarbonFluxAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-carbon-flux.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"]
             ),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
 
 
 class TestCarbonDataAdmin:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
         analytics_in = CarbonFluxAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
             canopy_cover=30,
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = CarbonFluxAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -78,20 +83,18 @@ class TestCarbonDataAdmin:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, client, analytics_in
+                yield test_request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
+        test_request, client, resource_tp = setup
         assert test_request.status_code == 202
         response = test_request.json()
         assert (
             response["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
-        resource = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        resource = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         expected = pd.DataFrame(
             {
@@ -126,7 +129,7 @@ class TestCarbonDataAdmin:
 
 
 class TestCarbonDataFeature:
-    @pytest_asyncio.fixture(autouse=True)
+    @pytest_asyncio.fixture
     async def setup(self):
         analytics_in = CarbonFluxAnalyticsIn(
             aoi=CustomAreaOfInterest(
@@ -156,13 +159,16 @@ class TestCarbonDataFeature:
             canopy_cover=50,
         )
         analytics_in.set_input_uris(Environment.production)
+        analyzer = CarbonFluxAnalyzer(input_uris=INPUT_URIS[Environment.production])
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -173,20 +179,18 @@ class TestCarbonDataFeature:
                     json=analytics_in.model_dump(),
                 )
 
-                yield test_request, client, analytics_in
+                yield test_request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
+        test_request, client, resource_tp = setup
         assert test_request.status_code == 202
         response = test_request.json()
         assert (
             response["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
-        resource = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        resource = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         expected = pd.DataFrame(
             {

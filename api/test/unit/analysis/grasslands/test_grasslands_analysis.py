@@ -8,7 +8,9 @@ import rioxarray  # noqa: F401
 import xarray as xr
 from dask.dataframe import DataFrame as DaskDataFrame
 
-from app.domain.analyzers.grasslands_analyzer import GrasslandsAnalyzer
+from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
+from app.domain.models.dataset import Dataset
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -182,6 +184,8 @@ class TestGrasslandsOTFAnalysis:
     async def test_grasslands_otf_analysis(
         self, mock_read_zarr, grasslands_datacube, pixel_area
     ):
+        input_uris = INPUT_URIS[Environment.production]
+
         mock_read_zarr.side_effect = [grasslands_datacube, pixel_area]
 
         aoi = {
@@ -203,7 +207,12 @@ class TestGrasslandsOTFAnalysis:
 
         with dask.config.set(scheduler="synchronous"):
             result_df = GrasslandsAnalyzer.analyze_area(
-                aoi, aoi["geometry"], 2000, 2022
+                aoi,
+                aoi["geometry"],
+                2000,
+                2022,
+                input_uris["grasslands_zarr_uri"],
+                input_uris[str(Dataset.area_hectares)],
             )
             computed_df = result_df.compute()
 

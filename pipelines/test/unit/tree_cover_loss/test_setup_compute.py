@@ -1,6 +1,7 @@
 import dask.array as da
 import numpy as np
 import xarray as xr
+import pytest
 
 from pipelines.tree_cover_loss import stages
 
@@ -16,6 +17,8 @@ def _create_mock_datasets(shape=(2, 2)):
         primary_forests_data = [[0]]
         natural_forests_data = [[0]]
         tclf_data = [[0]]
+        mangroves_data = [[0]]
+        gain_from_height_data = [[0]]
         country_data = [[1]]
         region_data = [[1]]
         subregion_data = [[1]]
@@ -30,6 +33,8 @@ def _create_mock_datasets(shape=(2, 2)):
         primary_forests_data = [[0, 1], [0, 0]]
         natural_forests_data = [[1, 1], [0, 0]]
         tclf_data = [[2, 5], [0, 4]]
+        mangroves_data = [[1, 0], [0, 1]]
+        gain_from_height_data = [[10, 6], [5, 2]]
         country_data = [[1, 1], [2, 2]]
         region_data = [[1, 1], [2, 2]]
         subregion_data = [[1, 2], [3, 4]]
@@ -54,6 +59,12 @@ def _create_mock_datasets(shape=(2, 2)):
     natural_forests = xr.DataArray(
         da.array(natural_forests_data, dtype=np.uint8), dims=["y", "x"], coords=coords
     )
+    mangroves = xr.DataArray(
+        da.array(mangroves_data, dtype=np.uint8), dims=["y", "x"], coords=coords
+    )
+    gain_from_height = xr.DataArray(
+        da.array(gain_from_height_data, dtype=np.uint8), dims=["y", "x"], coords=coords
+    )
     country = xr.DataArray(
         da.array(country_data, dtype=np.int16), dims=["y", "x"], coords=coords
     )
@@ -69,7 +80,7 @@ def _create_mock_datasets(shape=(2, 2)):
             "area_ha": xr.DataArray(
                 da.array(area_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
-            "carbon__Mg_CO2e": xr.DataArray(
+            "carbon_emissions_MgCO2e": xr.DataArray(
                 da.array(carbon_data, dtype=np.float32), dims=["y", "x"], coords=coords
             ),
             "tree_cover_loss_from_fires_area_ha": xr.DataArray(
@@ -86,6 +97,8 @@ def _create_mock_datasets(shape=(2, 2)):
         drivers,
         primary_forests,
         natural_forests,
+        mangroves,
+        gain_from_height,
         country,
         region,
         subregion,
@@ -101,12 +114,14 @@ def test_setup_compute_groupby_schema_and_order():
         (0, "tree_cover_loss_year", np.uint8),
         (1, "canopy_cover", np.uint8),
         (2, "is_intact_forest", np.int16),
-        (3, "driver", np.int16),
+        (3, "tree_cover_loss_driver", np.int16),
         (4, "is_primary_forest", np.uint8),
         (5, "natural_forest_class", np.uint8),
-        (6, "country", np.int16),
-        (7, "region", np.uint8),
-        (8, "subregion", np.int16),
+        (6, "mangrove_stock_2000", np.uint8),
+        (7, "tree_cover_gain_from_height", np.uint8),
+        (8, "country", np.int16),
+        (9, "region", np.uint8),
+        (10, "subregion", np.int16),
     ]
 
     # validate column order, names, and dtypes
@@ -132,7 +147,11 @@ def test_setup_compute_creates_concat_dataarray():
     ), f"mask should have 'layer' dimension, got dims: {mask.dims}"
 
     # verify layer coord values
-    expected_layers = ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"]
+    expected_layers = [
+        "area_ha",
+        "carbon_emissions_MgCO2e",
+        "tree_cover_loss_from_fires_area_ha",
+    ]
     actual_layers = list(mask.coords["layer"].values)
     assert (
         actual_layers == expected_layers
