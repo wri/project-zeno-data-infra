@@ -114,7 +114,7 @@ def test_setup_compute_groupby_schema_and_order():
         (0, "tree_cover_loss_year", np.uint8),
         (1, "canopy_cover", np.uint8),
         (2, "is_intact_forest", np.int16),
-        (3, "driver", np.int16),
+        (3, "tree_cover_loss_driver", np.int16),
         (4, "is_primary_forest", np.uint8),
         (5, "natural_forest_class", np.uint8),
         (6, "mangrove_stock_2000", np.uint8),

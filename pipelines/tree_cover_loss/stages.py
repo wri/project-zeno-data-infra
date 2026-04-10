@@ -270,7 +270,7 @@ def setup_compute(
         tcl.rename("tree_cover_loss_year"),
         tcd.rename("canopy_cover"),
         ifl.rename("is_intact_forest"),
-        drivers.rename("driver"),
+        drivers.rename("tree_cover_loss_driver"),
         primary_forests.rename("is_primary_forest"),
         natural_forests.rename("natural_forest_class"),
         mangrove.rename("mangrove_stock_2000"),
@@ -337,7 +337,9 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
         7: "Other natural disturbances",
     }
 
-    result_df["driver"] = result_df["driver"].map(categoryid_to_driver)
+    result_df["tree_cover_loss_driver"] = result_df["tree_cover_loss_driver"].map(
+        categoryid_to_driver
+    )
 
     # convert primary forest to boolean
     result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
@@ -357,8 +359,12 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     # Now calculate the carbon for canopy_cover 30, 50, 70.
     value_cols = ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"]
     contextual_cols = [
-        "tree_cover_loss_year", "canopy_cover", "is_intact_forest",
-        "driver", "is_primary_forest", "natural_forest_class"
+        "tree_cover_loss_year",
+        "canopy_cover",
+        "is_intact_forest",
+        "tree_cover_loss_driver",
+        "is_primary_forest",
+        "natural_forest_class",
     ]
     gadm_cols = ["country", "region", "subregion"]
     groupby_cols = contextual_cols + gadm_cols
@@ -535,13 +541,13 @@ def get_validation_statistics(
 
     # if the whole thing is masked just exit early
     if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
-        driver_results = pd.DataFrame({"area_ha": [], "driver": []})
+        driver_results = pd.DataFrame({"area_ha": [], "tree_cover_loss_driver": []})
     else:
         driver_results = (
             area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()
         )
         driver_results = driver_results.rename(
-            columns={"area": "area_ha", "classification": "driver"}
+            columns={"area": "area_ha", "classification": "tree_cover_loss_driver"}
         )
 
     natural_forests_results = (
