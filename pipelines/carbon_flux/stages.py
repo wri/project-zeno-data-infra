@@ -2,6 +2,7 @@ from typing import Callable, Dict, Optional, Tuple
 
 import pandas as pd
 import xarray as xr
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     ANALYTICS_BUCKET,
@@ -17,7 +18,12 @@ from pipelines.prefect_flows.common_stages import (
 from pipelines.prefect_flows.common_stages import create_zarrs as common_create_zarrs
 from pipelines.prefect_flows.common_stages import (
     rollup_by_gadm_and_convert_to_aoi,
+    symmetric_relative_difference,
 )
+from pipelines.repositories.google_earth_engine_dataset_repository import (
+    GoogleEarthEngineDatasetRepository,
+)
+from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
 
 PIPELINE_CHUNK_SIZE = 10_000
 OTF_CHUNK_SIZE = 4_000
@@ -233,3 +239,93 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
 def _load_zarr(zarr_uri, group=None):
     return xr.open_zarr(zarr_uri, group=group)
+
+
+def qc_against_validation_source(
+    result_df: pd.DataFrame,
+    qc_feature_repository=None,
+    gee_repository=None,
+    qc_error_threshold: float = 0.02,
+) -> bool:
+    if qc_feature_repository is None:
+        qc_feature_repository = QCFeaturesRepository()
+    if gee_repository is None:
+        gee_repository = GoogleEarthEngineDatasetRepository()
+
+    qc_features = qc_feature_repository.load(limit=20)
+
+    def qc_feature(row):
+        print(f"Starting QC on GID {row.GID_2}")
+        admin2_aoi_id = row.GID_2.split("_")[0]
+        sample = result_df[
+            (result_df.aoi_id == admin2_aoi_id) & (result_df.tree_cover_density == 30)
+        ]
+
+        if sample.size > 0:
+            sample_emissions = sample[
+                sample.carbontype == "carbon_gross_emissions"
+            ].value.sum()
+            sample_removals = sample[
+                sample.carbontype == "carbon_gross_removals"
+            ].value.sum()
+        else:
+            sample_emissions = 0
+            sample_removals = 0
+
+        validation = get_carbon_validation_statistics(row.geometry, gee_repository)
+
+        diff_emissions = symmetric_relative_difference(
+            validation["emissions_Mg_CO2e"], sample_emissions
+        )
+        diff_removals = symmetric_relative_difference(
+            validation["removals_Mg_CO2e"], sample_removals
+        )
+
+        r = pd.Series(
+            {
+                "pass": bool(
+                    diff_emissions < qc_error_threshold
+                    and diff_removals < qc_error_threshold
+                ),
+                "sample_emissions": sample_emissions,
+                "validation_emissions": validation["emissions_Mg_CO2e"],
+                "sample_removals": sample_removals,
+                "validation_removals": validation["removals_Mg_CO2e"],
+            }
+        )
+        print(f"\n{row.GID_2}\n{r}")
+        return r
+
+    qc_features[
+        [
+            "qc_pass",
+            "sample_emissions",
+            "validation_emissions",
+            "sample_removals",
+            "validation_removals",
+        ]
+    ] = qc_features.apply(qc_feature, axis=1)
+
+    return bool(qc_features.qc_pass.all())
+
+
+def get_carbon_validation_statistics(
+    geom: Polygon,
+    gee_repository=None,
+) -> Dict[str, float]:
+    if gee_repository is None:
+        gee_repository = GoogleEarthEngineDatasetRepository()
+
+    emissions = gee_repository.load("carbon_gross_emissions", geom)
+    removals = gee_repository.load("carbon_gross_removals", geom)
+
+    area_ha = gee_repository.load("area", geom, like=emissions.b1)["area"] / 10000
+
+    emissions_total = float((emissions.b1 * area_ha).sum(skipna=True).item())
+    removals_total = float((removals.b1 * area_ha).sum(skipna=True).item())
+
+    return {
+        "emissions_Mg_CO2e": emissions_total,
+        "removals_Mg_CO2e": removals_total,
+    }
+

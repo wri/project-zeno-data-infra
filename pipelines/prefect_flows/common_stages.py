@@ -412,6 +412,12 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     return results_with_ids
 
 
+# for TCL and carbon validation
+def symmetric_relative_difference(a, b):
+    avg = (abs(a) + abs(b)) / 2
+    return 0 if avg == 0 else abs(a - b) / avg
+
+
 def save_results(df: pd.DataFrame, results_uri: str) -> str:
     print("Starting parquet")
 
