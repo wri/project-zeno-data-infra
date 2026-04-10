@@ -48,7 +48,8 @@ class GoogleEarthEngineDatasetRepository:
             gee_service_account_b64 = os.getenv("GEE_SERVICE_ACCOUNT_JSON")
             if gee_service_account_b64:
                 gee_service_account = json.loads(
-                    base64.b64decode(gee_service_account_b64).decode("utf-8")
+                    base64.b64decode(gee_service_account_b64).decode("utf-8"),
+                    strict=False,
                 )
                 creds = ee.ServiceAccountCredentials(
                     gee_service_account["client_email"],

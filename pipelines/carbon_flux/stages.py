@@ -251,11 +251,13 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
 def _load_zarr(zarr_uri, group=None):
     return xr.open_zarr(zarr_uri, group=group)
+
+
 def qc_against_validation_source(
     result_df: pd.DataFrame,
     qc_feature_repository=None,
     gee_repository=None,
-    qc_error_threshold: float = 0.05,
+    qc_error_threshold: float = 0.02,
 ) -> bool:
     if qc_feature_repository is None:
         qc_feature_repository = QCFeaturesRepository()
