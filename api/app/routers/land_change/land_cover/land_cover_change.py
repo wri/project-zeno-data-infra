@@ -3,6 +3,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
+from app.dependencies import get_environment
 from app.domain.analyzers.land_cover_change_analyzer import (
     INPUT_URIS,
     LandCoverChangeAnalyzer,
@@ -38,7 +39,7 @@ def get_analysis_repository(request: Request) -> AnalysisRepository:
 def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
-    environment: Environment = Depends(Environment),
+    environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
