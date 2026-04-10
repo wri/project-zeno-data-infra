@@ -213,7 +213,7 @@ def load_data(
     area_and_emissions = xr.Dataset(
         {
             "area_ha": pixel_area,
-            "carbon__Mg_CO2e": carbon_emissions,
+            "carbon_emissions_MgCO2e": carbon_emissions,
             "tree_cover_loss_from_fires_area_ha": tclf_area,
         }
     )
@@ -257,11 +257,11 @@ def setup_compute(
     mask = xr.concat(
         [
             area_and_emissions["area_ha"],
-            area_and_emissions["carbon__Mg_CO2e"],
+            area_and_emissions["carbon_emissions_MgCO2e"],
             area_and_emissions["tree_cover_loss_from_fires_area_ha"],
         ],
         pd.Index(
-            ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"],
+            ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"],
             name="layer",
         ),
     )
@@ -355,7 +355,7 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     result_df.dropna(subset=["country"], inplace=True)
 
     # Now calculate the carbon for canopy_cover 30, 50, 70.
-    value_cols = ["area_ha", "carbon_Mg_CO2e", "tree_cover_loss_from_fires_area_ha"]
+    value_cols = ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"]
     contextual_cols = [
         "tree_cover_loss_year", "canopy_cover", "is_intact_forest",
         "driver", "is_primary_forest", "natural_forest_class"
@@ -375,19 +375,19 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
             | (result_df['mangrove_stock_2000'] == 1)
             | (result_df['tree_cover_gain_from_height'] == 1)
         )
-        temp_df = result_df[mask].groupby(groupby_cols, as_index=False)["carbon_Mg_CO2e"].sum()
+        temp_df = result_df[mask].groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
         temp_df["canopy_cover"] = T
         results.append(temp_df)
 
     # Count zero carbon for any canopy_cover below 30
-    below30_df = result_df[result_df['canopy_cover'] < 30].groupby(groupby_cols, as_index=False)["carbon_Mg_CO2e"].sum()
-    below30_df["carbon_Mg_CO2e"] = 0.0
+    below30_df = result_df[result_df['canopy_cover'] < 30].groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
+    below30_df["carbon_emissions_MgCO2e"] = 0.0
     results.append(below30_df)
 
     carbon_df = pd.concat(results, ignore_index=True)
     # Do another groupby to combine any rows with duplicated groupbys because of
     # setting canopy_cover to T above.
-    carbon_df = carbon_df.groupby(groupby_cols, as_index=False)["carbon_Mg_CO2e"].sum()
+    carbon_df = carbon_df.groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
 
     # Do groupby only with the TCL results to similarly drop out the mangroves and gain_from_height.
     tcl_df = result_df.groupby(groupby_cols, as_index=False)[["area_ha", "tree_cover_loss_from_fires_area_ha"]].sum()

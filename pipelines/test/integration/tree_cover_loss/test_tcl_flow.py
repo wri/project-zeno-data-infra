@@ -55,7 +55,7 @@ def test_tcl_flow_real_data(
         "aoi_id",
         "aoi_type",
         "area_ha",
-        "carbon_Mg_CO2e",
+        "carbon_emissions_MgCO2e",
         "tree_cover_loss_from_fires_area_ha",
     }
     assert set(result_df.columns) == expected_columns
@@ -136,7 +136,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "aoi_id",
         "aoi_type",
         "area_ha",
-        "carbon_Mg_CO2e",
+        "carbon_emissions_MgCO2e",
         "tree_cover_loss_from_fires_area_ha",
     }
     assert set(result_df.columns) == expected_columns
@@ -216,7 +216,7 @@ def test_tcl_flow_with_bbox(
         "aoi_id",
         "aoi_type",
         "area_ha",
-        "carbon_Mg_CO2e",
+        "carbon_emissions_MgCO2e",
         "tree_cover_loss_from_fires_area_ha",
     }
     assert set(result_df.columns) == expected_columns
