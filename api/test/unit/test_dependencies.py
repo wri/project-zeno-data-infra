@@ -42,3 +42,15 @@ class TestGetEnvironmentDependency:
     async def test_invalid_header_value_returns_422(self):
         response = _client.get("/test-env", headers={"x-environment": "invalid"})
         assert response.status_code == 422
+
+    def test_x_environment_header_is_hidden_from_docs(self):
+        schema = _app.openapi()
+
+        for path, path_item in schema["paths"].items():
+            for method, operation in path_item.items():
+                for parameter in operation.get("parameters", []):
+                    assert parameter.get("name") != "x-environment", (
+                        f"x-environment header should be hidden from docs "
+                        f"(found in {method.upper()} {path}). "
+                        "Add include_in_schema=False to the Header() in get_environment."
+                    )
