@@ -3,15 +3,17 @@ from test.integration import (
     resource_thumbprint,
     retry_getting_resource,
 )
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_environment
 from app.domain.analyzers.land_cover_change_analyzer import (
     INPUT_URIS,
     LandCoverChangeAnalyzer,
@@ -93,6 +95,7 @@ class TestLandCoverChangeData:
                 )
 
                 yield test_request, client, resource_tp
+        app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
@@ -140,3 +143,58 @@ class TestLandCoverChangeData:
             atol=1e-8,  # Absolute tolerance
             rtol=1e-2,  # Relative tolerance
         )
+
+
+@pytest.mark.asyncio
+async def test_staging_env_header_is_forwarded_to_service():
+    # Regression test for bug fixed in
+    # https://github.com/wri/project-zeno-data-infra/pull/244
+    resolved_environments = []
+
+    async def tracking_get_environment(
+        x_environment: Environment | None = Header(default=None),
+    ) -> Environment:
+        resolved = (
+            x_environment if x_environment is not None else Environment.production
+        )
+        resolved_environments.append(resolved)
+        return resolved
+
+    app.dependency_overrides.clear()
+    app.dependency_overrides[get_environment] = tracking_get_environment
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
+
+    analytics_in = LandCoverChangeAnalyticsIn(
+        aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31"])
+    )
+
+    patched_uris = {
+        **INPUT_URIS,
+        Environment.staging: INPUT_URIS[Environment.production],
+    }
+
+    try:
+        with patch(
+            "app.routers.land_change.land_cover.land_cover_change.INPUT_URIS",
+            patched_uris,
+        ):
+            async with LifespanManager(app):
+                async with AsyncClient(
+                    transport=ASGITransport(app), base_url="http://testserver"
+                ) as client:
+                    response = await client.post(
+                        f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                        json=analytics_in.model_dump(),
+                        headers={"x-environment": "staging"},
+                    )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resolved_environments == [Environment.staging], (
+        f"Expected get_environment to be called with staging, got: {resolved_environments}. "
+        "If this list is empty, the dependency is likely wired as Depends(Environment) "
+        "instead of Depends(get_environment), causing the override to be silently ignored."
+    )
+    assert response.status_code == 202
