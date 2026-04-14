@@ -15,7 +15,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
-from app.domain.models.environment import Environment
+from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -55,7 +55,7 @@ def create_analysis_service(
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri=INPUT_URIS[environment]["admin_results_uri"]
+                table_uri=resolve_uris(INPUT_URIS, environment)["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
                 environment=environment,
@@ -68,7 +68,8 @@ def create_analysis_service(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=TreeCoverAnalyzer(
-            compute_engine=compute_engine, input_uris=INPUT_URIS[environment]
+            compute_engine=compute_engine,
+            input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,
     )

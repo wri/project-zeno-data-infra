@@ -5,7 +5,7 @@ from pydantic import UUID5
 
 from app.dependencies import get_environment
 from app.domain.analyzers.dist_alerts_analyzer import INPUT_URIS, DistAlertsAnalyzer
-from app.domain.models.environment import Environment
+from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
@@ -41,7 +41,7 @@ def create_analysis_service(
         analysis_repository=analysis_repository,
         analyzer=DistAlertsAnalyzer(
             compute_engine=getattr(request.app.state, "dask_client", None),
-            input_uris=INPUT_URIS[environment],
+            input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,
     )

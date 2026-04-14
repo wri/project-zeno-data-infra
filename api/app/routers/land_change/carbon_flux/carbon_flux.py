@@ -5,7 +5,7 @@ from pydantic import UUID5
 
 from app.dependencies import get_environment
 from app.domain.analyzers.carbon_flux_analyzer import INPUT_URIS, CarbonFluxAnalyzer
-from app.domain.models.environment import Environment
+from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -43,9 +43,9 @@ def create_analysis_service(
         analyzer=CarbonFluxAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                table_uri=INPUT_URIS[environment]["admin_results_uri"]
+                table_uri=resolve_uris(INPUT_URIS, environment)["admin_results_uri"]
             ),
-            input_uris=INPUT_URIS[environment],
+            input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,
     )
