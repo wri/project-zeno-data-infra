@@ -112,6 +112,7 @@ class AnalysisService:
                     "event": f"{self.event}_analytics_processing_failure",
                     "severity": "high",
                     "metadata": self.analytics_resource.metadata,
+                    "resource_id": self.analytics_resource_id,
                     "analysis_repository": self.analysis_repository,
                     "analyzer": self.analyzer,
                     "error_type": e.__class__.__name__,
