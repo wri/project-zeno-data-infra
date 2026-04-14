@@ -69,7 +69,7 @@ async def get_analysis(
     except Exception as e:
         logging.error(
             {
-                "event": "tree_cover_loss_analytics_resource_request_failure",
+                "event": "common_analytics_resource_request_failure",
                 "severity": "high",
                 "resource_id": resource_id,
                 "resource_metadata": analysis.metadata,
