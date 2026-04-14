@@ -16,7 +16,7 @@ def _make_result_df(area_ha, canopy_cover, driver, natural_forest_class):
             "area_ha": area_ha,
             "tree_cover_loss_year": [2021, 2022],
             "canopy_cover": canopy_cover,
-            "driver": driver,
+            "tree_cover_loss_driver": driver,
             "aoi_id": ["AFG.1.1", "AFG.1.1"],
             "natural_forest_class": natural_forest_class,
         }
@@ -115,5 +115,5 @@ def test_get_validation_statistics_with_fake_repo():
         geom, gee_repository=FakeGoogleEarthEngineDatasetRepository()
     )["driver_results"]
 
-    expected = pd.DataFrame({"driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
+    expected = pd.DataFrame({"tree_cover_loss_driver": [1.0, 3.0], "area_ha": [2.0, 2.0]})
     pd.testing.assert_frame_equal(result, expected, check_dtype=False)

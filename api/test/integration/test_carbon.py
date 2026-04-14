@@ -47,8 +47,7 @@ def create_analysis_service_for_tests(
         analyzer=CarbonFluxAnalyzer(
             compute_engine=request.app.state.dask_client,
             query_service=DuckDbPrecalcQueryService(
-                # FIXME: Why not use production URI?
-                table_uri=INPUT_URIS[Environment.test]["admin_results_uri"]
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"]
             ),
             input_uris=INPUT_URIS[Environment.production],
         ),

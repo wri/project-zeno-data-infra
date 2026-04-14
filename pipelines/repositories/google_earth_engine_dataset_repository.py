@@ -11,11 +11,11 @@ class GoogleEarthEngineDatasetRepository:
     # lazy load ee assets since ee may not be initiazed yet
     EE_ASSETS = {
         "loss": lambda: ee.Image("UMD/hansen/global_forest_change_2024_v1_12"),
-        "tcl_drivers": lambda: ee.Image(
-            "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"
-        ),
+        "tcl_drivers": lambda: ee.Image("projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"),
         "area": lambda: ee.Image.pixelArea(),
         "natural_lands": lambda: ee.Image("WRI/SBTN/naturalLands/v1_1/2020"),
+        "carbon_gross_emissions": lambda: ee.Image("projects/forma-250/assets/gfw_forest_carbon_gross_emissions/gross_emissions_forest_extent_per_hectare_v1_4_2_2001_2024"),
+        "carbon_gross_removals": lambda: ee.Image("projects/forma-250/assets/gfw_forest_carbon_gross_removals/gross_removals_forest_extent_per_hectare_v1_4_2_2001_2024"),
     }
 
     def __init__(self, default_scale=0.00025, default_projection="EPSG:4326"):
@@ -48,7 +48,8 @@ class GoogleEarthEngineDatasetRepository:
             gee_service_account_b64 = os.getenv("GEE_SERVICE_ACCOUNT_JSON")
             if gee_service_account_b64:
                 gee_service_account = json.loads(
-                    base64.b64decode(gee_service_account_b64).decode("utf-8")
+                    base64.b64decode(gee_service_account_b64).decode("utf-8"),
+                    strict=False,
                 )
                 creds = ee.ServiceAccountCredentials(
                     gee_service_account["client_email"],

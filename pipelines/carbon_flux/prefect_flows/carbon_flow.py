@@ -6,6 +6,11 @@ from prefect import flow
 from pipelines.carbon_flux.prefect_flows import carbon_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
+from pipelines.globals import (
+    tree_cover_density_2000_zarr_uri,
+    mangrove_stock_2000_zarr_uri,
+    tree_cover_gain_from_height_zarr_uri
+)
 
 
 @flow(name="Carbon flux")
@@ -15,14 +20,6 @@ def gadm_carbon_flux(overwrite: bool = False):
     carbon_zarr_uris = carbon_tasks.create_zarrs.with_options(
         name="create-carbon-zarrs"
     )(overwrite=overwrite)
-
-    mangrove_stock_2000_zarr_uri = "s3://lcl-analytics/zarr/jpl_mangrove_aboveground_biomass_stock_2000/v201902/is_mangrove.zarr/"
-    tree_cover_gain_from_height_zarr_uri = (
-        "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
-    )
-    tree_cover_density_2000_zarr_uri = (
-        "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr/"
-    )
 
     result_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon.parquet"
 
@@ -61,4 +58,7 @@ def gadm_carbon_flux(overwrite: bool = False):
     result_uri = common_tasks.save_result.with_options(name="carbon-flux-save-result")(
         result_df, result_uri
     )
+    carbon_tasks.qc_against_validation_source.with_options(
+        name="carbon-flux-qc"
+    )(result_df)
     return result_uri

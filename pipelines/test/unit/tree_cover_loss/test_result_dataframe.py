@@ -18,7 +18,8 @@ def _create_sparse_dataarray(
 
     # concatenate along layer dimension (following carbon flux pattern)
     return xr.concat(
-        [area_da, carbon_da], pd.Index(["area_ha", "carbon_Mg_CO2e"], name="layer")
+        [area_da, carbon_da],
+        pd.Index(["area_ha", "carbon_emissions_MgCO2e"], name="layer"),
     )
 
 
@@ -47,21 +48,21 @@ def test_create_result_dataframe_same_sparsity_pattern():
     assert "year" in df.columns
     assert "country" in df.columns
     assert "area_ha" in df.columns
-    assert "carbon_Mg_CO2e" in df.columns
+    assert "carbon_emissions_MgCO2e" in df.columns
 
     # verify values
     assert (
         df["area_ha"].sum() == 60.0
     ), f"expected area sum 60.0, got {df['area_ha'].sum()}"
     assert (
-        df["carbon_Mg_CO2e"].sum() == 600.0
-    ), f"expected carbon sum 600.0, got {df['carbon_Mg_CO2e'].sum()}"
+        df["carbon_emissions_MgCO2e"].sum() == 600.0
+    ), f"expected carbon sum 600.0, got {df['carbon_emissions_MgCO2e'].sum()}"
 
     # verify specific rows
     row_0_0 = df[(df["year"] == 2001) & (df["country"] == 1)]
     assert len(row_0_0) == 1
     assert row_0_0["area_ha"].iloc[0] == 10.0
-    assert row_0_0["carbon_Mg_CO2e"].iloc[0] == 100.0
+    assert row_0_0["carbon_emissions_MgCO2e"].iloc[0] == 100.0
 
 
 def test_create_result_dataframe_mismatched_sparsity():
@@ -90,21 +91,21 @@ def test_create_result_dataframe_mismatched_sparsity():
     row_0_0 = df[(df["year"] == 2001) & (df["country"] == 1)]
     assert len(row_0_0) == 1
     assert row_0_0["area_ha"].iloc[0] == 10.0
-    assert row_0_0["carbon_Mg_CO2e"].iloc[0] == 100.0
+    assert row_0_0["carbon_emissions_MgCO2e"].iloc[0] == 100.0
 
     # row (1,1): area but no carbon
     row_1_1 = df[(df["year"] == 2002) & (df["country"] == 2)]
     assert len(row_1_1) == 1
     assert row_1_1["area_ha"].iloc[0] == 20.0
     assert (
-        row_1_1["carbon_Mg_CO2e"].iloc[0] == 0.0
+        row_1_1["carbon_emissions_MgCO2e"].iloc[0] == 0.0
     ), "missing carbon should be filled with 0.0"
 
     # row (2,0): carbon but no area
     row_2_0 = df[(df["year"] == 2003) & (df["country"] == 1)]
     assert len(row_2_0) == 1
     assert row_2_0["area_ha"].iloc[0] == 0.0, "missing area should be filled with 0.0"
-    assert row_2_0["carbon_Mg_CO2e"].iloc[0] == 300.0
+    assert row_2_0["carbon_emissions_MgCO2e"].iloc[0] == 300.0
 
 
 def test_create_result_dataframe_output_schema():
@@ -130,7 +131,12 @@ def test_create_result_dataframe_output_schema():
     df = stages.create_result_dataframe(result_dataarray)
 
     # verify column names and dtypes
-    expected_columns = {"tree_cover_loss_year", "country", "area_ha", "carbon_Mg_CO2e"}
+    expected_columns = {
+        "tree_cover_loss_year",
+        "country",
+        "area_ha",
+        "carbon_emissions_MgCO2e",
+    }
     assert (
         set(df.columns) == expected_columns
     ), f"expected columns {expected_columns}, got {set(df.columns)}"
@@ -138,7 +144,7 @@ def test_create_result_dataframe_output_schema():
         np.float32,
         np.float64,
     ], f"area should be float, got {df['area_ha'].dtype}"
-    assert df["carbon_Mg_CO2e"].dtype in [
+    assert df["carbon_emissions_MgCO2e"].dtype in [
         np.float32,
         np.float64,
-    ], f"carbon should be float, got {df['carbon_Mg_CO2e'].dtype}"
+    ], f"carbon should be float, got {df['carbon_emissions_MgCO2e'].dtype}"

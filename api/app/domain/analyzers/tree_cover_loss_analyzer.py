@@ -16,7 +16,21 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 INPUT_URIS: Dict[Environment, Dict[str, str]] = {
-    Environment.staging: {},
+    Environment.staging: {
+        **{
+            str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.staging)
+            for ds in [
+                Dataset.area_hectares,
+                Dataset.canopy_cover,
+                Dataset.carbon_emissions,
+                Dataset.natural_forests,
+                Dataset.primary_forest,
+                Dataset.tree_cover_loss,
+                Dataset.tree_cover_loss_drivers,
+            ]
+        },
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss.parquet",
+    },
     Environment.production: {
         **{
             str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)

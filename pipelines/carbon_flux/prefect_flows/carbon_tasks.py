@@ -44,3 +44,8 @@ def setup_compute(
 @task
 def postprocess_result(result: xr.DataArray):
     return stages.create_result_dataframe(result)
+
+
+@task
+def qc_against_validation_source(result_df) -> bool:
+    return stages.qc_against_validation_source(result_df)
