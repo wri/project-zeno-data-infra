@@ -31,19 +31,18 @@ async def create_analysis(
 ) -> DataMartResourceLinkResponse:
     try:
         data.set_input_uris(environment)
+        await service.set_resource_from(data)
 
         logging.info(
             {
                 "event": f"{service.event_name()}_analytics_request",
                 "analytics_in": data.model_dump(),
-                "resource_id": data.thumbprint(),
+                "resource_id": service.resource_thumbprint(),
             }
         )
-
-        await service.set_resource_from(data)
         background_tasks.add_task(service.do)
         # background_tasks.add_task(test_s3_access)
-        # background_tasks.add_task(test_dynamodb_s3_repository)
+        # background_tasks.add_task(test_dynamodb_s3_repository, environment, service)
         link_url = resource_link_callback(request=request, service=service)
         link = DataMartResourceLink(link=link_url)
         return DataMartResourceLinkResponse(data=link, status=service.get_status())
@@ -139,7 +138,9 @@ def test_s3_access():
         )
 
 
-async def test_dynamodb_s3_repository():
+async def test_dynamodb_s3_repository(
+    environment: Environment, service: AnalysisService
+):
     """Testing new resource repository"""
     try:
         repo = AwsDynamoDbS3AnalysisRepository("integration_test")
@@ -150,8 +151,8 @@ async def test_dynamodb_s3_repository():
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
-        thumbprint = analytics_in.thumbprint()
+        analytics_in.set_input_uris(environment)
+        thumbprint = service.resource_thumbprint()
         await repo.store_analysis(
             thumbprint,
             Analysis(
