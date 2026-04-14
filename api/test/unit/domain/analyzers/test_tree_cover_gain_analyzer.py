@@ -98,7 +98,6 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
             start_year="2000",
             end_year="2010",
         )
-        metadata.set_input_uris(Environment.production)
         analysis = Analysis(
             result=None, metadata=metadata.model_dump(), status=AnalysisStatus.pending
         )

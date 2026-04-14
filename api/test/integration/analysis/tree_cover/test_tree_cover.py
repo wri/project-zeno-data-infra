@@ -83,7 +83,6 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             canopy_cover=15,
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )
@@ -152,7 +151,6 @@ class TestTreeCoverAnalyticsPostWithKba:
             ),
             canopy_cover=15,
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )

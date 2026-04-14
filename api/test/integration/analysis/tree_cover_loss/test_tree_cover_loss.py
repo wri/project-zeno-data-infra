@@ -95,7 +95,6 @@ class TestTclAnalyticsPostWithMultipleAdminAOIs:
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverLossAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )
@@ -171,7 +170,6 @@ class TestTclAnalyticsPostWithKba:
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverLossAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )
@@ -245,7 +243,6 @@ class TestTclAnalyticsAdminAOIWithDriver:
             canopy_cover=30,
             intersections=["driver"],
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverLossAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )
@@ -318,7 +315,6 @@ class TestTclAnalyticsPostWithKbaWithDriver:
             canopy_cover=30,
             intersections=["driver"],
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverLossAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )
@@ -391,7 +387,6 @@ class TestTclAnalyticsWithForestFilters:
             forest_filter="primary_forest",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = TreeCoverLossAnalyzer(
             compute_engine=None, input_uris=INPUT_URIS[Environment.production]
         )

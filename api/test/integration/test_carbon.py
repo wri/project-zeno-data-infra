@@ -62,7 +62,6 @@ class TestCarbonDataAdmin:
             aoi=AdminAreaOfInterest(type="admin", ids=["NGA.20.31", "IDN.25.3", "CHN"]),
             canopy_cover=30,
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = CarbonFluxAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
         delete_resource_files(ANALYTICS_NAME, resource_tp)
@@ -158,7 +157,6 @@ class TestCarbonDataFeature:
             ),
             canopy_cover=50,
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = CarbonFluxAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
         delete_resource_files(ANALYTICS_NAME, resource_tp)

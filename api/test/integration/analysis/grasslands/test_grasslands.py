@@ -56,7 +56,6 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             start_year="2015",
             end_year="2020",
         )
-        analytics_in.set_input_uris(Environment.production)
         analyzer = GrasslandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -129,7 +128,6 @@ class TestGrasslandsAnalyticsPostWithKba:
             end_year="2020",
         )
         analyzer = GrasslandsAnalyzer(input_uris=INPUT_URIS[Environment.production])
-        analytics_in.set_input_uris(Environment.production)
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         delete_resource_files(ANALYTICS_NAME, resource_tp)

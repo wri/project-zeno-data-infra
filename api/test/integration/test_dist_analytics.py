@@ -70,8 +70,6 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
             intersections=[],
         )
         analytics_in._version = TEST_VERSION
-        analytics_in.set_input_uris(Environment.production)
-
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -129,9 +127,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -185,9 +181,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
 
         resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -243,9 +237,7 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -280,9 +272,7 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
-
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -339,7 +329,6 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -423,7 +412,6 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
             end_date="2024-08-16",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -498,7 +486,6 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
             end_date="2025-04-30",
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
         analytics_in._version = TEST_VERSION
         analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
         resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -612,7 +599,6 @@ async def test_gadm_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -677,7 +663,6 @@ async def test_kba_dist_analytics_no_intersection():
         end_date="2024-08-16",
         intersections=[],
     )
-    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -734,7 +719,6 @@ async def test_admin_dist_analytics_by_grasslands():
         end_date="2024-08-16",
         intersections=["grasslands"],
     )
-    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
@@ -794,7 +778,6 @@ async def test_admin_dist_analytics_by_land_cover():
         end_date="2024-08-16",
         intersections=["land_cover"],
     )
-    analytics_in.set_input_uris(Environment.production)
     analytics_in._version = TEST_VERSION
     analyzer = DistAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
