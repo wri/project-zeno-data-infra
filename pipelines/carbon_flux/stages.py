@@ -328,4 +328,3 @@ def get_carbon_validation_statistics(
         "emissions_Mg_CO2e": emissions_total,
         "removals_Mg_CO2e": removals_total,
     }
-

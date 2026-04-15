@@ -53,7 +53,7 @@ def test_carbon_flow_with_mocked_data(
     ]
 
     with prefect_test_harness():
-        gadm_carbon_flux(overwrite=True)
+        gadm_carbon_flux(version="test_version", overwrite=True)
 
     result_df = mock_save_parquet.call_args[0][0]
 
