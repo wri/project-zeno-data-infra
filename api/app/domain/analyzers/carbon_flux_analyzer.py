@@ -23,7 +23,7 @@ INPUT_URIS = {
         "tree_cover_gain_from_height_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_gain_from_height/v20240126/raster/epsg-4326/zarr/period.zarr/",
         # Value [0, 100] inclusive.
         "tree_cover_density_2000_zarr_uri": "s3://gfw-data-lake/umd_tree_cover_density_2000/v1.8/raster/epsg-4326/zarr/threshold.zarr/",
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/forest-carbon/v1.12/admin-carbon.parquet",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/forest-carbon/v1.13/admin-carbon.parquet",
     },
     Environment.production: {
         # These are zarrs with total emissions (not per-hectare)
