@@ -21,7 +21,7 @@ def gadm_carbon_flux(version: str, overwrite: bool = False):
         name="create-carbon-zarrs"
     )(overwrite=overwrite)
 
-    result_uri = "s3://lcl-analytics/zonal-statistics/forest-carbon/{version}/admin-carbon.parquet"
+    result_uri = f"s3://lcl-analytics/zonal-statistics/forest-carbon/{version}/admin-carbon.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri

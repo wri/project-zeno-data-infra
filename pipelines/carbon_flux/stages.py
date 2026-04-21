@@ -234,7 +234,20 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
     df = rollup_by_gadm_and_convert_to_aoi(df, ["tree_cover_density", "carbontype"])
 
-    return df
+    # Pivot the carbon values to be their own columns based on the carbon type.
+    df_pivoted = df.pivot_table(
+        index=['tree_cover_density', 'aoi_id', 'aoi_type'],
+        columns='carbontype',
+        values='value'
+    ).reset_index()
+
+    carbon_cols = ['carbon_gross_emissions', 'carbon_gross_removals', 'carbon_net_flux']
+    df_pivoted = df_pivoted.rename(columns={col: f"{col}_Mg_CO2e" for col in carbon_cols})
+
+    # Remove the name of the columns axis (clean up the header)
+    df_pivoted.columns.name = None
+
+    return df_pivoted
 
 
 def _load_zarr(zarr_uri, group=None):
