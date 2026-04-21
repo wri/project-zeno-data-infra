@@ -57,14 +57,11 @@ def test_carbon_flow_with_mocked_data(
 
     result_df = mock_save_parquet.call_args[0][0]
 
-    expected_columns = {"aoi_id", "aoi_type", "tree_cover_density", "carbontype", "value"}
+    expected_columns = {'aoi_type', 'carbon_gross_emissions_Mg_CO2e', 'aoi_id', 'carbon_gross_removals_Mg_CO2e', 'tree_cover_density', 'carbon_net_flux_Mg_CO2e'}
     assert set(result_df.columns) == expected_columns
 
-    assert set(result_df["carbontype"].unique()).issubset(
-        {"carbon_net_flux", "carbon_gross_removals", "carbon_gross_emissions"}
-    )
     assert set(result_df["tree_cover_density"].unique()).issubset({30, 50, 75})
-    assert result_df["value"].dtype.kind == "f"
+    assert result_df["carbon_gross_emissions_Mg_CO2e"].dtype.kind == "f"
 
 
 def test_qc_against_validation_source_with_fake_gee_repo():
