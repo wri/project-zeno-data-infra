@@ -14,14 +14,14 @@ from pipelines.globals import (
 
 
 @flow(name="Carbon flux")
-def gadm_carbon_flux(overwrite: bool = False):
+def gadm_carbon_flux(version: str, overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
     carbon_zarr_uris = carbon_tasks.create_zarrs.with_options(
         name="create-carbon-zarrs"
     )(overwrite=overwrite)
 
-    result_uri = "s3://lcl-analytics/zonal-statistics/admin-carbon.parquet"
+    result_uri = f"s3://lcl-analytics/zonal-statistics/forest-carbon/{version}/admin-carbon.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
