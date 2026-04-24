@@ -314,6 +314,41 @@ def create_result_dataframe(result: xr.DataArray) -> pd.DataFrame:
     return df_pivoted
 
 
+# Temporarily pivot the canopy_cover column, so we can subtract, for each unique set
+# of ids and contextual columns, carbon_emissions_MgCO2e value for 50% canopy from
+# the 30% value, and the 75% value from the 50% value. This means our TCL carbon query
+# can then test for canopy_cover >= 30/50/75, rather than canopy_cover == 30/50/75.
+def unaggregate_carbon_by_canopy_cover(df: pd.DataFrame):
+    id_cols = ['aoi_id', 'aoi_type']
+    context_cols = [
+        'tree_cover_loss_year', 'is_intact_forest', 'tree_cover_loss_driver',
+        'is_primary_forest', 'natural_forest_class'
+    ]
+    group_cols = id_cols + context_cols
+    target_col = 'carbon_emissions_MgCO2e'
+
+    # Pivot the data to make subtraction easy. This aligns the canopy values side-by-side
+    # for every unique group
+    pivoted = df.pivot_table(index=group_cols, columns='canopy_cover', values=target_col).fillna(0)
+
+    # Do the actual difference calculation, so we can use canopy_cover >= 30/50/75,
+    # rather than canopy_cover == 30/50/75
+    pivoted[30] = pivoted[30] - pivoted[50]
+    pivoted[50] = pivoted[50] - pivoted[75]
+
+    # Convert the pivoted table back to long format with values 30/50/75.
+    updated_values = pivoted[[30, 50, 75]].stack().reset_index()
+    updated_values.columns = group_cols + ['canopy_cover', 'new_val']
+
+    # Merge with the original data frame, and take the new carbon value where calculated.
+    df = df.merge(updated_values, on=group_cols + ['canopy_cover'], how='left')
+    df[target_col] = df['new_val'].combine_first(df[target_col])
+
+    # Drop the helper column
+    df = df.drop(columns=['new_val'])
+    return df
+
+
 def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     result_df = create_result_dataframe(result)
     # convert year values (1-24) to actual years (2001-2024)
@@ -404,6 +439,8 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     final_df[value_cols] = final_df[value_cols].fillna(0)
 
     results_with_ids = rollup_by_gadm_and_convert_to_aoi(final_df, contextual_cols)
+
+    results_with_ids = unaggregate_carbon_by_canopy_cover(results_with_ids)
 
     return results_with_ids
 
