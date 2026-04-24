@@ -1,3 +1,4 @@
+# flake8: noqa: E501
 import json
 import logging
 import os
@@ -88,6 +89,12 @@ def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
 
 def read_zarr_clipped_to_geojson(uri, geojson, group: str | None = None):
     zarr = read_zarr(uri, group=group)
+    if not zarr.dims:
+        raise ValueError(
+            f"Zarr at {uri} (group={group!r}) opened with no dimensions. "
+            "The zarr may be a group container requiring a 'group' parameter, "
+            "or the store structure may have changed."
+        )
     zarr.rio.write_crs("EPSG:4326", inplace=True)
     clipped = clip_zarr_to_geojson(zarr, geojson)
     return clipped
