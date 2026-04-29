@@ -106,15 +106,15 @@ class CarbonFluxAnalyzer(Analyzer):
         )
 
         carbon_net_flux = read_zarr_clipped_to_geojson(
-            input_uris["carbon_net_flux_zarr_uri"], geojson
+            input_uris["carbon_net_flux_zarr_uri"], geojson, group="otf"
         )
 
         carbon_gross_removals = read_zarr_clipped_to_geojson(
-            input_uris["carbon_gross_removals_zarr_uri"], geojson
+            input_uris["carbon_gross_removals_zarr_uri"], geojson, group="otf"
         )
 
         carbon_gross_emissions = read_zarr_clipped_to_geojson(
-            input_uris["carbon_gross_emissions_zarr_uri"], geojson
+            input_uris["carbon_gross_emissions_zarr_uri"], geojson, group="otf"
         )
 
         mangrove_stock_2000 = read_zarr_clipped_to_geojson(
