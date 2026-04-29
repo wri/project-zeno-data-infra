@@ -29,7 +29,6 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
                 Dataset.tree_cover_loss_drivers,
             ]
         },
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260424.parquet",
     },
     Environment.production: {
         **{
@@ -44,7 +43,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
                 Dataset.tree_cover_loss_drivers,
             ]
         },
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.12/admin-tree-cover-loss.parquet",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260424.parquet",
     },
 }
 
