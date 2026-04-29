@@ -67,7 +67,7 @@ class GasType(Enum):
     co2e = "CO2e"
     co2 = "CO2"
     ch4 = "CH4"
-    n2o = "N20"
+    n2o = "N2O"
 
     def __str__(self):
         return self.value
