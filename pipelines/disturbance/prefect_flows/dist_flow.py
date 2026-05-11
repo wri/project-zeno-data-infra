@@ -52,6 +52,9 @@ def dist_alerts_flow(dist_version=None, overwrite=False, is_latest=False) -> lis
     logger = get_run_logger()
     result_uris = []
 
+    is_latest = str(is_latest).lower() == "true"
+    overwrite = str(overwrite).lower() == "true"
+
     if dist_version is None:
         is_latest = True
         dist_version = get_new_dist_version()
