@@ -143,7 +143,7 @@ def load_data(
     ifl: xr.DataArray = _load_zarr(ifl_uri).band_data
     ifl = xr.align(
         tcl,
-        ifl.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        ifl.reindex_like(tcl, method="nearest", fill_value=0),
         join="left",
     )[1].astype(np.int16)
 
