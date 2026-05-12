@@ -46,7 +46,7 @@ def pixel_area_ds():
 def carbon_emissions_ds():
     carbon = xr.Dataset(
         data_vars={
-            "carbon_emissions_MgCO2e": (
+            "band_data": (
                 ("band", "y", "x"),
                 da.array([[[1000.0, 1500.0], [2000.0, 2500.0]]], dtype=np.float32),
             )
@@ -157,6 +157,42 @@ def tclf_ds():
             "band_data": (
                 ("band", "y", "x"),
                 da.array([[[1, 5], [3, 0]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
+    )
+    return tclf
+
+
+@pytest.fixture
+def mangrove_ds():
+    tclf = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[1, 0], [0, 1]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": np.array([0], dtype=np.int16),
+            "y": np.array([1.0, 0.0], dtype=np.float64),
+            "x": np.array([0.0, 1.0], dtype=np.float64),
+        },
+    )
+    return tclf
+
+
+@pytest.fixture
+def gain_from_height_ds():
+    tclf = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[10, 6], [5, 2]]], dtype=np.uint8),
             )
         },
         coords={

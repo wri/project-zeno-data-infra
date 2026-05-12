@@ -9,7 +9,7 @@ services:
     ports:
       - "8000:8000"  # Maps port 8000 on the host to port 8000 in the container
       - "8787:8787"  # Maps port 8787 on the host to port 8787 in the container for Dask dashboard
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -19,5 +19,6 @@ services:
       - PYTHON_VERSION=3.13  
       - PYTHONPATH=/app
     volumes:
+      - ./app:/app/app
       - $HOME/.aws:/home/appuser/.aws:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

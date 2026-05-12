@@ -6,7 +6,7 @@ from app.domain.models.environment import Environment
 
 
 async def get_environment(
-    x_environment: Environment | None = Header(default=None),
+    x_environment: Environment | None = Header(include_in_schema=False, default=None),
 ) -> Environment:
     """Resolve the data environment from the x-environment request header.
 

@@ -9,7 +9,6 @@ from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
@@ -27,23 +26,20 @@ async def create_analysis(
     background_tasks: BackgroundTasks,
     request: Request,
     resource_link_callback: Callable,
-    environment: Environment = Environment.production,
 ) -> DataMartResourceLinkResponse:
     try:
-        data.set_input_uris(environment)
+        await service.set_resource_from(data)
 
         logging.info(
             {
                 "event": f"{service.event_name()}_analytics_request",
                 "analytics_in": data.model_dump(),
-                "resource_id": data.thumbprint(),
+                "resource_id": service.resource_thumbprint(),
             }
         )
-
-        await service.set_resource_from(data)
         background_tasks.add_task(service.do)
         # background_tasks.add_task(test_s3_access)
-        # background_tasks.add_task(test_dynamodb_s3_repository)
+        # background_tasks.add_task(test_dynamodb_s3_repository, service)
         link_url = resource_link_callback(request=request, service=service)
         link = DataMartResourceLink(link=link_url)
         return DataMartResourceLinkResponse(data=link, status=service.get_status())
@@ -73,7 +69,7 @@ async def get_analysis(
     except Exception as e:
         logging.error(
             {
-                "event": "tree_cover_loss_analytics_resource_request_failure",
+                "event": "common_analytics_resource_request_failure",
                 "severity": "high",
                 "resource_id": resource_id,
                 "resource_metadata": analysis.metadata,
@@ -139,9 +135,11 @@ def test_s3_access():
         )
 
 
-async def test_dynamodb_s3_repository():
+async def test_dynamodb_s3_repository(service: AnalysisService):
     """Testing new resource repository"""
     try:
+        # FIXME: This call appears broken (not enough args), but not sure
+        # how to fix. Do we even need this function anymore?
         repo = AwsDynamoDbS3AnalysisRepository("integration_test")
         analytics_in = TreeCoverLossAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["TST"]),
@@ -150,8 +148,7 @@ async def test_dynamodb_s3_repository():
             canopy_cover=30,
             intersections=[],
         )
-        analytics_in.set_input_uris(Environment.production)
-        thumbprint = analytics_in.thumbprint()
+        thumbprint = service.resource_thumbprint()
         await repo.store_analysis(
             thumbprint,
             Analysis(

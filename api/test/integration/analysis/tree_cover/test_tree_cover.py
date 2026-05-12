@@ -1,4 +1,8 @@
-from test.integration import delete_resource_files, retry_getting_resource
+from test.integration import (
+    delete_resource_files,
+    resource_thumbprint,
+    retry_getting_resource,
+)
 
 import pandas as pd
 import pytest
@@ -7,7 +11,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.tree_cover_analyzer import TreeCoverAnalyzer
+from app.domain.analyzers.tree_cover_analyzer import INPUT_URIS, TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -53,10 +57,10 @@ def create_analysis_service_for_tests(
         handler=TreeCoverPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal-statistics/admin-tree-cover.parquet"
+                table_uri=INPUT_URIS[Environment.production]["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
-                dataset_repository=ZarrDatasetRepository(),
+                dataset_repository=ZarrDatasetRepository(Environment.production),
                 aoi_geometry_repository=DataApiAoiGeometryRepository(),
                 dask_client_router=request.app.state.dask_client_router,
             ),
@@ -65,7 +69,9 @@ def create_analysis_service_for_tests(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverAnalyzer(compute_engine=compute_engine),
+        analyzer=TreeCoverAnalyzer(
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        ),
         event=ANALYTICS_NAME,
     )
 
@@ -77,7 +83,10 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
             aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9", "BRA.14"]),
             canopy_cover=15,
         )
-        analytics_in.set_input_uris(Environment.production)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
 
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
@@ -85,7 +94,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -96,7 +105,7 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
                     json=analytics_in.model_dump(),
                 )
 
-                yield (request, client, analytics_in)
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -106,11 +115,11 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -120,10 +129,8 @@ class TestAnalyticsPostWithMultipleAdminAOIs:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 
@@ -144,14 +151,18 @@ class TestTreeCoverAnalyticsPostWithKba:
             ),
             canopy_cover=15,
         )
-        analytics_in.set_input_uris(Environment.production)
+        analyzer = TreeCoverAnalyzer(
+            compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        )
+        resource_tp = resource_thumbprint(analytics_in, analyzer)
+
         app.dependency_overrides[create_analysis_service] = (
             create_analysis_service_for_tests
         )
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
-        delete_resource_files(ANALYTICS_NAME, analytics_in.thumbprint())
+        delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
@@ -162,7 +173,7 @@ class TestTreeCoverAnalyticsPostWithKba:
                     json=analytics_in.model_dump(),
                 )
 
-                yield (request, client, analytics_in)
+                yield request, client, resource_tp
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
@@ -172,11 +183,11 @@ class TestTreeCoverAnalyticsPostWithKba:
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, _, analysis_params = setup
+        test_request, _, resource_tp = setup
         resource = test_request.json()
         assert (
             resource["data"]["link"]
-            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{analysis_params.thumbprint()}"
+            == f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
 
     @pytest.mark.asyncio
@@ -186,10 +197,8 @@ class TestTreeCoverAnalyticsPostWithKba:
 
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
-        test_request, client, analysis_params = setup
-        data = await retry_getting_resource(
-            ANALYTICS_NAME, analysis_params.thumbprint(), client
-        )
+        test_request, client, resource_tp = setup
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
 

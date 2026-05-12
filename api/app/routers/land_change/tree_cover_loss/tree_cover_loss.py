@@ -4,7 +4,10 @@ from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.dependencies import get_environment
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.analyzers.tree_cover_loss_analyzer import (
+    INPUT_URIS,
+    TreeCoverLossAnalyzer,
+)
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
 )
@@ -17,7 +20,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
-from app.domain.models.environment import Environment
+from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
@@ -57,7 +60,7 @@ def create_analysis_service(
         handler=TreeCoverLossPrecalcHandler(
             precalc_query_builder=PrecalcSqlQueryBuilder(),
             precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri="s3://lcl-analytics/zonal_statistics/admin-tree-cover-loss-emissions-by-driver.parquet"
+                table_uri=resolve_uris(INPUT_URIS, environment)["admin_results_uri"]
             ),
             next_handler=FloxOTFHandler(
                 environment=environment,
@@ -69,7 +72,9 @@ def create_analysis_service(
 
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=TreeCoverLossAnalyzer(compute_engine),
+        analyzer=TreeCoverLossAnalyzer(
+            compute_engine, resolve_uris(INPUT_URIS, environment)
+        ),
         event=ANALYTICS_NAME,
     )
 
@@ -87,7 +92,6 @@ async def create(
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
-    environment: Environment = Depends(get_environment),
 ):
     return await create_analysis(
         data=data,
@@ -95,7 +99,6 @@ async def create(
         request=request,
         background_tasks=background_tasks,
         resource_link_callback=_datamart_resource_link_response,
-        environment=environment,
     )
 
 

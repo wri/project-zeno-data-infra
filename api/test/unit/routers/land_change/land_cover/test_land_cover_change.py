@@ -4,7 +4,6 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.models.environment import Environment
 from app.main import app
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import AdminAreaOfInterest
@@ -26,7 +25,6 @@ def dummy_analytics_in():
             ids=["IDN.24.9"],
         ),
     )
-    analytics_in.set_input_uris(Environment.production)
     return analytics_in
 
 
@@ -54,7 +52,6 @@ class TestLandCoverChangePostUseCaseInitiation:
         assert actual["aoi"] == expected["aoi"]
         assert actual["_version"] == expected["_version"]
         assert actual["_analytics_name"] == expected["_analytics_name"]
-        # deliberately skip _environment — that's an infrastructure concern, not what this test is about
 
         mock_service.reset_mock(return_value=True)
 

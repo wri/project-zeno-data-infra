@@ -8,22 +8,14 @@ from app.domain.analyzers.deforestation_luc_emissions_factor_analyzer import (
     DeforestationLUCEmissionsFactorAnalyzer,
 )
 from app.domain.models.analysis import Analysis
-from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.common.analysis import AnalysisStatus
+from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
-
-
-class DummyAnalysisRepository:
-    def __init__(self):
-        self.analysis = None
-
-    async def store_analysis(self, resource_id, analysis):
-        self.analysis = analysis
 
 
 class TestLandCoverChangeAdminAois:
@@ -533,15 +525,14 @@ class TestLandCoverChangeAdminAois:
 
     @pytest_asyncio.fixture(autouse=True)
     async def analyzer_with_test_data(self, parquet_mock_data):
-        self.analysis_repo = DummyAnalysisRepository()
         table_name = "/tmp/test.parquet"
         parquet_mock_data.to_parquet("/tmp/test.parquet", index=False)
 
         query_service = DuckDbPrecalcQueryService(table_name)
         analyzer = DeforestationLUCEmissionsFactorAnalyzer(
-            analysis_repository=self.analysis_repo,
             compute_engine=None,
             query_service=query_service,
+            input_uris={"admin_results_table_uri": table_name},
         )
 
         return analyzer
@@ -552,13 +543,14 @@ class TestLandCoverChangeAdminAois:
         analyzer_with_test_data,
     ):
         analytics_in = DeforestationLUCEmissionsFactorAnalyticsIn(
-            aoi={"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]},
+            aoi=AdminAreaOfInterest(
+                **{"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]}
+            ),
             gas_types=["CO2e", "CH4"],
             crop_types=["Banana"],
             start_year="2021",
             end_year="2023",
         )
-        analytics_in.set_input_uris(Environment.production)
 
         analysis = Analysis(
             metadata=analytics_in.model_dump(mode="json"),
@@ -567,11 +559,11 @@ class TestLandCoverChangeAdminAois:
         )
 
         await analyzer_with_test_data.analyze(analysis)
+        self.result = analysis.result
 
     def test_analysis_result(self):
         try:
-            results = self.analysis_repo.analysis.result
-            df = pd.DataFrame(results)
+            df = pd.DataFrame(self.result)
 
             assert len(df.columns) == 8
         finally:

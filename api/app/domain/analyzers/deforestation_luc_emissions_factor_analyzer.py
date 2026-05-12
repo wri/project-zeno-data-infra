@@ -1,12 +1,23 @@
+from typing import Dict
+
 import newrelic.agent as nr_agent
 
 from app.analysis.common.analysis import get_sql_in_list
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.models.common.analysis import AnalysisStatus
+from app.domain.models.environment import Environment
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
+
+INPUT_URIS = {
+    Environment.staging: {},
+    Environment.production: {
+        "admin_results_table_uri": (
+            "s3://lcl-analytics/zonal-statistics/admin-deforestation-luc-emissions-factor.parquet"
+        )
+    },
+}
 
 
 class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
@@ -14,42 +25,31 @@ class DeforestationLUCEmissionsFactorAnalyzer(Analyzer):
 
     def __init__(
         self,
-        analysis_repository=None,
         compute_engine=None,
-        dataset_repository=None,
         query_service=None,
+        input_uris: Dict[str, str] | None = None,
     ):
-        self.analysis_repository = analysis_repository
         self.compute_engine = compute_engine
-        self.dataset_repository = dataset_repository
         self.query_service = query_service
+        self.input_uris = input_uris
 
     @nr_agent.function_trace(name="DeforestationLUCEmissionsFactorAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis):
+    async def analyze(self, analysis: Analysis) -> None:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for actual analysis")
+
         deforestation_luc_emissions_factor_analytics_in = (
             DeforestationLUCEmissionsFactorAnalyticsIn(**analysis.metadata)
         )
-        if analysis.metadata.get("_input_uris") is not None:
-            deforestation_luc_emissions_factor_analytics_in._input_uris = (
-                analysis.metadata["_input_uris"]
-            )
+
         if deforestation_luc_emissions_factor_analytics_in.aoi.type == "admin":
             results = await self.analyze_admin_areas(
                 deforestation_luc_emissions_factor_analytics_in
             )
-
         else:
             raise NotImplementedError()
 
-        analyzed_analysis = Analysis(
-            results,
-            analysis.metadata,
-            AnalysisStatus.saved,
-        )
-        await self.analysis_repository.store_analysis(
-            deforestation_luc_emissions_factor_analytics_in.thumbprint(),
-            analyzed_analysis,
-        )
+        analysis.result = results
 
     async def analyze_admin_areas(self, analytics_in):
         aoi_ids = get_sql_in_list(analytics_in.aoi.ids)

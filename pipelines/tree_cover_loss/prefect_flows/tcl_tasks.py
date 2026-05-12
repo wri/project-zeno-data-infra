@@ -7,6 +7,13 @@ from shapely import Polygon
 
 from pipelines.tree_cover_loss import stages
 
+create_zarrs_func = stages.create_zarrs
+
+
+@task
+def create_zarrs(overwrite=False) -> dict[str, str]:
+    return create_zarrs_func(overwrite=overwrite)
+
 
 @task
 def load_data(
@@ -19,7 +26,10 @@ def load_data(
     primary_forests_uri: Optional[str] = None,
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
+    mangrove_stock_2000_zarr_uri: Optional[str] = None,
+    tree_cover_gain_from_height_zarr_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
+    group: Optional[str] = None,
 ) -> Tuple:
     return stages.load_data(
         tree_cover_loss_uri,
@@ -31,7 +41,10 @@ def load_data(
         primary_forests_uri,
         natural_forests_uri,
         tree_cover_loss_from_fires_uri,
+        mangrove_stock_2000_zarr_uri,
+        tree_cover_gain_from_height_zarr_uri,
         bbox,
+        group=group,
     )
 
 

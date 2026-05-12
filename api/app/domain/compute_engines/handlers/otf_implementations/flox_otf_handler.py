@@ -24,7 +24,7 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 
 class FloxOTFHandler(AnalyticsOTFHandler):
     EXPECTED_GROUPS = {
-        Dataset.tree_cover_loss: np.arange(0, 25),
+        Dataset.tree_cover_loss: np.arange(0, 31),
         Dataset.tree_cover_gain: np.arange(0, 5),
         Dataset.canopy_cover: np.arange(0, 8),
         Dataset.tree_cover_loss_drivers: np.arange(0, 8),

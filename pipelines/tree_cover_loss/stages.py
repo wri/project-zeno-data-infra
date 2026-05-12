@@ -6,27 +6,61 @@ import xarray as xr
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
+    ANALYTICS_BUCKET,
+    DATA_LAKE_BUCKET,
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
+    thresh_to_pct
 )
-from pipelines.prefect_flows.common_stages import _load_zarr, numeric_to_alpha3
+from pipelines.prefect_flows.common_stages import (
+    _load_zarr,
+)
+from pipelines.prefect_flows.common_stages import create_zarrs as common_create_zarrs
+from pipelines.prefect_flows.common_stages import (
+    numeric_to_alpha3,
+    rollup_by_gadm_and_convert_to_aoi,
+    symmetric_relative_difference,
+)
 from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
 
-# tcd threshold mapping
-thresh_to_pct = {
-    0: "0",
-    1: "10",
-    2: "15",
-    3: "20",
-    4: "25",
-    5: "30",
-    6: "50",
-    7: "75",
+PIPELINE_CHUNK_SIZE = 10_000
+OTF_CHUNK_SIZE = 4_000
+
+TCL_VERSION = "v1.13"
+TCLF_VERSION = "v1.13"
+DRIVERS_VERSION = "v1.13"
+
+DATASETS = {
+    "tree_cover_loss": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss/{TCL_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss/{TCL_VERSION}/year.zarr",
+        "dtype": "uint8",
+    },
+    "tree_cover_loss_from_fires": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/umd_tree_cover_loss_from_fires/{TCLF_VERSION}/raster/epsg-4326/10/40000/year/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/umd-tree-cover-loss-from-fires/{TCLF_VERSION}/year.zarr",
+        "dtype": "uint8",
+    },
+    "drivers": {
+        "tiles_uri": f"s3://{DATA_LAKE_BUCKET}/wri_google_tree_cover_loss_drivers/{DRIVERS_VERSION}/raster/epsg-4326/10/40000/category/gdal-geotiff/tiles.geojson",
+        "zarr_uri": f"s3://{ANALYTICS_BUCKET}/zarr/wri-google-tree-cover-loss-drivers/{DRIVERS_VERSION}/category.zarr",
+        "dtype": "uint8",
+    },
 }
+
+
+def create_zarrs(overwrite: bool = False) -> Dict[str, str]:
+    """Create zarr stores for TCL pipeline datasets from tiled GeoTIFFs."""
+    return common_create_zarrs(
+        datasets=DATASETS,
+        overwrite=overwrite,
+        pipeline_chunk_size=PIPELINE_CHUNK_SIZE,
+        otf_chunk_size=OTF_CHUNK_SIZE,
+    )
 
 
 def load_data(
@@ -39,7 +73,10 @@ def load_data(
     primary_forests_uri: Optional[str] = None,
     natural_forests_uri: Optional[str] = None,
     tree_cover_loss_from_fires_uri: Optional[str] = None,
+    mangrove_stock_2000_zarr_uri: Optional[str] = None,
+    tree_cover_gain_from_height_zarr_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
+    group: Optional[str] = None,
 ) -> Tuple[
     xr.DataArray,
     xr.Dataset,
@@ -52,13 +89,14 @@ def load_data(
     xr.DataArray,
     xr.DataArray,
     xr.DataArray,
+    xr.DataArray
 ]:
     """
     Load in the tree cover loss zarr, pixel area zarr, carbon emissions zarr, tree cover density zarr, and the GADM zarrs
     Returns xr.DataArray for TCL and contextual layers and xr.Dataset for pixel area/carbon emissions
     """
 
-    tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri).band_data
+    tcl: xr.DataArray = _load_zarr(tree_cover_loss_uri, group=group).band_data
     if bbox is not None:
         min_x, min_y, max_x, max_y = bbox.bounds
         # TODO assumption about zarr coords, wrap in class
@@ -75,13 +113,26 @@ def load_data(
     )[1]
 
     carbon_emissions: xr.DataArray = _load_zarr(
-        carbon_emissions_uri
-    ).carbon_emissions_MgCO2e
+        carbon_emissions_uri, group=group
+    ).band_data
     carbon_emissions = xr.align(
         tcl,
         carbon_emissions.reindex_like(tcl, method="nearest", tolerance=1e-5),
         join="left",
     )[1]
+
+    tclf: xr.DataArray = _load_zarr(
+        tree_cover_loss_from_fires_uri, group="pipeline"
+    ).band_data
+    tclf = xr.align(
+        tcl,
+        tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        join="left",
+    )[1]
+    # Convert tclf to a non-zero pixel area where there is a loss year, so it can be
+    # used as part of the mask. The value of the loss year doesn't matter, since it
+    # is always the same as the TCL loss year.
+    tclf_area = (tclf > 0) * pixel_area
 
     # contextual layers
     tcd: xr.DataArray = _load_zarr(tree_cover_density_uri).band_data
@@ -96,7 +147,7 @@ def load_data(
         join="left",
     )[1].astype(np.int16)
 
-    drivers: xr.DataArray = _load_zarr(drivers_uri).band_data
+    drivers: xr.DataArray = _load_zarr(drivers_uri, group=group).band_data
     drivers = xr.align(
         tcl,
         drivers.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
@@ -121,14 +172,24 @@ def load_data(
         join="left",
     )[1]
 
-    tclf: xr.DataArray = _load_zarr(tree_cover_loss_from_fires_uri).band_data
-    tclf = xr.align(
+    mangrove_stock_2000: xr.DataArray = _load_zarr(mangrove_stock_2000_zarr_uri).band_data
+    mangrove_stock_2000_aligned = xr.align(
         tcl,
-        tclf.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        mangrove_stock_2000.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
         join="left",
     )[1]
-    # Convert tclf to a simple boolean, since its loss year is the same as TCL.
-    tclf = xr.where(tclf > 0, 1, 0).astype("uint8")
+
+    tree_cover_gain_from_height: xr.DataArray = _load_zarr(tree_cover_gain_from_height_zarr_uri).band_data
+    tree_cover_gain_from_height_aligned = xr.align(
+        tcl,
+        tree_cover_gain_from_height.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        join="left",
+    )[1]
+    # Map tree_cover_gain_from_height to 1 if any gain, 0 otherwise.
+    tree_cover_gain_from_height_aligned = xr.where(
+        tree_cover_gain_from_height_aligned > 0, 1, 0
+    ).astype("uint8")
+
     # GADM zarrs
     country: xr.DataArray = _load_zarr(country_zarr_uri).band_data
     country = xr.align(
@@ -151,7 +212,11 @@ def load_data(
 
     # combine area with emissions to sum both together
     area_and_emissions = xr.Dataset(
-        {"area_ha": pixel_area, "carbon__Mg_CO2e": carbon_emissions}
+        {
+            "area_ha": pixel_area,
+            "carbon_emissions_MgCO2e": carbon_emissions,
+            "tree_cover_loss_from_fires_area_ha": tclf_area,
+        }
     )
 
     return (
@@ -162,7 +227,8 @@ def load_data(
         drivers,
         primary_forests,
         natural_forests,
-        tclf,
+        mangrove_stock_2000_aligned,
+        tree_cover_gain_from_height_aligned,
         country,
         region,
         subregion,
@@ -182,25 +248,34 @@ def setup_compute(
         drivers,
         primary_forests,
         natural_forests,
-        tclf,
+        mangrove,
+        height,
         country,
         region,
         subregion,
     ) = datasets
 
     mask = xr.concat(
-        [area_and_emissions["area_ha"], area_and_emissions["carbon__Mg_CO2e"]],
-        pd.Index(["area_ha", "carbon_Mg_CO2e"], name="layer"),
+        [
+            area_and_emissions["area_ha"],
+            area_and_emissions["carbon_emissions_MgCO2e"],
+            area_and_emissions["tree_cover_loss_from_fires_area_ha"],
+        ],
+        pd.Index(
+            ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"],
+            name="layer",
+        ),
     )
 
     groupbys: Tuple[xr.DataArray, ...] = (
         tcl.rename("tree_cover_loss_year"),
         tcd.rename("canopy_cover"),
         ifl.rename("is_intact_forest"),
-        drivers.rename("driver"),
+        drivers.rename("tree_cover_loss_driver"),
         primary_forests.rename("is_primary_forest"),
         natural_forests.rename("natural_forest_class"),
-        tclf.rename("is_tree_cover_loss_from_fires"),
+        mangrove.rename("mangrove_stock_2000"),
+        height.rename("tree_cover_gain_from_height"),
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
@@ -263,7 +338,9 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
         7: "Other natural disturbances",
     }
 
-    result_df["driver"] = result_df["driver"].map(categoryid_to_driver)
+    result_df["tree_cover_loss_driver"] = result_df["tree_cover_loss_driver"].map(
+        categoryid_to_driver
+    )
 
     # convert primary forest to boolean
     result_df["is_primary_forest"] = result_df["is_primary_forest"].astype(bool)
@@ -277,84 +354,58 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
         natural_forest_class_to_label
     )
 
-    result_df["is_tree_cover_loss_from_fires"] = result_df[
-        "is_tree_cover_loss_from_fires"
-    ].astype(bool)
-
     result_df["country"] = result_df["country"].map(numeric_to_alpha3)
     result_df.dropna(subset=["country"], inplace=True)
 
-    if result_df.size == 0:
-        result_df = result_df.drop(columns=["country", "region", "subregion"])
-        result_df["aoi_id"] = pd.Series(dtype="object")
-        result_df["aoi_type"] = pd.Series(dtype="object")
-        return result_df
+    # Now calculate the carbon for canopy_cover 30, 50, 70.
+    value_cols = ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"]
+    contextual_cols = [
+        "tree_cover_loss_year",
+        "canopy_cover",
+        "is_intact_forest",
+        "tree_cover_loss_driver",
+        "is_primary_forest",
+        "natural_forest_class",
+    ]
+    gadm_cols = ["country", "region", "subregion"]
+    groupby_cols = contextual_cols + gadm_cols
 
-    region_df = (
-        result_df.drop(columns=["subregion"])
-        .groupby(
-            [
-                "country",
-                "region",
-                "canopy_cover",
-                "tree_cover_loss_year",
-                "driver",
-                "is_primary_forest",
-                "is_intact_forest",
-                "is_tree_cover_loss_from_fires",
-            ]
+    thresholds = [30, 50, 75]
+    results = []
+
+    # For canopy_cover 30, 50, 75, add in the extra carbon from mangroves and
+    # gain_from_height. The groupby drops out mangroves and gain_from_height in the
+    # process, since not included in groupby_cols.
+    for T in thresholds:
+        mask = (
+            (result_df['canopy_cover'] >= T)
+            | (result_df['mangrove_stock_2000'] == 1)
+            | (result_df['tree_cover_gain_from_height'] == 1)
         )
-        .sum()
-        .reset_index()
-    )
-    country_df = (
-        region_df.drop(columns=["region"])
-        .groupby(
-            [
-                "country",
-                "canopy_cover",
-                "tree_cover_loss_year",
-                "driver",
-                "is_primary_forest",
-                "is_intact_forest",
-                "is_tree_cover_loss_from_fires",
-            ]
-        )
-        .sum()
-        .reset_index()
-    )
+        temp_df = result_df[mask].groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
+        temp_df["canopy_cover"] = T
+        results.append(temp_df)
 
-    subregion_df = result_df.copy()
-    region_df = region_df.copy()
-    country_df = country_df.copy()
+    # Count zero carbon for any canopy_cover below 30
+    below30_df = result_df[result_df['canopy_cover'] < 30].groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
+    below30_df["carbon_emissions_MgCO2e"] = 0.0
+    results.append(below30_df)
 
-    if subregion_df.size > 0:
-        subregion_df["aoi_id"] = (
-            subregion_df[["country", "region", "subregion"]]
-            .astype(str)
-            .agg(".".join, axis=1)
-        )
+    carbon_df = pd.concat(results, ignore_index=True)
+    # Do another groupby to combine any rows with duplicated groupbys because of
+    # setting canopy_cover to T above.
+    carbon_df = carbon_df.groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
 
-    if region_df.size > 0:
-        region_df["aoi_id"] = (
-            region_df[["country", "region"]].astype(str).agg(".".join, axis=1)
-        )
+    # Do groupby only with the TCL results to similarly drop out the mangroves and gain_from_height.
+    tcl_df = result_df.groupby(groupby_cols, as_index=False)[["area_ha", "tree_cover_loss_from_fires_area_ha"]].sum()
+    # Now do an outer join to combine the TCL results with special carbon results
+    # calculated above with the same set of group-by columns.
+    final_df = pd.merge(carbon_df, tcl_df, on=groupby_cols, how='outer', validate="one_to_one")
+    final_df[value_cols] = final_df[value_cols].fillna(0)
 
-    country_df["aoi_id"] = country_df["country"]
-
-    subregion_df = subregion_df.drop(columns=["country", "region", "subregion"])
-    region_df = region_df.drop(columns=["country", "region"])
-    country_df = country_df.drop(columns=["country"])
-
-    results_with_ids = pd.concat([country_df, region_df, subregion_df])
-    results_with_ids["aoi_type"] = "admin"
+    results_with_ids = rollup_by_gadm_and_convert_to_aoi(final_df, contextual_cols)
 
     return results_with_ids
-
-
-def _symmetric_relative_difference(a, b):
-    avg = (abs(a) + abs(b)) / 2
-    return 0 if avg == 0 else abs(a - b) / avg
 
 
 # In Justin's original QC feature file (now at
@@ -386,7 +437,7 @@ def qc_against_validation_source(
         if sample_stats.size > 0:
             sample_driver_area_ha_total = sample_stats[
                 (sample_stats.canopy_cover.astype(np.int8) >= 30)
-                & (sample_stats.driver != "Unknown")
+                & (sample_stats.tree_cover_loss_driver != "Unknown")
             ].area_ha.sum()
 
             sample_natural_forests_ha_total = sample_stats[
@@ -412,10 +463,10 @@ def qc_against_validation_source(
         else:
             validation_natural_forests_ha_total = 0
 
-        diff_driver = _symmetric_relative_difference(
+        diff_driver = symmetric_relative_difference(
             validation_driver_area_ha_total, sample_driver_area_ha_total
         )
-        diff_natural_forest = _symmetric_relative_difference(
+        diff_natural_forest = symmetric_relative_difference(
             validation_natural_forests_ha_total, sample_natural_forests_ha_total
         )
 
@@ -486,13 +537,13 @@ def get_validation_statistics(
 
     # if the whole thing is masked just exit early
     if loss_tcd30_mask.isnull().all().item() or drivers_class.isnull().all().item():
-        driver_results = pd.DataFrame({"area_ha": [], "driver": []})
+        driver_results = pd.DataFrame({"area_ha": [], "tree_cover_loss_driver": []})
     else:
         driver_results = (
             area.groupby(drivers_class).sum(skipna=True).to_dataframe().reset_index()
         )
         driver_results = driver_results.rename(
-            columns={"area": "area_ha", "classification": "driver"}
+            columns={"area": "area_ha", "classification": "tree_cover_loss_driver"}
         )
 
     natural_forests_results = (

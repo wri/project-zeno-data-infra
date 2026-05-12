@@ -1,9 +1,16 @@
 import json
 import os
 import time
+import uuid
 from pathlib import Path
 
 import pytest
+
+from app.domain.analyzers.analyzer import Analyzer
+from app.models.common.analysis import AnalyticsIn
+from app.use_cases.analysis.analysis_service import (
+    resource_thumbprint as service_thumbprint,
+)
 
 
 ##################################################################
@@ -61,3 +68,8 @@ async def retry_getting_resource(router: str, resource_id: str, client):
     if attempts >= 10:
         pytest.fail("Resource stuck on 'pending' status")
     return data
+
+
+def resource_thumbprint(analytics_in: AnalyticsIn, analyzer: Analyzer) -> uuid.UUID:
+    # TODO: Make this break loudly if AnalysisService.resource_thumbprint changes
+    return service_thumbprint(analytics_in, analyzer)

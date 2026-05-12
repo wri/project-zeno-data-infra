@@ -6,7 +6,10 @@ import xarray as xr
 from distributed import Client, LocalCluster
 from shapely.geometry import box, mapping
 
-from app.domain.analyzers.tree_cover_loss_analyzer import TreeCoverLossAnalyzer
+from app.domain.analyzers.tree_cover_loss_analyzer import (
+    INPUT_URIS,
+    TreeCoverLossAnalyzer,
+)
 from app.domain.compute_engines.compute_engine import (
     ComputeEngine,
 )
@@ -21,6 +24,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_que
 )
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
+from app.domain.models.environment import Environment
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
@@ -112,8 +116,11 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
 
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
-    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     assert "BRA" in results.aoi_id.to_list()
     assert 2020 in results.tree_cover_loss_year.to_list()
@@ -147,8 +154,11 @@ async def test_flox_handler_happy_path():
 
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
-    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),
@@ -191,8 +201,11 @@ async def test_flox_handler_natural_forests():
 
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
-    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),
@@ -255,8 +268,11 @@ async def test_flox_handler_custom_area():
 
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
-    analyzer = TreeCoverLossAnalyzer(compute_engine=compute_engine)
-    results = await analyzer.analyze(analysis)
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
 
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),

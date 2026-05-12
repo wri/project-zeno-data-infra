@@ -21,11 +21,11 @@ def create_cluster():
     cluster = coiled.Cluster(
         name="gnw_zonal_stat_count",
         region="us-east-1",
-        n_workers=1,
+        n_workers=10,
         tags={"project": "gnw_zonal_stat"},
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
-        compute_purchase_option="spot_with_fallback",
+        compute_purchase_option="on-demand",
         no_client_timeout="5 seconds",
         container=os.getenv("PIPELINES_IMAGE"),
         environ={
@@ -59,11 +59,11 @@ def run_dist_update(version=None, overwrite=False, is_latest=False) -> list[str]
 def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
     result_uris = []
 
+    carbon_result = carbon_flow.gadm_carbon_flux(version, overwrite=overwrite)
+    result_uris.append(carbon_result)
+
     tcl_result = tcl_flow.umd_tree_cover_loss_flow(version, overwrite=overwrite)
     result_uris.append(tcl_result)
-
-    carbon_result = carbon_flow.gadm_carbon_flux(overwrite=overwrite)
-    result_uris.append(carbon_result)
 
     return result_uris
 
