@@ -44,7 +44,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
             ]
         },
         # Should match result_uri in tcl_flow.py in pipelines.
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260512.parquet",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260424.parquet",
     },
 }
 
