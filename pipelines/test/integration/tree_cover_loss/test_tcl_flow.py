@@ -51,7 +51,7 @@ def test_tcl_flow_real_data(
         "is_intact_forest",
         "tree_cover_loss_driver",
         "is_primary_forest",
-        "natural_forest_class",
+        "natural_forests_class",
         "aoi_id",
         "aoi_type",
         "area_ha",
@@ -64,7 +64,7 @@ def test_tcl_flow_real_data(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df["natural_forest_class"].dtype == object
+    assert result_df["natural_forests_class"].dtype == object
     assert result_df.size == 37455
     mock_qc_write_results.assert_called_once()
 
@@ -132,7 +132,7 @@ def test_tcl_flow_with_new_contextual_layers(
         "is_intact_forest",
         "tree_cover_loss_driver",
         "is_primary_forest",
-        "natural_forest_class",
+        "natural_forests_class",
         "aoi_id",
         "aoi_type",
         "area_ha",
@@ -145,7 +145,7 @@ def test_tcl_flow_with_new_contextual_layers(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df["natural_forest_class"].dtype == object
+    assert result_df["natural_forests_class"].dtype == object
     assert result_df.size == 396
 
 
@@ -212,7 +212,7 @@ def test_tcl_flow_with_bbox(
         "is_intact_forest",
         "tree_cover_loss_driver",
         "is_primary_forest",
-        "natural_forest_class",
+        "natural_forests_class",
         "aoi_id",
         "aoi_type",
         "area_ha",
@@ -225,5 +225,5 @@ def test_tcl_flow_with_bbox(
     assert result_df["is_intact_forest"].dtype == bool
     assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
-    assert result_df["natural_forest_class"].dtype == object
+    assert result_df["natural_forests_class"].dtype == object
     assert result_df.size == 99
