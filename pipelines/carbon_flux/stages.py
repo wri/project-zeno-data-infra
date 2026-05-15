@@ -275,12 +275,8 @@ def qc_against_validation_source(
         ]
 
         if sample.size > 0:
-            sample_emissions = sample[
-                sample.carbontype == "carbon_gross_emissions"
-            ].value.sum()
-            sample_removals = sample[
-                sample.carbontype == "carbon_gross_removals"
-            ].value.sum()
+            sample_emissions = sample["carbon_gross_emissions_Mg_CO2e"].sum()
+            sample_removals = sample["carbon_gross_removals_Mg_CO2e"].sum()
         else:
             sample_emissions = 0
             sample_removals = 0

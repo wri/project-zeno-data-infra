@@ -69,11 +69,11 @@ def test_qc_against_validation_source_with_fake_gee_repo():
     #   emissions = 100.0 Mg CO2e, removals = 50.0 Mg CO2e
     result_df_matching = pd.DataFrame(
         {
-            "aoi_id": ["AFG.1.1", "AFG.1.1"],
-            "aoi_type": ["admin2", "admin2"],
-            "tree_cover_density": [30, 30],
-            "carbontype": ["carbon_gross_emissions", "carbon_gross_removals"],
-            "value": [100.0, 50.0],
+            "aoi_id": ["AFG.1.1"],
+            "aoi_type": ["admin2"],
+            "tree_cover_density": [30],
+            "carbon_gross_emissions_Mg_CO2e": [100.0],
+            "carbon_gross_removals_Mg_CO2e": [50.0],
         }
     )
     assert (
@@ -88,11 +88,11 @@ def test_qc_against_validation_source_with_fake_gee_repo():
     # Values diverge significantly from GEE validation (2x > 5% threshold) → fail
     result_df_diverged = pd.DataFrame(
         {
-            "aoi_id": ["AFG.1.1", "AFG.1.1"],
-            "aoi_type": ["admin2", "admin2"],
-            "tree_cover_density": [30, 30],
-            "carbontype": ["carbon_gross_emissions", "carbon_gross_removals"],
-            "value": [200.0, 100.0],
+            "aoi_id": ["AFG.1.1"],
+            "aoi_type": ["admin2"],
+            "tree_cover_density": [30],
+            "carbon_gross_emissions_Mg_CO2e": [200.0],
+            "carbon_gross_removals_Mg_CO2e": [100.0],
         }
     )
     assert (
