@@ -18,7 +18,9 @@ def gadm_natural_lands_area(overwrite: bool = False):
     logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
 
     contextual_column_name = "natural_lands"
-    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-natural-lands.parquet"
+    result_uri = (
+        f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-natural-lands-fixed.parquet"
+    )
     funcname = "sum"
 
     if not overwrite and s3_uri_exists(result_uri):
