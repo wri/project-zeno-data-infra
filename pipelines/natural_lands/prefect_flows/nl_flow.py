@@ -1,8 +1,6 @@
 import logging
 
 import numpy as np
-from prefect import flow
-
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     pixel_area_zarr_uri,
@@ -11,6 +9,7 @@ from pipelines.globals import (
 from pipelines.natural_lands.prefect_flows import nl_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
+from prefect import flow
 
 
 @flow(name="Natural lands area")
@@ -19,7 +18,7 @@ def gadm_natural_lands_area(overwrite: bool = False):
 
     contextual_column_name = "natural_lands"
     result_uri = (
-        f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-natural-lands-fixed.parquet"
+        f"s3://{ANALYTICS_BUCKET}/zonal-statistics/admin-natural-lands-20260518.parquet"
     )
     funcname = "sum"
 

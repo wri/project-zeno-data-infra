@@ -415,7 +415,7 @@ class TestNLAnalyticsPostWithMultipleAdminAOIs:
                     "Natural peat short vegetation",
                     "Cropland",
                     "Built-up",
-                    "Non-natural hhort vegetation",  # FIXME: Typo?
+                    "Non-natural short vegetation",
                     "Non-natural peat short vegetation",
                     "Non-natural bare",
                     "Natural forests",
