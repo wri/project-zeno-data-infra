@@ -10,7 +10,7 @@ from pipelines.test.integration.tree_cover_loss.conftest import (
 from pipelines.tree_cover_loss import stages
 
 
-def _make_result_df(area_ha, canopy_cover, driver, natural_forest_class):
+def _make_result_df(area_ha, canopy_cover, driver, natural_forests_class):
     return pd.DataFrame(
         {
             "area_ha": area_ha,
@@ -18,7 +18,7 @@ def _make_result_df(area_ha, canopy_cover, driver, natural_forest_class):
             "canopy_cover": canopy_cover,
             "tree_cover_loss_driver": driver,
             "aoi_id": ["AFG.1.1", "AFG.1.1"],
-            "natural_forest_class": natural_forest_class,
+            "natural_forests_class": natural_forests_class,
         }
     )
 

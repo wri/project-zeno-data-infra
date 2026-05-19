@@ -83,7 +83,8 @@ update_flows = {
     name="GNW zonal stats update",
     log_prints=True,
     description=(
-        "Update the zonal statistics by GADM areas (admin levels 0, 1 and 2). Two flows are available: "
+        "This is the entry point to run updates via Prefect Cloud UI or CLI to update zonal statistics for various datasets for GADM areas."
+        "Two flows are available currently: "
         "-'dist_update' will just run an update on DIST alerts, and is the default for backward compatibility"
         "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide all necessary updates for TCL."
     ),
@@ -97,6 +98,10 @@ def run_updates(
     logger = get_run_logger()
     dask_client = None
     result_uris = []
+
+    # when called from Prefect webhook, the booleans flags are passed as strings, so we need to convert them to booleans
+    is_latest = str(is_latest).lower() == "true"
+    overwrite = str(overwrite).lower() == "true"
 
     try:
         dask_client = create_cluster()
