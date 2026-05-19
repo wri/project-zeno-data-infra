@@ -114,6 +114,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
   flow_id        = prefect_flow.gnw_zonal_stats_update.id
   path           = "/app"
   entrypoint     = "pipelines/run_updates.py:run_updates"
+  enforce_parameter_schema = false
 
   job_variables = jsonencode({
     image = var.pipelines_image

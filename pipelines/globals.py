@@ -23,7 +23,7 @@ tree_cover_density_2000_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr"
 )
 ifl_intact_forest_lands_zarr_uri = (
-    f"s3://{ANALYTICS_BUCKET}/zarr/ifl-intact-forest-landscapes-2000/v2021/is.zarr/"
+    f"s3://{ANALYTICS_BUCKET}/zarr/ifl-intact-forest-landscapes-2000/v2021.1/is.zarr/"
 )
 umd_primary_forests_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-regional-primary-forest-2001/v201901/is.zarr/"
