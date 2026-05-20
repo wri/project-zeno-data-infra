@@ -29,7 +29,7 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedForestFilter = Literal["primary_forest", "natural_forest"]
+AllowedForestFilter = Literal["primary_forest", "natural_forest", "intact_forest"]
 AllowedIntersections = List[Literal["driver"]]
 
 

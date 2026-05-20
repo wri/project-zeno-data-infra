@@ -74,6 +74,12 @@ class TestDatasetRepository(ZarrDatasetRepository):
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
             xarr.name = "natural_forests"
+        elif dataset == Dataset.intact_forest:
+            # top 3 rows are 1s, remaining rows are 0s
+            data = np.vstack([np.ones((3, 10)), np.zeros((7, 10))])
+            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
+            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+            xarr.name = "is_intact_forest"
         else:
             raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
@@ -227,6 +233,55 @@ async def test_flox_handler_natural_forests():
         check_exact=False,  # Allow approximate comparison for numbers
         atol=1e-8,  # Absolute tolerance
         rtol=1e-4,  # Relative tolerance
+    )
+
+
+@pytest.mark.asyncio
+async def test_flox_handler_intact_forest():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
+    compute_engine = ComputeEngine(
+        handler=FloxOTFHandler(
+            dataset_repository=TestDatasetRepository(),
+            aoi_geometry_repository=TestAoiGeometryRepository(),
+            dask_client=dask_client,
+        )
+    )
+    aoi = ProtectedAreaOfInterest(ids=["1234"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        start_year="2021",
+        end_year="2024",
+        forest_filter="intact_forest",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
+
+    # intact_forest=1 keeps top 3 rows, year filter keeps top half (5 rows)
+    # → rows 0-2, all 10 cols: 30 pixels × 5000 ha = 150000, carbon 30 × 1.5 = 45.0
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(results),
+        pd.DataFrame(
+            {
+                "tree_cover_loss_year": [2021],
+                "area_ha": [150000.0],
+                "aoi_id": ["1234"],
+                "aoi_type": ["protected_area"],
+                "carbon_emissions_MgCO2e": [45.0],
+            },
+        ),
+        check_like=True,
+        check_exact=False,
+        atol=1e-8,
+        rtol=1e-4,
     )
 
 

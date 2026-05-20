@@ -23,7 +23,7 @@ class ZarrDatasetRepository:
             Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/pixel_area_ha.zarr",  # noqa: E501
             Dataset.canopy_cover: "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr",  # noqa: E501
             Dataset.carbon_emissions: "s3://lcl-analytics/zarr/gfw-carbon-gross-emissions/v20260327/Mg_CO2e.zarr",  # noqa: E501
-            Dataset.intact_forest: "s3://lcl-analytics/zarr/ifl-intact-forest-landscapes-2000/v2021/is.zarr",  # noqa: E501
+            Dataset.intact_forest: "s3://lcl-analytics/zarr/ifl-intact-forest-landscapes-2000/v2021.1/is.zarr",  # noqa: E501
             Dataset.natural_forests: "s3://lcl-analytics/zarr/sbtn-natural-forests/sbtn_natural_forests_class.zarr",  # noqa: E501
             Dataset.natural_lands: "s3://lcl-analytics/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr",  # noqa: E501
             Dataset.primary_forest: "s3://lcl-analytics/zarr/umd-regional-primary-forest-2001/v201901/is.zarr",  # noqa: E501
@@ -98,6 +98,8 @@ class ZarrDatasetRepository:
             val_map = {"2000-2005": 1, "2005-2010": 2, "2010-2015": 3, "2015-2020": 4}
             return [val_map[val] for val in value]
         elif dataset == Dataset.primary_forest:
+            return int(value)
+        elif dataset == Dataset.intact_forest:
             return int(value)
         elif dataset == Dataset.natural_lands:
             return value
