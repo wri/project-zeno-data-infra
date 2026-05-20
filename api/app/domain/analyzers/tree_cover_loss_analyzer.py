@@ -107,6 +107,15 @@ class TreeCoverLossAnalyzer(Analyzer):
         elif analytics_in.forest_filter == "natural_forest":
             query.group_bys.append(Dataset.natural_forests)
 
+        elif analytics_in.forest_filter == "intact_forest":
+            query.filters.append(
+                DatasetFilter(
+                    dataset=Dataset.intact_forest,
+                    op="=",
+                    value=1,
+                )
+            )
+
         results = await self.compute_engine.compute(analytics_in.aoi, query)
 
         # postprocess, set NaN for carbon if canopy cover requested is <30
