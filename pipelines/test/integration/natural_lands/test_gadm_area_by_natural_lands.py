@@ -64,7 +64,8 @@ def test_gadm_area_by_natural_lands_result(
         )
 
     assert (
-        result_uri == "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet"
+        result_uri
+        == "s3://lcl-analytics/zonal-statistics/admin-natural-lands-20260518.parquet"
     )
 
     # Verify

@@ -38,7 +38,7 @@ def test_tcl_flow_real_data(
             "v1.12", overwrite=True, bbox=test_geom.bounds
         )
 
-    assert "admin-tree-cover-loss_v20260424.parquet" in result_uri
+    assert "admin-tree-cover-loss_v20260518.parquet" in result_uri
     assert "v1.12" in result_uri
 
     # get the the saved df

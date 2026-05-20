@@ -50,7 +50,7 @@ INPUT_URIS = {
                 Dataset.natural_lands,
             ]
         },
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-natural-lands.parquet",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/admin-natural-lands-20260518.parquet",
     },
 }
 
