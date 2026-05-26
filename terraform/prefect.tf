@@ -160,7 +160,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         title   = "Flow Name"
         type    = "string"
         default = "dist_update"
-        enum    = ["dist_update", "tcl_update"]
+        enum    = ["dist_update", "tcl_update", "intdist_update"]
       }
     }
   })
