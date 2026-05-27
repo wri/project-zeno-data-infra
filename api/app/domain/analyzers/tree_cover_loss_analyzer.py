@@ -119,12 +119,25 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        query = await build_query(analytics_in)
-
-        results = await self.compute_engine.compute(analytics_in.aoi, query)
+        if analytics_in.aoi.type == "admin":
+            results = await self.analyze_admin_areas(analytics_in)
+        else:
+            results = await self.analyze_otf(analytics_in)
 
         # postprocess, set NaN for carbon if canopy cover requested is <30
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:
             results[Dataset.carbon_emissions.get_field_name()] = np.nan
 
         analysis.result = results
+
+    async def analyze_admin_areas(self, analytics_in: TreeCoverLossAnalyticsIn):
+        query: DatasetQuery = await build_query(analytics_in)
+
+        results = await self.compute_engine.compute(analytics_in.aoi, query)
+        return results
+
+    async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn):
+        query: DatasetQuery = await build_query(analytics_in)
+
+        results = await self.compute_engine.compute(analytics_in.aoi, query)
+        return results
