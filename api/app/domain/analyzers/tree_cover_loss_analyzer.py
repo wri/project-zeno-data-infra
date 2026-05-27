@@ -4,6 +4,9 @@ import newrelic.agent as nr_agent
 import numpy as np
 
 from app.domain.analyzers.analyzer import Analyzer
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+    PrecalcSqlQueryBuilder,
+)
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import (
     Dataset,
@@ -13,6 +16,9 @@ from app.domain.models.dataset import (
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 INPUT_URIS: Dict[Environment, Dict[str, str]] = {
@@ -131,10 +137,20 @@ class TreeCoverLossAnalyzer(Analyzer):
         analysis.result = results
 
     async def analyze_admin_areas(self, analytics_in: TreeCoverLossAnalyticsIn):
-        query: DatasetQuery = await build_query(analytics_in)
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
 
-        results = await self.compute_engine.compute(analytics_in.aoi, query)
-        return results
+        query: DatasetQuery = await build_query(analytics_in)
+        query_builder = PrecalcSqlQueryBuilder()
+        sql_str: str = query_builder.build(analytics_in.aoi.ids, query)
+
+        query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
+
+        df = await query_service.execute(sql_str)
+
+        df["aoi_type"] = ["admin"] * len(df["aoi_id"])
+
+        return df
 
     async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn):
         query: DatasetQuery = await build_query(analytics_in)
