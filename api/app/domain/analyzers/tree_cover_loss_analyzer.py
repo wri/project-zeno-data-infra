@@ -49,6 +49,64 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
 }
 
 
+async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
+    query = DatasetQuery(
+        aggregate=DatasetAggregate(
+            datasets=[Dataset.area_hectares, Dataset.carbon_emissions], func="sum"
+        ),
+        group_bys=[],
+        filters=[
+            DatasetFilter(
+                dataset=Dataset.tree_cover_loss,
+                op=">=",
+                value=analytics_in.start_year,
+            ),
+            DatasetFilter(
+                dataset=Dataset.tree_cover_loss,
+                op="<=",
+                value=analytics_in.end_year,
+            ),
+        ],
+    )
+
+    # if by driver, return across all years since that's how the model is calculated
+    # otherwise group by TCL year
+    if "driver" in analytics_in.intersections:
+        query.group_bys.append(Dataset.tree_cover_loss_drivers)
+    else:
+        query.group_bys.append(Dataset.tree_cover_loss)
+
+    if analytics_in.canopy_cover is not None:
+        query.filters.append(
+            DatasetFilter(
+                dataset=Dataset.canopy_cover,
+                op=">=",
+                value=analytics_in.canopy_cover,
+            ),
+        )
+
+    if analytics_in.forest_filter == "primary_forest":
+        query.filters.append(
+            DatasetFilter(
+                dataset=Dataset.primary_forest,
+                op="=",
+                value=1,
+            )
+        )
+    elif analytics_in.forest_filter == "natural_forest":
+        query.group_bys.append(Dataset.natural_forests)
+
+    elif analytics_in.forest_filter == "intact_forest":
+        query.filters.append(
+            DatasetFilter(
+                dataset=Dataset.intact_forest,
+                op="=",
+                value=1,
+            )
+        )
+    return query
+
+
 class TreeCoverLossAnalyzer(Analyzer):
     def __init__(self, compute_engine, input_uris: Dict[str, str] | None = None):
         self.compute_engine = compute_engine
@@ -61,60 +119,7 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        query = DatasetQuery(
-            aggregate=DatasetAggregate(
-                datasets=[Dataset.area_hectares, Dataset.carbon_emissions], func="sum"
-            ),
-            group_bys=[],
-            filters=[
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_loss,
-                    op=">=",
-                    value=analytics_in.start_year,
-                ),
-                DatasetFilter(
-                    dataset=Dataset.tree_cover_loss,
-                    op="<=",
-                    value=analytics_in.end_year,
-                ),
-            ],
-        )
-
-        # if by driver, return across all years since that's how the model is calculated
-        # otherwise group by TCL year
-        if "driver" in analytics_in.intersections:
-            query.group_bys.append(Dataset.tree_cover_loss_drivers)
-        else:
-            query.group_bys.append(Dataset.tree_cover_loss)
-
-        if analytics_in.canopy_cover is not None:
-            query.filters.append(
-                DatasetFilter(
-                    dataset=Dataset.canopy_cover,
-                    op=">=",
-                    value=analytics_in.canopy_cover,
-                ),
-            )
-
-        if analytics_in.forest_filter == "primary_forest":
-            query.filters.append(
-                DatasetFilter(
-                    dataset=Dataset.primary_forest,
-                    op="=",
-                    value=1,
-                )
-            )
-        elif analytics_in.forest_filter == "natural_forest":
-            query.group_bys.append(Dataset.natural_forests)
-
-        elif analytics_in.forest_filter == "intact_forest":
-            query.filters.append(
-                DatasetFilter(
-                    dataset=Dataset.intact_forest,
-                    op="=",
-                    value=1,
-                )
-            )
+        query = await build_query(analytics_in)
 
         results = await self.compute_engine.compute(analytics_in.aoi, query)
 
