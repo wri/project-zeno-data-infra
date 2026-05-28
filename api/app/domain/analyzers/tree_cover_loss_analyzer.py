@@ -119,14 +119,18 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis) -> None:
+    async def analyze(
+        self, analysis: Analysis, query_service: DuckDbPrecalcQueryService | None = None
+    ) -> None:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
         if analytics_in.aoi.type == "admin":
-            results = await self.analyze_admin_areas(analytics_in)
+            results = await self.analyze_admin_areas(
+                analytics_in, query_service=query_service
+            )
         else:
             results = await self.analyze_otf(analytics_in)
 
@@ -136,23 +140,29 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analysis.result = results
 
-    async def analyze_admin_areas(self, analytics_in: TreeCoverLossAnalyticsIn):
+    async def analyze_admin_areas(
+        self,
+        analytics_in: TreeCoverLossAnalyticsIn,
+        query_service: DuckDbPrecalcQueryService | None = None,
+    ) -> Dict:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
+        if query_service is None:
+            query_service = DuckDbPrecalcQueryService(
+                self.input_uris["admin_results_uri"]
+            )
 
         query: DatasetQuery = await build_query(analytics_in)
         query_builder = PrecalcSqlQueryBuilder()
         sql_str: str = query_builder.build(analytics_in.aoi.ids, query)
 
-        query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
+        results: Dict = await query_service.execute(sql_str)
 
-        df = await query_service.execute(sql_str)
+        results["aoi_type"] = ["admin"] * len(results["aoi_id"])
 
-        df["aoi_type"] = ["admin"] * len(df["aoi_id"])
+        return results
 
-        return df
-
-    async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn):
+    async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn) -> Dict:
         query: DatasetQuery = await build_query(analytics_in)
 
         results = await self.compute_engine.compute(analytics_in.aoi, query)

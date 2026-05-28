@@ -1,3 +1,5 @@
+from typing import Dict
+
 import duckdb
 import numpy as np
 import pandas as pd
@@ -15,12 +17,6 @@ from app.domain.compute_engines.compute_engine import (
 )
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
-)
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
-    TreeCoverLossPrecalcHandler,
-)
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
-    PrecalcSqlQueryBuilder,
 )
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
@@ -89,7 +85,7 @@ class TestDatasetRepository(ZarrDatasetRepository):
 @pytest.mark.asyncio
 async def test_get_tree_cover_loss_precalc_handler_happy_path():
     class MockParquetQueryService:
-        async def execute(self, query: str):
+        async def execute(self, query: str) -> Dict:
             data_source = pd.DataFrame(  # noqa
                 {
                     "aoi_id": ["BRA", "BRA", "BRA"],
@@ -101,15 +97,7 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
                 }
             )
 
-            return duckdb.sql(query).df()
-
-    compute_engine = ComputeEngine(
-        handler=TreeCoverLossPrecalcHandler(
-            precalc_query_builder=PrecalcSqlQueryBuilder(),
-            precalc_query_service=MockParquetQueryService(),
-            next_handler=None,
-        )
-    )
+            return duckdb.sql(query).df().to_dict(orient="list")
 
     aoi = AdminAreaOfInterest(ids=["BRA", "IDN", "COD"])
     analytics_in = TreeCoverLossAnalyticsIn(
@@ -123,10 +111,12 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        compute_engine=None, input_uris=INPUT_URIS[Environment.production]
     )
-    await analyzer.analyze(analysis)
-    results = analysis.result
+    await analyzer.analyze(analysis, MockParquetQueryService())
+    result_dict = analysis.result
+
+    results = pd.DataFrame(result_dict)
 
     assert "BRA" in results.aoi_id.to_list()
     assert 2020 in results.tree_cover_loss_year.to_list()
