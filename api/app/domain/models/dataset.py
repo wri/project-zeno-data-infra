@@ -43,7 +43,7 @@ class DatasetFilter(StrictBaseModel):
 
     def __str__(self):
         field = self.dataset.get_field_name()
-        # Supress trailing commas of monotuples
+        # Suppress trailing commas of monotuples
         match self.value:
             case (x,):
                 value_repr: str = f"('{x}')"

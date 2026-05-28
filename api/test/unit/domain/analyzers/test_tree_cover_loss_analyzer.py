@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import duckdb
 import numpy as np
 import pandas as pd
@@ -86,6 +88,51 @@ class TestDatasetRepository(ZarrDatasetRepository):
         return xarr
 
 
+@pytest.mark.asyncio
+async def test_get_tree_cover_loss_precalc_handler_happy_path_new():
+
+    class MockParquetQueryService:
+        async def execute(self, query: str):
+            data_source = pd.DataFrame(  # noqa
+                {
+                    "aoi_id": ["BRA", "BRA", "BRA"],
+                    "aoi_type": ["admin", "admin", "admin"],
+                    "tree_cover_loss_year": [2015, 2020, 2023],
+                    "area_ha": [1, 10, 100],
+                    "canopy_cover": [20, 30, 50],
+                    "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
+                }
+            )
+
+            return duckdb.sql(query).df()
+
+    aoi = AdminAreaOfInterest(ids=["BRA", "IDN", "COD"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30,
+        start_year="2020",
+        end_year="2024",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis, MockParquetQueryService())
+    results = analysis.result
+
+    assert "BRA" in results.aoi_id.to_list()
+    assert 2020 in results.tree_cover_loss_year.to_list()
+    assert 2023 in results.tree_cover_loss_year.to_list()
+    assert 10.0 in results.area_ha.to_list()
+    assert 100.0 in results.area_ha.to_list()
+    assert "admin" in results.aoi_type.to_list()
+    assert results.size == 10
+
+
+@pytest.mark.xfail(reason="Obsolete")
 @pytest.mark.asyncio
 async def test_get_tree_cover_loss_precalc_handler_happy_path():
     class MockParquetQueryService:
