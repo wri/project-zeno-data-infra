@@ -1,4 +1,5 @@
 from typing import Dict
+from unittest.mock import patch
 
 import duckdb
 import numpy as np
@@ -86,6 +87,7 @@ class TestDatasetRepository(ZarrDatasetRepository):
 async def test_get_tree_cover_loss_precalc_handler_happy_path():
     class MockParquetQueryService:
         async def execute(self, query: str) -> Dict:
+            # DuckDB references this table implicitly bc its in scope when we run .sql()
             data_source = pd.DataFrame(  # noqa
                 {
                     "aoi_id": ["BRA", "BRA", "BRA"],
@@ -96,7 +98,6 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
                     "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
                 }
             )
-
             return duckdb.sql(query).df().to_dict(orient="list")
 
     aoi = AdminAreaOfInterest(ids=["BRA", "IDN", "COD"])
@@ -113,7 +114,9 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
     analyzer = TreeCoverLossAnalyzer(
         compute_engine=None, input_uris=INPUT_URIS[Environment.production]
     )
-    await analyzer.analyze(analysis, MockParquetQueryService())
+    with patch("app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService") as mock_qs:
+        mock_qs.return_value.execute = MockParquetQueryService().execute
+        await analyzer.analyze(analysis)
     result_dict = analysis.result
 
     results = pd.DataFrame(result_dict)
