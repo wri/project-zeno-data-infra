@@ -18,7 +18,6 @@ class Dataset(Enum):
     tree_cover_gain = "tree_cover_gain"
     tree_cover_loss = "tree_cover_loss"
     tree_cover_loss_drivers = "tree_cover_loss_driver"
-    tree_cover_loss_from_fires = "tree_cover_loss_from_fires"
 
     def get_field_name(self):
         DATASET_TO_NAMES = {
@@ -32,7 +31,6 @@ class Dataset(Enum):
             Dataset.tree_cover_gain: "tree_cover_gain_period",
             Dataset.tree_cover_loss: "tree_cover_loss_year",
             Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
-            Dataset.tree_cover_loss_from_fires: "tree_cover_loss_from_fires_area_ha",
         }
 
         return DATASET_TO_NAMES[self]

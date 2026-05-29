@@ -30,7 +30,7 @@ AoiUnion = Union[
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 AllowedForestFilter = Literal["primary_forest", "natural_forest", "intact_forest"]
-AllowedIntersections = List[Literal["driver", "fire"]]
+AllowedIntersections = List[Literal["driver"]]
 
 
 class TreeCoverLossAnalyticsIn(AnalyticsIn):
@@ -67,7 +67,7 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         ...,
         min_length=0,
         max_length=1,
-        description="List of intersection types. Drivers intersections refers to dominant driver across all years of loss, and will return results aggregated across all years. Fire intersection returns fire-driven tree cover loss area AND non-fire loss, by year",
+        description="List of intersection types. Drivers intersections refers to dominant driver across all years of loss, and will return results aggregated across all years.",
     )
 
     @field_validator("start_year", "end_year")
