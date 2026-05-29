@@ -338,3 +338,52 @@ async def test_flox_handler_custom_area():
         atol=1e-8,  # Absolute tolerance
         rtol=1e-4,  # Relative tolerance
     )
+
+
+@pytest.mark.asyncio
+async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
+    class MockParquetQueryService:
+        async def execute(self, query: str) -> Dict:
+            # DuckDB references this table implicitly bc its in scope when we run .sql()
+            data_source = pd.DataFrame(  # noqa
+                {
+                    "aoi_id": ["BRA", "BRA", "BRA"],
+                    "aoi_type": ["admin", "admin", "admin"],
+                    "tree_cover_loss_year": [2015, 2020, 2023],
+                    "area_ha": [1, 10, 100],
+                    "canopy_cover": [20, 30, 50],
+                    "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
+                    "tree_cover_loss_from_fires_area_ha": [0.2, 0.3, 0.4]
+                }
+            )
+            return duckdb.sql(query).df().to_dict(orient="list")
+
+    aoi = AdminAreaOfInterest(ids=["BRA", "IDN", "COD"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30,
+        start_year="2020",
+        end_year="2024",
+        intersections=["fire"],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+    )
+    with patch("app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService") as mock_qs:
+        mock_qs.return_value.execute = MockParquetQueryService().execute
+        await analyzer.analyze(analysis)
+    result_dict = analysis.result
+
+    results = pd.DataFrame(result_dict)
+
+    assert "BRA" in results.aoi_id.to_list()
+    assert 2020 in results.tree_cover_loss_year.to_list()
+    assert 2023 in results.tree_cover_loss_year.to_list()
+    assert 10.0 in results.area_ha.to_list()
+    assert 100.0 in results.area_ha.to_list()
+    assert "admin" in results.aoi_type.to_list()
+    assert 0.3 in results.tree_cover_loss_from_fires_area_ha.to_list()
+    assert results.size == 12

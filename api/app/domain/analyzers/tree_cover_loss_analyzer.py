@@ -83,7 +83,6 @@ async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
         query.group_bys.append(Dataset.tree_cover_loss)
 
     # if by fire, return both TCLF and non-fire TCL results by year
-    # TODO: should this be by driver OR by fire?
     if "fire" in analytics_in.intersections:
         query.aggregate.datasets.append(Dataset.tree_cover_loss_from_fires)
 
