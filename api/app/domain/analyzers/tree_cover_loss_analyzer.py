@@ -120,16 +120,17 @@ class TreeCoverLossAnalyzer(Analyzer):
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
     async def analyze(
-        self, analysis: Analysis, query_service: DuckDbPrecalcQueryService | None = None
+        self, analysis: Analysis
     ) -> None:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
+        
         if analytics_in.aoi.type == "admin":
             results = await self.analyze_admin_areas(
-                analytics_in, query_service=query_service
+                analytics_in
             )
         else:
             results = await self.analyze_otf(analytics_in)
@@ -143,14 +144,12 @@ class TreeCoverLossAnalyzer(Analyzer):
     async def analyze_admin_areas(
         self,
         analytics_in: TreeCoverLossAnalyticsIn,
-        query_service: DuckDbPrecalcQueryService | None = None,
     ) -> Dict:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
-        if query_service is None:
-            query_service = DuckDbPrecalcQueryService(
-                self.input_uris["admin_results_uri"]
-            )
+        query_service = DuckDbPrecalcQueryService(
+            self.input_uris["admin_results_uri"]
+        )
 
         query: DatasetQuery = await build_query(analytics_in)
         query_builder = PrecalcSqlQueryBuilder()
