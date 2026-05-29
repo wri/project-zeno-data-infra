@@ -163,10 +163,19 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         results["aoi_type"] = ["admin"] * len(results["aoi_id"])
 
+        # for TCLF analysis we want to calculate non-fire TCL
+        if "fire" in analytics_in.intersections:
+            results["tree_cover_loss_non_fires_area_ha"] = [tcl_area - tclf_area for tcl_area, tclf_area in zip(results["area_ha"], results["tree_cover_loss_from_fires_area_ha"])]
+
         return results
 
     async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn) -> Dict:
         query: DatasetQuery = await build_query(analytics_in)
 
         results = await self.compute_engine.compute(analytics_in.aoi, query)
+
+        # for TCLF analysis we want to calculate non-fire TCL
+        if "fire" in analytics_in.intersections:
+            results["tree_cover_loss_non_fires_area_ha"] = [tcl_area - tclf_area for tcl_area, tclf_area in zip(results["area_ha"], results["tree_cover_loss_from_fires_area_ha"])]
+
         return results

@@ -360,7 +360,8 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
                     "area_ha": [1, 10, 100],
                     "canopy_cover": [20, 30, 50],
                     "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
-                    "tree_cover_loss_from_fires_area_ha": [0.2, 0.3, 0.4]
+                    "tree_cover_loss_from_fires_area_ha": [0.2, 0.3, 0.4],
+                    "tree_cover_loss_non_fires_area_ha": [0.8, 9.7, 99.6]
                 }
             )
             return duckdb.sql(query).df().to_dict(orient="list")
@@ -383,7 +384,6 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
         mock_qs.return_value.execute = MockParquetQueryService().execute
         await analyzer.analyze(analysis)
     result_dict = analysis.result
-
     results = pd.DataFrame(result_dict)
 
     assert "BRA" in results.aoi_id.to_list()
@@ -393,7 +393,8 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
     assert 100.0 in results.area_ha.to_list()
     assert "admin" in results.aoi_type.to_list()
     assert 0.3 in results.tree_cover_loss_from_fires_area_ha.to_list()
-    assert results.size == 12
+    assert 99.6 in results.tree_cover_loss_non_fires_area_ha.to_list() # TCL-TCLF
+    assert results.size == 14
 
 
 @pytest.mark.asyncio
@@ -434,7 +435,8 @@ async def test_flox_handler_tree_cover_loss_from_fires():
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],
                 "carbon_emissions_MgCO2e": [37.5],
-                "tree_cover_loss_from_fires_area_ha": [25.0]
+                "tree_cover_loss_from_fires_area_ha": [25.0], # only half of pixels meet tcd>30
+                "tree_cover_loss_non_fires_area_ha": [124975.0] # TCL - TCLF
             },
         ),
         check_like=True,
