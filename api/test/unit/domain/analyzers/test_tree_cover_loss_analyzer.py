@@ -49,6 +49,7 @@ class TestDatasetRepository(ZarrDatasetRepository):
             xarr.name = "area_ha"
         elif dataset == Dataset.canopy_cover:
             # left half is 1s, right half is 5s
+            # only right half is tcd>30
             data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
@@ -77,6 +78,12 @@ class TestDatasetRepository(ZarrDatasetRepository):
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
             xarr.name = "is_intact_forest"
+        elif dataset == Dataset.tree_cover_loss_from_fires:
+            # top half is 21.0s, bottom half is 5.5s
+            data = np.vstack([np.full((5, 10), 1.0), np.full((5, 10), 0.0)])
+            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
+            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+            xarr.name = "tree_cover_loss_from_fires_area_ha"
         else:
             raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
@@ -387,3 +394,51 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
     assert "admin" in results.aoi_type.to_list()
     assert 0.3 in results.tree_cover_loss_from_fires_area_ha.to_list()
     assert results.size == 12
+
+
+@pytest.mark.asyncio
+async def test_flox_handler_tree_cover_loss_from_fires():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
+    compute_engine = ComputeEngine(
+        handler=FloxOTFHandler(
+            dataset_repository=TestDatasetRepository(),
+            aoi_geometry_repository=TestAoiGeometryRepository(),
+            dask_client=dask_client,
+        )
+    )
+    aoi = ProtectedAreaOfInterest(ids=["1234"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30, 
+        start_year="2010",
+        end_year="2022",
+        intersections=["fire"],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
+
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(results),
+        pd.DataFrame(
+            {
+                "tree_cover_loss_year": [2021],
+                "area_ha": [125000.0],
+                "aoi_id": ["1234"],
+                "aoi_type": ["protected_area"],
+                "carbon_emissions_MgCO2e": [37.5],
+                "tree_cover_loss_from_fires_area_ha": [25.0]
+            },
+        ),
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
