@@ -30,7 +30,7 @@ AoiUnion = Union[
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 AllowedForestFilter = Literal["primary_forest", "natural_forest", "intact_forest"]
-AllowedIntersections = List[Literal["driver"]]
+AllowedIntersections = List[Literal["driver", "fire"]]
 
 
 class TreeCoverLossAnalyticsIn(AnalyticsIn):
@@ -67,7 +67,7 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         ...,
         min_length=0,
         max_length=1,
-        description="List of intersection types. Drivers intersections refers to dominant driver across all years of loss, and will return results aggregated across all years.",
+        description="List of intersection types. Drivers intersections refers to dominant driver across all years of loss, and will return results aggregated across all years. Fire intersection returns fire-driven tree cover loss area AND non-fire loss, by year",
     )
 
     @field_validator("start_year", "end_year")
@@ -106,6 +106,15 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
                 raise ValueError(
                     "natural_forest filter is not currently available for admin AOI type."
                 )
+        return self
+
+    @model_validator(mode="after")
+    def validate_fire_intersection(self):
+        # TODO OTF TCLF support deferred to a follow-up PR
+        if "fire" in self.intersections and self.aoi.type != "admin":
+            raise ValueError(
+                "fire intersection is currently only available for admin areas."
+            )
         return self
 
 

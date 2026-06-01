@@ -75,12 +75,16 @@ async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
         ],
     )
 
-    # if by driver, return across all years since that's how the model is calculated
-    # otherwise group by TCL year
+    # if by driver, return across all years since that's how the model is
+    # calculated otherwise group by TCL year
     if "driver" in analytics_in.intersections:
         query.group_bys.append(Dataset.tree_cover_loss_drivers)
     else:
         query.group_bys.append(Dataset.tree_cover_loss)
+
+    # if by fire, return both TCLF and non-fire TCL results by year
+    if "fire" in analytics_in.intersections:
+        query.aggregate.datasets.append(Dataset.tree_cover_loss_from_fires)
 
     if analytics_in.canopy_cover is not None:
         query.filters.append(
@@ -119,7 +123,9 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis) -> None:
+    async def analyze(
+        self, analysis: Analysis
+    ) -> None:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
 
@@ -140,6 +146,8 @@ class TreeCoverLossAnalyzer(Analyzer):
         self,
         analytics_in: TreeCoverLossAnalyticsIn,
     ) -> Dict:
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
         query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
 
         query: DatasetQuery = await build_query(analytics_in)
@@ -150,10 +158,31 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         results["aoi_type"] = ["admin"] * len(results["aoi_id"])
 
+        # for TCLF analysis we want to calculate non-fire TCL
+        if "fire" in analytics_in.intersections:
+            results["tree_cover_loss_non_fires_area_ha"] = [
+                tcl_area - tclf_area
+                for tcl_area, tclf_area in zip(
+                    results["area_ha"],
+                    results["tree_cover_loss_from_fires_area_ha"],
+                )
+            ]
+
         return results
 
     async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn) -> Dict:
         query: DatasetQuery = await build_query(analytics_in)
 
         results = await self.compute_engine.compute(analytics_in.aoi, query)
+
+        # for TCLF analysis we want to calculate non-fire TCL
+        if "fire" in analytics_in.intersections:
+            results["tree_cover_loss_non_fires_area_ha"] = [
+                tcl_area - tclf_area
+                for tcl_area, tclf_area in zip(
+                    results["area_ha"],
+                    results["tree_cover_loss_from_fires_area_ha"],
+                )
+            ]
+
         return results

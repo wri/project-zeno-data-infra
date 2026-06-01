@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 from distributed import Client, LocalCluster
+from pydantic import ValidationError
 from shapely.geometry import box, mapping
 
 from app.domain.analyzers.tree_cover_loss_analyzer import (
@@ -49,6 +50,7 @@ class TestDatasetRepository(ZarrDatasetRepository):
             xarr.name = "area_ha"
         elif dataset == Dataset.canopy_cover:
             # left half is 1s, right half is 5s
+            # only right half is tcd>30
             data = np.hstack([np.ones((10, 5)), np.full((10, 5), 5)])
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
@@ -77,6 +79,12 @@ class TestDatasetRepository(ZarrDatasetRepository):
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
             xarr.name = "is_intact_forest"
+        elif dataset == Dataset.tree_cover_loss_from_fires:
+            # top half is 1.0s, bottom half is 0.0s
+            data = np.vstack([np.full((5, 10), 1.0), np.full((5, 10), 0.0)])
+            coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
+            xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
+            xarr.name = "tree_cover_loss_from_fires_area_ha"
         else:
             raise ValueError(f"Not a valid dataset for this test:{dataset}")
 
@@ -331,6 +339,110 @@ async def test_flox_handler_custom_area():
                 "aoi_id": ["my_feature"],
                 "aoi_type": ["feature_collection"],
                 "carbon_emissions_MgCO2e": [37.5],
+            },
+        ),
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
+    class MockParquetQueryService:
+        async def execute(self, query: str) -> Dict:
+            # DuckDB references this table implicitly bc its in scope when we run .sql()
+            data_source = pd.DataFrame(  # noqa
+                {
+                    "aoi_id": ["BRA", "BRA", "BRA"],
+                    "aoi_type": ["admin", "admin", "admin"],
+                    "tree_cover_loss_year": [2015, 2020, 2023],
+                    "area_ha": [1, 10, 100],
+                    "canopy_cover": [20, 30, 50],
+                    "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
+                    "tree_cover_loss_from_fires_area_ha": [0.2, 0.3, 0.4],
+                    "tree_cover_loss_non_fires_area_ha": [0.8, 9.7, 99.6]
+                }
+            )
+            return duckdb.sql(query).df().to_dict(orient="list")
+
+    aoi = AdminAreaOfInterest(ids=["BRA", "IDN", "COD"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30,
+        start_year="2020",
+        end_year="2024",
+        intersections=["fire"],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+    )
+    with patch("app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService") as mock_qs:
+        mock_qs.return_value.execute = MockParquetQueryService().execute
+        await analyzer.analyze(analysis)
+    result_dict = analysis.result
+    results = pd.DataFrame(result_dict)
+
+    assert "BRA" in results.aoi_id.to_list()
+    assert 2020 in results.tree_cover_loss_year.to_list()
+    assert 2023 in results.tree_cover_loss_year.to_list()
+    assert 10.0 in results.area_ha.to_list()
+    assert 100.0 in results.area_ha.to_list()
+    assert "admin" in results.aoi_type.to_list()
+    assert 0.3 in results.tree_cover_loss_from_fires_area_ha.to_list()
+    assert 99.6 in results.tree_cover_loss_non_fires_area_ha.to_list() # TCL-TCLF
+    assert results.size == 14
+
+
+@pytest.mark.xfail(
+    raises=ValidationError,
+    strict=True,
+    reason="OTF TCLF is deferred to a follow-up PR",
+)
+@pytest.mark.asyncio
+async def test_flox_handler_tree_cover_loss_from_fires():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
+    compute_engine = ComputeEngine(
+        handler=FloxOTFHandler(
+            dataset_repository=TestDatasetRepository(),
+            aoi_geometry_repository=TestAoiGeometryRepository(),
+            dask_client=dask_client,
+        )
+    )
+    aoi = ProtectedAreaOfInterest(ids=["1234"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30, 
+        start_year="2010",
+        end_year="2022",
+        intersections=["fire"],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
+
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(results),
+        pd.DataFrame(
+            {
+                "tree_cover_loss_year": [2021],
+                "area_ha": [125000.0],
+                "aoi_id": ["1234"],
+                "aoi_type": ["protected_area"],
+                "carbon_emissions_MgCO2e": [37.5],
+                "tree_cover_loss_from_fires_area_ha": [25.0], # only half of pixels meet tcd>30
+                "tree_cover_loss_non_fires_area_ha": [124975.0] # TCL - TCLF
             },
         ),
         check_like=True,

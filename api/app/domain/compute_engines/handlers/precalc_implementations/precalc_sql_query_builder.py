@@ -12,6 +12,7 @@ class PrecalcSqlQueryBuilder:
         Dataset.primary_forest: "is_primary_forest",
         Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
         Dataset.tree_cover_loss_drivers: "tree_cover_loss_driver",
+        Dataset.tree_cover_loss_from_fires: "tree_cover_loss_from_fires_area_ha",
     }
 
     def build(self, aoi_ids, query: DatasetQuery) -> str:
