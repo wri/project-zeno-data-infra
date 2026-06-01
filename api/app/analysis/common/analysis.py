@@ -15,7 +15,7 @@ JULIAN_DATE_2021 = 2459215
 
 
 class FeatureTooSmallError(Exception):
-    """Raised when a AOI is too small to contain any pixel centroids."""
+    """Raised when an AOI is too small to contain any pixel centroids."""
 
     pass
 
