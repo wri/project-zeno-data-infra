@@ -75,8 +75,8 @@ async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
         ],
     )
 
-    # if by driver, return across all years since that's how the model is calculated
-    # otherwise group by TCL year
+    # if by driver, return across all years since that's how the model is
+    # calculated otherwise group by TCL year
     if "driver" in analytics_in.intersections:
         query.group_bys.append(Dataset.tree_cover_loss_drivers)
     else:
@@ -160,7 +160,13 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         # for TCLF analysis we want to calculate non-fire TCL
         if "fire" in analytics_in.intersections:
-            results["tree_cover_loss_non_fires_area_ha"] = [tcl_area - tclf_area for tcl_area, tclf_area in zip(results["area_ha"], results["tree_cover_loss_from_fires_area_ha"])]
+            results["tree_cover_loss_non_fires_area_ha"] = [
+                tcl_area - tclf_area
+                for tcl_area, tclf_area in zip(
+                    results["area_ha"],
+                    results["tree_cover_loss_from_fires_area_ha"],
+                )
+            ]
 
         return results
 
@@ -171,6 +177,12 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         # for TCLF analysis we want to calculate non-fire TCL
         if "fire" in analytics_in.intersections:
-            results["tree_cover_loss_non_fires_area_ha"] = [tcl_area - tclf_area for tcl_area, tclf_area in zip(results["area_ha"], results["tree_cover_loss_from_fires_area_ha"])]
+            results["tree_cover_loss_non_fires_area_ha"] = [
+                tcl_area - tclf_area
+                for tcl_area, tclf_area in zip(
+                    results["area_ha"],
+                    results["tree_cover_loss_from_fires_area_ha"],
+                )
+            ]
 
         return results

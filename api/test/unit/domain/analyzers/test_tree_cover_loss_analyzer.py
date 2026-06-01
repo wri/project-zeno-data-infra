@@ -79,7 +79,7 @@ class TestDatasetRepository(ZarrDatasetRepository):
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
             xarr.name = "is_intact_forest"
         elif dataset == Dataset.tree_cover_loss_from_fires:
-            # top half is 21.0s, bottom half is 5.5s
+            # top half is 1.0s, bottom half is 0.0s
             data = np.vstack([np.full((5, 10), 1.0), np.full((5, 10), 0.0)])
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
