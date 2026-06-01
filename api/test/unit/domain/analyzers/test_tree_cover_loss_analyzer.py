@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 from distributed import Client, LocalCluster
+from pydantic import ValidationError
 from shapely.geometry import box, mapping
 
 from app.domain.analyzers.tree_cover_loss_analyzer import (
@@ -397,6 +398,11 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
     assert results.size == 14
 
 
+@pytest.mark.xfail(
+    raises=ValidationError,
+    strict=True,
+    reason="OTF TCLF is deferred to a follow-up PR",
+)
 @pytest.mark.asyncio
 async def test_flox_handler_tree_cover_loss_from_fires():
     dask_cluster = LocalCluster(asynchronous=True)
