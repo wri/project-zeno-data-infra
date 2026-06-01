@@ -131,11 +131,8 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        
         if analytics_in.aoi.type == "admin":
-            results = await self.analyze_admin_areas(
-                analytics_in
-            )
+            results = await self.analyze_admin_areas(analytics_in)
         else:
             results = await self.analyze_otf(analytics_in)
 
@@ -151,9 +148,7 @@ class TreeCoverLossAnalyzer(Analyzer):
     ) -> Dict:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
-        query_service = DuckDbPrecalcQueryService(
-            self.input_uris["admin_results_uri"]
-        )
+        query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
 
         query: DatasetQuery = await build_query(analytics_in)
         query_builder = PrecalcSqlQueryBuilder()
