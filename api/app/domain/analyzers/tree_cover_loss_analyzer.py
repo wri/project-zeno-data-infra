@@ -55,7 +55,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
 }
 
 
-async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
+def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
     query = DatasetQuery(
         aggregate=DatasetAggregate(
             datasets=[Dataset.area_hectares, Dataset.carbon_emissions], func="sum"
@@ -123,9 +123,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(
-        self, analysis: Analysis
-    ) -> None:
+    async def analyze(self, analysis: Analysis) -> None:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
 
@@ -150,7 +148,7 @@ class TreeCoverLossAnalyzer(Analyzer):
             raise Exception("Input URIs must be provided for actual analysis")
         query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
 
-        query: DatasetQuery = await build_query(analytics_in)
+        query: DatasetQuery = _build_query(analytics_in)
         query_builder = PrecalcSqlQueryBuilder()
         sql_str: str = query_builder.build(analytics_in.aoi.ids, query)
 
@@ -171,7 +169,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         return results
 
     async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn) -> Dict:
-        query: DatasetQuery = await build_query(analytics_in)
+        query: DatasetQuery = _build_query(analytics_in)
 
         results = await self.compute_engine.compute(analytics_in.aoi, query)
 
