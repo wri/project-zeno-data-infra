@@ -78,7 +78,7 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=TreeCoverLossAnalyzer(
-            compute_engine, INPUT_URIS[Environment.production]
+            compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
         ),
         event=ANALYTICS_NAME,
     )

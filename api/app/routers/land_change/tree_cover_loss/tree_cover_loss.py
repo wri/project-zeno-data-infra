@@ -25,6 +25,7 @@ from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -73,7 +74,11 @@ def create_analysis_service(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=TreeCoverLossAnalyzer(
-            compute_engine, resolve_uris(INPUT_URIS, environment)
+            compute_engine,
+            dask_client_router=request.app.state.dask_client_router,
+            dataset_repository=ZarrDatasetRepository(),
+            aoi_geometry_repository=DataApiAoiGeometryRepository(),
+            input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,
     )
