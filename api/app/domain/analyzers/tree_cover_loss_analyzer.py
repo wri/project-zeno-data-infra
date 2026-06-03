@@ -4,6 +4,7 @@ import newrelic.agent as nr_agent
 import numpy as np
 
 from app.domain.analyzers.analyzer import Analyzer
+from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
@@ -15,6 +16,9 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
+from app.domain.repositories.data_api_aoi_geometry_repository import (
+    DataApiAoiGeometryRepository,
+)
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -118,8 +122,19 @@ def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
 
 
 class TreeCoverLossAnalyzer(Analyzer):
-    def __init__(self, compute_engine, input_uris: Dict[str, str] | None = None):
+    def __init__(
+        self,
+        compute_engine,
+        *,
+        dask_client_router: DaskClientRouter = None,
+        dataset_repository: ZarrDatasetRepository = None,
+        aoi_geometry_repository: DataApiAoiGeometryRepository = None,
+        input_uris: Dict[str, str] | None = None,
+    ):
         self.compute_engine = compute_engine
+        self.dask_client_router = dask_client_router
+        self.dataset_repository = dataset_repository
+        self.aoi_geometry_repository = aoi_geometry_repository
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
