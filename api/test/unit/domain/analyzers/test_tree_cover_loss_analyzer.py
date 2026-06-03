@@ -14,12 +14,7 @@ from app.domain.analyzers.tree_cover_loss_analyzer import (
     INPUT_URIS,
     TreeCoverLossAnalyzer,
 )
-from app.domain.compute_engines.compute_engine import (
-    ComputeEngine,
-)
-from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
-    FloxOTFHandler,
-)
+from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
@@ -120,9 +115,14 @@ async def test_get_tree_cover_loss_precalc_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=None,
+        dataset_repository=None,
+        aoi_geometry_repository=None,
+        input_uris=INPUT_URIS[Environment.production],
     )
-    with patch("app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService") as mock_qs:
+    with patch(
+        "app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService"
+    ) as mock_qs:
         mock_qs.return_value.execute = MockParquetQueryService().execute
         await analyzer.analyze(analysis)
     result_dict = analysis.result
@@ -143,13 +143,6 @@ async def test_flox_handler_happy_path():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
 
-    compute_engine = ComputeEngine(
-        handler=FloxOTFHandler(
-            dataset_repository=TestDatasetRepository(),
-            aoi_geometry_repository=TestAoiGeometryRepository(),
-            dask_client=dask_client,
-        )
-    )
     aoi = ProtectedAreaOfInterest(ids=["1234"])
     analytics_in = TreeCoverLossAnalyticsIn(
         aoi=aoi,
@@ -162,7 +155,10 @@ async def test_flox_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=DaskClientRouter(dask_client, None),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=TestAoiGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
     )
     await analyzer.analyze(analysis)
     results = analysis.result
@@ -190,13 +186,6 @@ async def test_flox_handler_natural_forests():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
 
-    compute_engine = ComputeEngine(
-        handler=FloxOTFHandler(
-            dataset_repository=TestDatasetRepository(),
-            aoi_geometry_repository=TestAoiGeometryRepository(),
-            dask_client=dask_client,
-        )
-    )
     aoi = ProtectedAreaOfInterest(ids=["1234"])
     analytics_in = TreeCoverLossAnalyticsIn(
         aoi=aoi,
@@ -209,7 +198,10 @@ async def test_flox_handler_natural_forests():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=DaskClientRouter(dask_client, None),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=TestAoiGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
     )
     await analyzer.analyze(analysis)
     results = analysis.result
@@ -242,13 +234,6 @@ async def test_flox_handler_intact_forest():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
 
-    compute_engine = ComputeEngine(
-        handler=FloxOTFHandler(
-            dataset_repository=TestDatasetRepository(),
-            aoi_geometry_repository=TestAoiGeometryRepository(),
-            dask_client=dask_client,
-        )
-    )
     aoi = ProtectedAreaOfInterest(ids=["1234"])
     analytics_in = TreeCoverLossAnalyticsIn(
         aoi=aoi,
@@ -261,7 +246,10 @@ async def test_flox_handler_intact_forest():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=DaskClientRouter(dask_client, None),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=TestAoiGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
     )
     await analyzer.analyze(analysis)
     results = analysis.result
@@ -295,14 +283,6 @@ async def test_flox_handler_custom_area():
         async def load(self, aoi_type, aoi_ids):
             raise ValueError("This should not be called for custom AOI!")
 
-    compute_engine = ComputeEngine(
-        handler=FloxOTFHandler(
-            dataset_repository=TestDatasetRepository(),
-            aoi_geometry_repository=TestAoiGeometryRepository(),
-            dask_client=dask_client,
-        )
-    )
-
     feature_collection = {
         "type": "FeatureCollection",
         "features": [
@@ -325,7 +305,13 @@ async def test_flox_handler_custom_area():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=DaskClientRouter(
+            local_client=dask_client,
+            remote_client=dask_client,
+        ),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=TestAoiGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
     )
     await analyzer.analyze(analysis)
     results = analysis.result
@@ -362,7 +348,7 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
                     "canopy_cover": [20, 30, 50],
                     "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3],
                     "tree_cover_loss_from_fires_area_ha": [0.2, 0.3, 0.4],
-                    "tree_cover_loss_non_fires_area_ha": [0.8, 9.7, 99.6]
+                    "tree_cover_loss_non_fires_area_ha": [0.8, 9.7, 99.6],
                 }
             )
             return duckdb.sql(query).df().to_dict(orient="list")
@@ -379,9 +365,14 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=None, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=None,
+        dataset_repository=None,
+        aoi_geometry_repository=None,
+        input_uris=INPUT_URIS[Environment.production],
     )
-    with patch("app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService") as mock_qs:
+    with patch(
+        "app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService"
+    ) as mock_qs:
         mock_qs.return_value.execute = MockParquetQueryService().execute
         await analyzer.analyze(analysis)
     result_dict = analysis.result
@@ -394,7 +385,7 @@ async def test_get_tree_cover_loss_from_fires_precalc_handler_happy_path():
     assert 100.0 in results.area_ha.to_list()
     assert "admin" in results.aoi_type.to_list()
     assert 0.3 in results.tree_cover_loss_from_fires_area_ha.to_list()
-    assert 99.6 in results.tree_cover_loss_non_fires_area_ha.to_list() # TCL-TCLF
+    assert 99.6 in results.tree_cover_loss_non_fires_area_ha.to_list()  # TCL-TCLF
     assert results.size == 14
 
 
@@ -408,17 +399,10 @@ async def test_flox_handler_tree_cover_loss_from_fires():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
 
-    compute_engine = ComputeEngine(
-        handler=FloxOTFHandler(
-            dataset_repository=TestDatasetRepository(),
-            aoi_geometry_repository=TestAoiGeometryRepository(),
-            dask_client=dask_client,
-        )
-    )
     aoi = ProtectedAreaOfInterest(ids=["1234"])
     analytics_in = TreeCoverLossAnalyticsIn(
         aoi=aoi,
-        canopy_cover=30, 
+        canopy_cover=30,
         start_year="2010",
         end_year="2022",
         intersections=["fire"],
@@ -427,7 +411,10 @@ async def test_flox_handler_tree_cover_loss_from_fires():
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
     analyzer = TreeCoverLossAnalyzer(
-        compute_engine=compute_engine, input_uris=INPUT_URIS[Environment.production]
+        dask_client_router=DaskClientRouter(dask_client, None),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=TestAoiGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
     )
     await analyzer.analyze(analysis)
     results = analysis.result
@@ -441,8 +428,10 @@ async def test_flox_handler_tree_cover_loss_from_fires():
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],
                 "carbon_emissions_MgCO2e": [37.5],
-                "tree_cover_loss_from_fires_area_ha": [25.0], # only half of pixels meet tcd>30
-                "tree_cover_loss_non_fires_area_ha": [124975.0] # TCL - TCLF
+                "tree_cover_loss_from_fires_area_ha": [
+                    25.0
+                ],  # only half of pixels meet tcd>30
+                "tree_cover_loss_non_fires_area_ha": [124975.0],  # TCL - TCLF
             },
         ),
         check_like=True,

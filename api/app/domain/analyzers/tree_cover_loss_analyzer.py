@@ -5,6 +5,9 @@ import numpy as np
 
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.compute_engines.dask_client_router import DaskClientRouter
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
+    FloxOTFHandler,
+)
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
@@ -124,14 +127,11 @@ def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
 class TreeCoverLossAnalyzer(Analyzer):
     def __init__(
         self,
-        compute_engine,
-        *,
         dask_client_router: DaskClientRouter = None,
         dataset_repository: ZarrDatasetRepository = None,
         aoi_geometry_repository: DataApiAoiGeometryRepository = None,
         input_uris: Dict[str, str] | None = None,
     ):
-        self.compute_engine = compute_engine
         self.dask_client_router = dask_client_router
         self.dataset_repository = dataset_repository
         self.aoi_geometry_repository = aoi_geometry_repository
@@ -183,9 +183,17 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         return results
 
-    async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn) -> Dict:
+    async def analyze_otf(
+        self, analytics_in: TreeCoverLossAnalyticsIn
+    ) -> Dict[str, list]:
         query: DatasetQuery = _build_query(analytics_in)
 
-        results = await self.compute_engine.compute(analytics_in.aoi, query)
+        handler = FloxOTFHandler(
+            dataset_repository=self.dataset_repository,
+            aoi_geometry_repository=self.aoi_geometry_repository,
+            dask_client_router=self.dask_client_router,
+        )
+
+        results = await handler.handle(analytics_in.aoi, query)
 
         return results

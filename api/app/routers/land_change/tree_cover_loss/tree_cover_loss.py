@@ -8,27 +8,12 @@ from app.domain.analyzers.tree_cover_loss_analyzer import (
     INPUT_URIS,
     TreeCoverLossAnalyzer,
 )
-from app.domain.compute_engines.compute_engine import (
-    ComputeEngine,
-)
-from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
-    FloxOTFHandler,
-)
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_handlers import (
-    TreeCoverLossPrecalcHandler,
-)
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
-    PrecalcSqlQueryBuilder,
-)
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.data_api_aoi_geometry_repository import (
     DataApiAoiGeometryRepository,
 )
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
-from app.infrastructure.external_services.duck_db_query_service import (
-    DuckDbPrecalcQueryService,
-)
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
@@ -57,24 +42,10 @@ def create_analysis_service(
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
-    compute_engine = ComputeEngine(
-        handler=TreeCoverLossPrecalcHandler(
-            precalc_query_builder=PrecalcSqlQueryBuilder(),
-            precalc_query_service=DuckDbPrecalcQueryService(
-                table_uri=resolve_uris(INPUT_URIS, environment)["admin_results_uri"]
-            ),
-            next_handler=FloxOTFHandler(
-                environment=environment,
-                aoi_geometry_repository=DataApiAoiGeometryRepository(),
-                dask_client_router=request.app.state.dask_client_router,
-            ),
-        )
-    )
 
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=TreeCoverLossAnalyzer(
-            compute_engine,
             dask_client_router=request.app.state.dask_client_router,
             dataset_repository=ZarrDatasetRepository(),
             aoi_geometry_repository=DataApiAoiGeometryRepository(),
