@@ -3,6 +3,7 @@ import logging
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
+from pipelines.intdist.prefect_flows.gadm_intdist_alerts import intdist_alerts_area
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
 from pipelines.intdist.create_zarr import create_zarr
 
@@ -27,11 +28,18 @@ def create_zarr_task(dist_version: str, overwrite=False) -> str:
 )
 def intdist_zarr_flow(version=None, overwrite=False) -> list[str]:
     logger = get_run_logger()
+    result_uris = []
 
     if version is None:
         version = get_new_intdist_version()
         logger.info(f"Latest int-dist version: {version}")
 
-    dist_zarr_uri = create_zarr_task(version, overwrite=overwrite)
+    intdist_zarr_uri = create_zarr_task(version, overwrite=overwrite)
 
-    return [dist_zarr_uri]
+    # Base GADM dist alerts
+    gadm_dist_result = intdist_alerts_area(
+        intdist_zarr_uri, version, overwrite=overwrite
+    )
+    result_uris.append(gadm_dist_result)
+
+    return result_uris

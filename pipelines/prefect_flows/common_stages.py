@@ -362,7 +362,8 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
 
     # subregion_df is all the rows which have a subregion. rows that don't have
     # subregion will be covered by region_df and country_df.
-    subregion_df = df[df.subregion != 0]
+    # copy() is used to silence an unnecessary pandas warning.
+    subregion_df = df[df.subregion != 0].copy()
 
     # Create a dataframe which aggregates by the same groupbys after the subregion
     # column is eliminated - so it is the same grouped results but at the
