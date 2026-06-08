@@ -8,10 +8,10 @@ import xarray as xr
 from dateutil.relativedelta import relativedelta
 
 from pipelines.globals import (
-    country_zarr_uri,
-    pixel_area_zarr_uri,
-    region_zarr_uri,
-    subregion_zarr_uri,
+    country_10m_zarr_uri,
+    pixel_area_10m_zarr_uri,
+    region_10m_zarr_uri,
+    subregion_10m_zarr_uri,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -54,19 +54,19 @@ def load_data(
     # reindex to alerts to avoid floating point precision issues
     # when aligning the datasets
     # https://github.com/pydata/xarray/issues/2217.  This also converts the 30m GADM zarrs to 10m.
-    country = _load_zarr(country_zarr_uri).reindex_like(
+    country = _load_zarr(country_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).chunk(spatial_chunks)
     country_aligned = xr.align(alerts, country, join="left")[1].band_data
-    region = _load_zarr(region_zarr_uri).reindex_like(
+    region = _load_zarr(region_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).chunk(spatial_chunks)
     region_aligned = xr.align(alerts, region, join="left")[1].band_data
-    subregion = _load_zarr(subregion_zarr_uri).reindex_like(
+    subregion = _load_zarr(subregion_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).chunk(spatial_chunks)
     subregion_aligned = xr.align(alerts, subregion, join="left")[1].band_data
-    pixel_area = _load_zarr(pixel_area_zarr_uri).reindex_like(
+    pixel_area = _load_zarr(pixel_area_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).chunk(spatial_chunks)
     pixel_area = pixel_area.rio.write_crs("EPSG:4326", inplace=True)
@@ -75,6 +75,8 @@ def load_data(
 
     alerts = clip_ds_to_geojson(alerts, geojson)
     country_aligned = clip_ds_to_geojson(country_aligned, geojson)
+    region_aligned = clip_ds_to_geojson(region_aligned, geojson)
+    subregion_aligned = clip_ds_to_geojson(subregion_aligned, geojson)
     pixel_area_aligned = clip_ds_to_geojson(pixel_area_aligned, geojson)
 
     if contextual_uri is not None:
@@ -90,8 +92,8 @@ def load_data(
     return (
         alerts,
         country_aligned,
-        # region_aligned,
-        # subregion_aligned,
+        region_aligned,
+        subregion_aligned,
         pixel_area_aligned,
         contextual_layer_aligned,
     )
@@ -103,15 +105,15 @@ def setup_compute(
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xarray reduce on alerts"""
-    ( alerts, country,
-    # region, subregion,
-      pixel_area, contextual_layer) = datasets
+    (alerts, country,
+     region, subregion,
+     pixel_area, contextual_layer) = datasets
 
     base_layer = pixel_area
     groupbys: Tuple[xr.DataArray, ...] = (
         country.rename("country"),
-        # region.rename("region"),
-        # subregion.rename("subregion"),
+        region.rename("region"),
+        subregion.rename("subregion"),
         alerts.alert_date,
         alerts.confidence,
     )
@@ -140,4 +142,4 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
 
 
 def _load_zarr(zarr_uri):
-    return xr.open_zarr(zarr_uri)
+    return xr.open_zarr(zarr_uri, storage_options={"requester_pays": True})
