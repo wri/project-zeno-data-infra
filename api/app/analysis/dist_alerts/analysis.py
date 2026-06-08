@@ -104,7 +104,7 @@ async def zonal_statistics(
     ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
-    expected_groups = [np.arange(731, 2000), [1, 2, 3]]
+    expected_groups = [np.arange(731, 2365), [1, 2, 3]]  # Dates (2023/1/1 to 2027/6/23) and confidence
     if intersection == "natural_lands":
         natural_lands = read_zarr_clipped_to_geojson(
             input_uris["natural_lands_zarr_uri"],

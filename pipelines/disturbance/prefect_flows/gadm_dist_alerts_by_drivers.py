@@ -27,7 +27,7 @@ def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
         np.arange(5),  # driver categories
-        np.arange(731, 2000),  # dates values
+        np.arange(731, 2365),  # dates values, 2023/1/1 to 2027/6/23
         [1, 2, 3],  # confidence values
     )
     datasets = dist_common_tasks.load_data.with_options(
