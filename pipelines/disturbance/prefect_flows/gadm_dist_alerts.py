@@ -18,7 +18,7 @@ def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
         np.arange(999),  # country ISO codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
-        np.arange(731, 2000),  # dates values
+        np.arange(731, 3288),  # dates values, 2023/1/1 to 2030/1/1
         [1, 2, 3],  # confidence values
     )
 
