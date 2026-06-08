@@ -16,9 +16,9 @@ def intdist_alerts_area(intdist_zarr_uri: str, version: str, overwrite=False):
 
     expected_groups = (
         np.arange(999),  # country ISO codes
-        np.arange(86),  # region codes
-        np.arange(854),  # subregion codes
-        np.arange(731, 2000),  # dates values
+#        np.arange(86),  # region codes
+#        np.arange(854),  # subregion codes
+        np.arange(2923, 5000),  # dates values, number of days since 2014/12/31 -> (2023/1/1, 2028/9/8)
         [1, 2, 3],  # confidence values
     )
 
