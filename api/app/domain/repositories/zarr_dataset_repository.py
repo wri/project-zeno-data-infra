@@ -18,7 +18,9 @@ class ZarrDatasetRepository:
     # app/domain/models/dataset.py::Dataset
 
     _ZARR_URIS = {
-        Environment.staging: {},
+        Environment.staging: {
+            Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/area_ha_30m_f64.zarr",  # noqa: E501
+        },
         Environment.production: {
             Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/pixel_area_ha.zarr",  # noqa: E501
             Dataset.canopy_cover: "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr",  # noqa: E501

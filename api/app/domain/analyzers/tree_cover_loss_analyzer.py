@@ -35,6 +35,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
                 Dataset.tree_cover_loss_drivers,
             ]
         },
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260609.parquet",
     },
     Environment.production: {
         **{
@@ -123,9 +124,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(
-        self, analysis: Analysis
-    ) -> None:
+    async def analyze(self, analysis: Analysis) -> None:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
 
