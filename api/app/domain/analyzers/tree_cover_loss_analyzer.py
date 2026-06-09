@@ -124,9 +124,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
-    async def analyze(
-        self, analysis: Analysis
-    ) -> None:
+    async def analyze(self, analysis: Analysis) -> None:
         if self.input_uris is None:
             raise Exception("Input URIs must be provided for actual analysis")
 
