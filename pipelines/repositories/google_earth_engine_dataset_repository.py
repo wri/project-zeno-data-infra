@@ -10,12 +10,18 @@ from shapely.geometry import mapping
 class GoogleEarthEngineDatasetRepository:
     # lazy load ee assets since ee may not be initiazed yet
     EE_ASSETS = {
-        "loss": lambda: ee.Image("UMD/hansen/global_forest_change_2024_v1_12"),
-        "tcl_drivers": lambda: ee.Image("projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_2_2001_2024"),
+        "loss": lambda: ee.Image("UMD/hansen/global_forest_change_2025_v1_13"),
+        "tcl_drivers": lambda: ee.Image(
+            "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_3_2001_2025"
+        ),
         "area": lambda: ee.Image.pixelArea(),
         "natural_lands": lambda: ee.Image("WRI/SBTN/naturalLands/v1_1/2020"),
-        "carbon_gross_emissions": lambda: ee.Image("projects/forma-250/assets/gfw_forest_carbon_gross_emissions/gross_emissions_forest_extent_per_hectare_v1_4_2_2001_2024"),
-        "carbon_gross_removals": lambda: ee.Image("projects/forma-250/assets/gfw_forest_carbon_gross_removals/gross_removals_forest_extent_per_hectare_v1_4_2_2001_2024"),
+        "carbon_gross_emissions": lambda: ee.Image(
+            "projects/wri-datalab/gfw-data-lake/v1-4-3-2001-2025/gross-emissions-forest-extent-per-ha/gross-emissions-global-forest-extent-per-ha-2001-2025"
+        ),
+        "carbon_gross_removals": lambda: ee.Image(
+            "projects/wri-datalab/gfw-data-lake/v1-4-3-2001-2025/gross-removals-forest-extent-per-ha/gross-removals-global-forest-extent-per-ha-2001-2025"
+        ),
     }
 
     def __init__(self, default_scale=0.00025, default_projection="EPSG:4326"):
