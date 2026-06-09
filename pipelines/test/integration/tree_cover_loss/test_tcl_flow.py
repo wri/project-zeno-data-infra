@@ -25,9 +25,9 @@ def test_tcl_flow_real_data(
     test_geom = shape(ARG_1_28)
 
     mock_create_zarrs.return_value = {
-        "tree_cover_loss": "s3://lcl-analytics/zarr/umd-tree-cover-loss/v1.12/year.zarr",
-        "tree_cover_loss_from_fires": "s3://lcl-analytics/zarr/umd-tree-cover-loss-from-fires/v1.12/year.zarr",
-        "drivers": "s3://lcl-analytics/zarr/wri-google-tree-cover-loss-drivers/v1.12/category.zarr",
+        "tree_cover_loss": "s3://lcl-analytics/zarr/umd-tree-cover-loss/v1.13/year.zarr",
+        "tree_cover_loss_from_fires": "s3://lcl-analytics/zarr/umd-tree-cover-loss-from-fires/v1.13/year.zarr",
+        "drivers": "s3://lcl-analytics/zarr/wri-google-tree-cover-loss-drivers/v1.13/category.zarr",
     }
     mock_qc_load.return_value = gpd.GeoDataFrame(
         {"geometry": [test_geom], "GID_2": "ARG.1.28_1"}
@@ -35,11 +35,11 @@ def test_tcl_flow_real_data(
 
     with prefect_test_harness():
         result_uri = umd_tree_cover_loss_flow(
-            "v1.12", overwrite=True, bbox=test_geom.bounds
+            "v1.13", overwrite=True, bbox=test_geom.bounds
         )
 
     assert "admin-tree-cover-loss_v20260609.parquet" in result_uri
-    assert "v1.12" in result_uri
+    assert "v1.13" in result_uri
 
     # get the the saved df
     result_df = mock_save_parquet.call_args[0][0]
@@ -65,7 +65,7 @@ def test_tcl_flow_real_data(
     assert result_df["tree_cover_loss_driver"].dtype == object
     assert result_df["is_primary_forest"].dtype == bool
     assert result_df["natural_forests_class"].dtype == object
-    assert result_df.size == 37455
+    assert result_df.size == 40040
     mock_qc_write_results.assert_called_once()
 
 
