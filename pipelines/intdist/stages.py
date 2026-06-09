@@ -22,38 +22,18 @@ ExpectedGroupsType = Tuple
 alerts_confidence = {2: "low", 3: "high"}
 
 
-def wkb_to_geojson_feature(wkbstr: str) -> dict:
-    geom = wkb.loads(bytes.fromhex(wkbstr))
-    subobj = mapping(geom)
-    return subobj
-
-
-def clip_ds_to_geojson(ds, geojson: dict):
-    geom = shape(geojson)
-    sliced = ds.sel(
-        x=slice(geom.bounds[0], geom.bounds[2]),
-        y=slice(geom.bounds[3], geom.bounds[1]),
-    ).squeeze("band")
-    clipped = sliced.rio.clip([geom])
-    return clipped
-
-
 def load_data(
     zarr_uri: str,
     contextual_uri: Optional[str] = None,
 ) -> Tuple[xr.DataArray, ...]:
     """Load in the alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
-    wkbstr = "01030000000100000005000000e7aed1e4156e5840d583f1ef0d6706405123d124216e5840bb5dcfdae43506403dbcd0243d70584057ee7202b43806406a50d1e404705840f75140ece2700640e7aed1e4156e5840d583f1ef0d670640"
-    # wkbstr = "01030000000100000005000000fa7637c15bb94ec0e082b62ea03811c0fa7637c15bb94ec010b38ccd0d7a19c070b278d981f94cc010b38ccd0d7a19c070b278d981f94cc0e082b62ea03811c0fa7637c15bb94ec0e082b62ea03811c0"
-    geojson = wkb_to_geojson_feature(wkbstr)
-
     alerts = _load_zarr(zarr_uri)
     spatial_chunks = {"x": alerts.chunksizes["x"], "y": alerts.chunksizes["y"]}
 
     # reindex to alerts to avoid floating point precision issues
     # when aligning the datasets
-    # https://github.com/pydata/xarray/issues/2217.  This also converts the 30m GADM zarrs to 10m.
+    # https://github.com/pydata/xarray/issues/2217.
     country = _load_zarr(country_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).chunk(spatial_chunks)
@@ -69,15 +49,7 @@ def load_data(
     pixel_area = _load_zarr(pixel_area_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).chunk(spatial_chunks)
-    pixel_area = pixel_area.rio.write_crs("EPSG:4326", inplace=True)
     pixel_area_aligned = xr.align(alerts, pixel_area, join="left")[1].band_data
-    pixel_area_aligned = pixel_area_aligned / 9.0
-
-    alerts = clip_ds_to_geojson(alerts, geojson)
-    country_aligned = clip_ds_to_geojson(country_aligned, geojson)
-    region_aligned = clip_ds_to_geojson(region_aligned, geojson)
-    subregion_aligned = clip_ds_to_geojson(subregion_aligned, geojson)
-    pixel_area_aligned = clip_ds_to_geojson(pixel_area_aligned, geojson)
 
     if contextual_uri is not None:
         contextual_layer = _load_zarr(contextual_uri).reindex_like(

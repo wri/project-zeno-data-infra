@@ -34,7 +34,7 @@ def create_cluster():
         },
         worker_options={"nthreads": 4},  # to avoid OOMs
     )
-    cluster.adapt(minimum=20, maximum=100)
+    cluster.adapt(minimum=30, maximum=100)
 
     client = cluster.get_client()
     return client
@@ -117,7 +117,7 @@ def run_updates(
     overwrite = str(overwrite).lower() == "true"
 
     try:
-        # dask_client = create_cluster()
+        dask_client = create_cluster()
 
         flow_fn = update_flows.get(flow_name)
         if flow_fn is None:
@@ -141,9 +141,8 @@ def run_updates(
         logger.error("Analysis failed.")
         raise
     finally:
-        # if dask_client:
-        #     dask_client.shutdown()
-        pass
+        if dask_client:
+            dask_client.shutdown()
 
     return result_uris
 
