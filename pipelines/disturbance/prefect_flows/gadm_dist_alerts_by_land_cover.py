@@ -33,7 +33,7 @@ def dist_alerts_by_land_cover_area(
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
         np.arange(9),  # land cover classes
-        np.arange(731, 2000),  # dates values
+        np.arange(731, 3288),  # dates values, 2023/1/1 to 2030/1/1
         [1, 2, 3],  # confidence values
     )
     datasets = dist_common_tasks.load_data.with_options(

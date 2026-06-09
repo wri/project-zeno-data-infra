@@ -3,15 +3,13 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 import xarray as xr
-from shapely.geometry import Polygon
-
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     DATA_LAKE_BUCKET,
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
-    thresh_to_pct
+    thresh_to_pct,
 )
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
@@ -26,6 +24,7 @@ from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
+from shapely.geometry import Polygon
 
 PIPELINE_CHUNK_SIZE = 10_000
 OTF_CHUNK_SIZE = 4_000
@@ -89,7 +88,7 @@ def load_data(
     xr.DataArray,
     xr.DataArray,
     xr.DataArray,
-    xr.DataArray
+    xr.DataArray,
 ]:
     """
     Load in the tree cover loss zarr, pixel area zarr, carbon emissions zarr, tree cover density zarr, and the GADM zarrs
@@ -105,7 +104,7 @@ def load_data(
     # load and align zarrs with tcl
 
     # aggregation layers
-    pixel_area: xr.DataArray = _load_zarr(pixel_area_uri).band_data
+    pixel_area: xr.DataArray = _load_zarr(pixel_area_uri, group=group).band_data
     pixel_area = xr.align(
         tcl,
         pixel_area.reindex_like(tcl, method="nearest", tolerance=1e-5),
@@ -122,7 +121,7 @@ def load_data(
     )[1]
 
     tclf: xr.DataArray = _load_zarr(
-        tree_cover_loss_from_fires_uri, group="pipeline"
+        tree_cover_loss_from_fires_uri, group=group
     ).band_data
     tclf = xr.align(
         tcl,
@@ -172,17 +171,25 @@ def load_data(
         join="left",
     )[1]
 
-    mangrove_stock_2000: xr.DataArray = _load_zarr(mangrove_stock_2000_zarr_uri).band_data
+    mangrove_stock_2000: xr.DataArray = _load_zarr(
+        mangrove_stock_2000_zarr_uri
+    ).band_data
     mangrove_stock_2000_aligned = xr.align(
         tcl,
-        mangrove_stock_2000.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        mangrove_stock_2000.reindex_like(
+            tcl, method="nearest", tolerance=1e-5, fill_value=0
+        ),
         join="left",
     )[1]
 
-    tree_cover_gain_from_height: xr.DataArray = _load_zarr(tree_cover_gain_from_height_zarr_uri).band_data
+    tree_cover_gain_from_height: xr.DataArray = _load_zarr(
+        tree_cover_gain_from_height_zarr_uri
+    ).band_data
     tree_cover_gain_from_height_aligned = xr.align(
         tcl,
-        tree_cover_gain_from_height.reindex_like(tcl, method="nearest", tolerance=1e-5, fill_value=0),
+        tree_cover_gain_from_height.reindex_like(
+            tcl, method="nearest", tolerance=1e-5, fill_value=0
+        ),
         join="left",
     )[1]
     # Map tree_cover_gain_from_height to 1 if any gain, 0 otherwise.
@@ -262,7 +269,11 @@ def setup_compute(
             area_and_emissions["tree_cover_loss_from_fires_area_ha"],
         ],
         pd.Index(
-            ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"],
+            [
+                "area_ha",
+                "carbon_emissions_MgCO2e",
+                "tree_cover_loss_from_fires_area_ha",
+            ],
             name="layer",
         ),
     )
@@ -319,17 +330,22 @@ def create_result_dataframe(result: xr.DataArray) -> pd.DataFrame:
 # the 30% value, and the 75% value from the 50% value. This means our TCL carbon query
 # can then test for canopy_cover >= 30/50/75, rather than canopy_cover == 30/50/75.
 def unaggregate_carbon_by_canopy_cover(df: pd.DataFrame):
-    id_cols = ['aoi_id', 'aoi_type']
+    id_cols = ["aoi_id", "aoi_type"]
     context_cols = [
-        'tree_cover_loss_year', 'is_intact_forest', 'tree_cover_loss_driver',
-        'is_primary_forest', 'natural_forests_class'
+        "tree_cover_loss_year",
+        "is_intact_forest",
+        "tree_cover_loss_driver",
+        "is_primary_forest",
+        "natural_forests_class",
     ]
     group_cols = id_cols + context_cols
-    target_col = 'carbon_emissions_MgCO2e'
+    target_col = "carbon_emissions_MgCO2e"
 
     # Pivot the data to make subtraction easy. This aligns the canopy values side-by-side
     # for every unique group
-    pivoted = df.pivot_table(index=group_cols, columns='canopy_cover', values=target_col).fillna(0)
+    pivoted = df.pivot_table(
+        index=group_cols, columns="canopy_cover", values=target_col
+    ).fillna(0)
 
     # Do the actual difference calculation, so we can use canopy_cover >= 30/50/75,
     # rather than canopy_cover == 30/50/75
@@ -338,14 +354,14 @@ def unaggregate_carbon_by_canopy_cover(df: pd.DataFrame):
 
     # Convert the pivoted table back to long format with values 30/50/75.
     updated_values = pivoted[[30, 50, 75]].stack().reset_index()
-    updated_values.columns = group_cols + ['canopy_cover', 'new_val']
+    updated_values.columns = group_cols + ["canopy_cover", "new_val"]
 
     # Merge with the original data frame, and take the new carbon value where calculated.
-    df = df.merge(updated_values, on=group_cols + ['canopy_cover'], how='left')
-    df[target_col] = df['new_val'].combine_first(df[target_col])
+    df = df.merge(updated_values, on=group_cols + ["canopy_cover"], how="left")
+    df[target_col] = df["new_val"].combine_first(df[target_col])
 
     # Drop the helper column
-    df = df.drop(columns=['new_val'])
+    df = df.drop(columns=["new_val"])
     return df
 
 
@@ -393,7 +409,11 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     result_df.dropna(subset=["country"], inplace=True)
 
     # Now calculate the carbon for canopy_cover 30, 50, 70.
-    value_cols = ["area_ha", "carbon_emissions_MgCO2e", "tree_cover_loss_from_fires_area_ha"]
+    value_cols = [
+        "area_ha",
+        "carbon_emissions_MgCO2e",
+        "tree_cover_loss_from_fires_area_ha",
+    ]
     contextual_cols = [
         "tree_cover_loss_year",
         "canopy_cover",
@@ -413,29 +433,43 @@ def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     # process, since not included in groupby_cols.
     for T in thresholds:
         mask = (
-            (result_df['canopy_cover'] >= T)
-            | (result_df['mangrove_stock_2000'] == 1)
-            | (result_df['tree_cover_gain_from_height'] == 1)
+            (result_df["canopy_cover"] >= T)
+            | (result_df["mangrove_stock_2000"] == 1)
+            | (result_df["tree_cover_gain_from_height"] == 1)
         )
-        temp_df = result_df[mask].groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
+        temp_df = (
+            result_df[mask]
+            .groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"]
+            .sum()
+        )
         temp_df["canopy_cover"] = T
         results.append(temp_df)
 
     # Count zero carbon for any canopy_cover below 30
-    below30_df = result_df[result_df['canopy_cover'] < 30].groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
+    below30_df = (
+        result_df[result_df["canopy_cover"] < 30]
+        .groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"]
+        .sum()
+    )
     below30_df["carbon_emissions_MgCO2e"] = 0.0
     results.append(below30_df)
 
     carbon_df = pd.concat(results, ignore_index=True)
     # Do another groupby to combine any rows with duplicated groupbys because of
     # setting canopy_cover to T above.
-    carbon_df = carbon_df.groupby(groupby_cols, as_index=False)["carbon_emissions_MgCO2e"].sum()
+    carbon_df = carbon_df.groupby(groupby_cols, as_index=False)[
+        "carbon_emissions_MgCO2e"
+    ].sum()
 
     # Do groupby only with the TCL results to similarly drop out the mangroves and gain_from_height.
-    tcl_df = result_df.groupby(groupby_cols, as_index=False)[["area_ha", "tree_cover_loss_from_fires_area_ha"]].sum()
+    tcl_df = result_df.groupby(groupby_cols, as_index=False)[
+        ["area_ha", "tree_cover_loss_from_fires_area_ha"]
+    ].sum()
     # Now do an outer join to combine the TCL results with special carbon results
     # calculated above with the same set of group-by columns.
-    final_df = pd.merge(carbon_df, tcl_df, on=groupby_cols, how='outer', validate="one_to_one")
+    final_df = pd.merge(
+        carbon_df, tcl_df, on=groupby_cols, how="outer", validate="one_to_one"
+    )
     final_df[value_cols] = final_df[value_cols].fillna(0)
 
     results_with_ids = rollup_by_gadm_and_convert_to_aoi(final_df, contextual_cols)

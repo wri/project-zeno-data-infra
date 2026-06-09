@@ -84,7 +84,6 @@ class TestCarbonDataAdmin:
 
                 yield test_request, client, resource_tp
 
-    @pytest.mark.xfail(reason="Needs updating for TCL v1.13 values")
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
         test_request, client, resource_tp = setup
@@ -101,19 +100,19 @@ class TestCarbonDataAdmin:
                 "aoi_id": ["CHN", "IDN.25.3", "NGA.20.31"],
                 "aoi_type": ["admin", "admin", "admin"],
                 "carbon_net_flux_Mg_CO2e": [
-                    -11422581500.146715,
-                    24370083.802587524,
-                    -12.349344253540039,
+                    -11727475771.724575,
+                    26186895.461166743,
+                    -12.34934377670288,
                 ],
                 "carbon_gross_removals_Mg_CO2e": [
-                    17417177319.904095,
-                    28127167.23389721,
-                    12.349344253540039,
+                    18075612929.057934,
+                    28918309.474041566,
+                    12.34934377670288,
                 ],
                 "carbon_gross_emissions_Mg_CO2e": [
-                    5994595888.622183,
-                    52496919.891059,
-                    0.0,
+                    6348137153.639694,
+                    55105204.9604063,
+                    float("nan"),
                 ],
             }
         )
@@ -180,7 +179,6 @@ class TestCarbonDataFeature:
 
                 yield test_request, client, resource_tp
 
-    @pytest.mark.xfail(reason="Needs updating for TCL v1.13 values")
     @pytest.mark.asyncio
     async def test_resource_calculate_results(self, setup):
         test_request, client, resource_tp = setup
@@ -197,7 +195,7 @@ class TestCarbonDataFeature:
                 "aoi_id": ["test_aoi"],
                 "aoi_type": ["feature"],
                 "carbon_net_flux_Mg_CO2e": [32997.52734375],
-                "carbon_gross_removals_Mg_CO2e": [10810.841796875],
+                "carbon_gross_removals_Mg_CO2e": [11069.26929435134],
                 "carbon_gross_emissions_Mg_CO2e": [43808.37109375],
             }
         )
