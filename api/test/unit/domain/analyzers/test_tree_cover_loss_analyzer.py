@@ -75,8 +75,8 @@ class TestDatasetRepository(ZarrDatasetRepository):
             xarr.name = "is_intact_forest"
         elif dataset == Dataset.tree_cover_loss_from_fires:
             # Year codes per the real zarr: fire-loss year mirrors TCL year.
-            # Top half = 21 (fire-loss in 2021), bottom half = 0 (no fire loss).
-            data = np.vstack([np.full((5, 10), 21), np.full((5, 10), 0)])
+            # Top 3 rows = 21 (fire-loss in 2021), remaining rows = 0 (no fire loss).
+            data = np.vstack([np.full((3, 10), 21), np.full((7, 10), 0)])
             coords = {"x": np.arange(10), "y": np.arange(9, -1, -1)}
             xarr = xr.DataArray(data, coords=coords, dims=("x", "y"))
             xarr.name = "tree_cover_loss_from_fires_area_ha"
@@ -414,10 +414,11 @@ async def test_flox_handler_tree_cover_loss_from_fires():
     await analyzer.analyze(analysis)
     results = analysis.result
 
-    # Fixture: fires year=21 in the same top half where TCL year=21. With
-    # canopy_cover>=30 (right 5 cols) and TCL year filter 2010-2022 (top 5 rows),
-    # the 25 overlapping pixels are all fire-driven loss: fires = TCL = 125000;
-    # non-fires = 0.
+    # Fixture: fires year=21 in top 3 rows, TCL year=21 in top 5 rows. With
+    # canopy_cover>=30 (right 5 cols) and TCL year filter 2010-2022 (top 5 rows):
+    # - TCLF pixels: rows 0-2 x cols 5-9 = 15 pixels × 5000 ha = 75000 ha
+    # - non-fire TCL pixels: rows 3-4 x cols 5-9 = 10 pixels × 5000 ha = 50000 ha
+    # - total TCL = 125000 ha
     pd.testing.assert_frame_equal(
         pd.DataFrame(results),
         pd.DataFrame(
@@ -427,10 +428,8 @@ async def test_flox_handler_tree_cover_loss_from_fires():
                 "aoi_id": ["1234"],
                 "aoi_type": ["protected_area"],
                 "carbon_emissions_MgCO2e": [37.5],
-                "tree_cover_loss_from_fires_area_ha": [
-                    25.0
-                ],  # only half of pixels meet tcd>30
-                "tree_cover_loss_non_fires_area_ha": [124975.0],  # TCL - TCLF
+                "tree_cover_loss_from_fires_area_ha": [75000.0],  # 15 pixels × 5000 ha
+                "tree_cover_loss_non_fires_area_ha": [50000.0],  # TCL - TCLF
             },
         ),
         check_like=True,
