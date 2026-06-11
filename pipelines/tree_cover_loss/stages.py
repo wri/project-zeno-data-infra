@@ -1,8 +1,11 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+from shapely.geometry import Polygon
+
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     DATA_LAKE_BUCKET,
@@ -24,7 +27,6 @@ from pipelines.repositories.google_earth_engine_dataset_repository import (
     GoogleEarthEngineDatasetRepository,
 )
 from pipelines.repositories.qc_feature_repository import QCFeaturesRepository
-from shapely.geometry import Polygon
 
 PIPELINE_CHUNK_SIZE = 10_000
 OTF_CHUNK_SIZE = 4_000
@@ -492,6 +494,7 @@ def qc_against_validation_source(
     qc_feature_repository=None,
     gee_repository=None,
     qc_error_threshold=0.01,
+    max_workers: int = 10,
 ):
     if qc_feature_repository is None:
         qc_feature_repository = QCFeaturesRepository()
@@ -557,6 +560,16 @@ def qc_against_validation_source(
         print(f"\n{row.GID_2}\n{r}")
         return r
 
+    # Submit each row's GEE-backed QC check in parallel. The work is I/O-bound
+    # (HTTP roundtrips to GEE's highvolume endpoint), so threads give a near-
+    # linear speedup until we saturate the endpoint or our credentials. Order
+    # is preserved by executor.map so the positional assignment below still
+    # lines up with qc_features' row order.
+    rows = [row for _, row in qc_features.iterrows()]
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        feature_results = list(executor.map(qc_feature, rows))
+    results_df = pd.DataFrame(feature_results, index=qc_features.index)
+
     qc_features[
         [
             "qc_pass",
@@ -566,7 +579,7 @@ def qc_against_validation_source(
             "validation_natural_forest",
             "detail",
         ]
-    ] = qc_features.apply(qc_feature, axis=1)
+    ] = results_df.values
 
     if version is not None:
         qc_feature_repository.write_results(

@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Dict, Optional, Tuple
 
 import pandas as pd
@@ -10,7 +11,7 @@ from pipelines.globals import (
     country_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
-    thresh_to_pct
+    thresh_to_pct,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -236,13 +237,15 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
 
     # Pivot the carbon values to be their own columns based on the carbon type.
     df_pivoted = df.pivot_table(
-        index=['tree_cover_density', 'aoi_id', 'aoi_type'],
-        columns='carbontype',
-        values='value'
+        index=["tree_cover_density", "aoi_id", "aoi_type"],
+        columns="carbontype",
+        values="value",
     ).reset_index()
 
-    carbon_cols = ['carbon_gross_emissions', 'carbon_gross_removals', 'carbon_net_flux']
-    df_pivoted = df_pivoted.rename(columns={col: f"{col}_Mg_CO2e" for col in carbon_cols})
+    carbon_cols = ["carbon_gross_emissions", "carbon_gross_removals", "carbon_net_flux"]
+    df_pivoted = df_pivoted.rename(
+        columns={col: f"{col}_Mg_CO2e" for col in carbon_cols}
+    )
 
     # Remove the name of the columns axis (clean up the header)
     df_pivoted.columns.name = None
@@ -259,6 +262,7 @@ def qc_against_validation_source(
     qc_feature_repository=None,
     gee_repository=None,
     qc_error_threshold: float = 0.02,
+    max_workers: int = 10,
 ) -> bool:
     if qc_feature_repository is None:
         qc_feature_repository = QCFeaturesRepository()
@@ -305,6 +309,16 @@ def qc_against_validation_source(
         print(f"\n{row.GID_2}\n{r}")
         return r
 
+    # Submit each row's GEE-backed QC check in parallel. The work is I/O-bound
+    # (HTTP roundtrips to GEE's highvolume endpoint), so threads give a near-
+    # linear speedup until we saturate the endpoint or our credentials. Order
+    # is preserved by executor.map so the positional assignment below still
+    # lines up with qc_features' row order.
+    rows = [row for _, row in qc_features.iterrows()]
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        feature_results = list(executor.map(qc_feature, rows))
+    results_df = pd.DataFrame(feature_results, index=qc_features.index)
+
     qc_features[
         [
             "qc_pass",
@@ -313,7 +327,7 @@ def qc_against_validation_source(
             "sample_removals",
             "validation_removals",
         ]
-    ] = qc_features.apply(qc_feature, axis=1)
+    ] = results_df.values
 
     return bool(qc_features.qc_pass.all())
 

@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import threading
 
 import ee
 import xarray as xr
@@ -8,7 +9,7 @@ from shapely.geometry import mapping
 
 
 class GoogleEarthEngineDatasetRepository:
-    # lazy load ee assets since ee may not be initiazed yet
+    # lazy load ee assets since ee may not be initialized yet
     EE_ASSETS = {
         "loss": lambda: ee.Image("UMD/hansen/global_forest_change_2025_v1_13"),
         "tcl_drivers": lambda: ee.Image(
@@ -23,6 +24,11 @@ class GoogleEarthEngineDatasetRepository:
             "projects/wri-datalab/gfw-data-lake/v1-4-3-2001-2025/gross-removals-forest-extent-per-ha/gross-removals-global-forest-extent-per-ha-2001-2025"
         ),
     }
+
+    # Guards the lazy ee.Initialize() in `initialize` so that, when many
+    # threads call load() concurrently for the first time, only one of them
+    # actually performs initialization.
+    _init_lock = threading.Lock()
 
     def __init__(self, default_scale=0.00025, default_projection="EPSG:4326"):
         self.default_scale = default_scale
@@ -50,7 +56,13 @@ class GoogleEarthEngineDatasetRepository:
         return ds
 
     def initialize(self):
-        if not ee.data.is_initialized():
+        if ee.data.is_initialized():
+            return
+        with self._init_lock:
+            # Re-check inside the lock: another thread may have initialized
+            # while we were waiting.
+            if ee.data.is_initialized():
+                return
             gee_service_account_b64 = os.getenv("GEE_SERVICE_ACCOUNT_JSON")
             if gee_service_account_b64:
                 gee_service_account = json.loads(
@@ -62,7 +74,7 @@ class GoogleEarthEngineDatasetRepository:
                     key_data=json.dumps(gee_service_account),
                 )
                 ee.Initialize(
-                    creds, opt_url="https://earthengine-highvolume.googleapis.com"
+                    creds, url="https://earthengine-highvolume.googleapis.com"
                 )
             else:
                 raise RuntimeError("No valid EE credentials found")
