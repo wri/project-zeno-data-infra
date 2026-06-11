@@ -122,7 +122,7 @@ class NaturalLandsAnalyzer(Analyzer):
 
         pixel_area = read_zarr_clipped_to_geojson(
             pixel_area_obj_name, geojson, group="otf"
-        )
+        ).reindex_like(natural_lands, method="nearest", tolerance=1e-5)
 
         groupby_layers = [natural_lands]
         expected_groups = [np.arange(1, 22)]
