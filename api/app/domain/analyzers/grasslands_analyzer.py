@@ -104,7 +104,7 @@ class GrasslandsAnalyzer(Analyzer):
         ).sel(year=slice(start_year, end_year))
 
         pixel_area = read_zarr_clipped_to_geojson(
-            pixel_area_obj_name, geojson
+            pixel_area_obj_name, geojson, group="otf"
         ).reindex_like(grasslands, method="nearest", tolerance=1e-5)
 
         grasslands_only = (grasslands == 2).astype(np.uint8)

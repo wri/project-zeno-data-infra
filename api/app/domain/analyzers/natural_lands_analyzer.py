@@ -120,7 +120,9 @@ class NaturalLandsAnalyzer(Analyzer):
         ).band_data
         natural_lands.name = "natural_lands_class"
 
-        pixel_area = read_zarr_clipped_to_geojson(pixel_area_obj_name, geojson)
+        pixel_area = read_zarr_clipped_to_geojson(
+            pixel_area_obj_name, geojson, group="otf"
+        )
 
         groupby_layers = [natural_lands]
         expected_groups = [np.arange(1, 22)]
