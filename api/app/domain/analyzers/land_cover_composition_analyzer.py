@@ -109,7 +109,9 @@ class LandCoverCompositionAnalyzer(Analyzer):
     @staticmethod
     def analyze_area(aoi, geojson, land_cover_zarr_uri, pixel_area_zarr_uri):
         umd_land_cover = read_zarr_clipped_to_geojson(land_cover_zarr_uri, geojson)
-        pixel_area = read_zarr_clipped_to_geojson(pixel_area_zarr_uri, geojson)
+        pixel_area = read_zarr_clipped_to_geojson(
+            pixel_area_zarr_uri, geojson, group="otf"
+        )
 
         lc_data_2024 = umd_land_cover.band_data.sel(year=2024)
         lc_data_2024.name = "land_cover_class"

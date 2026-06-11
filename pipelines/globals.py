@@ -6,7 +6,7 @@ country_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries
 region_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm1.zarr"
 subregion_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm2.zarr"
 pixel_area_zarr_uri = (
-    f"s3://{ANALYTICS_BUCKET}/zarr/umd-area-2013/v1.10/pixel_area_ha.zarr"
+    f"s3://{ANALYTICS_BUCKET}/zarr/umd-area-2013/v1.10/area_ha_30m_f64.zarr"
 )
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
 sbtn_natural_lands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr"
@@ -29,7 +29,9 @@ umd_primary_forests_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-regional-primary-forest-2001/v201901/is.zarr/"
 )
 mangrove_stock_2000_zarr_uri = "s3://lcl-analytics/zarr/jpl_mangrove_aboveground_biomass_stock_2000/v201902/is_mangrove.zarr/"
-tree_cover_gain_from_height_zarr_uri = "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
+tree_cover_gain_from_height_zarr_uri = (
+    "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/"
+)
 
 
 # tcd threshold mapping

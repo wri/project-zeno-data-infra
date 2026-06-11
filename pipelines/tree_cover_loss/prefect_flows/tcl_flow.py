@@ -2,23 +2,22 @@ import logging
 from typing import Optional, Tuple
 
 import numpy as np
-from prefect import flow
-from shapely.geometry import box
-
 from pipelines.carbon_flux.stages import DATASETS as CARBON_FLUX_DATASETS
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     ifl_intact_forest_lands_zarr_uri,
+    mangrove_stock_2000_zarr_uri,
     pixel_area_zarr_uri,
     sbtn_natural_forests_zarr_uri,
     tree_cover_density_2000_zarr_uri,
-    umd_primary_forests_zarr_uri,
-    mangrove_stock_2000_zarr_uri,
     tree_cover_gain_from_height_zarr_uri,
+    umd_primary_forests_zarr_uri,
 )
 from pipelines.prefect_flows import common_tasks
 from pipelines.tree_cover_loss.prefect_flows import tcl_tasks
 from pipelines.utils import s3_uri_exists
+from prefect import flow
+from shapely.geometry import box
 
 
 @flow(name="Tree Cover Loss")
@@ -39,7 +38,7 @@ def umd_tree_cover_loss_flow(
         The S3 URI for the saved parquet result.
     """
     # Should match the admin_results_uri in tree_cover_loss_analyzer.py
-    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/tcl/{version}/admin-tree-cover-loss_v20260518.parquet"
+    result_uri = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/tcl/{version}/admin-tree-cover-loss_v20260609.parquet"
 
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri

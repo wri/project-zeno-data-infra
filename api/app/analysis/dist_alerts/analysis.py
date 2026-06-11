@@ -100,11 +100,14 @@ async def zonal_statistics(
     dist_alerts = read_zarr_clipped_to_geojson(dist_obj_name, geojson)
 
     pixel_area = read_zarr_clipped_to_geojson(
-        input_uris[str(Dataset.area_hectares)], geojson
+        input_uris[str(Dataset.area_hectares)], geojson, group="otf"
     ).band_data.reindex_like(dist_alerts, method="nearest", tolerance=1e-5)
 
     groupby_layers = [dist_alerts.alert_date, dist_alerts.confidence]
-    expected_groups = [np.arange(731, 2000), [1, 2, 3]]
+    expected_groups = [
+        np.arange(731, 3288),
+        [1, 2, 3],
+    ]  # Dates (2023/1/1 to 2030/1/1) and confidence
     if intersection == "natural_lands":
         natural_lands = read_zarr_clipped_to_geojson(
             input_uris["natural_lands_zarr_uri"],
