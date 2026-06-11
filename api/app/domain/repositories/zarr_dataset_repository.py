@@ -18,11 +18,9 @@ class ZarrDatasetRepository:
     # app/domain/models/dataset.py::Dataset
 
     _ZARR_URIS = {
-        Environment.staging: {
-            Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/area_ha_30m_f64.zarr",  # noqa: E501
-        },
+        Environment.staging: {},
         Environment.production: {
-            Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/pixel_area_ha.zarr",  # noqa: E501
+            Dataset.area_hectares: "s3://lcl-analytics/zarr/umd-area-2013/v1.10/area_ha_30m_f64.zarr",  # noqa: E501
             Dataset.canopy_cover: "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr",  # noqa: E501
             Dataset.carbon_emissions: "s3://lcl-analytics/zarr/gfw-carbon-gross-emissions/v20260327/Mg_CO2e.zarr",  # noqa: E501
             Dataset.intact_forest: "s3://lcl-analytics/zarr/ifl-intact-forest-landscapes-2000/v2021.1/is.zarr",  # noqa: E501
