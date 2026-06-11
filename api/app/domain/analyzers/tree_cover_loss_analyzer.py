@@ -41,8 +41,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
                 Dataset.tree_cover_loss,
                 Dataset.tree_cover_loss_drivers,
             ]
-        },
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260609.parquet",
+        }
     },
     Environment.production: {
         **{
@@ -58,7 +57,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
             ]
         },
         # Should match result_uri in tcl_flow.py in pipelines.
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260518.parquet",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260609.parquet",
     },
 }
 
