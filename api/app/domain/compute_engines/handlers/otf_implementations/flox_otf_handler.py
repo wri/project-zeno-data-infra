@@ -95,7 +95,13 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             xarr = dataset_repository.load(ds, geometry=aoi_geometry).reindex_like(
                 by, method="nearest", tolerance=1e-5
             )
-            by[ds.get_field_name()] = xarr
+            if ds == Dataset.tree_cover_loss_from_fires:
+                # TCLF zarr encodes lossyear identical to TCL, so here we get pixels
+                # where TCLF exists and replace with area_ha
+                # This assumes that area_hectares is ordered first in Datasets
+                by[ds.get_field_name()] = xr.where(xarr > 0, by["area_ha"], 0)
+            else:
+                by[ds.get_field_name()] = xarr
 
         objs = []
         expected_groups = []
