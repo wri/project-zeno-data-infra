@@ -4,6 +4,10 @@ import newrelic.agent as nr_agent
 import numpy as np
 
 from app.domain.analyzers.analyzer import Analyzer
+from app.domain.compute_engines.dask_client_router import DaskClientRouter
+from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
+    FloxOTFHandler,
+)
 from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
     PrecalcSqlQueryBuilder,
 )
@@ -15,6 +19,9 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
+from app.domain.repositories.data_api_aoi_geometry_repository import (
+    DataApiAoiGeometryRepository,
+)
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -55,7 +62,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
 }
 
 
-async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
+def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
     query = DatasetQuery(
         aggregate=DatasetAggregate(
             datasets=[Dataset.area_hectares, Dataset.carbon_emissions], func="sum"
@@ -118,8 +125,16 @@ async def build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
 
 
 class TreeCoverLossAnalyzer(Analyzer):
-    def __init__(self, compute_engine, input_uris: Dict[str, str] | None = None):
-        self.compute_engine = compute_engine
+    def __init__(
+        self,
+        dask_client_router: DaskClientRouter | None = None,
+        dataset_repository: ZarrDatasetRepository | None = None,
+        aoi_geometry_repository: DataApiAoiGeometryRepository | None = None,
+        input_uris: Dict[str, str] | None = None,
+    ):
+        self.dask_client_router = dask_client_router
+        self.dataset_repository = dataset_repository
+        self.aoi_geometry_repository = aoi_geometry_repository
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverLossAnalyzer.analyze")
@@ -138,17 +153,25 @@ class TreeCoverLossAnalyzer(Analyzer):
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:
             results[Dataset.carbon_emissions.get_field_name()] = np.nan
 
+        # For TCLF analysis we also want to calculate non-fire TCL
+        if "fire" in analytics_in.intersections:
+            results["tree_cover_loss_non_fires_area_ha"] = [
+                tcl_area - tclf_area
+                for tcl_area, tclf_area in zip(
+                    results["area_ha"],
+                    results["tree_cover_loss_from_fires_area_ha"],
+                )
+            ]
+
         analysis.result = results
 
     async def analyze_admin_areas(
         self,
         analytics_in: TreeCoverLossAnalyticsIn,
     ) -> Dict:
-        if self.input_uris is None:
-            raise Exception("Input URIs must be provided for actual analysis")
         query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
 
-        query: DatasetQuery = await build_query(analytics_in)
+        query: DatasetQuery = _build_query(analytics_in)
         query_builder = PrecalcSqlQueryBuilder()
         sql_str: str = query_builder.build(analytics_in.aoi.ids, query)
 
@@ -156,31 +179,19 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         results["aoi_type"] = ["admin"] * len(results["aoi_id"])
 
-        # for TCLF analysis we want to calculate non-fire TCL
-        if "fire" in analytics_in.intersections:
-            results["tree_cover_loss_non_fires_area_ha"] = [
-                tcl_area - tclf_area
-                for tcl_area, tclf_area in zip(
-                    results["area_ha"],
-                    results["tree_cover_loss_from_fires_area_ha"],
-                )
-            ]
-
         return results
 
-    async def analyze_otf(self, analytics_in: TreeCoverLossAnalyticsIn) -> Dict:
-        query: DatasetQuery = await build_query(analytics_in)
+    async def analyze_otf(
+        self, analytics_in: TreeCoverLossAnalyticsIn
+    ) -> Dict[str, list]:
+        query: DatasetQuery = _build_query(analytics_in)
 
-        results = await self.compute_engine.compute(analytics_in.aoi, query)
+        handler = FloxOTFHandler(
+            dataset_repository=self.dataset_repository,
+            aoi_geometry_repository=self.aoi_geometry_repository,
+            dask_client_router=self.dask_client_router,
+        )
 
-        # for TCLF analysis we want to calculate non-fire TCL
-        if "fire" in analytics_in.intersections:
-            results["tree_cover_loss_non_fires_area_ha"] = [
-                tcl_area - tclf_area
-                for tcl_area, tclf_area in zip(
-                    results["area_ha"],
-                    results["tree_cover_loss_from_fires_area_ha"],
-                )
-            ]
+        results = await handler.handle(analytics_in.aoi, query)
 
         return results
