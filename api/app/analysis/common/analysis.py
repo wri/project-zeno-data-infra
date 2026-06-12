@@ -7,6 +7,7 @@ from typing import Iterable
 
 import duckdb
 import httpx
+import numpy as np
 import xarray as xr
 from rioxarray.exceptions import NoDataInBounds
 from shapely.geometry import shape
@@ -65,12 +66,58 @@ async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_a
     return geojson
 
 
+def _infer_grid(coord: xr.DataArray) -> tuple[float, float]:
+    """Infer (pixel-edge origin, pixel step magnitude) from a 1-D coord.
+
+    The stored coordinate values are pixel centers and carry ~1e-11 of
+    floating-point jitter accumulated across the global axis. Using the
+    first two values gives us a step accurate to well within half a pixel,
+    which is all we need for snapping slice bounds to pixel edges.
+    """
+    values = coord.values
+    step = abs(float(values[1]) - float(values[0]))
+    # Edge origin sits half a pixel "before" the first pixel center.
+    # Direction-agnostic: works for ascending x and descending y.
+    first = float(values[0])
+    sign = 1.0 if values[-1] > values[0] else -1.0
+    origin = first - sign * step / 2.0
+    return origin, step
+
+
+def _snap_to_grid(
+    lo: float, hi: float, origin: float, step: float
+) -> tuple[float, float]:
+    """Snap [lo, hi] outward to the nearest pixel edges of the given grid.
+
+    The snapped bounds land on pixel boundaries — halfway between stored
+    pixel centers — so two zarrs on the same nominal grid but with slightly
+    different floating-point coordinate values will deterministically
+    select the same set of pixels.
+    """
+    lo_snapped = np.floor((lo - origin) / step) * step + origin
+    hi_snapped = np.ceil((hi - origin) / step) * step + origin
+    return float(lo_snapped), float(hi_snapped)
+
+
 def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
     geom = shape(geojson)
+    minx, miny, maxx, maxy = geom.bounds
+
+    # Snap the slice bounds to the dataset's nominal pixel grid before sel.
+    # Two zarrs that nominally share a grid may have x/y coord arrays that
+    # differ by ~1e-11 due to stored float64 jitter; without snapping, a
+    # geometry bound that lands within that jitter of a pixel center can
+    # cause sel to include the pixel in one zarr and exclude it in the
+    # other, producing off-by-one mismatches that break downstream
+    # alignment (e.g. flox.xarray_reduce with join="exact").
+    x_origin, x_step = _infer_grid(xarr.x)
+    y_origin, y_step = _infer_grid(xarr.y)
+    minx, maxx = _snap_to_grid(minx, maxx, x_origin, x_step)
+    miny, maxy = _snap_to_grid(miny, maxy, y_origin, y_step)
 
     sliced: xr.Dataset = xarr.sel(
-        x=slice(geom.bounds[0], geom.bounds[2]),
-        y=slice(geom.bounds[3], geom.bounds[1]),
+        x=slice(minx, maxx),
+        y=slice(maxy, miny),
     )
     if "band" in sliced.dims:
         sliced = sliced.squeeze("band")
