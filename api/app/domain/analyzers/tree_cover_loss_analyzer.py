@@ -127,9 +127,9 @@ def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
 class TreeCoverLossAnalyzer(Analyzer):
     def __init__(
         self,
-        dask_client_router: DaskClientRouter = None,
-        dataset_repository: ZarrDatasetRepository = None,
-        aoi_geometry_repository: DataApiAoiGeometryRepository = None,
+        dask_client_router: DaskClientRouter | None = None,
+        dataset_repository: ZarrDatasetRepository | None = None,
+        aoi_geometry_repository: DataApiAoiGeometryRepository | None = None,
         input_uris: Dict[str, str] | None = None,
     ):
         self.dask_client_router = dask_client_router
@@ -169,8 +169,6 @@ class TreeCoverLossAnalyzer(Analyzer):
         self,
         analytics_in: TreeCoverLossAnalyticsIn,
     ) -> Dict:
-        if self.input_uris is None:
-            raise Exception("Input URIs must be provided for actual analysis")
         query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
 
         query: DatasetQuery = _build_query(analytics_in)
