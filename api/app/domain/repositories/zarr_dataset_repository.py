@@ -30,6 +30,7 @@ class ZarrDatasetRepository:
             Dataset.tree_cover_gain: "s3://lcl-analytics/zarr/umd_tree_cover_gain_from_height/v20240126/period.zarr/",  # noqa: E501
             Dataset.tree_cover_loss: "s3://lcl-analytics/zarr/umd-tree-cover-loss/v1.13/year.zarr",  # noqa: E501
             Dataset.tree_cover_loss_drivers: "s3://lcl-analytics/zarr/wri-google-tree-cover-loss-drivers/v1.13/category.zarr",  # noqa: E501
+            Dataset.tree_cover_loss_from_fires: "s3://lcl-analytics/zarr/umd-tree-cover-loss-from-fires/v1.13/year.zarr",  # noqa: E501
         },
     }
 

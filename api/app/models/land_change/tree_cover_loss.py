@@ -108,16 +108,6 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
                 )
         return self
 
-    @model_validator(mode="after")
-    def validate_fire_intersection(self):
-        # TODO OTF TCLF support deferred to a follow-up PR
-        if "fire" in self.intersections and self.aoi.type != "admin":
-            raise ValueError(
-                "fire intersection is currently only available for admin areas."
-            )
-        return self
-
-
 class TreeCoverLossAnalytics(StrictBaseModel):
     result: Optional[dict] = None
     metadata: Optional[dict] = None
