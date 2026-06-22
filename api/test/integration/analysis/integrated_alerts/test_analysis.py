@@ -9,16 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.integrated_alerts_analyzer import (
     INPUT_URIS,
-    build_admin_query,
-    extract_params,
-    integrated_alerts_area,
-)
-from app.domain.analyzers.zonal_statistics.analyzer import ZonalStatisticsAnalyzer
-from app.domain.analyzers.zonal_statistics.dask_on_the_fly import (
-    DaskOnTheFlyStatistics,
-)
-from app.domain.analyzers.zonal_statistics.precomputed_admin_source import (
-    PrecomputedAdminSource,
+    IntegratedAlertsAnalyzer,
 )
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -52,38 +43,24 @@ def get_file_system_analysis_repository():
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
 
-def build_analyzer(compute_engine=None) -> ZonalStatisticsAnalyzer:
-    input_uris = INPUT_URIS[Environment.production]
-    return ZonalStatisticsAnalyzer(
-        model=IntegratedAlertsAnalyticsIn,
-        admin_source=PrecomputedAdminSource(
-            query_service=DuckDbPrecalcQueryService(
-                table_uri=input_uris["admin_results_table_uri"]
-            ),
-            build_query=build_admin_query,
-        ),
-        on_the_fly=DaskOnTheFlyStatistics(
-            compute_engine=compute_engine,
-            input_uris=input_uris,
-            area_fn=integrated_alerts_area,
-            extract_params=extract_params,
-        ),
-        input_uris=input_uris,
-    )
-
-
 def create_analysis_service_for_tests(
     request: Request, analysis_repository=Depends(get_file_system_analysis_repository)
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=build_analyzer(compute_engine=request.app.state.dask_client),
+        analyzer=IntegratedAlertsAnalyzer(
+            compute_engine=request.app.state.dask_client,
+            duckdb_query_service=DuckDbPrecalcQueryService(
+                table_uri=INPUT_URIS[Environment.production]["admin_results_table_uri"]
+            ),
+            input_uris=INPUT_URIS[Environment.production],
+        ),
         event=ANALYTICS_NAME,
     )
 
 
 async def post_analytics(analytics_in):
-    analyzer = build_analyzer()
+    analyzer = IntegratedAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     delete_resource_files(ANALYTICS_NAME, resource_tp)
