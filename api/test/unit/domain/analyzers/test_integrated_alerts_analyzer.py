@@ -7,7 +7,7 @@ import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
 
-from app.domain.analyzers import integrated_alerts_analyzer
+from app.domain.analyzers import zonal_statistics_analyzer
 from app.domain.analyzers.integrated_alerts_analyzer import IntegratedAlertsAnalyzer
 from app.domain.models.analysis import Analysis
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -113,7 +113,7 @@ class TestAnalyzerRouting:
         async def fake_get_geojson(aois):
             return [{"type": "Polygon", "coordinates": []}]
 
-        monkeypatch.setattr(integrated_alerts_analyzer, "get_geojson", fake_get_geojson)
+        monkeypatch.setattr(zonal_statistics_analyzer, "get_geojson", fake_get_geojson)
 
         analyzer = IntegratedAlertsAnalyzer(
             compute_engine=FakeEngine(), input_uris={"x": "y"}
@@ -157,13 +157,17 @@ class TestPrecomputedAdminAnalysis:
         analyzer = IntegratedAlertsAnalyzer(
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri=precomputed_admin_results
-            )
+            ),
+            input_uris={},
+        )
+        analysis = make_analysis(
+            {"type": "admin", "ids": ["BRA.1"]},
+            start_date="2024-01-01",
+            end_date="2024-12-31",
         )
 
-        result = await analyzer.analyze_admin_areas(
-            ["BRA.1"], "2024-01-01", "2024-12-31"
-        )
-        df = pd.DataFrame(result)
+        await analyzer.analyze(analysis)
+        df = pd.DataFrame(analysis.result)
 
         # ordered by aoi_id, alert_date, alert_confidence (high < highest < low)
         expected = pd.DataFrame(
