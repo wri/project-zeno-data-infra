@@ -16,7 +16,7 @@ from app.domain.models.analysis import Analysis
 from app.domain.models.environment import Environment
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
-ALERTS_CONFIDENCE = {2: "low", 3: "high"}
+ALERTS_CONFIDENCE = {2: "low", 3: "high", 4: "highest"}
 
 # We want to move this into configuration, but will tolerate it being here for now.
 # Note that it actually gets passed in to the constructor for easy moving later.
@@ -132,7 +132,7 @@ class IntegratedAlertsAnalyzer(Analyzer):
         groupby_layers = [alerts.alert_date, alerts.confidence]
         expected_groups = [
             np.arange(5000),  # days since 2020-12-31 (epoch matches the GADM parquet)
-            [2, 3],  # confidence: 2=low, 3=high
+            [2, 3, 4],  # confidence: 2=low, 3=high, 4=highest
         ]
 
         alerts_area = xarray_reduce(

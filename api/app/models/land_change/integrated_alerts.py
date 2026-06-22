@@ -49,11 +49,11 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
 
 class IntegratedAlertsAnalytics(StrictBaseModel):
     result: Optional[dict] = {  # column oriented for loading into a dataframe
-        "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
-        "aoi_type": ["admin", "admin", "admin"],
-        "alert_date": ["2024-01-01", "2024-01-03", "2024-01-03"],
-        "alert_confidence": ["low", "low", "high"],
-        "area_ha": [38, 5, 3],
+        "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12", "BRA.1.12"],
+        "aoi_type": ["admin", "admin", "admin", "admin"],
+        "alert_date": ["2024-01-01", "2024-01-03", "2024-01-03", "2024-01-03"],
+        "alert_confidence": ["low", "low", "high", "highest"],
+        "area_ha": [38, 5, 3, 2],
     }
     metadata: Optional[dict] = None
     message: Optional[str] = None

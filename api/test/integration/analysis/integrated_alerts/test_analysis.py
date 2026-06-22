@@ -177,6 +177,6 @@ class TestIntegratedAlertsPostWithFeatureCollection:
         assert (df.aoi_id == "test_otf").all()
         assert (df.aoi_type == "feature").all()
         assert df.area_ha.any()
-        assert set(df.alert_confidence.unique()).issubset({"low", "high"})
+        assert set(df.alert_confidence.unique()).issubset({"low", "high", "highest"})
         # aoi_id, aoi_type, alert_date, alert_confidence, area_ha
         assert df.columns.size == 5
