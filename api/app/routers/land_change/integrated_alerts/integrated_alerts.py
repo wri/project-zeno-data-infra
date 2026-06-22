@@ -6,7 +6,16 @@ from pydantic import UUID5
 from app.dependencies import get_environment
 from app.domain.analyzers.integrated_alerts_analyzer import (
     INPUT_URIS,
-    IntegratedAlertsAnalyzer,
+    build_admin_query,
+    extract_params,
+    integrated_alerts_area,
+)
+from app.domain.analyzers.zonal_statistics.analyzer import ZonalStatisticsAnalyzer
+from app.domain.analyzers.zonal_statistics.dask_on_the_fly import (
+    DaskOnTheFlyStatistics,
+)
+from app.domain.analyzers.zonal_statistics.precomputed_admin_source import (
+    PrecomputedAdminSource,
 )
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -41,16 +50,24 @@ def create_analysis_service(
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
+    input_uris = resolve_uris(INPUT_URIS, environment)
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=IntegratedAlertsAnalyzer(
-            compute_engine=request.app.state.dask_client,
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=resolve_uris(INPUT_URIS, environment)[
-                    "admin_results_table_uri"
-                ]
+        analyzer=ZonalStatisticsAnalyzer(
+            model=IntegratedAlertsAnalyticsIn,
+            admin_source=PrecomputedAdminSource(
+                query_service=DuckDbPrecalcQueryService(
+                    table_uri=input_uris["admin_results_table_uri"]
+                ),
+                build_query=build_admin_query,
             ),
-            input_uris=resolve_uris(INPUT_URIS, environment),
+            on_the_fly=DaskOnTheFlyStatistics(
+                compute_engine=request.app.state.dask_client,
+                input_uris=input_uris,
+                area_fn=integrated_alerts_area,
+                extract_params=extract_params,
+            ),
+            input_uris=input_uris,
         ),
         event=ANALYTICS_NAME,
     )
