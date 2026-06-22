@@ -1,10 +1,12 @@
-import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from app.analysis.integrated_alerts.query import create_gadm_integrated_alerts_query
 from app.domain.analyzers import integrated_alerts_analyzer
-from app.domain.analyzers.integrated_alerts_analyzer import IntegratedAlertsAnalyzer
+from app.domain.analyzers.integrated_alerts_analyzer import (
+    IntegratedAlertsAnalyzer,
+    full_date,
+    gadm_subquery,
+)
 from app.domain.models.analysis import Analysis
 from app.models.land_change.integrated_alerts import (
     ANALYTICS_NAME,
@@ -12,48 +14,56 @@ from app.models.land_change.integrated_alerts import (
 )
 
 
-class TestGadmQueryAdm2:
-    @pytest.fixture(autouse=True)
-    def setup_before_each(self):
-        self.query = create_gadm_integrated_alerts_query(
-            ["IDN", "24", "9"], "admin-intdist-alerts"
+class FakeQueryService:
+    def __init__(self):
+        self.query = None
+
+    async def execute(self, query):
+        self.query = query
+        return {
+            "aoi_id": ["IDN.24.9"],
+            "alert_date": ["2029-06-01"],
+            "alert_confidence": ["high"],
+            "area_ha": [1.0],
+        }
+
+
+def make_analysis(aoi, start_date="2029-01-01", end_date="2032-12-31") -> Analysis:
+    metadata = IntegratedAlertsAnalyticsIn(
+        aoi=aoi, start_date=start_date, end_date=end_date
+    ).model_dump()
+    return Analysis(result=None, metadata=metadata, status="pending")
+
+
+class TestGadmSubquery:
+    def test_adm2_filters_and_groups(self):
+        query = gadm_subquery("IDN.24.9", "2029-01-01", "2032-12-31")
+        assert "SELECT 'IDN.24.9' AS aoi_id" in query
+        assert "country = 'IDN' AND region = 24 AND subregion = 9" in query
+        assert (
+            "intdist_alert_date BETWEEN DATE '2029-01-01' AND DATE '2032-12-31'"
+            in query
         )
+        assert "GROUP BY intdist_alert_date, intdist_alert_confidence" in query
+        assert "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date" in query
+        assert "intdist_alert_confidence AS alert_confidence" in query
+        assert "SUM(area_ha)::FLOAT AS area_ha" in query
 
-    def test_select_clause_aliases_to_alert_columns(self):
-        expected_clause = (
-            "SELECT country, region, subregion, "
-            "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date, "
-            "intdist_alert_confidence AS alert_confidence, "
-            "SUM(area_ha)::FLOAT AS area_ha"
-        )
-        assert expected_clause in self.query
-
-    def test_from_clause(self):
-        assert "admin-intdist-alerts'" in self.query
-
-    def test_where_clause(self):
-        assert "WHERE country = 'IDN' AND region = 24 AND subregion = 9" in self.query
-
-    def test_group_by_clause(self):
-        expected_clause = (
-            "GROUP BY country, region, subregion, "
-            "intdist_alert_date, intdist_alert_confidence"
-        )
-        assert expected_clause in self.query
-
-    def test_order_by_clause(self):
-        expected_clause = (
-            "ORDER BY country, region, subregion, "
-            "intdist_alert_date, intdist_alert_confidence"
-        )
-        assert expected_clause in self.query
+    def test_iso_only_filters_by_country(self):
+        query = gadm_subquery("IDN", "2029-01-01", "2032-12-31")
+        assert "WHERE country = 'IDN' AND intdist_alert_date" in query
+        assert "region" not in query
+        assert "subregion" not in query
 
 
-class TestGadmQueryIso:
-    def test_iso_only_groups_by_country(self):
-        query = create_gadm_integrated_alerts_query(["IDN"], "admin-intdist-alerts")
-        assert "WHERE country = 'IDN'" in query
-        assert "GROUP BY country, intdist_alert_date, intdist_alert_confidence" in query
+class TestFullDate:
+    def test_year_only_start_and_end(self):
+        assert full_date("2029") == "2029-01-01"
+        assert full_date("2029", end=True) == "2029-12-31"
+
+    def test_full_date_passthrough(self):
+        assert full_date("2029-03-16") == "2029-03-16"
+        assert full_date("2029-03-16", end=True) == "2029-03-16"
 
 
 class TestIntegratedAlertsModel:
@@ -84,91 +94,49 @@ class TestIntegratedAlertsModel:
             )
 
 
-def make_analysis(aoi, start_date="2024-01-01", end_date="2024-12-31") -> Analysis:
-    metadata = IntegratedAlertsAnalyticsIn(
-        aoi=aoi, start_date=start_date, end_date=end_date
-    ).model_dump()
-    return Analysis(result=None, metadata=metadata, status="pending")
-
-
 class TestAnalyzerRouting:
     @pytest.mark.asyncio
-    async def test_admin_uses_precomputed(self, monkeypatch):
-        captured = {}
-
-        async def fake_precomputed(aoi, dask_client, version):
-            captured["called"] = "precomputed"
-            captured["version"] = version
-            return pd.DataFrame({"alert_date": ["2024-06-01"], "area_ha": [1.0]})
-
-        async def fake_otf(*args, **kwargs):
-            captured["called"] = "otf"
-            return pd.DataFrame()
-
-        monkeypatch.setattr(
-            integrated_alerts_analyzer, "get_precomputed_statistics", fake_precomputed
+    async def test_admin_uses_query_service_with_union_and_normalized_dates(self):
+        query_service = FakeQueryService()
+        analyzer = IntegratedAlertsAnalyzer(
+            duckdb_query_service=query_service, input_uris={}
         )
-        monkeypatch.setattr(
-            integrated_alerts_analyzer, "zonal_statistics_on_aois", fake_otf
+        analysis = make_analysis(
+            {"type": "admin", "ids": ["IDN", "BRA.1"]},
+            start_date="2029",
+            end_date="2032",
         )
-
-        analyzer = IntegratedAlertsAnalyzer(compute_engine=None, input_uris={})
-        analysis = make_analysis({"type": "admin", "ids": ["IDN.24.9"]})
-        analysis.metadata["_version"] = "v20260101"
 
         await analyzer.analyze(analysis)
 
-        assert captured["called"] == "precomputed"
-        assert captured["version"] == "v20260101"
+        assert "UNION ALL" in query_service.query
+        assert "SELECT 'IDN' AS aoi_id" in query_service.query
+        assert "SELECT 'BRA.1' AS aoi_id" in query_service.query
+        # year-only inputs are normalised to full dates
+        assert "DATE '2029-01-01' AND DATE '2032-12-31'" in query_service.query
+        assert analysis.result["aoi_type"] == ["admin"]
 
     @pytest.mark.asyncio
-    async def test_non_admin_uses_otf(self, monkeypatch):
-        captured = {}
+    async def test_non_admin_routes_to_otf(self, monkeypatch):
+        class RoutedToOtf(Exception):
+            pass
 
-        async def fake_precomputed(*args, **kwargs):
-            captured["called"] = "precomputed"
-            return pd.DataFrame()
+        class FakeEngine:
+            def map(self, *args, **kwargs):
+                raise RoutedToOtf()
 
-        async def fake_otf(input_uris, aoi, dask_client, version):
-            captured["called"] = "otf"
-            return pd.DataFrame({"alert_date": ["2024-06-01"], "area_ha": [1.0]})
+            async def gather(self, *args, **kwargs):
+                raise AssertionError("gather should not be reached")
 
-        monkeypatch.setattr(
-            integrated_alerts_analyzer, "get_precomputed_statistics", fake_precomputed
+        async def fake_get_geojson(aois):
+            return [{"type": "Polygon", "coordinates": []}]
+
+        monkeypatch.setattr(integrated_alerts_analyzer, "get_geojson", fake_get_geojson)
+
+        analyzer = IntegratedAlertsAnalyzer(
+            compute_engine=FakeEngine(), input_uris={"x": "y"}
         )
-        monkeypatch.setattr(
-            integrated_alerts_analyzer, "zonal_statistics_on_aois", fake_otf
-        )
-
-        analyzer = IntegratedAlertsAnalyzer(compute_engine=None, input_uris={})
         analysis = make_analysis({"type": "protected_area", "ids": ["555625448"]})
 
-        await analyzer.analyze(analysis)
-
-        assert captured["called"] == "otf"
-
-    @pytest.mark.asyncio
-    async def test_filters_by_date_range(self, monkeypatch):
-        async def fake_precomputed(aoi, dask_client, version):
-            return pd.DataFrame(
-                {
-                    "alert_date": ["2023-12-31", "2024-06-01", "2025-01-01"],
-                    "area_ha": [1.0, 2.0, 3.0],
-                }
-            )
-
-        monkeypatch.setattr(
-            integrated_alerts_analyzer, "get_precomputed_statistics", fake_precomputed
-        )
-
-        analyzer = IntegratedAlertsAnalyzer(compute_engine=None, input_uris={})
-        analysis = make_analysis(
-            {"type": "admin", "ids": ["IDN.24.9"]},
-            start_date="2024-01-01",
-            end_date="2024-12-31",
-        )
-
-        await analyzer.analyze(analysis)
-
-        assert analysis.result["alert_date"] == ["2024-06-01"]
-        assert analysis.result["area_ha"] == [2.0]
+        with pytest.raises(RoutedToOtf):
+            await analyzer.analyze(analysis)

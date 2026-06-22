@@ -49,9 +49,6 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
 
 class IntegratedAlertsAnalytics(StrictBaseModel):
     result: Optional[dict] = {  # column oriented for loading into a dataframe
-        "country": ["BRA", "BRA", "BRA"],
-        "region": [1, 1, 1],
-        "subregion": [12, 12, 12],
         "aoi_id": ["BRA.1.12", "BRA.1.12", "BRA.1.12"],
         "aoi_type": ["admin", "admin", "admin"],
         "alert_date": ["2024-01-01", "2024-01-03", "2024-01-03"],
