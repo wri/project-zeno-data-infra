@@ -5,7 +5,6 @@ from app.domain.analyzers import integrated_alerts_analyzer
 from app.domain.analyzers.integrated_alerts_analyzer import (
     IntegratedAlertsAnalyzer,
     full_date,
-    gadm_subquery,
 )
 from app.domain.models.analysis import Analysis
 from app.models.land_change.integrated_alerts import (
@@ -33,27 +32,6 @@ def make_analysis(aoi, start_date="2029-01-01", end_date="2032-12-31") -> Analys
         aoi=aoi, start_date=start_date, end_date=end_date
     ).model_dump()
     return Analysis(result=None, metadata=metadata, status="pending")
-
-
-class TestGadmSubquery:
-    def test_adm2_filters_and_groups(self):
-        query = gadm_subquery("IDN.24.9", "2029-01-01", "2032-12-31")
-        assert "SELECT 'IDN.24.9' AS aoi_id" in query
-        assert "country = 'IDN' AND region = 24 AND subregion = 9" in query
-        assert (
-            "intdist_alert_date BETWEEN DATE '2029-01-01' AND DATE '2032-12-31'"
-            in query
-        )
-        assert "GROUP BY intdist_alert_date, intdist_alert_confidence" in query
-        assert "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date" in query
-        assert "intdist_alert_confidence AS alert_confidence" in query
-        assert "SUM(area_ha)::FLOAT AS area_ha" in query
-
-    def test_iso_only_filters_by_country(self):
-        query = gadm_subquery("IDN", "2029-01-01", "2032-12-31")
-        assert "WHERE country = 'IDN' AND intdist_alert_date" in query
-        assert "region" not in query
-        assert "subregion" not in query
 
 
 class TestFullDate:
@@ -96,7 +74,7 @@ class TestIntegratedAlertsModel:
 
 class TestAnalyzerRouting:
     @pytest.mark.asyncio
-    async def test_admin_uses_query_service_with_union_and_normalized_dates(self):
+    async def test_admin_uses_query_service_with_in_clause_and_normalized_dates(self):
         query_service = FakeQueryService()
         analyzer = IntegratedAlertsAnalyzer(
             duckdb_query_service=query_service, input_uris={}
@@ -109,11 +87,14 @@ class TestAnalyzerRouting:
 
         await analyzer.analyze(analysis)
 
-        assert "UNION ALL" in query_service.query
-        assert "SELECT 'IDN' AS aoi_id" in query_service.query
-        assert "SELECT 'BRA.1' AS aoi_id" in query_service.query
+        # single scan keyed by aoi_id, not a per-id UNION ALL
+        assert "UNION ALL" not in query_service.query
+        assert "aoi_id IN ('IDN', 'BRA.1')" in query_service.query
         # year-only inputs are normalised to full dates
-        assert "DATE '2029-01-01' AND DATE '2032-12-31'" in query_service.query
+        assert (
+            "intdist_alert_date BETWEEN DATE '2029-01-01' AND DATE '2032-12-31'"
+            in query_service.query
+        )
         assert analysis.result["aoi_type"] == ["admin"]
 
     @pytest.mark.asyncio
