@@ -97,14 +97,18 @@ class IntegratedAlertsAnalyzer(Analyzer):
     async def analyze_admin_areas(
         self, gadm_ids, start_date, end_date
     ) -> Dict[str, Any]:
-        # The precomputed parquet is keyed by country/region/subregion, so each
-        # GADM id is aggregated to its admin level and labelled with its aoi_id.
-        subqueries = [
-            gadm_subquery(aoi_id, start_date, end_date) for aoi_id in gadm_ids
-        ]
+        # The precomputed parquet is keyed by aoi_id and preaggregated to each
+        # GADM level, so a single scan filtered by aoi_id serves every request.
+        id_list = ", ".join(f"'{aoi_id}'" for aoi_id in gadm_ids)
         query = (
-            " UNION ALL ".join(subqueries)
-            + " ORDER BY aoi_id, alert_date, alert_confidence"
+            "SELECT aoi_id, "
+            "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date, "
+            "intdist_alert_confidence AS alert_confidence, "
+            "area_ha "
+            "FROM data_source "
+            f"WHERE aoi_id IN ({id_list}) "
+            f"AND intdist_alert_date BETWEEN DATE '{start_date}' AND DATE '{end_date}' "
+            "ORDER BY aoi_id, alert_date, alert_confidence"
         )
         data: Dict = await self.duckdb_query_service.execute(query)
         data["aoi_type"] = ["admin"] * len(data["aoi_id"])
@@ -169,25 +173,3 @@ def full_date(value: str, end: bool = False) -> str:
     if len(value) == 4:
         return f"{value}-12-31" if end else f"{value}-01-01"
     return value
-
-
-def gadm_subquery(aoi_id: str, start_date: str, end_date: str) -> str:
-    parts = aoi_id.split(".")
-    filters = [f"country = '{parts[0]}'"]
-    if len(parts) > 1:
-        filters.append(f"region = {parts[1]}")
-    if len(parts) > 2:
-        filters.append(f"subregion = {parts[2]}")
-    filters.append(
-        f"intdist_alert_date BETWEEN DATE '{start_date}' AND DATE '{end_date}'"
-    )
-    where_clause = " AND ".join(filters)
-    return (
-        f"SELECT '{aoi_id}' AS aoi_id, "
-        "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date, "
-        "intdist_alert_confidence AS alert_confidence, "
-        "SUM(area_ha)::FLOAT AS area_ha "
-        "FROM data_source "
-        f"WHERE {where_clause} "
-        "GROUP BY intdist_alert_date, intdist_alert_confidence"
-    )
