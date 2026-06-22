@@ -1,18 +1,12 @@
 from functools import partial
-from typing import Any, Dict, List
+from typing import Dict
 
 import dask.dataframe as dd
-import newrelic.agent as nr_agent
 import numpy as np
 from flox.xarray import xarray_reduce
 
-from app.analysis.common.analysis import (
-    JULIAN_DATE_2021,
-    get_geojson,
-    read_zarr_clipped_to_geojson,
-)
-from app.domain.analyzers.analyzer import Analyzer
-from app.domain.models.analysis import Analysis
+from app.analysis.common.analysis import JULIAN_DATE_2021, read_zarr_clipped_to_geojson
+from app.domain.analyzers.zonal_statistics_analyzer import ZonalStatisticsAnalyzer
 from app.domain.models.environment import Environment
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
@@ -40,67 +34,18 @@ INPUT_URIS = {
 }
 
 
-class IntegratedAlertsAnalyzer(Analyzer):
+class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
     """Get integrated disturbance alert areas by date and confidence for the AOIs"""
 
-    def __init__(
-        self,
-        compute_engine=None,
-        duckdb_query_service=None,
-        input_uris: Dict[str, str] | None = None,
-    ):
-        self.compute_engine = compute_engine  # Dask Client, or not?
-        self.duckdb_query_service = duckdb_query_service
-        self.input_uris = input_uris
+    model = IntegratedAlertsAnalyticsIn
 
-    @nr_agent.function_trace(name="IntegratedAlertsAnalyzer.analyze")
-    async def analyze(self, analysis: Analysis) -> None:
-        if self.input_uris is None:
-            raise Exception("Input URIs must be provided for actual analysis")
-
-        integrated_alerts_in = IntegratedAlertsAnalyticsIn(**analysis.metadata)
-        start_date = full_date(integrated_alerts_in.start_date)
-        end_date = full_date(integrated_alerts_in.end_date, end=True)
-
-        if integrated_alerts_in.aoi.type == "admin":
-            gadm_ids: List = integrated_alerts_in.aoi.ids
-            results: Dict = await self.analyze_admin_areas(
-                gadm_ids, start_date, end_date
-            )
-        else:
-            aois = integrated_alerts_in.aoi.model_dump()
-            geojsons = await get_geojson(aois)
-            if aois["type"] != "feature_collection":
-                aoi_list = sorted(
-                    [{"type": aois["type"], "id": id} for id in aois["ids"]],
-                    key=lambda aoi: aoi["id"],
-                )
-            else:
-                aoi_list = aois["feature_collection"]["features"]
-                geojsons = [geojson["geometry"] for geojson in geojsons]
-
-            analysis_partial = partial(
-                self.analyze_area,
-                self.input_uris,
-                start_date=start_date,
-                end_date=end_date,
-            )
-            dd_df_futures = await self.compute_engine.gather(
-                self.compute_engine.map(analysis_partial, aoi_list, geojsons)
-            )
-            dfs = await self.compute_engine.gather(dd_df_futures)
-            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
-            results = combined_results_df.to_dict(orient="list")
-
-        analysis.result = results
-
-    async def analyze_admin_areas(
-        self, gadm_ids, start_date, end_date
-    ) -> Dict[str, Any]:
+    def build_admin_query(self, analytics_in) -> str:
         # The precomputed parquet is keyed by aoi_id and preaggregated to each
         # GADM level, so a single scan filtered by aoi_id serves every request.
-        id_list = ", ".join(f"'{aoi_id}'" for aoi_id in gadm_ids)
-        query = (
+        start_date = full_date(analytics_in.start_date)
+        end_date = full_date(analytics_in.end_date, end=True)
+        id_list = ", ".join(f"'{aoi_id}'" for aoi_id in analytics_in.aoi.ids)
+        return (
             "SELECT aoi_id, "
             "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date, "
             "intdist_alert_confidence AS alert_confidence, "
@@ -110,10 +55,14 @@ class IntegratedAlertsAnalyzer(Analyzer):
             f"AND intdist_alert_date BETWEEN DATE '{start_date}' AND DATE '{end_date}' "
             "ORDER BY aoi_id, alert_date, alert_confidence"
         )
-        data: Dict = await self.duckdb_query_service.execute(query)
-        data["aoi_type"] = ["admin"] * len(data["aoi_id"])
 
-        return data
+    def build_area_task(self, analytics_in):
+        return partial(
+            self.analyze_area,
+            self.input_uris,
+            start_date=full_date(analytics_in.start_date),
+            end_date=full_date(analytics_in.end_date, end=True),
+        )
 
     @staticmethod
     def analyze_area(
