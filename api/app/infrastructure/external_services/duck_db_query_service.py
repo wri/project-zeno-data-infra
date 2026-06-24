@@ -25,13 +25,16 @@ def run_query_sync(sql: str, params=None):
 
 
 class DuckDbPrecalcQueryService:
-    def __init__(self, table_uri):
+    def __init__(self, table_uri, timeout_seconds: float = 300):
         self.table_uri = table_uri
+        self.timeout_seconds = timeout_seconds
 
     async def execute(self, query: str) -> Dict:
         # replace data_source in query FROM with actual table URI
         query = query.replace("data_source", f"'{self.table_uri}'")
-        loop = asyncio.get_running_loop()
-        df = await loop.run_in_executor(process_pool, run_query_sync, query)
-
+        df = await asyncio.wait_for(self._run(query), timeout=self.timeout_seconds)
         return df.to_dict(orient="list")
+
+    async def _run(self, query: str):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(process_pool, run_query_sync, query)

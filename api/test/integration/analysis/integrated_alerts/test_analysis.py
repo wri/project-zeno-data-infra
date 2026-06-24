@@ -35,8 +35,8 @@ from app.use_cases.analysis.analysis_service import AnalysisService, resource_th
 
 # The precomputed parquet currently carries alert dates in the 2029-2032 range
 # (a known pipeline epoch offset), so the integration window targets those dates.
-START_DATE = "2029"
-END_DATE = "2032"
+START_DATE = "2029-01-01"
+END_DATE = "2032-12-31"
 
 
 def get_file_system_analysis_repository():

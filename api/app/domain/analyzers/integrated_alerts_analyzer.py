@@ -7,7 +7,9 @@ from flox.xarray import xarray_reduce
 
 from app.analysis.common.analysis import JULIAN_DATE_2021, read_zarr_clipped_to_geojson
 from app.domain.analyzers.zonal_statistics_analyzer import ZonalStatisticsAnalyzer
+from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
 ALERTS_CONFIDENCE = {2: "low", 3: "high", 4: "highest"}
@@ -22,13 +24,12 @@ INPUT_URIS = {
             "s3://lcl-analytics/zarr/gfw_integrated_dist_alerts/v20260601/"
             "date_conf.zarr"
         ),
-        "pixel_area_zarr_uri": (
-            "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/"
-            "area_m_10m_f32"
+        str(Dataset.area_hectares): ZarrDatasetRepository.resolve_zarr_uri(
+            Dataset.area_hectares, Environment.production
         ),
         "admin_results_table_uri": (
             "s3://lcl-analytics/zonal-statistics/intdist-alerts/v20260601/"
-            "admin-intdist-alerts.parquet"
+            "admin-intdist-alerts.aoi.parquet"
         ),
     },
 }
@@ -42,8 +43,8 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
     def build_admin_query(self, analytics_in) -> str:
         # The precomputed parquet is keyed by aoi_id and preaggregated to each
         # GADM level, so a single scan filtered by aoi_id serves every request.
-        start_date = full_date(analytics_in.start_date)
-        end_date = full_date(analytics_in.end_date, end=True)
+        start_date = analytics_in.start_date
+        end_date = analytics_in.end_date
         id_list = ", ".join(f"'{aoi_id}'" for aoi_id in analytics_in.aoi.ids)
         return (
             "SELECT aoi_id, "
@@ -60,8 +61,8 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
         return partial(
             self.analyze_area,
             self.input_uris,
-            start_date=full_date(analytics_in.start_date),
-            end_date=full_date(analytics_in.end_date, end=True),
+            start_date=analytics_in.start_date,
+            end_date=analytics_in.end_date,
         )
 
     @staticmethod
@@ -75,7 +76,7 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
         )
 
         pixel_area = read_zarr_clipped_to_geojson(
-            input_uris["pixel_area_zarr_uri"], geojson
+            input_uris[str(Dataset.area_hectares)], geojson, group="otf"
         ).band_data.reindex_like(alerts, method="nearest", tolerance=1e-5)
 
         groupby_layers = [alerts.alert_date, alerts.confidence]
@@ -115,10 +116,3 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
             & (df.alert_date <= end_date)
         ]
         return df
-
-
-def full_date(value: str, end: bool = False) -> str:
-    """Normalise a year-only value (YYYY) to a full YYYY-MM-DD date."""
-    if len(value) == 4:
-        return f"{value}-12-31" if end else f"{value}-01-01"
-    return value

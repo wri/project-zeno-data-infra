@@ -1,3 +1,4 @@
+import asyncio
 from abc import abstractmethod
 from typing import Any, Dict
 
@@ -25,10 +26,12 @@ class ZonalStatisticsAnalyzer(Analyzer):
         compute_engine=None,
         duckdb_query_service=None,
         input_uris: Dict[str, str] | None = None,
+        otf_timeout_seconds: float = 600,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.duckdb_query_service = duckdb_query_service
         self.input_uris = input_uris
+        self.otf_timeout_seconds = otf_timeout_seconds
 
     @nr_agent.function_trace(name="ZonalStatisticsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -50,6 +53,14 @@ class ZonalStatisticsAnalyzer(Analyzer):
         return data
 
     async def _run_on_the_fly(self, analytics_in) -> Dict[str, Any]:
+        # Bound the whole on-the-fly computation so a hung/slow Dask job fails the
+        # analysis (-> "failed") instead of leaving the resource pending forever.
+        return await asyncio.wait_for(
+            self._compute_on_the_fly(analytics_in),
+            timeout=self.otf_timeout_seconds,
+        )
+
+    async def _compute_on_the_fly(self, analytics_in) -> Dict[str, Any]:
         aois = analytics_in.aoi.model_dump()
         geojsons = await get_geojson(aois)
         if aois["type"] != "feature_collection":
