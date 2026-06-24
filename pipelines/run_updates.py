@@ -12,7 +12,7 @@ from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
-from pipelines.intdist.prefect_flows import intdist_flow
+from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -70,10 +70,10 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 
 
 @flow
-def run_intdist_update(version, overwrite=False, is_latest=False) -> list[str]:
+def run_integrated_alerts_update(version, overwrite=False, is_latest=False) -> list[str]:
     result_uris = []
 
-    result = intdist_flow.intdist_zarr_flow(version, overwrite=overwrite)
+    result = integrated_alerts_flow.integrated_alerts_zarr_flow(version, overwrite=overwrite)
     result_uris.append(result)
 
     return result_uris
@@ -82,13 +82,13 @@ def run_intdist_update(version, overwrite=False, is_latest=False) -> list[str]:
 class UpdateFlow(str, Enum):
     DIST_UPDATE = "dist_update"
     TCL_UPDATE = "tcl_update"
-    INTDIST_UPDATE = "intdist_update"
+    INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
 
 
 update_flows = {
     UpdateFlow.DIST_UPDATE: run_dist_update,
     UpdateFlow.TCL_UPDATE: run_tcl_update,
-    UpdateFlow.INTDIST_UPDATE: run_intdist_update,
+    UpdateFlow.INTEGRATED_ALERTS_UPDATE: run_integrated_alerts_update,
 }
 
 

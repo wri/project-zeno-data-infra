@@ -3,10 +3,10 @@ from typing import Optional, Tuple
 import xarray as xr
 from prefect import task
 
-from pipelines.intdist import stages
+from pipelines.integrated_alerts import stages
 from pipelines.globals import ANALYTICS_BUCKET
 
-INTDIST_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/intdist-alerts"
+INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
 
 
 @task
