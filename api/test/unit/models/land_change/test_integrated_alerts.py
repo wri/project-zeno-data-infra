@@ -33,3 +33,12 @@ class TestIntegratedAlertsAnalyticsIn:
                 start_date="not-a-date",
                 end_date="2024-12-31",
             )
+
+    def test_rejects_year_only_date(self):
+        # Integrated alerts requires full YYYY-MM-DD dates, not year-only.
+        with pytest.raises(ValidationError):
+            IntegratedAlertsAnalyticsIn(
+                aoi={"type": "admin", "ids": ["IDN.24.9"]},
+                start_date="2024",
+                end_date="2024-12-31",
+            )

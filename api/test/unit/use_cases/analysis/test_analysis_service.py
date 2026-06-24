@@ -309,6 +309,43 @@ class TestTreeCoverLossServiceCollaborators:
             ),
         )
 
+    @pytest.mark.asyncio
+    async def test_timeout_error_stores_timeout_message_in_result(
+        self,
+        stub_analysis_in,
+        mock_analysis_repository,
+        mock_analyzer,
+    ):
+        ############
+        # Arrange  #
+        ############
+        mock_analysis_repository.load_analysis.side_effect = [
+            Analysis(result=None, metadata=None, status=None)
+        ]
+
+        mock_analyzer.analyze.side_effect = [TimeoutError()]
+
+        analysis_service = AnalysisService(
+            analysis_repository=mock_analysis_repository,
+            analyzer=mock_analyzer,
+            event="test_endpoint_name",
+        )
+
+        ############
+        # Act      #
+        ############
+        await analysis_service.set_resource_from(stub_analysis_in)
+        await analysis_service.do()
+
+        ############
+        # Assert   #
+        ############
+        assert analysis_service.get_status() == AnalysisStatus.failed
+        stored = mock_analysis_repository.store_analysis.call_args.args[1]
+        assert stored.status == AnalysisStatus.failed
+        assert "error" in stored.result
+        assert "timed out" in stored.result["error"].lower()
+
 
 def _make_analyzer(thumbprint: uuid.UUID) -> MagicMock:
     analyzer = MagicMock(spec=Analyzer)

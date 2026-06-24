@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import patch
 
 import dask
@@ -10,6 +11,7 @@ import xarray as xr
 from app.domain.analyzers import zonal_statistics_analyzer
 from app.domain.analyzers.integrated_alerts_analyzer import IntegratedAlertsAnalyzer
 from app.domain.models.analysis import Analysis
+from app.domain.models.dataset import Dataset
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -37,20 +39,6 @@ Y_VALS = np.linspace(48.0, 47.99775, 10)  # latitude, descending (matches clip s
 X_VALS = np.linspace(105.0, 105.00225, 10)  # longitude, ascending
 
 
-class FakeQueryService:
-    def __init__(self):
-        self.query = None
-
-    async def execute(self, query):
-        self.query = query
-        return {
-            "aoi_id": ["IDN.24.9"],
-            "alert_date": ["2029-06-01"],
-            "alert_confidence": ["high"],
-            "area_ha": [1.0],
-        }
-
-
 def make_analysis(aoi, start_date="2029-01-01", end_date="2032-12-31") -> Analysis:
     metadata = IntegratedAlertsAnalyticsIn(
         aoi=aoi, start_date=start_date, end_date=end_date
@@ -58,57 +46,18 @@ def make_analysis(aoi, start_date="2029-01-01", end_date="2032-12-31") -> Analys
     return Analysis(result=None, metadata=metadata, status="pending")
 
 
-class TestAnalyzerRouting:
-    """analyze() dispatch and date normalization. The query/transform behavior
-    itself is covered by the analysis tests below."""
-
+class TestOtfTimeout:
     @pytest.mark.asyncio
-    async def test_admin_normalizes_year_only_dates(self):
-        query_service = FakeQueryService()
-        analyzer = IntegratedAlertsAnalyzer(
-            duckdb_query_service=query_service, input_uris={}
-        )
-        analysis = make_analysis(
-            {"type": "admin", "ids": ["IDN", "BRA.1"]},
-            start_date="2029",
-            end_date="2032",
-        )
-
-        await analyzer.analyze(analysis)
-
-        # year-only inputs are widened to a full date window before querying
-        assert "2029-01-01" in query_service.query
-        assert "2032-12-31" in query_service.query
-        assert analysis.result["aoi_type"] == ["admin"]
-
-    @pytest.mark.asyncio
-    async def test_admin_passes_full_dates_through(self):
-        query_service = FakeQueryService()
-        analyzer = IntegratedAlertsAnalyzer(
-            duckdb_query_service=query_service, input_uris={}
-        )
-        analysis = make_analysis(
-            {"type": "admin", "ids": ["IDN.24.9"]},
-            start_date="2029-03-16",
-            end_date="2030-06-01",
-        )
-
-        await analyzer.analyze(analysis)
-
-        assert "2029-03-16" in query_service.query
-        assert "2030-06-01" in query_service.query
-
-    @pytest.mark.asyncio
-    async def test_non_admin_routes_to_otf(self, monkeypatch):
-        class RoutedToOtf(Exception):
-            pass
-
-        class FakeEngine:
+    async def test_otf_times_out_when_compute_hangs(self, monkeypatch):
+        class HangingEngine:
             def map(self, *args, **kwargs):
-                raise RoutedToOtf()
+                return ["future"]
 
             async def gather(self, *args, **kwargs):
-                raise AssertionError("gather should not be reached")
+                await asyncio.sleep(10)
+
+            async def compute(self, *args, **kwargs):
+                await asyncio.sleep(10)
 
         async def fake_get_geojson(aois):
             return [{"type": "Polygon", "coordinates": []}]
@@ -116,11 +65,13 @@ class TestAnalyzerRouting:
         monkeypatch.setattr(zonal_statistics_analyzer, "get_geojson", fake_get_geojson)
 
         analyzer = IntegratedAlertsAnalyzer(
-            compute_engine=FakeEngine(), input_uris={"x": "y"}
+            compute_engine=HangingEngine(),
+            input_uris={"x": "y"},
+            otf_timeout_seconds=0.01,
         )
         analysis = make_analysis({"type": "protected_area", "ids": ["555625448"]})
 
-        with pytest.raises(RoutedToOtf):
+        with pytest.raises(asyncio.TimeoutError):
             await analyzer.analyze(analysis)
 
 
@@ -223,7 +174,7 @@ class TestOtfAnalysis:
 
         input_uris = {
             "integrated_alerts_zarr_uri": "memory://alerts",
-            "pixel_area_zarr_uri": "memory://area",
+            str(Dataset.area_hectares): "memory://area",
         }
         aoi = {"type": "Feature", "properties": {"id": "test_otf"}}
         # polygon encloses the whole grid so every pixel survives the clip
@@ -245,6 +196,9 @@ class TestOtfAnalysis:
                 input_uris, aoi, geojson, "2020-01-01", "2099-12-31"
             )
             computed = result_df.compute()
+
+        # pixel-area is read from the hectares zarr's "otf" group (2nd read_zarr call)
+        assert mock_read_zarr.call_args_list[1].kwargs.get("group") == "otf"
 
         computed = computed.sort_values("alert_confidence").reset_index(drop=True)
 

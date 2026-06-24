@@ -2,7 +2,7 @@ from typing import Annotated, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
-from ..common.analysis import DATE_REGEX, AnalysisStatus, AnalyticsIn
+from ..common.analysis import AnalysisStatus, AnalyticsIn
 from ..common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
@@ -13,6 +13,9 @@ from ..common.areas_of_interest import (
 from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "integrated_alerts"
+
+# Full YYYY-MM-DD dates only; year-only values are not accepted.
+DATE_REGEX = r"^\d{4}-(0?[1-9]|1[012])-(0?[1-9]|[12][0-9]|3[01])$"
 
 AoiUnion = Union[
     AdminAreaOfInterest,
@@ -34,16 +37,16 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
     start_date: str = Field(
         ...,
         title="Start Date",
-        description="Must be either year or YYYY-MM-DD date format.",
+        description="Must be in YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
-        examples=["2023", "2023-01-01"],
+        examples=["2023-01-01"],
     )
     end_date: str = Field(
         ...,
         title="End Date",
-        description="Must be either year or YYYY-MM-DD date format.",
+        description="Must be in YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
-        examples=["2024", "2024-12-31"],
+        examples=["2024-12-31"],
     )
 
 

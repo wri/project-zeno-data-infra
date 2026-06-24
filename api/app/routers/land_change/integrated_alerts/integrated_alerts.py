@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
@@ -51,6 +53,7 @@ def create_analysis_service(
                 ]
             ),
             input_uris=resolve_uris(INPUT_URIS, environment),
+            otf_timeout_seconds=float(os.environ.get("OTF_TIMEOUT_SECONDS", 600)),
         ),
         event=ANALYTICS_NAME,
     )
