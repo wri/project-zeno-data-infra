@@ -9,6 +9,7 @@ class Dataset(Enum):
     # the production env in zarr_dataset_repository.py, and a field name in the
     # dictionary below
     area_hectares = "area_hectares"
+    pixel_area_m2_10m = "pixel_area_m2_10m"
     canopy_cover = "canopy_cover"
     carbon_emissions = "carbon_emissions"
     intact_forest = "intact_forest"
@@ -23,6 +24,7 @@ class Dataset(Enum):
     def get_field_name(self):
         DATASET_TO_NAMES = {
             Dataset.area_hectares: "area_ha",
+            Dataset.pixel_area_m2_10m: "area_m2",
             Dataset.canopy_cover: "canopy_cover",
             Dataset.carbon_emissions: "carbon_emissions_MgCO2e",
             Dataset.intact_forest: "is_intact_forest",

@@ -174,7 +174,7 @@ class TestOtfAnalysis:
 
         input_uris = {
             "integrated_alerts_zarr_uri": "memory://alerts",
-            str(Dataset.area_hectares): "memory://area",
+            str(Dataset.pixel_area_m2_10m): "memory://area",
         }
         aoi = {"type": "Feature", "properties": {"id": "test_otf"}}
         # polygon encloses the whole grid so every pixel survives the clip
@@ -197,9 +197,6 @@ class TestOtfAnalysis:
             )
             computed = result_df.compute()
 
-        # pixel-area is read from the hectares zarr's "otf" group (2nd read_zarr call)
-        assert mock_read_zarr.call_args_list[1].kwargs.get("group") == "otf"
-
         computed = computed.sort_values("alert_confidence").reset_index(drop=True)
 
         expected = (
@@ -207,11 +204,12 @@ class TestOtfAnalysis:
                 {
                     "alert_date": ["2023-12-31", "2023-12-31", "2023-12-31"],
                     "alert_confidence": ["high", "highest", "low"],
-                    # high=rows3-6, highest=rows7-9, low=rows0-2; 10 pixels per row
+                    # COLUMN_AREAS are m² per pixel; 10 pixels/row, m² -> ha (/10000).
+                    # high=rows3-6, highest=rows7-9, low=rows0-2.
                     "area_ha": [
-                        10 * COLUMN_AREAS[3:7].sum(),
-                        10 * COLUMN_AREAS[7:10].sum(),
-                        10 * COLUMN_AREAS[0:3].sum(),
+                        10 * COLUMN_AREAS[3:7].sum() / 10000,
+                        10 * COLUMN_AREAS[7:10].sum() / 10000,
+                        10 * COLUMN_AREAS[0:3].sum() / 10000,
                     ],
                     "aoi_type": ["feature", "feature", "feature"],
                     "aoi_id": ["test_otf", "test_otf", "test_otf"],

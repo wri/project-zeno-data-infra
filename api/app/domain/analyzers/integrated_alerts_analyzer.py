@@ -24,8 +24,8 @@ INPUT_URIS = {
             "s3://lcl-analytics/zarr/gfw_integrated_dist_alerts/v20260601/"
             "date_conf.zarr"
         ),
-        str(Dataset.area_hectares): ZarrDatasetRepository.resolve_zarr_uri(
-            Dataset.area_hectares, Environment.production
+        str(Dataset.pixel_area_m2_10m): ZarrDatasetRepository.resolve_zarr_uri(
+            Dataset.pixel_area_m2_10m, Environment.production
         ),
         "admin_results_table_uri": (
             "s3://lcl-analytics/zonal-statistics/intdist-alerts/v20260601/"
@@ -75,9 +75,16 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
             input_uris["integrated_alerts_zarr_uri"], geojson
         )
 
-        pixel_area = read_zarr_clipped_to_geojson(
-            input_uris[str(Dataset.area_hectares)], geojson, group="otf"
-        ).band_data.reindex_like(alerts, method="nearest", tolerance=1e-5)
+        # The 10m pixel-area raster is in m²; cast to float64 and convert to
+        # hectares so it matches the 10m alerts grid and the admin path's units.
+        pixel_area = (
+            read_zarr_clipped_to_geojson(
+                input_uris[str(Dataset.pixel_area_m2_10m)], geojson
+            )
+            .band_data.astype(np.float64)
+            .reindex_like(alerts, method="nearest", tolerance=1e-5)
+            / 10000
+        )
 
         groupby_layers = [alerts.alert_date, alerts.confidence]
         expected_groups = [
