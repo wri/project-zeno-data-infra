@@ -3,6 +3,7 @@ import xarray as xr
 import pandas as pd
 import io
 import boto3
+import rasterio
 
 from pipelines.globals import ANALYTICS_BUCKET, DATA_LAKE_BUCKET
 from pipelines.utils import s3_uri_exists
@@ -44,16 +45,26 @@ def create_zarr(version, overwrite=False) -> str:
     tile_uris = tiles.features.apply(
         lambda x: "/".join(["s3:/"] + x["properties"]["name"].split("/")[2:])
     )
-    print("Starting open_mfdataset")
-    dataset = xr.open_mfdataset(
-        tile_uris,
-        parallel=True,
-        engine="rasterio",
-        chunks={"x": 10000, "y": 10000},
-    )
-    decoded_alert_data = decode_alert_data(dataset.band_data)
-    print("Starting to_zarr")
-    decoded_alert_data.to_zarr(zarr_uri, mode="w")
-    print("Done to_zarr")
+
+    # Add these extra config options to make sure the operation doesn't fail
+    # due to transient "slow-down" returns from S3, because of all the parallel
+    # requests to the same folder.
+    with rasterio.Env(
+            GDAL_HTTP_MAX_RETRY=5,              # Try up to 5 times before failing
+            GDAL_HTTP_RETRY_DELAY=2,            # Wait 2 seconds before the first retry (uses exponential backoff)
+            GDAL_HTTP_RETRY_CODES="429,500,502,503,504",  # Trigger retries on these HTTP codes
+            GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR"  # Stop GDAL from listing S3 bucket looking for sidecar files
+    ):
+        print("Starting open_mfdataset")
+        dataset = xr.open_mfdataset(
+            tile_uris,
+            parallel=True,
+            engine="rasterio",
+            chunks={"x": 10000, "y": 10000},
+        )
+        decoded_alert_data = decode_alert_data(dataset.band_data)
+        print("Starting to_zarr")
+        decoded_alert_data.to_zarr(zarr_uri, mode="w")
+        print("Done to_zarr")
 
     return zarr_uri
