@@ -4,6 +4,16 @@ import xarray as xr
 from prefect import task
 
 from pipelines.integrated_alerts import stages
+from pipelines.globals import ANALYTICS_BUCKET
+
+INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
+
+
+@task
+def load_data(
+    zarr_uri: str, contextual_uri: Optional[str] = None
+) -> Tuple[xr.DataArray, ...]:
+    return stages.load_data(zarr_uri, contextual_uri)
 
 
 @task
