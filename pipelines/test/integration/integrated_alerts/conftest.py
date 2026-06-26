@@ -80,11 +80,14 @@ def subregion_ds():
 
 @pytest.fixture
 def pixel_area_ds():
+
     pixel_area = xr.Dataset(
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array([[[750.0, 750.0], [750.0, 750.0]]], dtype=np.float32),
+                da.array(
+                    [[[25000.0, 25000.0], [25000.0, 25000.0]]], dtype=np.float32
+                ),
             )
         },
     )

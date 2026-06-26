@@ -75,7 +75,7 @@ def test_gadm_integrated_alerts_result(
                 ],
             ),
             "alert_confidence": Column(str, Check.isin(["low", "high"])),
-            "area_ha": Column("float64", Check.isin([750.0, 1500.0])),
+            "area_ha": Column("float64", Check.isin([2.5, 5.0])),
         },
         unique=[
             "aoi_id",
@@ -118,10 +118,10 @@ def test_gadm_integrated_alerts_result(
     assert (result["aoi_type"] == "admin").all()
     assert not {"country", "region", "subregion"} & set(result.columns)
 
-    # every admin level totals the same area (4 px x 750)
+    # every admin level totals the same area (4 px x 2.5 ha)
     country_total = result[~result.aoi_id.str.contains(r"\.")]["area_ha"].sum()
     subregion_total = result[result.aoi_id.str.count(r"\.") == 2]["area_ha"].sum()
-    assert country_total == subregion_total == 3000.0
+    assert country_total == subregion_total == 10.0
 
     # verify dates and confidence levels
     bra_by_date = dict(
@@ -180,7 +180,7 @@ def test_gadm_integrated_alerts_multi_admin_rollup(
     assert (result["aoi_type"] == "admin").all()
 
     # verify area is correct per country across adm levels
-    # BRA = 2px, IDN = 2px, each px = 750ha
+    # BRA = 2px, IDN = 2px, each px = 2.5 ha
     for country, n_pixels in (("BRA", 2), ("IDN", 2)):
         prefix = f"{country}."
         country_total = result.loc[result.aoi_id == country, "area_ha"].sum()
@@ -195,7 +195,7 @@ def test_gadm_integrated_alerts_multi_admin_rollup(
             "area_ha",
         ].sum()
         assert (
-            country_total == region_total == subregion_total == n_pixels * 750.0
+            country_total == region_total == subregion_total == n_pixels * 2.5
         )
 
 
