@@ -33,10 +33,10 @@ from app.routers.land_change.integrated_alerts.integrated_alerts import (
 )
 from app.use_cases.analysis.analysis_service import AnalysisService, resource_thumbprint
 
-# The precomputed parquet currently carries alert dates in the 2029-2032 range
-# (a known pipeline epoch offset), so the integration window targets those dates.
-START_DATE = "2029-01-01"
-END_DATE = "2032-12-31"
+# Real-world date window: the admin parquet carries corrected dates (2023-2026)
+# and the OTF path is read against the 2015 epoch, so both land in this range.
+START_DATE = "2023-01-01"
+END_DATE = "2026-12-31"
 
 
 def get_file_system_analysis_repository():

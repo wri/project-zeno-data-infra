@@ -146,7 +146,7 @@ class TestOtfAnalysis:
         # all appear in the result.
         confidence_by_row = np.array([2, 2, 2, 3, 3, 3, 3, 4, 4, 4], dtype=np.uint8)
         confidence = np.tile(confidence_by_row[:, np.newaxis], (1, 10))
-        alert_date = np.full((10, 10), 1095, dtype=np.int64)  # -> 2023-12-31
+        alert_date = np.full((10, 10), 1095, dtype=np.int64)  # 2015 epoch -> 2017-12-30
 
         return xr.Dataset(
             {
@@ -193,7 +193,7 @@ class TestOtfAnalysis:
 
         with dask.config.set(scheduler="synchronous"):
             result_df = IntegratedAlertsAnalyzer.analyze_area(
-                input_uris, aoi, geojson, "2020-01-01", "2099-12-31"
+                input_uris, aoi, geojson, "2015-01-01", "2099-12-31"
             )
             computed = result_df.compute()
 
@@ -202,7 +202,7 @@ class TestOtfAnalysis:
         expected = (
             pd.DataFrame(
                 {
-                    "alert_date": ["2023-12-31", "2023-12-31", "2023-12-31"],
+                    "alert_date": ["2017-12-30", "2017-12-30", "2017-12-30"],
                     "alert_confidence": ["high", "highest", "low"],
                     # COLUMN_AREAS are m² per pixel; 10 pixels/row, m² -> ha (/10000).
                     # high=rows3-6, highest=rows7-9, low=rows0-2.
