@@ -106,6 +106,28 @@ class AnalysisService:
                     status=self.analytics_resource.status,
                 ),
             )
+        except TimeoutError as e:
+            logging.warning(
+                {
+                    "event": f"{self.event}_analytics_timeout",
+                    "severity": "medium",
+                    "metadata": self.analytics_resource.metadata,
+                    "error_details": str(e),
+                }
+            )
+            self.analytics_resource.status = AnalysisStatus.failed
+            self.analytics_resource.result = {
+                "error": "Analysis timed out. Try a smaller AOI or a shorter "
+                "date range."
+            }
+            await self.analysis_repository.store_analysis(
+                self.analytics_resource_id,
+                Analysis(
+                    metadata=self.analytics_resource.metadata,
+                    result=self.analytics_resource.result,
+                    status=self.analytics_resource.status,
+                ),
+            )
         except Exception as e:
             logging.error(
                 {
