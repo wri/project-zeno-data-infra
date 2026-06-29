@@ -79,7 +79,7 @@ class TestPrecomputedAdminAnalysis:
     @pytest.fixture
     def precomputed_admin_results(self, tmp_path):
         # Parquet keyed by aoi_id and preaggregated to grain
-        # (aoi_id, intdist_alert_date, intdist_alert_confidence).
+        # (aoi_id, alert_date, alert_confidence).
         rows = [
             ("BRA.1", "2024-01-01", "low", 10.0),
             ("BRA.1", "2024-01-01", "high", 5.0),
@@ -92,14 +92,14 @@ class TestPrecomputedAdminAnalysis:
             rows,
             columns=[
                 "aoi_id",
-                "intdist_alert_date",
-                "intdist_alert_confidence",
+                "alert_date",
+                "alert_confidence",
                 "area_ha",
             ],
         )
-        df["intdist_alert_date"] = pd.to_datetime(df["intdist_alert_date"])
+        df["alert_date"] = pd.to_datetime(df["alert_date"])
 
-        parquet_file = tmp_path / "admin-intdist-alerts.parquet"
+        parquet_file = tmp_path / "admin-integrated-alerts.parquet"
         df.to_parquet(parquet_file, index=False)
         return parquet_file
 

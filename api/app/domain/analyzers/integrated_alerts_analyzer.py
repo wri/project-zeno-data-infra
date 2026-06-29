@@ -14,6 +14,10 @@ from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
 ALERTS_CONFIDENCE = {2: "low", 3: "high", 4: "highest"}
 
+# Interpret alert-date codes against a 2014-12-31 epoch (start of 2015; 2192 days
+# before the 2020-12-31 base), shifting alert dates 6 years earlier.
+JULIAN_DATE_2015 = JULIAN_DATE_2021 - 2192
+
 # We want to move this into configuration, but will tolerate it being here for now.
 # Note that it actually gets passed in to the constructor for easy moving later.
 # Please DO NOT directly reference in constructor.
@@ -28,8 +32,8 @@ INPUT_URIS = {
             Dataset.pixel_area_m2_10m, Environment.production
         ),
         "admin_results_table_uri": (
-            "s3://lcl-analytics/zonal-statistics/intdist-alerts/v20260601/"
-            "admin-intdist-alerts.aoi.parquet"
+            "s3://lcl-analytics/zonal-statistics/integrated-alerts/v20260621/"
+            "admin-integrated-alerts.area-corrected.parquet"
         ),
     },
 }
@@ -48,12 +52,12 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
         id_list = ", ".join(f"'{aoi_id}'" for aoi_id in analytics_in.aoi.ids)
         return (
             "SELECT aoi_id, "
-            "STRFTIME(intdist_alert_date, '%Y-%m-%d') AS alert_date, "
-            "intdist_alert_confidence AS alert_confidence, "
+            "STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, "
+            "alert_confidence, "
             "area_ha "
             "FROM data_source "
             f"WHERE aoi_id IN ({id_list}) "
-            f"AND intdist_alert_date BETWEEN DATE '{start_date}' AND DATE '{end_date}' "
+            f"AND alert_date BETWEEN DATE '{start_date}' AND DATE '{end_date}' "
             "ORDER BY aoi_id, alert_date, alert_confidence"
         )
 
@@ -88,7 +92,7 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
 
         groupby_layers = [alerts.alert_date, alerts.confidence]
         expected_groups = [
-            np.arange(5000),  # days since 2020-12-31 (epoch matches the GADM parquet)
+            np.arange(5000),  # days since 2014-12-31 (epoch matches the GADM parquet)
             [2, 3, 4],  # confidence: 2=low, 3=high, 4=highest
         ]
 
@@ -111,7 +115,7 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
             ALERTS_CONFIDENCE, meta=("alert_confidence", "object")
         )
         df.alert_date = dd.to_datetime(
-            df.alert_date + JULIAN_DATE_2021, origin="julian", unit="D"
+            df.alert_date + JULIAN_DATE_2015, origin="julian", unit="D"
         ).dt.strftime("%Y-%m-%d")
 
         df["aoi_type"] = aoi["type"].lower()
