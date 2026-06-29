@@ -1,51 +1,45 @@
 import logging
 
-import numpy as np
-from prefect import flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
 
-from pipelines.globals import DATA_LAKE_BUCKET
-from pipelines.natural_lands.prefect_flows import nl_tasks
-from pipelines.prefect_flows import common_tasks
-from pipelines.utils import s3_uri_exists
+from pipelines.integrated_alerts.prefect_flows.gadm_integrated_alerts import integrated_alerts_area
+from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.integrated_alerts.create_zarr import create_zarr
+
+logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
 
-@flow(name="Integrated_alerts")
-def gadm_integrated_alerts_count(overwrite: bool = False):
-    logging.getLogger("distributed.client").setLevel(logging.ERROR)  # or logging.ERROR
+@task
+def get_new_integrated_alerts_version() -> str:
+    return get_latest_version("gfw_integrated_dist_alerts")
 
-    base_uri = "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/pixel_area_ha.zarr"
-    contextual_uri = (
-        "s3://gfw-data-lake/sbtn_natural_lands/zarr/sbtn_natural_lands_all_classes.zarr"
+
+@task
+def create_zarr_task(dist_version: str, overwrite=False) -> str:
+    zarr_uri = create_zarr(dist_version, overwrite=overwrite)
+    return zarr_uri
+
+
+@flow(
+    name="Create int-Dist zarr",
+    log_prints=True,
+    description="Create zarr from tiles of one version of the integrated disturbance alerts dataset",
+)
+def integrated_alerts_zarr_flow(version=None, overwrite=False) -> list[str]:
+    logger = get_run_logger()
+    result_uris = []
+
+    if version is None:
+        version = get_new_integrated_alerts_version()
+        logger.info(f"Latest int-dist version: {version}")
+
+    integrated_alerts_zarr_uri = create_zarr_task(version, overwrite=overwrite)
+
+    # Base GADM dist alerts
+    gadm_dist_result = integrated_alerts_area(
+        integrated_alerts_zarr_uri, version, overwrite=overwrite
     )
-    contextual_column_name = "integrated_alerts"
-    result_uri = f"s3://{DATA_LAKE_BUCKET}/sbtn_natural_lands/tabular/zonal_stats/gadm/gadm_adm2.parquet"
-    funcname = "count"
+    result_uris.append(gadm_dist_result)
 
-    if not overwrite and s3_uri_exists(result_uri):
-        return result_uri
-
-    expected_groups = (
-        np.arange(999),  # country iso codes
-        np.arange(1, 86),  # region codes
-        np.arange(1, 854),  # subregion codes
-        np.arange(1, 22),  # natural lands categories
-    )
-
-    datasets = common_tasks.load_data.with_options(
-        name="area-by-natural-lands-load-data"
-    )(base_uri, contextual_uri=contextual_uri)
-
-    compute_input = nl_tasks.setup_compute.with_options(
-        name="set-up-area-by-natural-lands-compute"
-    )(datasets, expected_groups, contextual_name=contextual_column_name)
-
-    result_dataset = common_tasks.compute_zonal_stat.with_options(
-        name="area-by-natural-lands-compute-zonal-stats"
-    )(*compute_input, funcname=funcname)
-    result_df = nl_tasks.postprocess_result.with_options(
-        name="area-by-natural-lands-postprocess-result"
-    )(result_dataset)
-    result_uri = common_tasks.save_result.with_options(
-        name="area-by-natural-lands-save-result"
-    )(result_df, result_uri)
-    return result_uri
+    return result_uris
