@@ -14,12 +14,14 @@ from pipelines.globals import (
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
+)
+from pipelines.prefect_flows.common_stages import (
     rollup_by_gadm_and_convert_to_aoi,
 )
 
 ExpectedGroupsType = Tuple
 
-alerts_confidence = {2: "low", 3: "high"}
+alerts_confidence = {2: "low", 3: "high", 4: "highest"}
 
 
 def load_data(
@@ -45,12 +47,12 @@ def load_data(
         alerts, method="nearest", tolerance=1e-5
     )
     subregion_aligned = xr.align(alerts, subregion, join="left")[1].band_data
-    pixel_area = _load_zarr(pixel_area_10m_zarr_uri).reindex_like(
-        alerts, method="nearest", tolerance=1e-5
-    ).astype(np.float64)
-    pixel_area_aligned = (
-        xr.align(alerts, pixel_area, join="left")[1].band_data / 10000
+    pixel_area = (
+        _load_zarr(pixel_area_10m_zarr_uri)
+        .reindex_like(alerts, method="nearest", tolerance=1e-5)
+        .astype(np.float64)
     )
+    pixel_area_aligned = xr.align(alerts, pixel_area, join="left")[1].band_data
 
     if contextual_uri is not None:
         contextual_layer = _load_zarr(contextual_uri).reindex_like(
@@ -78,9 +80,7 @@ def setup_compute(
     contextual_column_name: Optional[str] = None,
 ) -> Tuple:
     """Setup the arguments for the xarray reduce on alerts"""
-    (alerts, country,
-     region, subregion,
-     pixel_area, contextual_layer) = datasets
+    (alerts, country, region, subregion, pixel_area, contextual_layer) = datasets
 
     base_layer = pixel_area
     groupbys: Tuple[xr.DataArray, ...] = (
@@ -108,10 +108,8 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df["alert_date"] = df.sort_values(by="alert_date").alert_date.apply(
         lambda x: date(2014, 12, 31) + relativedelta(days=x)
     )
-    df["alert_confidence"] = df.alert_confidence.apply(
-        lambda x: alerts_confidence[x]
-    )
-    df = rollup_by_gadm_and_convert_to_aoi(df, ['alert_date', 'alert_confidence'])
+    df["alert_confidence"] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
+    df = rollup_by_gadm_and_convert_to_aoi(df, ["alert_date", "alert_confidence"])
     return df
 
 
