@@ -74,7 +74,7 @@ def test_gadm_integrated_alerts_result(
                     ),
                 ],
             ),
-            "alert_confidence": Column(str, Check.isin(["low", "high"])),
+            "alert_confidence": Column(str, Check.isin(["low", "high", "highest"])),
             "area_ha": Column("float64", Check.isin([2.5, 5.0])),
         },
         unique=[
@@ -132,7 +132,10 @@ def test_gadm_integrated_alerts_result(
     )
     assert bra_by_date[datetime.date(2023, 1, 1)] == "low"  # day 2923
     assert bra_by_date[datetime.date(2023, 2, 1)] == "high"  # day 2954
-    assert bra_by_date[datetime.date(2023, 3, 19)] == "high"  # day 3000
+    assert bra_by_date[datetime.date(2023, 3, 19)] == "highest"  # day 3000
+
+    # all three confidence levels are represented, including highest (code 4)
+    assert set(result["alert_confidence"]) == {"low", "high", "highest"}
 
 
 @pytest.mark.slow
@@ -194,9 +197,7 @@ def test_gadm_integrated_alerts_multi_admin_rollup(
             & (result.aoi_id.str.count(r"\.") == 2),
             "area_ha",
         ].sum()
-        assert (
-            country_total == region_total == subregion_total == n_pixels * 2.5
-        )
+        assert country_total == region_total == subregion_total == n_pixels * 2.5
 
 
 @pytest.mark.slow

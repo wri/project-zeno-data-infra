@@ -52,7 +52,7 @@ def load_data(
         .reindex_like(alerts, method="nearest", tolerance=1e-5)
         .astype(np.float64)
     )
-    pixel_area_aligned = xr.align(alerts, pixel_area, join="left")[1].band_data
+    pixel_area_aligned = xr.align(alerts, pixel_area, join="left")[1].band_data / 10000
 
     if contextual_uri is not None:
         contextual_layer = _load_zarr(contextual_uri).reindex_like(

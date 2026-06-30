@@ -1,7 +1,7 @@
-import pytest
-import numpy as np
-import xarray as xr
 import dask.array as da
+import numpy as np
+import pytest
+import xarray as xr
 
 
 @pytest.fixture
@@ -11,14 +11,19 @@ def expected_groups():
         [76],  # Country values in minimal data
         [7],  # Region values
         [124, 125],  # Subregion values
-        [2923, 2954, 3000], # Alert date values in minimal data (days since 2014-12-31):
+        [
+            2923,
+            2954,
+            3000,
+        ],  # Alert date values in minimal data (days since 2014-12-31):
         [2, 3],  # Confidence values in minimal data
     )
 
 
 @pytest.fixture
 def integrated_alerts_ds():
-    confidence_data = da.array([[[3, 2], [2, 3]]], dtype=np.int16)
+    # confidence codes: 2=low, 3=high, 4=highest
+    confidence_data = da.array([[[3, 2], [2, 4]]], dtype=np.int16)
     alert_date_data = da.array([[[2954, 2923], [2923, 3000]]], dtype=np.int16)
     integrated_alerts = xr.Dataset(
         data_vars={
@@ -85,9 +90,7 @@ def pixel_area_ds():
         data_vars={
             "band_data": (
                 ("band", "y", "x"),
-                da.array(
-                    [[[25000.0, 25000.0], [25000.0, 25000.0]]], dtype=np.float32
-                ),
+                da.array([[[25000.0, 25000.0], [25000.0, 25000.0]]], dtype=np.float32),
             )
         },
     )
@@ -98,7 +101,7 @@ def pixel_area_ds():
 @pytest.fixture
 def multi_admin_alerts_ds():
     """Alerts spanning BRA and IDN with uniform confidence and date so
-     the rollup exercised is purely spatial."""
+    the rollup exercised is purely spatial."""
     confidence_data = da.array([[[3, 3], [3, 3]]], dtype=np.int16)
     alert_date_data = da.array([[[2923, 2923], [2923, 2923]]], dtype=np.int16)
     integrated_alerts = xr.Dataset(
