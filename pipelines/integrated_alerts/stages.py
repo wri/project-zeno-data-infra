@@ -48,6 +48,7 @@ def load_data(
     pixel_area = _load_zarr(pixel_area_10m_zarr_uri).reindex_like(
         alerts, method="nearest", tolerance=1e-5
     ).astype(np.float64)
+    # Convert pixel area from square meters to hectares.
     pixel_area_aligned = (
         xr.align(alerts, pixel_area, join="left")[1].band_data / 10000
     )

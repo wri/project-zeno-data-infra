@@ -11,7 +11,7 @@ def expected_groups():
         [76],  # Country values in minimal data
         [7],  # Region values
         [124, 125],  # Subregion values
-        [2923, 2954, 3000], # Alert date values in minimal data (days since 2014-12-31):
+        [2923, 2954, 3000],  # Alert date values in minimal data (days since 2014-12-31):
         [2, 3],  # Confidence values in minimal data
     )
 
