@@ -20,8 +20,7 @@ JULIAN_DATE_2015 = JULIAN_DATE_2021 - 2192
 
 # Version-independent inputs only. The zarr and admin parquet are versioned; their
 # version comes from the `latest` marker in S3, resolved at the router (the edge)
-# and passed to build_input_uris. We want to move this into configuration, but
-# will tolerate it being here for now.
+# and passed to build_input_uris.
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
