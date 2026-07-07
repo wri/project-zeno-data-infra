@@ -12,13 +12,25 @@ class QCFeaturesRepository:
         qc_features = gpd.read_file(self.QC_FEATURES_URI)
 
         if aoi_id is not None:
-            return qc_features[
-                (qc_features["GID_2"] == aoi_id)
-            ]
+            return qc_features[(qc_features["GID_2"] == aoi_id)]
         elif limit is not None:
             return qc_features[start:limit]
 
         return qc_features
+
+    def load_tropical(self, lat_limit=30.0, limit=None, start=0):
+        """QC features fully within +/- lat_limit degrees (the tropical band the
+        integrated-alerts GEE asset covers), with the admin-2 aoi_id derived from
+        GID_2 (e.g. 'BRA.7.124_1' -> 'BRA.7.124')."""
+        features = gpd.read_file(self.QC_FEATURES_URI)
+        bounds = features.bounds
+        tropical = features[
+            (bounds["miny"] >= -lat_limit) & (bounds["maxy"] <= lat_limit)
+        ].copy()
+        tropical["aoi_id"] = tropical["GID_2"].str.split("_").str[0]
+        if limit is not None:
+            tropical = tropical.iloc[start : start + limit]
+        return tropical
 
     def write_results(self, results: gpd.GeoDataFrame, analysis: str, version: str):
         output_uri = (

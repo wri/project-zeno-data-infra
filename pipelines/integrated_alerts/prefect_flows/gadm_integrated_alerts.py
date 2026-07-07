@@ -1,14 +1,20 @@
 import numpy as np
-from prefect import flow
+from prefect import flow, task
 
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_common_tasks
+from pipelines.integrated_alerts.qc import qc_against_gee
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
 
+@task(name="integrated-alerts-qc")
+def qc_integrated_alerts(result_df, version):
+    return qc_against_gee(result_df, version)
+
+
 @flow(name="Integrated alerts area", retries=2, retry_delay_seconds=120)
 def integrated_alerts_area(
-    integrated_alerts_zarr_uri: str, version: str, overwrite=False
+    integrated_alerts_zarr_uri: str, version: str, overwrite=False, run_qc=True
 ):
     result_uri = (
         f"{integrated_alerts_common_tasks.INTEGRATED_ALERTS_PREFIX}"
@@ -43,6 +49,12 @@ def integrated_alerts_area(
     result_df = integrated_alerts_common_tasks.postprocess_result.with_options(
         name="integrated-alerts-postprocess-result"
     )(result_dataset)
+
+    if run_qc and not qc_integrated_alerts(result_df, version):
+        raise AssertionError(
+            "Integrated alerts QC failed against the GEE tropics asset"
+        )
+
     common_tasks.save_result.with_options(name="integrated-alerts-save-result")(
         result_df, result_uri
     )

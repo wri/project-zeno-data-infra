@@ -15,6 +15,9 @@ class GoogleEarthEngineDatasetRepository:
             "projects/landandcarbon/assets/wri_gdm_drivers_forest_loss_1km/v1_3_2001_2025"
         ),
         "area": lambda: ee.Image.pixelArea(),
+        "integrated_alerts": lambda: ee.Image(
+            "projects/forma-250/assets/gfw_integrated_dist_alerts/intdist_tropics"
+        ),
         "natural_lands": lambda: ee.Image("WRI/SBTN/naturalLands/v1_1/2020"),
         "carbon_gross_emissions": lambda: ee.Image(
             "projects/wri-datalab/gfw-data-lake/v1-4-3-2001-2025/gross-emissions-forest-extent-per-ha/gross-emissions-global-forest-extent-per-ha-2001-2025"
