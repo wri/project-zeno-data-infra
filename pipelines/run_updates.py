@@ -73,7 +73,9 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 def run_integrated_alerts_update(version, overwrite=False, is_latest=False) -> list[str]:
     result_uris = []
 
-    result = integrated_alerts_flow.integrated_alerts_zarr_flow(version, overwrite=overwrite)
+    result = integrated_alerts_flow.integrated_alerts_zarr_flow(version,
+                                                                overwrite=overwrite,
+                                                                is_latest=is_latest)
     result_uris.append(result)
 
     return result_uris
