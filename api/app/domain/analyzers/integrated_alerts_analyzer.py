@@ -8,7 +8,7 @@ from flox.xarray import xarray_reduce
 from app.analysis.common.analysis import JULIAN_DATE_2021, read_zarr_clipped_to_geojson
 from app.domain.analyzers.zonal_statistics_analyzer import ZonalStatisticsAnalyzer
 from app.domain.models.dataset import Dataset
-from app.domain.models.environment import Environment
+from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
@@ -18,25 +18,38 @@ ALERTS_CONFIDENCE = {2: "low", 3: "high", 4: "highest"}
 # before the 2020-12-31 base), shifting alert dates 6 years earlier.
 JULIAN_DATE_2015 = JULIAN_DATE_2021 - 2192
 
-# We want to move this into configuration, but will tolerate it being here for now.
-# Note that it actually gets passed in to the constructor for easy moving later.
-# Please DO NOT directly reference in constructor.
+# Version-independent inputs only. The zarr and admin parquet are versioned; their
+# version comes from the `latest` marker in S3, resolved at the router (the edge)
+# and passed to build_input_uris. We want to move this into configuration, but
+# will tolerate it being here for now.
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
-        "integrated_alerts_zarr_uri": (
-            "s3://lcl-analytics/zarr/gfw_integrated_dist_alerts/v20260601/"
-            "date_conf.zarr"
-        ),
         str(Dataset.pixel_area_m2_10m): ZarrDatasetRepository.resolve_zarr_uri(
             Dataset.pixel_area_m2_10m, Environment.production
         ),
-        "admin_results_table_uri": (
-            "s3://lcl-analytics/zonal-statistics/integrated-alerts/v20260621/"
-            "admin-integrated-alerts.area-corrected.parquet"
-        ),
     },
 }
+
+
+def build_input_uris(version: str, environment: Environment) -> Dict[str, str]:
+    """Resolve the full input-URI set for a given data version.
+
+    The zarr and admin parquet live under the version prefix; pixel area is
+    version-independent. ``version`` is read from the ``latest`` marker in S3 at
+    the router and threaded in here so nothing hardcodes a single version.
+    """
+    versioned = {
+        "integrated_alerts_zarr_uri": (
+            f"s3://lcl-analytics/zarr/gfw_integrated_dist_alerts/{version}/"
+            "date_conf.zarr"
+        ),
+        "admin_results_table_uri": (
+            f"s3://lcl-analytics/zonal-statistics/integrated-alerts/{version}/"
+            "admin-integrated-alerts.parquet"
+        ),
+    }
+    return {**resolve_uris(INPUT_URIS, environment), **versioned}
 
 
 class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):

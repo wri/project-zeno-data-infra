@@ -8,8 +8,8 @@ from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.integrated_alerts_analyzer import (
-    INPUT_URIS,
     IntegratedAlertsAnalyzer,
+    build_input_uris,
 )
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -33,6 +33,10 @@ from app.routers.land_change.integrated_alerts.integrated_alerts import (
 )
 from app.use_cases.analysis.analysis_service import AnalysisService, resource_thumbprint
 
+# Pin the integration test to a known-good published version.
+VERSION = "v20260706"
+INPUT_URIS = build_input_uris(VERSION, Environment.production)
+
 # Real-world date window: the admin parquet carries corrected dates (2023-2026)
 # and the OTF path is read against the 2015 epoch, so both land in this range.
 START_DATE = "2023-01-01"
@@ -51,16 +55,16 @@ def create_analysis_service_for_tests(
         analyzer=IntegratedAlertsAnalyzer(
             compute_engine=request.app.state.dask_client,
             duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=INPUT_URIS[Environment.production]["admin_results_table_uri"]
+                table_uri=INPUT_URIS["admin_results_table_uri"]
             ),
-            input_uris=INPUT_URIS[Environment.production],
+            input_uris=INPUT_URIS,
         ),
         event=ANALYTICS_NAME,
     )
 
 
 async def post_analytics(analytics_in):
-    analyzer = IntegratedAlertsAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    analyzer = IntegratedAlertsAnalyzer(input_uris=INPUT_URIS)
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     delete_resource_files(ANALYTICS_NAME, resource_tp)
