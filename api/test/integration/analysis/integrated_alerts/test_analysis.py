@@ -30,6 +30,7 @@ from app.models.land_change.integrated_alerts import (
 from app.routers.land_change.integrated_alerts.integrated_alerts import (
     create_analysis_service,
     get_analysis_repository,
+    get_latest_integrated_alerts_version,
 )
 from app.use_cases.analysis.analysis_service import AnalysisService, resource_thumbprint
 
@@ -64,6 +65,9 @@ def create_analysis_service_for_tests(
 
 
 async def post_analytics(analytics_in):
+    # The router sets _version from the S3 `latest` marker; pin it here so the
+    # expected thumbprint matches the API's regardless of the live marker.
+    analytics_in._version = VERSION
     analyzer = IntegratedAlertsAnalyzer(input_uris=INPUT_URIS)
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
@@ -75,6 +79,7 @@ async def post_analytics(analytics_in):
     app.dependency_overrides[get_analysis_repository] = (
         get_file_system_analysis_repository
     )
+    app.dependency_overrides[get_latest_integrated_alerts_version] = lambda: VERSION
 
     async with LifespanManager(app):
         async with AsyncClient(
