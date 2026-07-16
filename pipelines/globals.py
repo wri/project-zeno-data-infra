@@ -22,6 +22,12 @@ afolu_vegetation_zarr_uri = (
     "version_1_0_5__standard__global/mega_zarr/annual_intervals/4000_pixels/"
     "20260130/vegetation_zarr.zarr"
 )
+# Mineral soil organic carbon (SOC v1.0.1). 5-year interval axis (index 0..4);
+# per-hectare stock-change rates. (Organic peat soil is a follow-up.)
+afolu_soc_zarr_uri = (
+    "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/"
+    "version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr"
+)
 
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
 sbtn_natural_lands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr"

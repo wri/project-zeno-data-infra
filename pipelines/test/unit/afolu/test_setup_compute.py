@@ -1,10 +1,10 @@
-from pipelines.afolu_vegetation import stages
+from pipelines.afolu import stages
 
 
 def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
     datasets, expected_groups = synthetic_datasets
 
-    cube, groupbys, out_expected_groups = stages.setup_compute(
+    cube, groupbys, out_expected_groups = stages.setup_vegetation_compute(
         datasets, expected_groups
     )
 
@@ -28,7 +28,7 @@ def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
         "country",
         "region",
         "subregion",
-        "veg_category",
+        "category",
         "year",
     ]
     assert out_expected_groups is expected_groups

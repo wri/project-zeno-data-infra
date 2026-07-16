@@ -10,7 +10,7 @@ came from — that lives behind ``reference.load_reference_totals``.
 
 import pandas as pd
 
-from pipelines.afolu_vegetation.stages import MEASURES
+from pipelines.afolu.stages import MEASURES
 from pipelines.prefect_flows.common_stages import symmetric_relative_difference
 
 REL_THRESHOLD = 0.02
@@ -23,17 +23,17 @@ def qc_against_reference(
     rel_threshold: float = REL_THRESHOLD,
     abs_threshold: float = ABS_THRESHOLD,
 ) -> bool:
-    """Return True if every country x category total matches the reference."""
+    """Return True if every country x component x category total matches the
+    reference (within the dual threshold)."""
+    keys = ["country", "component", "category"]
     country_rows = result_df[~result_df["aoi_id"].str.contains(".", regex=False)]
     ours = (
-        country_rows.groupby(["aoi_id", "veg_category"])[MEASURES]
+        country_rows.rename(columns={"aoi_id": "country"})
+        .groupby(keys)[MEASURES]
         .sum()
         .reset_index()
-        .rename(columns={"aoi_id": "country"})
     )
-    merged = ours.merge(
-        reference_totals, on=["country", "veg_category"], suffixes=("_ours", "_ref")
-    )
+    merged = ours.merge(reference_totals, on=keys, suffixes=("_ours", "_ref"))
 
     passed = True
     for measure in MEASURES:
@@ -45,7 +45,7 @@ def qc_against_reference(
             if relative > rel_threshold and absolute > abs_threshold:
                 passed = False
                 print(
-                    f"QC FLAG {row.country}/{row.veg_category}/{measure}: "
+                    f"QC FLAG {row.country}/{row.component}/{row.category}/{measure}: "
                     f"ours={ours_value:.1f} ref={ref_value:.1f} rel={relative:.3f}"
                 )
     return passed
