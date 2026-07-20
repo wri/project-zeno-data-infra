@@ -2,7 +2,7 @@
 
 The reference is an independently-produced admin-level zonal-statistics table. Its
 source and schema are provisional and may be swapped, so the rest of the pipeline
-depends only on the tidy shape this returns — ``country, component, category,
+depends only on the tidy shape this returns — ``country, carbon_pool, flux_class,
 <measures>`` — never on where the numbers came from. To point QC at a different
 source, replace this adapter (and the column maps) without touching ``qc`` or the
 flow logic.
@@ -49,15 +49,15 @@ def _vegetation_totals(reference: pd.DataFrame) -> pd.DataFrame:
     veg = reference.rename(
         columns={source: name for name, source in VEGETATION_SOURCE_COLUMNS.items()}
     ).copy()
-    veg["category"] = [
+    veg["flux_class"] = [
         VEGETATION_CATEGORIES[classify(detailed, broad)]
         for detailed, broad in zip(
             veg["land_state_detailed_class"], veg["land_state_broad_class"]
         )
     ]
-    veg = veg[veg["category"] != "excluded"]
-    totals = veg.groupby(["adm0", "category"])[MEASURES].sum().reset_index()
-    totals["component"] = "vegetation"
+    veg = veg[veg["flux_class"] != "excluded"]
+    totals = veg.groupby(["adm0", "flux_class"])[MEASURES].sum().reset_index()
+    totals["carbon_pool"] = "vegetation"
     return totals.rename(columns={"adm0": "country"})
 
 
@@ -66,6 +66,6 @@ def _mineral_totals(reference: pd.DataFrame) -> pd.DataFrame:
         columns={source: name for name, source in MINERAL_SOURCE_COLUMNS.items()}
     )
     totals = mineral.groupby("adm0")[MEASURES].sum().reset_index()
-    totals["component"] = "soil"
-    totals["category"] = "mineral"
+    totals["carbon_pool"] = "soil"
+    totals["flux_class"] = "mineral"
     return totals.rename(columns={"adm0": "country"})

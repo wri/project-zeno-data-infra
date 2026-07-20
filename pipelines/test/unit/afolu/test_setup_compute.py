@@ -28,7 +28,7 @@ def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
         "country",
         "region",
         "subregion",
-        "category",
+        "flux_class",
         "year",
     ]
     assert out_expected_groups is expected_groups

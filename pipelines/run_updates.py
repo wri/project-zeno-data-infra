@@ -7,12 +7,13 @@ import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
+from pipelines.afolu.prefect_flows import afolu_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
+from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
-from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -70,27 +71,36 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 
 
 @flow
-def run_integrated_alerts_update(version, overwrite=False, is_latest=False) -> list[str]:
+def run_integrated_alerts_update(
+    version, overwrite=False, is_latest=False
+) -> list[str]:
     result_uris = []
 
-    result = integrated_alerts_flow.integrated_alerts_zarr_flow(version,
-                                                                overwrite=overwrite,
-                                                                is_latest=is_latest)
+    result = integrated_alerts_flow.integrated_alerts_zarr_flow(
+        version, overwrite=overwrite, is_latest=is_latest
+    )
     result_uris.append(result)
 
     return result_uris
+
+
+@flow
+def run_afolu_update(version, overwrite=False, is_latest=False) -> list[str]:
+    return [afolu_flow.afolu_area(version=version, overwrite=overwrite)]
 
 
 class UpdateFlow(str, Enum):
     DIST_UPDATE = "dist_update"
     TCL_UPDATE = "tcl_update"
     INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
+    AFOLU_UPDATE = "afolu_update"
 
 
 update_flows = {
     UpdateFlow.DIST_UPDATE: run_dist_update,
     UpdateFlow.TCL_UPDATE: run_tcl_update,
     UpdateFlow.INTEGRATED_ALERTS_UPDATE: run_integrated_alerts_update,
+    UpdateFlow.AFOLU_UPDATE: run_afolu_update,
 }
 
 
@@ -128,10 +138,11 @@ def run_updates(
                 f"Unsupported flow selection: '{flow_name}'. Accepted values: {accepted}"
             )
 
-        if flow_name == UpdateFlow.TCL_UPDATE and version is None:
-            raise ValueError(
-                f"version is required when flow is {UpdateFlow.TCL_UPDATE}"
-            )
+        if (
+            flow_name in (UpdateFlow.TCL_UPDATE, UpdateFlow.AFOLU_UPDATE)
+            and version is None
+        ):
+            raise ValueError(f"version is required when flow is {flow_name}")
 
         result_uris = flow_fn(
             version=version,

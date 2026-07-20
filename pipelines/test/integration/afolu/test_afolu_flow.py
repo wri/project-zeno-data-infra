@@ -67,10 +67,10 @@ def test_stp_reproduces_reference_totals():
         EXPECTED_TOTALS["net_flux_MgCO2e"], rel=0.02
     )
 
-    assert set(country["component"]) == {"vegetation"}
+    assert set(country["carbon_pool"]) == {"vegetation"}
 
     # sign sanity: tree_gain is removals-only (net sink), tree_loss is a source
-    by_cat = country.groupby("category")[
+    by_cat = country.groupby("flux_class")[
         ["gross_emissions_MgCO2e", "net_flux_MgCO2e"]
     ].sum()
     assert by_cat.loc["tree_gain", "gross_emissions_MgCO2e"] == pytest.approx(0.0)
@@ -100,8 +100,8 @@ def test_brunei_mineral_soil_reproduces_reference():
     reduced = common_stages.compute(cube, groupbys, out_expected_groups, "sum")
     df = stages.soil_mineral_result_dataframe(reduced)
 
-    country = df[(df["aoi_id"] == "BRN") & (df["category"] == "mineral")]
-    assert set(country["component"]) == {"soil"}
+    country = df[(df["aoi_id"] == "BRN") & (df["flux_class"] == "mineral")]
+    assert set(country["carbon_pool"]) == {"soil"}
     # broadcast to every annual year -> constant net rate each year
     assert set(country["year"]) == set(range(2016, 2025))
     assert country["net_flux_MgCO2e"].to_numpy() == pytest.approx(

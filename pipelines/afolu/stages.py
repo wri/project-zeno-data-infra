@@ -48,18 +48,18 @@ LAND_STATE_VAR = "land_state_node"
 def setup_compute(
     measures: Dict[str, xr.DataArray],
     pixel_area: xr.DataArray,
-    category: xr.DataArray,
+    flux_class: xr.DataArray,
     country: xr.DataArray,
     region: xr.DataArray,
     subregion: xr.DataArray,
     year: xr.DataArray,
     expected_groups: Tuple,
 ) -> Tuple:
-    """Build the per-pixel flux cube + group-by layers for one component.
+    """Build the per-pixel flux cube + group-by layers for one carbon pool.
 
     ``measures`` maps canonical names to per-hectare DataArrays; each is converted
     to per-pixel totals and stacked with an ``area_ha`` layer along ``analysis_layer``.
-    Grouping is admin x category x year.
+    Grouping is admin x flux_class x year.
     """
     pixel_area = pixel_area.fillna(0)
     layers = [
@@ -78,7 +78,7 @@ def setup_compute(
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
-        category.rename("category"),
+        flux_class.rename("flux_class"),
         year,
     )
     return (cube, groupbys, expected_groups)
@@ -86,13 +86,13 @@ def setup_compute(
 
 def create_result_dataframe(
     reduced: xr.DataArray,
-    category_names: Dict[int, str],
-    component: str,
+    class_names: Dict[int, str],
+    carbon_pool: str,
     year_expansion: Optional[Dict[int, List[int]]] = None,
 ) -> pd.DataFrame:
-    """Reshape the sparse reduce into tidy aoi_id rows for one component.
+    """Reshape the sparse reduce into tidy aoi_id rows for one carbon pool.
 
-    ``category_names`` maps category codes to labels (``"excluded"`` rows dropped).
+    ``class_names`` maps flux-class codes to labels (``"excluded"`` rows dropped).
     ``year_expansion`` maps each reduced year index to the calendar year(s) it
     represents; when ``None`` the index is a calendar offset from ``YEAR_BASE``
     (vegetation's annual axis). Soil passes an expansion that broadcasts interval
@@ -100,19 +100,19 @@ def create_result_dataframe(
     """
     df = common_create_result_dataframe(reduced)
     df = df.pivot_table(
-        index=["country", "region", "subregion", "category", "year"],
+        index=["country", "region", "subregion", "flux_class", "year"],
         columns="analysis_layer",
         values="value",
         aggfunc="sum",
     ).reset_index()
     df.columns.name = None
 
-    df["category"] = df["category"].map(category_names)
-    df = df[df["category"] != "excluded"]
+    df["flux_class"] = df["flux_class"].map(class_names)
+    df = df[df["flux_class"] != "excluded"]
     df = _to_calendar_years(df, year_expansion)
 
-    df = rollup_by_gadm_and_convert_to_aoi(df, ["category", "year"])
-    df["component"] = component
+    df = rollup_by_gadm_and_convert_to_aoi(df, ["flux_class", "year"])
+    df["carbon_pool"] = carbon_pool
     return df
 
 

@@ -7,8 +7,8 @@ def reference_totals():
     return pd.DataFrame(
         {
             "country": ["STP", "STP", "STP"],
-            "component": ["vegetation", "vegetation", "soil"],
-            "category": ["tree_loss", "trees_remaining_trees", "mineral"],
+            "carbon_pool": ["vegetation", "vegetation", "soil"],
+            "flux_class": ["tree_loss", "trees_remaining_trees", "mineral"],
             "gross_emissions_MgCO2e": [9182.0, 1244.5, 5000.0],
             "gross_removals_MgCO2": [0.0, -11663944.0, -2000.0],
             "net_flux_MgCO2e": [9182.0, -11663944.0, 3000.0],
@@ -23,8 +23,8 @@ def result_df(scale=1.0):
         {
             "aoi_id": ["STP", "STP", "STP", "STP.1"],
             "aoi_type": ["admin"] * 4,
-            "component": ["vegetation", "vegetation", "soil", "vegetation"],
-            "category": [
+            "carbon_pool": ["vegetation", "vegetation", "soil", "vegetation"],
+            "flux_class": [
                 "tree_loss",
                 "trees_remaining_trees",
                 "mineral",
@@ -51,8 +51,8 @@ def test_qc_ignores_tiny_absolute_diff():
     reference = pd.DataFrame(
         {
             "country": ["STP"],
-            "component": ["vegetation"],
-            "category": ["tree_gain"],
+            "carbon_pool": ["vegetation"],
+            "flux_class": ["tree_gain"],
             "gross_emissions_MgCO2e": [1.0],
             "gross_removals_MgCO2": [-10.0],
             "net_flux_MgCO2e": [-9.0],
@@ -62,8 +62,8 @@ def test_qc_ignores_tiny_absolute_diff():
         {
             "aoi_id": ["STP"],
             "aoi_type": ["admin"],
-            "component": ["vegetation"],
-            "category": ["tree_gain"],
+            "carbon_pool": ["vegetation"],
+            "flux_class": ["tree_gain"],
             "year": [2016],
             "gross_emissions_MgCO2e": [5.0],
             "gross_removals_MgCO2": [-50.0],

@@ -23,9 +23,9 @@ def qc_against_reference(
     rel_threshold: float = REL_THRESHOLD,
     abs_threshold: float = ABS_THRESHOLD,
 ) -> bool:
-    """Return True if every country x component x category total matches the
+    """Return True if every country x carbon_pool x flux_class total matches the
     reference (within the dual threshold)."""
-    keys = ["country", "component", "category"]
+    keys = ["country", "carbon_pool", "flux_class"]
     country_rows = result_df[~result_df["aoi_id"].str.contains(".", regex=False)]
     ours = (
         country_rows.rename(columns={"aoi_id": "country"})
@@ -45,7 +45,8 @@ def qc_against_reference(
             if relative > rel_threshold and absolute > abs_threshold:
                 passed = False
                 print(
-                    f"QC FLAG {row.country}/{row.component}/{row.category}/{measure}: "
-                    f"ours={ours_value:.1f} ref={ref_value:.1f} rel={relative:.3f}"
+                    f"QC FLAG {row.country}/{row.carbon_pool}/{row.flux_class}/"
+                    f"{measure}: ours={ours_value:.1f} ref={ref_value:.1f} "
+                    f"rel={relative:.3f}"
                 )
     return passed
