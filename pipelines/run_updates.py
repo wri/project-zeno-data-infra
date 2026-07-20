@@ -6,6 +6,7 @@ import click
 import coiled
 from prefect import flow, task
 from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 from pipelines.afolu.prefect_flows import afolu_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
@@ -85,8 +86,16 @@ def run_integrated_alerts_update(
 
 
 @flow
-def run_afolu_update(version, overwrite=False, is_latest=False) -> list[str]:
-    return [afolu_flow.afolu_area(version=version, overwrite=overwrite)]
+def run_afolu_update(version, overwrite=False, is_latest=False, bbox=None) -> list[str]:
+    return [afolu_flow.afolu_area(version=version, overwrite=overwrite, bbox=bbox)]
+
+
+def _parse_bbox(bbox):
+    """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
+    if not bbox:
+        return None
+    minx, miny, maxx, maxy = (float(v) for v in str(bbox).split(","))
+    return box(minx, miny, maxx, maxy)
 
 
 class UpdateFlow(str, Enum):
@@ -119,6 +128,8 @@ def run_updates(
     overwrite=False,
     is_latest=False,
     flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
+    bbox=None,
+    local=False,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -127,9 +138,14 @@ def run_updates(
     # when called from Prefect webhook, the booleans flags are passed as strings, so we need to convert them to booleans
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
+    local = str(local).lower() == "true"
+    # bbox (afolu_update only) clips the reduce to one area; it is independent of
+    # where compute runs -- Coiled by default, or the local machine with local=True.
+    bbox_geom = _parse_bbox(bbox)
 
     try:
-        dask_client = create_cluster()
+        if not local:
+            dask_client = create_cluster()
 
         flow_fn = update_flows.get(flow_name)
         if flow_fn is None:
@@ -144,11 +160,10 @@ def run_updates(
         ):
             raise ValueError(f"version is required when flow is {flow_name}")
 
-        result_uris = flow_fn(
-            version=version,
-            overwrite=overwrite,
-            is_latest=is_latest,
-        )
+        kwargs = dict(version=version, overwrite=overwrite, is_latest=is_latest)
+        if flow_name == UpdateFlow.AFOLU_UPDATE:
+            kwargs["bbox"] = bbox_geom
+        result_uris = flow_fn(**kwargs)
 
     except Exception:
         logger.error("Analysis failed.")
@@ -173,12 +188,27 @@ def run_updates(
 )
 @click.option("--overwrite", is_flag=True, help="Overwrite existing outputs.")
 @click.option("--is-latest", is_flag=True, help="Mark this version as latest.")
-def cli(flow_name, version, overwrite, is_latest):
+@click.option(
+    "--bbox",
+    default=None,
+    help=(
+        "minx,miny,maxx,maxy to clip afolu_update to one area; writes a local "
+        "parquet instead of the global S3 path. afolu_update only."
+    ),
+)
+@click.option(
+    "--local",
+    is_flag=True,
+    help="Run compute on this machine instead of a Coiled cluster.",
+)
+def cli(flow_name, version, overwrite, is_latest, bbox, local):
     run_updates(
         version=version,
         overwrite=overwrite,
         is_latest=is_latest,
         flow_name=UpdateFlow(flow_name),
+        bbox=bbox,
+        local=local,
     )
 
 
