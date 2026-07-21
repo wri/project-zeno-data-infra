@@ -1,6 +1,6 @@
 import numpy as np
 
-from pipelines.afolu import stages
+from pipelines.land_ghg_inventory import stages
 from pipelines.prefect_flows import common_stages
 
 
@@ -16,8 +16,7 @@ def test_result_dataframe_rolls_up_and_maps(synthetic_datasets):
     assert {
         "aoi_id",
         "aoi_type",
-        "carbon_pool",
-        "flux_class",
+        "land_state_class",
         "year",
         "gross_emissions_MgCO2e",
         "gross_removals_MgCO2",
@@ -25,14 +24,16 @@ def test_result_dataframe_rolls_up_and_maps(synthetic_datasets):
         "area_ha",
     }.issubset(df.columns)
 
-    # every vegetation row is tagged with the component; excluded states dropped
-    assert set(df["carbon_pool"]) == {"vegetation"}
-    assert "excluded" not in set(df["flux_class"])
+    # vegetation-only output carries no soil-distinguishing carbon_pool column
+    assert "carbon_pool" not in df.columns
+    assert "excluded" not in set(df["land_state_class"])
     assert set(df["year"]) == {2016, 2017}
 
     # subregion-level totals for one pixel: emis=20, rem=-8, net=12, area=2
     row = df[
-        (df.aoi_id == "BRA.1.1") & (df.flux_class == "tree_loss") & (df.year == 2016)
+        (df.aoi_id == "BRA.1.1")
+        & (df.land_state_class == "tree_loss")
+        & (df.year == 2016)
     ].iloc[0]
     assert row.gross_emissions_MgCO2e == 20.0
     assert row.gross_removals_MgCO2 == -8.0
@@ -41,7 +42,7 @@ def test_result_dataframe_rolls_up_and_maps(synthetic_datasets):
 
     # country-level roll-up row exists (single subregion -> same totals)
     country_row = df[
-        (df.aoi_id == "BRA") & (df.flux_class == "tree_loss") & (df.year == 2016)
+        (df.aoi_id == "BRA") & (df.land_state_class == "tree_loss") & (df.year == 2016)
     ].iloc[0]
     assert country_row.gross_emissions_MgCO2e == 20.0
 

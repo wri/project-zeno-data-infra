@@ -1,6 +1,6 @@
 from collections import Counter
 
-from pipelines.afolu.land_state_categories import (
+from pipelines.land_ghg_inventory.land_state_categories import (
     LAND_STATE_TO_CATEGORY,
     VEGETATION_CATEGORIES,
 )

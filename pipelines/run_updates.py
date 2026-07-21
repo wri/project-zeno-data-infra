@@ -8,11 +8,11 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from shapely.geometry import box
 
-from pipelines.afolu.prefect_flows import afolu_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
+from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
 
@@ -86,8 +86,14 @@ def run_integrated_alerts_update(
 
 
 @flow
-def run_afolu_update(version, overwrite=False, is_latest=False, bbox=None) -> list[str]:
-    return [afolu_flow.afolu_area(version=version, overwrite=overwrite, bbox=bbox)]
+def run_land_ghg_inventory_update(
+    version, overwrite=False, is_latest=False, bbox=None
+) -> list[str]:
+    return [
+        land_ghg_inventory_flow.land_ghg_inventory_area(
+            version=version, overwrite=overwrite, bbox=bbox
+        )
+    ]
 
 
 def _parse_bbox(bbox):
@@ -102,14 +108,14 @@ class UpdateFlow(str, Enum):
     DIST_UPDATE = "dist_update"
     TCL_UPDATE = "tcl_update"
     INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
-    AFOLU_UPDATE = "afolu_update"
+    LAND_GHG_INVENTORY_UPDATE = "land_ghg_inventory_update"
 
 
 update_flows = {
     UpdateFlow.DIST_UPDATE: run_dist_update,
     UpdateFlow.TCL_UPDATE: run_tcl_update,
     UpdateFlow.INTEGRATED_ALERTS_UPDATE: run_integrated_alerts_update,
-    UpdateFlow.AFOLU_UPDATE: run_afolu_update,
+    UpdateFlow.LAND_GHG_INVENTORY_UPDATE: run_land_ghg_inventory_update,
 }
 
 
@@ -139,8 +145,8 @@ def run_updates(
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
-    # bbox (afolu_update only) clips the reduce to one area; it is independent of
-    # where compute runs -- Coiled by default, or the local machine with local=True.
+    # bbox (land_ghg_inventory_update only) clips the reduce to one area. It is
+    # independent of where compute runs: Coiled by default, or local when local=True.
     bbox_geom = _parse_bbox(bbox)
 
     try:
@@ -155,13 +161,13 @@ def run_updates(
             )
 
         if (
-            flow_name in (UpdateFlow.TCL_UPDATE, UpdateFlow.AFOLU_UPDATE)
+            flow_name in (UpdateFlow.TCL_UPDATE, UpdateFlow.LAND_GHG_INVENTORY_UPDATE)
             and version is None
         ):
             raise ValueError(f"version is required when flow is {flow_name}")
 
         kwargs = dict(version=version, overwrite=overwrite, is_latest=is_latest)
-        if flow_name == UpdateFlow.AFOLU_UPDATE:
+        if flow_name == UpdateFlow.LAND_GHG_INVENTORY_UPDATE:
             kwargs["bbox"] = bbox_geom
         result_uris = flow_fn(**kwargs)
 
@@ -192,8 +198,9 @@ def run_updates(
     "--bbox",
     default=None,
     help=(
-        "minx,miny,maxx,maxy to clip afolu_update to one area; writes a local "
-        "parquet instead of the global S3 path. afolu_update only."
+        "minx,miny,maxx,maxy to clip land_ghg_inventory_update to one area; "
+        "writes a local parquet instead of the global S3 path. "
+        "land_ghg_inventory_update only."
     ),
 )
 @click.option(

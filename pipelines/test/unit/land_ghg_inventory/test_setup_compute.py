@@ -1,4 +1,4 @@
-from pipelines.afolu import stages
+from pipelines.land_ghg_inventory import stages
 
 
 def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
@@ -28,7 +28,7 @@ def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
         "country",
         "region",
         "subregion",
-        "flux_class",
+        "land_state_class",
         "year",
     ]
     assert out_expected_groups is expected_groups

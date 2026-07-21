@@ -17,14 +17,14 @@ pixel_area_10m_zarr_uri = (
 )
 # AFOLU GHG flux model — vegetation outputs (v1.0.5), annual 2016-2024, 30m.
 # Published by the AFOLU_GHG_flux_model team on gfw2-data; per-hectare fluxes.
-afolu_vegetation_zarr_uri = (
+land_ghg_inventory_vegetation_zarr_uri = (
     "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_vegetation/"
     "version_1_0_5__standard__global/mega_zarr/annual_intervals/4000_pixels/"
     "20260130/vegetation_zarr.zarr"
 )
 # Mineral soil organic carbon (SOC v1.0.1). 5-year interval axis (index 0..4);
 # per-hectare stock-change rates. (Organic peat soil is a follow-up.)
-afolu_soc_zarr_uri = (
+land_ghg_inventory_soc_zarr_uri = (
     "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/"
     "version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr"
 )

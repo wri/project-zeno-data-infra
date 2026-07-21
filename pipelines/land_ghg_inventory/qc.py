@@ -1,7 +1,7 @@
-"""QC for the AFOLU vegetation precompute.
+"""QC for the Land GHG inventory vegetation precompute.
 
 Compares this run's country-level totals against a reference dataset of the same
-shape (``country, veg_category, <measures>``). A (country, vegetation-category)
+shape (``country, land_state_class, <measures>``). A (country, land_state_class)
 total is flagged only when it differs by BOTH more than ``REL_THRESHOLD`` and more
 than ``ABS_THRESHOLD`` MgCO2e, so tiny-magnitude noise (and 10 m coastline
 differences) don't trip it. This module knows nothing about where the reference
@@ -10,7 +10,7 @@ came from — that lives behind ``reference.load_reference_totals``.
 
 import pandas as pd
 
-from pipelines.afolu.stages import MEASURES
+from pipelines.land_ghg_inventory.stages import MEASURES
 from pipelines.prefect_flows.common_stages import symmetric_relative_difference
 
 REL_THRESHOLD = 0.02
@@ -23,9 +23,9 @@ def qc_against_reference(
     rel_threshold: float = REL_THRESHOLD,
     abs_threshold: float = ABS_THRESHOLD,
 ) -> bool:
-    """Return True if every country x carbon_pool x flux_class total matches the
+    """Return True if every country x land_state_class total matches the
     reference (within the dual threshold)."""
-    keys = ["country", "carbon_pool", "flux_class"]
+    keys = ["country", "land_state_class"]
     country_rows = result_df[~result_df["aoi_id"].str.contains(".", regex=False)]
     ours = (
         country_rows.rename(columns={"aoi_id": "country"})
@@ -45,7 +45,7 @@ def qc_against_reference(
             if relative > rel_threshold and absolute > abs_threshold:
                 passed = False
                 print(
-                    f"QC FLAG {row.country}/{row.carbon_pool}/{row.flux_class}/"
+                    f"QC FLAG {row.country}/{row.land_state_class}/"
                     f"{measure}: ours={ours_value:.1f} ref={ref_value:.1f} "
                     f"rel={relative:.3f}"
                 )

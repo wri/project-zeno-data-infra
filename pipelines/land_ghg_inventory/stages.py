@@ -1,20 +1,19 @@
-"""Zonal-statistics stages for AFOLU flux (vegetation + soil).
+"""Zonal-statistics stages for Land GHG inventory vegetation flux.
 
-Each component sums per-hectare fluxes (converted to per-pixel totals) grouped by
-admin unit x category x year, then rolls up to aoi_id. The reduce and GADM roll-up
-are reused from ``pipelines.prefect_flows.common_stages``; ``setup_compute`` and
-``create_result_dataframe`` here are component-agnostic — vegetation and soil differ
-only in the measures, category layer, and year handling passed in.
+Sums per-hectare fluxes (converted to per-pixel totals by multiplying by pixel area)
+grouped by admin unit x land_state_class x year, then rolls up to aoi_id. The reduce
+and GADM roll-up are reused from ``pipelines.prefect_flows.common_stages``. Soil is a
+separate pipeline with its own output parquet.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.afolu.land_state_categories import (
+from pipelines.land_ghg_inventory.land_state_categories import (
     LAND_STATE_TO_CATEGORY,
     VEGETATION_CATEGORIES,
 )
@@ -48,18 +47,19 @@ LAND_STATE_VAR = "land_state_node"
 def setup_compute(
     measures: Dict[str, xr.DataArray],
     pixel_area: xr.DataArray,
-    flux_class: xr.DataArray,
+    land_state_class: xr.DataArray,
     country: xr.DataArray,
     region: xr.DataArray,
     subregion: xr.DataArray,
     year: xr.DataArray,
     expected_groups: Tuple,
 ) -> Tuple:
-    """Build the per-pixel flux cube + group-by layers for one carbon pool.
+    """Build the per-pixel flux cube + group-by layers for the reduce.
 
-    ``measures`` maps canonical names to per-hectare DataArrays; each is converted
-    to per-pixel totals and stacked with an ``area_ha`` layer along ``analysis_layer``.
-    Grouping is admin x flux_class x year.
+    The zarr fluxes are stored per-hectare, so ``measures`` (canonical name ->
+    per-hectare DataArray) are each multiplied by ``pixel_area`` (hectares) to get
+    per-pixel totals and stacked with an ``area_ha`` layer along ``analysis_layer``.
+    Grouping is admin x land_state_class x year.
     """
     pixel_area = pixel_area.fillna(0)
     layers = [
@@ -78,7 +78,7 @@ def setup_compute(
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
-        flux_class.rename("flux_class"),
+        land_state_class.rename("land_state_class"),
         year,
     )
     return (cube, groupbys, expected_groups)
@@ -87,49 +87,26 @@ def setup_compute(
 def create_result_dataframe(
     reduced: xr.DataArray,
     class_names: Dict[int, str],
-    carbon_pool: str,
-    year_expansion: Optional[Dict[int, List[int]]] = None,
 ) -> pd.DataFrame:
-    """Reshape the sparse reduce into tidy aoi_id rows for one carbon pool.
+    """Reshape the sparse reduce into tidy aoi_id rows.
 
-    ``class_names`` maps flux-class codes to labels (``"excluded"`` rows dropped).
-    ``year_expansion`` maps each reduced year index to the calendar year(s) it
-    represents; when ``None`` the index is a calendar offset from ``YEAR_BASE``
-    (vegetation's annual axis). Soil passes an expansion that broadcasts interval
-    rates onto the annual years.
+    ``class_names`` maps land-state-class codes to labels (``"excluded"`` rows
+    dropped). The reduced year index is a calendar offset from ``YEAR_BASE``.
     """
     df = common_create_result_dataframe(reduced)
     df = df.pivot_table(
-        index=["country", "region", "subregion", "flux_class", "year"],
+        index=["country", "region", "subregion", "land_state_class", "year"],
         columns="analysis_layer",
         values="value",
         aggfunc="sum",
     ).reset_index()
     df.columns.name = None
 
-    df["flux_class"] = df["flux_class"].map(class_names)
-    df = df[df["flux_class"] != "excluded"]
-    df = _to_calendar_years(df, year_expansion)
+    df["land_state_class"] = df["land_state_class"].map(class_names)
+    df = df[df["land_state_class"] != "excluded"]
+    df["year"] = df["year"].astype(int) + YEAR_BASE
 
-    df = rollup_by_gadm_and_convert_to_aoi(df, ["flux_class", "year"])
-    df["carbon_pool"] = carbon_pool
-    return df
-
-
-def _to_calendar_years(
-    df: pd.DataFrame, year_expansion: Optional[Dict[int, List[int]]]
-) -> pd.DataFrame:
-    if year_expansion is None:
-        df["year"] = df["year"].astype(int) + YEAR_BASE
-        return df
-    parts = []
-    for period, calendar_years in year_expansion.items():
-        period_rows = df[df["year"] == period]
-        for calendar_year in calendar_years:
-            rows = period_rows.copy()
-            rows["year"] = calendar_year
-            parts.append(rows)
-    return pd.concat(parts, ignore_index=True)
+    return rollup_by_gadm_and_convert_to_aoi(df, ["land_state_class", "year"])
 
 
 def _align_to(reference: xr.Dataset, uri: str) -> xr.DataArray:
@@ -209,69 +186,4 @@ def setup_vegetation_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
 
 
 def vegetation_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
-    return create_result_dataframe(reduced, VEGETATION_CATEGORIES, "vegetation")
-
-
-# --------------------------------------------------------------------------- #
-# Soil component — mineral SOC (organic peat soil is a follow-up)
-# --------------------------------------------------------------------------- #
-SOIL_MINERAL_SOURCE_VARS = {
-    "gross_emissions_MgCO2e": "SOC_loss__mineral_soil_extent__0-30cm_MgCO2_ha_yr",
-    "gross_removals_MgCO2": "SOC_gain__mineral_soil_extent__0-30cm_MgCO2_ha_yr",
-    "net_flux_MgCO2e": "SOC_net__mineral_soil_extent__0-30cm_MgCO2_ha_yr",
-}
-MINERAL_CATEGORY_CODE = 1
-SOIL_CATEGORY_NAMES = {MINERAL_CATEGORY_CODE: "mineral"}
-# Mineral SOC is a 5-year stock-change rate on an interval axis (index 0..4). The
-# reference broadcasts SOC period index 3 (the 2020->2022 change rate) across every
-# annual year, so we do the same. Validated against the reference (Brunei: exact).
-MINERAL_YEAR_EXPANSION = {3: list(range(2016, 2025))}
-
-
-def _constant_category(reference: xr.DataArray, code: int) -> xr.DataArray:
-    """A category layer with a single code everywhere (soil has no per-pixel
-    category split, unlike vegetation's land_state)."""
-    return (xr.zeros_like(reference, dtype="uint8") + np.uint8(code)).rename("category")
-
-
-def load_soil_mineral(
-    soc_uri: str,
-    pixel_area_uri: str,
-    country_uri: str,
-    region_uri: str,
-    subregion_uri: str,
-    bbox: Optional[Polygon] = None,
-) -> Tuple[xr.Dataset, xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]:
-    """Load mineral SOC loss/gain/net + pixel area + GADM, aligned to the SOC grid."""
-    soc = _load_zarr(soc_uri)[list(SOIL_MINERAL_SOURCE_VARS.values())]
-    soc = _clip(soc, bbox)
-    soc = soc.rename(
-        {source: name for name, source in SOIL_MINERAL_SOURCE_VARS.items()}
-    )
-    return (
-        soc,
-        _align_to(soc, pixel_area_uri),
-        _align_to(soc, country_uri),
-        _align_to(soc, region_uri),
-        _align_to(soc, subregion_uri),
-    )
-
-
-def setup_soil_mineral_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
-    soc, pixel_area, country, region, subregion = datasets
-    return setup_compute(
-        {name: soc[name] for name in MEASURES},
-        pixel_area,
-        _constant_category(pixel_area, MINERAL_CATEGORY_CODE),
-        country,
-        region,
-        subregion,
-        soc["year"],
-        expected_groups,
-    )
-
-
-def soil_mineral_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
-    return create_result_dataframe(
-        reduced, SOIL_CATEGORY_NAMES, "soil", MINERAL_YEAR_EXPANSION
-    )
+    return create_result_dataframe(reduced, VEGETATION_CATEGORIES)
