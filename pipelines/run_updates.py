@@ -1,9 +1,11 @@
 import logging
 import os
+from contextlib import nullcontext
 from enum import Enum
 
 import click
 import coiled
+from dask.distributed import performance_report
 from prefect import flow, task
 from prefect.logging import get_run_logger
 from shapely.geometry import box
@@ -136,6 +138,7 @@ def run_updates(
     flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
     bbox=None,
     local=False,
+    performance_report_path=None,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -166,10 +169,20 @@ def run_updates(
         ):
             raise ValueError(f"version is required when flow is {flow_name}")
 
+        # a Dask performance report needs the distributed scheduler, so it only
+        # applies to Coiled runs (there is no client under local=True)
+        if performance_report_path and dask_client is not None:
+            report = performance_report(filename=performance_report_path)
+        else:
+            if performance_report_path:
+                logger.warning("performance report skipped: no cluster (local run)")
+            report = nullcontext()
+
         kwargs = dict(version=version, overwrite=overwrite, is_latest=is_latest)
         if flow_name == UpdateFlow.LAND_GHG_INVENTORY_UPDATE:
             kwargs["bbox"] = bbox_geom
-        result_uris = flow_fn(**kwargs)
+        with report:
+            result_uris = flow_fn(**kwargs)
 
     except Exception:
         logger.error("Analysis failed.")
@@ -208,7 +221,14 @@ def run_updates(
     is_flag=True,
     help="Run compute on this machine instead of a Coiled cluster.",
 )
-def cli(flow_name, version, overwrite, is_latest, bbox, local):
+@click.option(
+    "--performance-report",
+    "performance_report_path",
+    default=None,
+    help="Write a Dask performance report HTML here (Coiled runs only; "
+    "ignored with --local).",
+)
+def cli(flow_name, version, overwrite, is_latest, bbox, local, performance_report_path):
     run_updates(
         version=version,
         overwrite=overwrite,
@@ -216,6 +236,7 @@ def cli(flow_name, version, overwrite, is_latest, bbox, local):
         flow_name=UpdateFlow(flow_name),
         bbox=bbox,
         local=local,
+        performance_report_path=performance_report_path,
     )
 
 
