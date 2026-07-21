@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 import numpy as np
-from prefect import flow, task
+from prefect import flow
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
@@ -13,16 +13,9 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
-from pipelines.land_ghg_inventory import qc, reference
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
-
-
-@task(name="land_ghg_inventory-qc")
-def qc_land_ghg_inventory(result_df, reference_uri) -> bool:
-    reference_totals = reference.load_reference_totals(reference_uri)
-    return qc.qc_against_reference(result_df, reference_totals)
 
 
 def _vegetation_result_df(bbox=None):
@@ -59,13 +52,13 @@ def _vegetation_result_df(bbox=None):
 def land_ghg_inventory_area(
     version: str,
     overwrite: bool = False,
-    reference_uri: Optional[str] = None,
     bbox: Optional[Polygon] = None,
 ):
     """Land GHG inventory vegetation land-flux zonal stats: gross emissions /
     removals / net flux and area, grouped by ``land_state_class`` (tree loss /
     tree gain / trees-remaining / non-trees-remaining) x year, rolled up to aoi_id.
-    Soil is a separate pipeline with its own output parquet.
+    Soil is a separate pipeline with its own output parquet. Results are QC'd
+    out-of-band against the reference dataset (see the QC notebook), not in-flow.
 
     ``bbox`` clips the reduce to one area for a laptop-friendly local run; the
     result is written to a local parquet
@@ -85,13 +78,6 @@ def land_ghg_inventory_area(
         result_uri = f"admin-land_ghg_inventory-vegetation-{version}.parquet"
 
     result_df = _vegetation_result_df(bbox)
-
-    if reference_uri is not None and not qc_land_ghg_inventory(
-        result_df, reference_uri
-    ):
-        raise AssertionError(
-            "Land GHG inventory QC failed against the reference dataset"
-        )
 
     return common_tasks.save_result.with_options(name="land_ghg_inventory-save-result")(
         result_df, result_uri
