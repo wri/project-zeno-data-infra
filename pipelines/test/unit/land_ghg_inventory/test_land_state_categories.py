@@ -1,6 +1,8 @@
 from collections import Counter
 
 from pipelines.land_ghg_inventory.land_state_categories import (
+    LAND_STATE_ATTRIBUTES,
+    LAND_STATE_CODES,
     LAND_STATE_TO_CATEGORY,
     VEGETATION_CATEGORIES,
 )
@@ -22,3 +24,18 @@ def test_representative_codes_map_to_expected_category():
     assert LAND_STATE_TO_CATEGORY[51000000] == 4  # non_trees_remaining_non_trees
     assert LAND_STATE_TO_CATEGORY[70000000] == 0  # excluded (no flux)
     assert VEGETATION_CATEGORIES[3] == "trees_remaining_trees"
+
+
+def test_attributes_cover_all_95_land_states():
+    assert len(LAND_STATE_ATTRIBUTES) == 95
+    assert LAND_STATE_CODES == tuple(sorted(LAND_STATE_ATTRIBUTES))
+
+
+def test_attributes_carry_meaning_broad_detailed_and_tall_veg_type():
+    assert LAND_STATE_ATTRIBUTES[11100000] == (
+        "Gain of mangroves + temp loss in interval",
+        "tree",
+        "tree_loss",
+        "mangrove",
+    )
+    assert LAND_STATE_ATTRIBUTES[70000000][2] == "no_flux"

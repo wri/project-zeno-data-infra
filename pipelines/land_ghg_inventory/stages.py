@@ -1,9 +1,10 @@
 """Zonal-statistics stages for Land GHG inventory vegetation flux.
 
 Sums per-hectare fluxes (converted to per-pixel totals by multiplying by pixel area)
-grouped by admin unit x land_state_class x year, then rolls up to aoi_id. The reduce
-and GADM roll-up are reused from ``pipelines.prefect_flows.common_stages``. Soil is a
-separate pipeline with its own output parquet.
+grouped by admin unit x land_state x year, then rolls up to aoi_id. Output keeps the
+raw land_state (all 95 codes); consolidation into broader classes is done at query
+time. The reduce and GADM roll-up are reused from
+``pipelines.prefect_flows.common_stages``. Soil is a separate pipeline.
 """
 
 from typing import Dict, Optional, Tuple
@@ -13,10 +14,7 @@ import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.land_ghg_inventory.land_state_categories import (
-    LAND_STATE_TO_CATEGORY,
-    VEGETATION_CATEGORIES,
-)
+from pipelines.land_ghg_inventory.land_state_categories import LAND_STATE_ATTRIBUTES
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
 )
@@ -47,7 +45,7 @@ LAND_STATE_VAR = "land_state_node"
 def setup_compute(
     measures: Dict[str, xr.DataArray],
     pixel_area: xr.DataArray,
-    land_state_class: xr.DataArray,
+    land_state: xr.DataArray,
     country: xr.DataArray,
     region: xr.DataArray,
     subregion: xr.DataArray,
@@ -59,7 +57,7 @@ def setup_compute(
     The zarr fluxes are stored per-hectare, so ``measures`` (canonical name ->
     per-hectare DataArray) are each multiplied by ``pixel_area`` (hectares) to get
     per-pixel totals and stacked with an ``area_ha`` layer along ``analysis_layer``.
-    Grouping is admin x land_state_class x year.
+    Grouping is admin x land_state x year.
     """
     pixel_area = pixel_area.fillna(0)
     layers = [
@@ -78,35 +76,46 @@ def setup_compute(
         country.rename("country"),
         region.rename("region"),
         subregion.rename("subregion"),
-        land_state_class.rename("land_state_class"),
+        land_state.rename("land_state"),
         year,
     )
     return (cube, groupbys, expected_groups)
 
 
-def create_result_dataframe(
-    reduced: xr.DataArray,
-    class_names: Dict[int, str],
-) -> pd.DataFrame:
-    """Reshape the sparse reduce into tidy aoi_id rows.
+def create_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
+    """Reshape the sparse reduce into tidy aoi_id rows keyed by raw land_state.
 
-    ``class_names`` maps land-state-class codes to labels (``"excluded"`` rows
-    dropped). The reduced year index is a calendar offset from ``YEAR_BASE``.
+    All land_state codes are kept (consolidation is a query-time concern); the
+    reduced year index is a calendar offset from ``YEAR_BASE``. The lookup's
+    descriptive columns are joined on afterward.
     """
     df = common_create_result_dataframe(reduced)
     df = df.pivot_table(
-        index=["country", "region", "subregion", "land_state_class", "year"],
+        index=["country", "region", "subregion", "land_state", "year"],
         columns="analysis_layer",
         values="value",
         aggfunc="sum",
     ).reset_index()
     df.columns.name = None
 
-    df["land_state_class"] = df["land_state_class"].map(class_names)
-    df = df[df["land_state_class"] != "excluded"]
     df["year"] = df["year"].astype(int) + YEAR_BASE
+    df = rollup_by_gadm_and_convert_to_aoi(df, ["land_state", "year"])
+    return _join_land_state_attributes(df)
 
-    return rollup_by_gadm_and_convert_to_aoi(df, ["land_state_class", "year"])
+
+def _join_land_state_attributes(df: pd.DataFrame) -> pd.DataFrame:
+    """Attach each land_state's meaning/broad/detailed/tall-veg-type from the lookup."""
+    attributes = pd.DataFrame(
+        [(code, *attrs) for code, attrs in LAND_STATE_ATTRIBUTES.items()],
+        columns=[
+            "land_state",
+            "land_state_meaning",
+            "land_state_broad_class",
+            "land_state_detailed_class",
+            "tall_veg_type",
+        ],
+    )
+    return df.merge(attributes, on="land_state", how="left")
 
 
 def _align_to(reference: xr.Dataset, uri: str) -> xr.DataArray:
@@ -128,22 +137,16 @@ def _clip(dataset: xr.Dataset, bbox: Optional[Polygon]) -> xr.Dataset:
 # --------------------------------------------------------------------------- #
 # Vegetation component
 # --------------------------------------------------------------------------- #
-def collapse_land_state(land_state: xr.DataArray) -> xr.DataArray:
-    """Relabel land_state_node codes to vegetation category codes (0-4).
-
-    Codes absent from the mapping collapse to 0 (excluded). Vectorised per dask
-    block via a sorted-code lookup.
+def _clean_land_state(land_state: xr.DataArray) -> xr.DataArray:
+    """Cast the raw land_state_node to a clean integer grouper. Off-extent NaN
+    becomes 0, which is absent from ``expected_groups`` and so dropped by the reduce.
     """
-    codes = np.array(sorted(LAND_STATE_TO_CATEGORY), dtype="int64")
-    categories = np.array([LAND_STATE_TO_CATEGORY[c] for c in codes], dtype="uint8")
 
-    def relabel(block):
-        block = np.nan_to_num(block, nan=0).astype("int64")
-        pos = np.clip(np.searchsorted(codes, block), 0, len(codes) - 1)
-        return np.where(codes[pos] == block, categories[pos], 0).astype("uint8")
+    def to_int(block):
+        return np.nan_to_num(block, nan=0).astype("int64")
 
     return xr.apply_ufunc(
-        relabel, land_state, dask="parallelized", output_dtypes=["uint8"]
+        to_int, land_state, dask="parallelized", output_dtypes=["int64"]
     )
 
 
@@ -176,7 +179,7 @@ def setup_vegetation_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
     return setup_compute(
         {name: veg[name] for name in MEASURES},
         pixel_area,
-        collapse_land_state(veg[LAND_STATE_VAR]),
+        _clean_land_state(veg[LAND_STATE_VAR]),
         country,
         region,
         subregion,
@@ -186,4 +189,4 @@ def setup_vegetation_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
 
 
 def vegetation_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
-    return create_result_dataframe(reduced, VEGETATION_CATEGORIES)
+    return create_result_dataframe(reduced)

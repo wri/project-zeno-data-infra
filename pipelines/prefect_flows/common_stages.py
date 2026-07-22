@@ -313,6 +313,7 @@ def compute(
     reduce_groupbys: Tuple,
     expected_groups: Tuple,
     funcname: str,
+    method: Optional[str] = None,
 ) -> xr.DataArray:
     print("Starting reduce")
     result = xarray_reduce(
@@ -323,6 +324,7 @@ def compute(
         reindex=ReindexStrategy(
             blockwise=False, array_type=ReindexArrayType.SPARSE_COO
         ),
+        method=method,
         fill_value=0,
     ).compute()
     print("Finished reduce")

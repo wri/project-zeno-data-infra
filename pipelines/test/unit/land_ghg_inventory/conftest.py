@@ -24,7 +24,7 @@ def synthetic_datasets():
 
     land_state_2d = np.array(
         [[11100000, 21100000], [13200000, 70000000]], dtype="int64"
-    )  # -> categories [[tree_loss, tree_gain], [trees_remaining, excluded]]
+    )  # tree_loss, tree_gain / tree_tree_undisturbed, no_flux
     land_state = np.stack([land_state_2d, land_state_2d])
 
     veg = xr.Dataset(
@@ -59,7 +59,8 @@ def synthetic_datasets():
         np.array([76]),
         np.array([1]),
         np.array([1]),
-        np.array([0, 1, 2, 3, 4]),
+        # raw land_state codes present in the scene (no longer collapsed to 0-4)
+        np.array([11100000, 13200000, 21100000, 70000000]),
         np.array([0, 1]),
     )
     return datasets, expected_groups

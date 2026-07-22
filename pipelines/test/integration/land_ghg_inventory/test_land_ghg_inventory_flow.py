@@ -16,6 +16,7 @@ from pipelines.globals import (
     subregion_zarr_uri,
 )
 from pipelines.land_ghg_inventory import stages
+from pipelines.land_ghg_inventory.land_state_categories import LAND_STATE_CODES
 from pipelines.prefect_flows import common_stages
 
 # São Tomé & Príncipe: both islands, ocean elsewhere (isolated -> clean bbox).
@@ -42,7 +43,7 @@ def test_stp_reproduces_reference_totals():
         np.arange(999),
         np.arange(86),
         np.arange(854),
-        np.array([0, 1, 2, 3, 4]),
+        np.array(LAND_STATE_CODES),
         np.arange(9),
     )
     cube, groupbys, out_expected_groups = stages.setup_vegetation_compute(
@@ -62,9 +63,9 @@ def test_stp_reproduces_reference_totals():
     )
 
     # sign sanity: tree_gain is removals-only (net sink), tree_loss is a source
-    by_class = country.groupby("land_state_class")[
+    by_detailed = country.groupby("land_state_detailed_class")[
         ["gross_emissions_MgCO2e", "net_flux_MgCO2e"]
     ].sum()
-    assert by_class.loc["tree_gain", "gross_emissions_MgCO2e"] == pytest.approx(0.0)
-    assert by_class.loc["tree_gain", "net_flux_MgCO2e"] < 0
-    assert by_class.loc["tree_loss", "net_flux_MgCO2e"] > 0
+    assert by_detailed.loc["tree_gain", "gross_emissions_MgCO2e"] == pytest.approx(0.0)
+    assert by_detailed.loc["tree_gain", "net_flux_MgCO2e"] < 0
+    assert by_detailed.loc["tree_loss", "net_flux_MgCO2e"] > 0

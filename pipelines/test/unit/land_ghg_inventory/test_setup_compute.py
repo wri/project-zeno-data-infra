@@ -1,3 +1,5 @@
+import numpy as np
+
 from pipelines.land_ghg_inventory import stages
 
 
@@ -28,7 +30,15 @@ def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
         "country",
         "region",
         "subregion",
-        "land_state_class",
+        "land_state",
         "year",
     ]
+    # grouped by the raw land_state codes, not the collapsed 0-4 categories
+    land_state = next(g for g in groupbys if g.name == "land_state")
+    assert set(np.unique(land_state.values)) == {
+        11100000,
+        13200000,
+        21100000,
+        70000000,
+    }
     assert out_expected_groups is expected_groups
