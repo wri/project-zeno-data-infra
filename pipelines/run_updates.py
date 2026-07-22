@@ -26,7 +26,6 @@ def create_cluster():
     cluster = coiled.Cluster(
         name="gnw_zonal_stat_count",
         region="us-east-1",
-        # workspace="wri",
         n_workers=10,
         tags={"project": "gnw_zonal_stat"},
         scheduler_vm_types=["r7g.xlarge"],

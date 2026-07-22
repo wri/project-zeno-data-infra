@@ -13,7 +13,6 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
-from pipelines.land_ghg_inventory.land_state_categories import LAND_STATE_CODES
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
@@ -25,7 +24,7 @@ def _vegetation_result_df(bbox=None):
         np.arange(999),  # country iso codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
-        np.array(LAND_STATE_CODES),  # raw land_state codes (95)
+        np.array([0, 1, 2, 3, 4]),  # vegetation category codes
         np.arange(9),  # year index 0..8 -> 2016..2024
     )
     datasets = land_ghg_inventory_tasks.load_vegetation.with_options(
