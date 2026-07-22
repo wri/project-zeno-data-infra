@@ -8,7 +8,15 @@ classes; we collapse them into the four MVP vegetation categories:
     tree_gain                      <- detailed_class == "tree_gain"
     trees_remaining_trees          <- detailed_class startswith "tree_tree"
     non_trees_remaining_non_trees  <- broad_class in {"crop", "short_veg"}
-    excluded                       <- no_flux / mangrove-mask states (no flux)
+    excluded                       <- no_flux (70000000, "Not in decision tree")
+
+Three "mangrove mask" bookkeeping codes share the same
+(detailed_class=mangrove_other, broad_class=tree), so ``classify`` can't tell them
+apart from their classes; they are assigned per-code from their meanings
+(researcher-confirmed):
+    10000000  "Before mangrove gain"                 -> tree_gain
+    10100000  "Non-mangrove remaining non-mangrove"   -> non_trees_remaining_non_trees
+    10200000  "After permanent mangrove loss"         -> tree_loss
 
 The mapping is small (95 codes) and stable, so it is checked in here rather than
 fetched at runtime. Source: ``LULUCF_state_node_lookup_table.xlsx`` sheet
@@ -16,8 +24,8 @@ fetched at runtime. Source: ``LULUCF_state_node_lookup_table.xlsx`` sheet
 state_node_lookup_tables/LULUCF_state_node_lookup_table.xlsx).
 
 To regenerate when the model publishes a new lookup sheet: read that sheet's
-``land_state`` / ``land_state_detailed_class`` / ``land_state_broad_class`` columns and
-re-apply the collapse rule above.
+``land_state`` / ``land_state_detailed_class`` / ``land_state_broad_class`` columns,
+re-apply the collapse rule above, then re-apply the three mangrove-mask overrides.
 """
 
 VEGETATION_CATEGORIES = {
@@ -31,6 +39,7 @@ VEGETATION_CATEGORIES = {
 # land_state codes grouped by category (from sheet v105_20260601)
 CATEGORY_LAND_STATES = {
     1: [  # tree_loss
+        10200000,  # mangrove mask: "After permanent mangrove loss" (per-code)
         11100000,
         12100000,
         12200000,
@@ -76,6 +85,7 @@ CATEGORY_LAND_STATES = {
         41900000,
     ],
     2: [  # tree_gain
+        10000000,  # mangrove mask: "Before mangrove gain" (per-code)
         11200000,
         21100000,
         21200000,
@@ -114,6 +124,7 @@ CATEGORY_LAND_STATES = {
         42222900,
     ],
     4: [  # non_trees_remaining_non_trees
+        10100000,  # mangrove mask: "Non-mangrove remaining non-mangrove" (per-code)
         51000000,
         52120000,
         52190000,
@@ -129,10 +140,7 @@ CATEGORY_LAND_STATES = {
         63200000,
         63900000,
     ],
-    0: [  # excluded (no flux / mangrove-mask bookkeeping states)
-        10000000,
-        10100000,
-        10200000,
+    0: [  # excluded ("Not in decision tree", no flux)
         70000000,
     ],
 }
@@ -146,9 +154,11 @@ LAND_STATE_TO_CATEGORY = {
 def classify(detailed_class, broad_class) -> int:
     """Collapse a land-state's detailed/broad class into a vegetation category code.
 
-    This is the canonical rule from which ``CATEGORY_LAND_STATES`` was generated; it
-    also lets us bucket any external table that carries the class columns (e.g. a
-    reference dataset used for QC).
+    The base rule from which ``CATEGORY_LAND_STATES`` was generated; it also buckets
+    any external table that carries the class columns (e.g. a reference dataset used
+    for QC). NOTE: the three mangrove-mask codes (10000000/10100000/10200000) are
+    assigned per-code in ``CATEGORY_LAND_STATES`` and are NOT captured here, because
+    they share the same (mangrove_other, tree) classes; this returns 0 for them.
     """
     if detailed_class == "tree_loss":
         return 1
