@@ -27,12 +27,11 @@ from pipelines.prefect_flows.common_stages import (
     rollup_by_gadm_and_convert_to_aoi,
 )
 
-# Canonical measures shared by every component.
 MEASURES = ["gross_emissions_MgCO2e", "gross_removals_MgCO2", "net_flux_MgCO2e"]
 AREA_LAYER = "area_ha"
-YEAR_BASE = 2016  # annual year index 0..8 -> 2016..2024
+YEAR_BASE = 2016  # year index 0..8 -> 2016..2024
 
-# Vegetation: canonical measure -> per-hectare source variable in the veg zarr.
+# canonical measure -> per-hectare source variable in the vegetation zarr
 VEGETATION_SOURCE_VARS = {
     "gross_emissions_MgCO2e": "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr",
     "gross_removals_MgCO2": "gross_removals__all_C_pools__MgCO2_ha_yr",
@@ -41,9 +40,6 @@ VEGETATION_SOURCE_VARS = {
 LAND_STATE_VAR = "land_state_node"
 
 
-# --------------------------------------------------------------------------- #
-# Generic core (used by every component)
-# --------------------------------------------------------------------------- #
 def setup_compute(
     measures: Dict[str, xr.DataArray],
     pixel_area: xr.DataArray,
@@ -125,9 +121,6 @@ def _clip(dataset: xr.Dataset, bbox: Optional[Polygon]) -> xr.Dataset:
     return dataset.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))
 
 
-# --------------------------------------------------------------------------- #
-# Vegetation component
-# --------------------------------------------------------------------------- #
 def collapse_land_state(land_state: xr.DataArray) -> xr.DataArray:
     """Relabel land_state_node codes to vegetation category codes (0-4).
 
