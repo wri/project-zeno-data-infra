@@ -1,7 +1,3 @@
-from typing import Dict
-from unittest.mock import patch
-
-import duckdb
 import pandas as pd
 import pytest
 from pydantic import ValidationError
@@ -12,6 +8,9 @@ from app.domain.analyzers.land_ghg_inventory_analyzer import (
 )
 from app.domain.models.analysis import Analysis
 from app.domain.models.environment import Environment
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
@@ -31,42 +30,41 @@ EXPECTED_COLUMNS = {
 }
 
 
-class FakeParquetQueryService:
-    """Runs the analyzer's real SQL against an in-memory parquet stand-in."""
-
-    async def execute(self, query: str) -> Dict:
-        data_source = pd.DataFrame(  # noqa: F841 (resolved by duckdb.sql scope)
-            {
-                "aoi_id": ["BRA.1", "BRA.1", "COL", "PER"],
-                "land_state_class": [
-                    "tree_loss",
-                    "tree_gain",
-                    "tree_loss",
-                    "tree_loss",
-                ],
-                "year": [2016, 2016, 2016, 2016],
-                "gross_emissions_MgCO2e": [100.0, 0.0, 50.0, 5.0],
-                "gross_removals_MgCO2": [-10.0, -20.0, -5.0, -1.0],
-                "net_flux_MgCO2e": [90.0, -20.0, 45.0, 4.0],
-                "area_ha": [1.0, 2.0, 3.0, 4.0],
-            }
-        )
-        return duckdb.sql(query).df().to_dict(orient="list")
+@pytest.fixture
+def precomputed_gadm_results(tmp_path):
+    """Real precomputed zonal-statistics parquet, queried through the real adapter."""
+    df = pd.DataFrame(
+        {
+            "aoi_id": ["BRA.1", "BRA.1", "COL", "PER"],
+            "land_state_class": ["tree_loss", "tree_gain", "tree_loss", "tree_loss"],
+            "year": [2016, 2016, 2016, 2016],
+            "gross_emissions_MgCO2e": [100.0, 0.0, 50.0, 5.0],
+            "gross_removals_MgCO2": [-10.0, -20.0, -5.0, -1.0],
+            "net_flux_MgCO2e": [90.0, -20.0, 45.0, 4.0],
+            "area_ha": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    parquet_file = tmp_path / "land_ghg_inventory_data.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
 
 
 @pytest.mark.asyncio
-async def test_admin_query_returns_flux_by_land_state_and_year():
+async def test_admin_query_returns_flux_by_land_state_and_year(
+    precomputed_gadm_results,
+):
     analytics_in = LandGHGInventoryAnalyticsIn(
         aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
-    analyzer = LandGHGInventoryAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    analyzer = LandGHGInventoryAnalyzer(
+        duckdb_query_service=DuckDbPrecalcQueryService(
+            table_uri=precomputed_gadm_results
+        ),
+        input_uris=INPUT_URIS[Environment.production],
+    )
 
-    with patch(
-        "app.domain.analyzers.land_ghg_inventory_analyzer.DuckDbPrecalcQueryService"
-    ) as mock_qs:
-        mock_qs.return_value.execute = FakeParquetQueryService().execute
-        await analyzer.analyze(analysis)
+    await analyzer.analyze(analysis)
 
     result = pd.DataFrame(analysis.result)
     assert EXPECTED_COLUMNS.issubset(result.columns)

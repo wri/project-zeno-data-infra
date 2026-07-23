@@ -10,6 +10,9 @@ from app.domain.analyzers.land_ghg_inventory_analyzer import (
 )
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.infrastructure.external_services.duck_db_query_service import (
+    DuckDbPrecalcQueryService,
+)
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
@@ -37,10 +40,14 @@ def create_analysis_service(
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
 ) -> AnalysisService:
+    input_uris = resolve_uris(INPUT_URIS, environment)
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandGHGInventoryAnalyzer(
-            input_uris=resolve_uris(INPUT_URIS, environment),
+            duckdb_query_service=DuckDbPrecalcQueryService(
+                table_uri=input_uris["admin_results_uri"]
+            ),
+            input_uris=input_uris,
         ),
         event=ANALYTICS_NAME,
     )

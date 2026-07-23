@@ -1,7 +1,9 @@
 from test.integration import (
     delete_resource_files,
     resource_thumbprint,
+    retry_getting_resource,
 )
+from typing import Dict
 
 import pytest
 import pytest_asyncio
@@ -31,6 +33,22 @@ from app.routers.land_change.land_ghg_inventory.land_ghg_inventory import (
 from app.use_cases.analysis.analysis_service import AnalysisService
 
 
+class FakeQueryService:
+    """Stand-in for the precomputed parquet so the full POST -> background ->
+    GET flow runs without touching S3."""
+
+    async def execute(self, query: str) -> Dict:
+        return {
+            "aoi_id": ["BRA.1", "BRA.1"],
+            "land_state_class": ["tree_loss", "tree_gain"],
+            "year": [2016, 2016],
+            "gross_emissions_MgCO2e": [100.0, 0.0],
+            "gross_removals_MgCO2": [-10.0, -20.0],
+            "net_flux_MgCO2e": [90.0, -20.0],
+            "area_ha": [1.0, 2.0],
+        }
+
+
 def get_file_system_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
 
@@ -43,7 +61,8 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandGHGInventoryAnalyzer(
-            input_uris=INPUT_URIS[Environment.production]
+            duckdb_query_service=FakeQueryService(),
+            input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
     )
@@ -76,26 +95,47 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
                     f"/v0/land_change/{ANALYTICS_NAME}/analytics",
                     json=analytics_in.model_dump(),
                 )
-                yield test_request, resource_tp
+                yield test_request, client, resource_tp
 
         app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_post_returns_202_accepted(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         assert test_request.status_code == 202
 
     @pytest.mark.asyncio
     async def test_post_returns_pending_status(self, setup):
-        test_request, _ = setup
+        test_request, _, _ = setup
         assert test_request.json()["status"] == "pending"
 
     @pytest.mark.asyncio
     async def test_post_returns_resource_link(self, setup):
-        test_request, resource_tp = setup
+        test_request, _, resource_tp = setup
         assert test_request.json()["data"]["link"] == (
             f"http://testserver/v0/land_change/{ANALYTICS_NAME}/analytics/{resource_tp}"
         )
+
+    @pytest.mark.asyncio
+    async def test_get_returns_saved_result(self, setup):
+        _, client, resource_tp = setup
+
+        data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+
+        assert data["status"] == "saved"
+        assert set(data["result"]).issuperset(
+            {
+                "aoi_id",
+                "aoi_type",
+                "land_state_class",
+                "year",
+                "gross_emissions_MgCO2e",
+                "gross_removals_MgCO2",
+                "net_flux_MgCO2e",
+                "area_ha",
+            }
+        )
+        assert set(data["result"]["aoi_type"]) == {"admin"}
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():
