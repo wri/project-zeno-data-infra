@@ -8,6 +8,12 @@ region_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/
 region_10m_zarr_uri = "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm1.10m.zarr"
 subregion_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm2.zarr"
 subregion_10m_zarr_uri = "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm2.10m.zarr"
+# Upper bound (exclusive) on the numeric code at each GADM admin level, for sizing
+# flox reduce group axes. flox silently drops any label at or above the bound, so
+# these must exceed the GADM v4.1 code maxima (bump on a GADM version change).
+gadm_country_code_count = 999  # numeric ISO; largest mapped code is 894
+gadm_region_code_count = 86  # adm1 index within a country
+gadm_subregion_code_count = 854  # adm2 index within an adm1
 pixel_area_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-area-2013/v1.10/area_ha_30m_f64.zarr"
 )

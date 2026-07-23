@@ -102,7 +102,12 @@ def create_result_dataframe(
     df = df[df["land_state_class"] != "excluded"]
     df["year"] = df["year"].astype(int) + YEAR_BASE
 
-    return rollup_by_gadm_and_convert_to_aoi(df, ["land_state_class", "year"])
+    result = rollup_by_gadm_and_convert_to_aoi(df, ["land_state_class", "year"])
+    # a structurally-zero measure (e.g. tree_gain emissions) is absent from the
+    # sparse reduce and pivots to NaN; emit dense 0.0 so consumers aren't surprised.
+    value_columns = MEASURES + [AREA_LAYER]
+    result[value_columns] = result.reindex(columns=value_columns).fillna(0.0)
+    return result
 
 
 def _align_to(reference: xr.Dataset, uri: str) -> xr.DataArray:

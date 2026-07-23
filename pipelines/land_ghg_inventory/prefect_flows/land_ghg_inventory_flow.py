@@ -8,6 +8,9 @@ from shapely.geometry import Polygon
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     country_zarr_uri,
+    gadm_country_code_count,
+    gadm_region_code_count,
+    gadm_subregion_code_count,
     land_ghg_inventory_vegetation_zarr_uri,
     pixel_area_zarr_uri,
     region_zarr_uri,
@@ -17,15 +20,20 @@ from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
+# Pipeline-specific reduce group axes (the admin axes come from globals). flox
+# silently drops labels at or above a bound, so these must cover the real range.
+VEGETATION_CATEGORY_COUNT = 5  # 0=excluded .. 4=non_trees_remaining_non_trees
+YEAR_COUNT = 9  # year index 0..8 -> 2016..2024
+
 
 def _vegetation_result_df(bbox=None):
     """Run the vegetation reduce and return its tidy component rows."""
     expected_groups = (
-        np.arange(999),  # country iso codes
-        np.arange(86),  # region codes
-        np.arange(854),  # subregion codes
-        np.array([0, 1, 2, 3, 4]),  # vegetation category codes
-        np.arange(9),  # year index 0..8 -> 2016..2024
+        np.arange(gadm_country_code_count),
+        np.arange(gadm_region_code_count),
+        np.arange(gadm_subregion_code_count),
+        np.arange(VEGETATION_CATEGORY_COUNT),
+        np.arange(YEAR_COUNT),
     )
     datasets = land_ghg_inventory_tasks.load_vegetation.with_options(
         name="land_ghg_inventory-vegetation-load-data"

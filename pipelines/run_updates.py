@@ -120,6 +120,15 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE: run_land_ghg_inventory_update,
 }
 
+# flows that produce versioned outputs and therefore require an explicit version
+VERSION_REQUIRED_FLOWS = (UpdateFlow.TCL_UPDATE, UpdateFlow.LAND_GHG_INVENTORY_UPDATE)
+
+
+def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
+    """Raise if the selected flow needs a version and none was given."""
+    if flow_name in VERSION_REQUIRED_FLOWS and version is None:
+        raise ValueError(f"version is required when flow is {flow_name}")
+
 
 @flow(
     name="GNW zonal stats update",
@@ -163,11 +172,7 @@ def run_updates(
                 f"Unsupported flow selection: '{flow_name}'. Accepted values: {accepted}"
             )
 
-        if (
-            flow_name in (UpdateFlow.TCL_UPDATE, UpdateFlow.LAND_GHG_INVENTORY_UPDATE)
-            and version is None
-        ):
-            raise ValueError(f"version is required when flow is {flow_name}")
+        _validate_flow_args(flow_name, version)
 
         # a Dask performance report needs the distributed scheduler, so it only
         # applies to Coiled runs (there is no client under local=True)
