@@ -1,18 +1,22 @@
 import logging
 import os
+from contextlib import nullcontext
 from enum import Enum
 
 import click
 import coiled
+from dask.distributed import performance_report
 from prefect import flow, task
 from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
+from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
+from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
-from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -70,28 +74,60 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 
 
 @flow
-def run_integrated_alerts_update(version, overwrite=False, is_latest=False) -> list[str]:
+def run_integrated_alerts_update(
+    version, overwrite=False, is_latest=False
+) -> list[str]:
     result_uris = []
 
-    result = integrated_alerts_flow.integrated_alerts_zarr_flow(version,
-                                                                overwrite=overwrite,
-                                                                is_latest=is_latest)
+    result = integrated_alerts_flow.integrated_alerts_zarr_flow(
+        version, overwrite=overwrite, is_latest=is_latest
+    )
     result_uris.append(result)
 
     return result_uris
+
+
+@flow
+def run_land_ghg_inventory_update(
+    version, overwrite=False, is_latest=False, bbox=None
+) -> list[str]:
+    return [
+        land_ghg_inventory_flow.land_ghg_inventory_area(
+            version=version, overwrite=overwrite, bbox=bbox
+        )
+    ]
+
+
+def _parse_bbox(bbox):
+    """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
+    if not bbox:
+        return None
+    minx, miny, maxx, maxy = (float(v) for v in str(bbox).split(","))
+    return box(minx, miny, maxx, maxy)
 
 
 class UpdateFlow(str, Enum):
     DIST_UPDATE = "dist_update"
     TCL_UPDATE = "tcl_update"
     INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
+    LAND_GHG_INVENTORY_UPDATE = "land_ghg_inventory_update"
 
 
 update_flows = {
     UpdateFlow.DIST_UPDATE: run_dist_update,
     UpdateFlow.TCL_UPDATE: run_tcl_update,
     UpdateFlow.INTEGRATED_ALERTS_UPDATE: run_integrated_alerts_update,
+    UpdateFlow.LAND_GHG_INVENTORY_UPDATE: run_land_ghg_inventory_update,
 }
+
+# flows that produce versioned outputs and therefore require an explicit version
+VERSION_REQUIRED_FLOWS = (UpdateFlow.TCL_UPDATE, UpdateFlow.LAND_GHG_INVENTORY_UPDATE)
+
+
+def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
+    """Raise if the selected flow needs a version and none was given."""
+    if flow_name in VERSION_REQUIRED_FLOWS and version is None:
+        raise ValueError(f"version is required when flow is {flow_name}")
 
 
 @flow(
@@ -109,6 +145,9 @@ def run_updates(
     overwrite=False,
     is_latest=False,
     flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
+    bbox=None,
+    local=False,
+    performance_report_path=None,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -117,9 +156,14 @@ def run_updates(
     # when called from Prefect webhook, the booleans flags are passed as strings, so we need to convert them to booleans
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
+    local = str(local).lower() == "true"
+    # bbox (land_ghg_inventory_update only) clips the reduce to one area. It is
+    # independent of where compute runs: Coiled by default, or local when local=True.
+    bbox_geom = _parse_bbox(bbox)
 
     try:
-        dask_client = create_cluster()
+        if not local:
+            dask_client = create_cluster()
 
         flow_fn = update_flows.get(flow_name)
         if flow_fn is None:
@@ -128,16 +172,22 @@ def run_updates(
                 f"Unsupported flow selection: '{flow_name}'. Accepted values: {accepted}"
             )
 
-        if flow_name == UpdateFlow.TCL_UPDATE and version is None:
-            raise ValueError(
-                f"version is required when flow is {UpdateFlow.TCL_UPDATE}"
-            )
+        _validate_flow_args(flow_name, version)
 
-        result_uris = flow_fn(
-            version=version,
-            overwrite=overwrite,
-            is_latest=is_latest,
-        )
+        # a Dask performance report needs the distributed scheduler, so it only
+        # applies to Coiled runs (there is no client under local=True)
+        if performance_report_path and dask_client is not None:
+            report = performance_report(filename=performance_report_path)
+        else:
+            if performance_report_path:
+                logger.warning("performance report skipped: no cluster (local run)")
+            report = nullcontext()
+
+        kwargs = dict(version=version, overwrite=overwrite, is_latest=is_latest)
+        if flow_name == UpdateFlow.LAND_GHG_INVENTORY_UPDATE:
+            kwargs["bbox"] = bbox_geom
+        with report:
+            result_uris = flow_fn(**kwargs)
 
     except Exception:
         logger.error("Analysis failed.")
@@ -162,12 +212,36 @@ def run_updates(
 )
 @click.option("--overwrite", is_flag=True, help="Overwrite existing outputs.")
 @click.option("--is-latest", is_flag=True, help="Mark this version as latest.")
-def cli(flow_name, version, overwrite, is_latest):
+@click.option(
+    "--bbox",
+    default=None,
+    help=(
+        "minx,miny,maxx,maxy to clip land_ghg_inventory_update to one area; "
+        "writes a local parquet instead of the global S3 path. "
+        "land_ghg_inventory_update only."
+    ),
+)
+@click.option(
+    "--local",
+    is_flag=True,
+    help="Run compute on this machine instead of a Coiled cluster.",
+)
+@click.option(
+    "--performance-report",
+    "performance_report_path",
+    default=None,
+    help="Write a Dask performance report HTML here (Coiled runs only; "
+    "ignored with --local).",
+)
+def cli(flow_name, version, overwrite, is_latest, bbox, local, performance_report_path):
     run_updates(
         version=version,
         overwrite=overwrite,
         is_latest=is_latest,
         flow_name=UpdateFlow(flow_name),
+        bbox=bbox,
+        local=local,
+        performance_report_path=performance_report_path,
     )
 
 
