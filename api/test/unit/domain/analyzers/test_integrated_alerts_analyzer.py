@@ -9,13 +9,34 @@ import rioxarray  # noqa: F401
 import xarray as xr
 
 from app.domain.analyzers import zonal_statistics_analyzer
-from app.domain.analyzers.integrated_alerts_analyzer import IntegratedAlertsAnalyzer
+from app.domain.analyzers.integrated_alerts_analyzer import (
+    IntegratedAlertsAnalyzer,
+    build_input_uris,
+)
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
+from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
+
+
+def test_build_input_uris_versions_zarr_and_parquet():
+    uris = build_input_uris("v20260706", Environment.production)
+
+    assert uris["integrated_alerts_zarr_uri"] == (
+        "s3://lcl-analytics/zarr/gfw_integrated_dist_alerts/v20260706/date_conf.zarr"
+    )
+    assert uris["admin_results_table_uri"] == (
+        "s3://lcl-analytics/zonal-statistics/integrated-alerts/v20260706/"
+        "admin-integrated-alerts.parquet"
+    )
+    # pixel area is version-independent and still resolved
+    pixel_area_uri = uris[str(Dataset.pixel_area_m2_10m)]
+    assert pixel_area_uri
+    assert "v20260706" not in pixel_area_uri
+
 
 # Pixel areas down one column of latitude; reused for both fixtures and for
 # computing expected per-group sums so nothing is a magic number.
