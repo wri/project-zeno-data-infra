@@ -6,6 +6,7 @@ from .dist_alerts import dist_alerts
 from .grasslands import grasslands
 from .integrated_alerts import integrated_alerts
 from .land_cover import land_cover_change, land_cover_composition
+from .land_ghg_inventory import land_ghg_inventory
 from .natural_lands import natural_lands
 from .tree_cover import tree_cover
 from .tree_cover_gain import tree_cover_gain
@@ -21,5 +22,7 @@ router.include_router(tree_cover_gain.router)
 router.include_router(land_cover_change.router)
 router.include_router(land_cover_composition.router)
 router.include_router(natural_lands.router)
+# hidden from the public OpenAPI docs for now (routes still functional)
+router.include_router(land_ghg_inventory.router, include_in_schema=False)
 router.include_router(carbon_flux.router)
 router.include_router(deforestation_luc_emissions_factor.router)
