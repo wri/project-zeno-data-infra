@@ -9,17 +9,17 @@ from ..common.base import Response, StrictBaseModel
 ANALYTICS_NAME = "land_ghg_inventory"
 
 
-class LandGhgInventoryAnalyticsIn(AnalyticsIn):
+class LandGHGInventoryAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20260723")
     aoi: AdminAreaOfInterest = Field(
         ...,
         title="AOI",
-        description="GADM admin area to summarize. GADM areas only (no on-the-fly).",
+        description="Admin area (by aoi_id). Admin areas only, no on-the-fly.",
     )
 
 
-class LandGhgInventoryAnalytics(StrictBaseModel):
+class LandGHGInventoryAnalytics(StrictBaseModel):
     result: Optional[dict] = None
     metadata: Optional[dict] = None
     message: Optional[str] = None
@@ -31,8 +31,8 @@ class LandGhgInventoryAnalytics(StrictBaseModel):
     }
 
 
-class LandGhgInventoryAnalyticsResponse(Response):
-    data: LandGhgInventoryAnalytics
+class LandGHGInventoryAnalyticsResponse(Response):
+    data: LandGHGInventoryAnalytics
     model_config = {
         "json_schema_extra": {
             "examples": [

@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.land_ghg_inventory_analyzer import (
     INPUT_URIS,
-    LandGhgInventoryAnalyzer,
+    LandGHGInventoryAnalyzer,
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -22,7 +22,7 @@ from app.main import app
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.land_ghg_inventory import (
     ANALYTICS_NAME,
-    LandGhgInventoryAnalyticsIn,
+    LandGHGInventoryAnalyticsIn,
 )
 from app.routers.land_change.land_ghg_inventory.land_ghg_inventory import (
     create_analysis_service,
@@ -42,20 +42,20 @@ def create_analysis_service_for_tests(
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=LandGhgInventoryAnalyzer(
+        analyzer=LandGHGInventoryAnalyzer(
             input_uris=INPUT_URIS[Environment.production]
         ),
         event=ANALYTICS_NAME,
     )
 
 
-class TestLandGhgInventoryPostWithNoPreviousRequest:
+class TestLandGHGInventoryPostWithNoPreviousRequest:
     @pytest_asyncio.fixture
     async def setup(self):
-        analytics_in = LandGhgInventoryAnalyticsIn(
+        analytics_in = LandGHGInventoryAnalyticsIn(
             aoi=AdminAreaOfInterest(type="admin", ids=["BRA.1"])
         )
-        analyzer = LandGhgInventoryAnalyzer(
+        analyzer = LandGHGInventoryAnalyzer(
             input_uris=INPUT_URIS[Environment.production]
         )
         resource_tp = resource_thumbprint(analytics_in, analyzer)

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.domain.analyzers.land_ghg_inventory_analyzer import (
     INPUT_URIS,
-    LandGhgInventoryAnalyzer,
+    LandGHGInventoryAnalyzer,
 )
 from app.domain.models.analysis import Analysis
 from app.domain.models.environment import Environment
@@ -17,7 +17,7 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
 )
-from app.models.land_change.land_ghg_inventory import LandGhgInventoryAnalyticsIn
+from app.models.land_change.land_ghg_inventory import LandGHGInventoryAnalyticsIn
 
 EXPECTED_COLUMNS = {
     "aoi_id",
@@ -56,11 +56,11 @@ class FakeParquetQueryService:
 
 @pytest.mark.asyncio
 async def test_admin_query_returns_flux_by_land_state_and_year():
-    analytics_in = LandGhgInventoryAnalyticsIn(
+    analytics_in = LandGHGInventoryAnalyticsIn(
         aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
-    analyzer = LandGhgInventoryAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    analyzer = LandGHGInventoryAnalyzer(input_uris=INPUT_URIS[Environment.production])
 
     with patch(
         "app.domain.analyzers.land_ghg_inventory_analyzer.DuckDbPrecalcQueryService"
@@ -70,7 +70,7 @@ async def test_admin_query_returns_flux_by_land_state_and_year():
 
     result = pd.DataFrame(analysis.result)
     assert EXPECTED_COLUMNS.issubset(result.columns)
-    # only the requested GADM ids come back (PER is filtered out by the WHERE clause)
+    # only the requested admin ids come back (PER is filtered out by the WHERE clause)
     assert set(result.aoi_id) == {"BRA.1", "COL"}
     assert set(result.aoi_type) == {"admin"}
     # tree_gain keeps its structural zero emissions (dense output, not NaN)
@@ -81,10 +81,10 @@ async def test_admin_query_returns_flux_by_land_state_and_year():
     assert tree_gain.net_flux_MgCO2e == -20.0
 
 
-def test_rejects_non_gadm_aoi():
-    # GADM areas only: a non-admin AOI must fail validation, not fall through to OTF.
+def test_rejects_non_admin_aoi():
+    # Admin areas only: a non-admin AOI must fail validation, not fall through to OTF.
     with pytest.raises(ValidationError):
-        LandGhgInventoryAnalyticsIn(
+        LandGHGInventoryAnalyticsIn(
             aoi=KeyBiodiversityAreaOfInterest(
                 type="key_biodiversity_area", ids=["8111"]
             )

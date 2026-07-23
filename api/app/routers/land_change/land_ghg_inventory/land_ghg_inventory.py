@@ -6,7 +6,7 @@ from pydantic import UUID5
 from app.dependencies import get_environment
 from app.domain.analyzers.land_ghg_inventory_analyzer import (
     INPUT_URIS,
-    LandGhgInventoryAnalyzer,
+    LandGHGInventoryAnalyzer,
 )
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -17,9 +17,9 @@ from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.land_ghg_inventory import (
     ANALYTICS_NAME,
-    LandGhgInventoryAnalytics,
-    LandGhgInventoryAnalyticsIn,
-    LandGhgInventoryAnalyticsResponse,
+    LandGHGInventoryAnalytics,
+    LandGHGInventoryAnalyticsIn,
+    LandGHGInventoryAnalyticsResponse,
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
@@ -39,7 +39,7 @@ def create_analysis_service(
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=LandGhgInventoryAnalyzer(
+        analyzer=LandGHGInventoryAnalyzer(
             input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,
@@ -55,7 +55,7 @@ def create_analysis_service(
 )
 async def create(
     *,
-    data: LandGhgInventoryAnalyticsIn,
+    data: LandGHGInventoryAnalyticsIn,
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
@@ -81,7 +81,7 @@ def _datamart_resource_link_response(request, service) -> str:
 @router.get(
     "/analytics/{resource_id}",
     response_class=ORJSONResponse,
-    response_model=LandGhgInventoryAnalyticsResponse,
+    response_model=LandGHGInventoryAnalyticsResponse,
     status_code=200,
 )
 async def get_land_ghg_inventory_analytics_result(
@@ -95,6 +95,6 @@ async def get_land_ghg_inventory_analytics_result(
         response=response,
     )
 
-    return LandGhgInventoryAnalyticsResponse(
-        data=LandGhgInventoryAnalytics(**analytics_out.model_dump()), status="success"
+    return LandGHGInventoryAnalyticsResponse(
+        data=LandGHGInventoryAnalytics(**analytics_out.model_dump()), status="success"
     )
