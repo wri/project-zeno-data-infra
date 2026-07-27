@@ -1,16 +1,18 @@
 import os
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+import boto3
+from cachetools.func import ttl_cache
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.dependencies import get_environment
 from app.domain.analyzers.integrated_alerts_analyzer import (
-    INPUT_URIS,
     IntegratedAlertsAnalyzer,
+    build_input_uris,
 )
-from app.domain.models.environment import Environment, resolve_uris
+from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -38,21 +40,36 @@ def get_analysis_repository(request: Request) -> AnalysisRepository:
     )
 
 
+@ttl_cache(maxsize=1, ttl=3600)
+def get_latest_integrated_alerts_version() -> str:
+    client = boto3.client("s3")
+    try:
+        response = client.get_object(
+            Bucket="lcl-analytics", Key="zonal-statistics/integrated-alerts/latest"
+        )
+    except client.exceptions.NoSuchKey as error:
+        raise HTTPException(
+            status_code=503,
+            detail="Integrated alerts 'latest' version marker not found in S3.",
+        ) from error
+    return response["Body"].read().decode("utf-8").strip()
+
+
 def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
+    version: str = Depends(get_latest_integrated_alerts_version),
 ) -> AnalysisService:
+    input_uris = build_input_uris(version, environment)
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=IntegratedAlertsAnalyzer(
             compute_engine=request.app.state.dask_client,
             duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=resolve_uris(INPUT_URIS, environment)[
-                    "admin_results_table_uri"
-                ]
+                table_uri=input_uris["admin_results_table_uri"]
             ),
-            input_uris=resolve_uris(INPUT_URIS, environment),
+            input_uris=input_uris,
             otf_timeout_seconds=float(os.environ.get("OTF_TIMEOUT_SECONDS", 600)),
         ),
         event=ANALYTICS_NAME,
@@ -72,7 +89,9 @@ async def create(
     request: Request,
     background_tasks: BackgroundTasks,
     service: AnalysisService = Depends(create_analysis_service),
+    version: str = Depends(get_latest_integrated_alerts_version),
 ):
+    data._version = version
     return await create_analysis(
         data=data,
         service=service,
