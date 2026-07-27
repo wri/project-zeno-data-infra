@@ -101,6 +101,11 @@ def run_land_ghg_inventory_update(
 ) -> list[str]:
     """Routes to the land_ghg_inventory component selected by `flow_name` (see
     LAND_GHG_INVENTORY_COMPONENT); runs all components if unset."""
+    if flow_name is not None and flow_name not in LAND_GHG_INVENTORY_COMPONENT:
+        raise ValueError(
+            f"Unsupported land_ghg_inventory flow_name: '{flow_name}'. "
+            f"Accepted values: {list(LAND_GHG_INVENTORY_COMPONENT)}"
+        )
     return land_ghg_inventory_flow.land_ghg_inventory_area(
         version=version,
         overwrite=overwrite,
