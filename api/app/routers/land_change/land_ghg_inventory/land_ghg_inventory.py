@@ -44,9 +44,14 @@ def create_analysis_service(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandGHGInventoryAnalyzer(
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=input_uris["admin_results_uri"]
-            ),
+            query_services={
+                "vegetation": DuckDbPrecalcQueryService(
+                    table_uri=input_uris["admin_vegetation_results_uri"]
+                ),
+                "agriculture": DuckDbPrecalcQueryService(
+                    table_uri=input_uris["admin_agriculture_results_uri"]
+                ),
+            },
             input_uris=input_uris,
         ),
         event=ANALYTICS_NAME,
