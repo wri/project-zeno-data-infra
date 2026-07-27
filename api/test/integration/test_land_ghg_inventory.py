@@ -34,19 +34,32 @@ from app.use_cases.analysis.analysis_service import AnalysisService
 
 
 class FakeQueryService:
-    """Stand-in for the precomputed parquet so the full POST -> background ->
-    GET flow runs without touching S3."""
+    """Stand-in for a precomputed parquet so the full POST -> background -> GET
+    flow runs without touching S3. Returns a fixed column-oriented payload."""
+
+    def __init__(self, payload: Dict):
+        self.payload = payload
 
     async def execute(self, query: str) -> Dict:
-        return {
-            "aoi_id": ["BRA.1", "BRA.1"],
-            "land_state_class": ["tree_loss", "tree_gain"],
-            "year": [2016, 2016],
-            "gross_emissions_MgCO2e": [100.0, 0.0],
-            "gross_removals_MgCO2": [-10.0, -20.0],
-            "net_flux_MgCO2e": [90.0, -20.0],
-            "area_ha": [1.0, 2.0],
-        }
+        return self.payload
+
+
+VEGETATION_PAYLOAD = {
+    "aoi_id": ["BRA.1", "BRA.1"],
+    "land_state_class": ["tree_loss", "tree_gain"],
+    "year": [2016, 2016],
+    "gross_emissions_MgCO2e": [100.0, 0.0],
+    "gross_removals_MgCO2": [-10.0, -20.0],
+    "net_flux_MgCO2e": [90.0, -20.0],
+    "area_ha": [1.0, 2.0],
+}
+
+AGRICULTURE_PAYLOAD = {
+    "aoi_id": ["BRA.1", "BRA.1"],
+    "aoi_type": ["admin", "admin"],
+    "category": ["cropland", "livestock"],
+    "gross_emissions_MgCO2e": [123.0, 456.0],
+}
 
 
 def get_file_system_analysis_repository() -> AnalysisRepository:
@@ -61,7 +74,10 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=LandGHGInventoryAnalyzer(
-            duckdb_query_service=FakeQueryService(),
+            query_services={
+                "vegetation": FakeQueryService(VEGETATION_PAYLOAD),
+                "agriculture": FakeQueryService(AGRICULTURE_PAYLOAD),
+            },
             input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,
@@ -123,8 +139,9 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
         data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
-        # tables are nested by category; only "vegetation" exists for now
-        assert set(data["result"]) == {"vegetation"}
+        # one table per category
+        assert set(data["result"]) == {"vegetation", "agriculture"}
+
         vegetation = data["result"]["vegetation"]
         assert set(vegetation).issuperset(
             {
@@ -139,6 +156,12 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
             }
         )
         assert set(vegetation["aoi_type"]) == {"admin"}
+
+        agriculture = data["result"]["agriculture"]
+        assert set(agriculture).issuperset(
+            {"aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e"}
+        )
+        assert set(agriculture["category"]) == {"cropland", "livestock"}
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():
