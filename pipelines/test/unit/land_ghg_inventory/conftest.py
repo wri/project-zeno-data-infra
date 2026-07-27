@@ -63,3 +63,42 @@ def synthetic_datasets():
         np.array([0, 1]),
     )
     return datasets, expected_groups
+
+
+@pytest.fixture
+def synthetic_agriculture_datasets():
+    """Tiny 2x2 scene, two admin units (BRA subregion 1 and BRA country-only).
+
+    Agriculture values are already per-pixel absolute totals (no pixel-area
+    multiplication, no year/land_state axis). Per-pixel totals are known:
+    cropland_emissions=[[10, 20], [30, 0]], livestock_emissions=[[1, 2], [3, 0]].
+    """
+    coords2 = {"y": [0.0, 1.0], "x": [0.0, 1.0]}
+
+    def layer(values, dtype="float32"):
+        return xr.DataArray(
+            da.from_array(np.array(values, dtype=dtype), chunks=(2, 2)),
+            dims=["y", "x"],
+            coords=coords2,
+        )
+
+    ag = xr.Dataset(
+        {
+            "cropland_emissions": layer([[10.0, 20.0], [30.0, 0.0]]),
+            "livestock_emissions": layer([[1.0, 2.0], [3.0, 0.0]]),
+        }
+    )
+
+    # top row -> BRA subregion 1; bottom-left -> BRA subregion 0 (region-only);
+    # bottom-right -> no country (dropped, like ocean pixels).
+    country = layer([[76, 76], [76, 0]], "int32")
+    region = layer([[1, 1], [1, 0]], "int32")
+    subregion = layer([[1, 1], [0, 0]], "int32")
+
+    datasets = (ag, country, region, subregion)
+    expected_groups = (
+        np.array([76]),
+        np.array([1]),
+        np.array([0, 1]),
+    )
+    return datasets, expected_groups

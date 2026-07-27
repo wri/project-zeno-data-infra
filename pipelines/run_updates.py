@@ -87,15 +87,26 @@ def run_integrated_alerts_update(
     return result_uris
 
 
+# flow_name -> land_ghg_inventory component to run; None means "run all".
+LAND_GHG_INVENTORY_COMPONENT = {
+    "land_ghg_inventory_update": None,
+    "land_ghg_inventory_vegetation_update": "vegetation",
+    "land_ghg_inventory_agriculture_update": "agriculture",
+}
+
+
 @flow
 def run_land_ghg_inventory_update(
-    version, overwrite=False, is_latest=False, bbox=None
+    version, overwrite=False, is_latest=False, bbox=None, flow_name=None
 ) -> list[str]:
-    return [
-        land_ghg_inventory_flow.land_ghg_inventory_area(
-            version=version, overwrite=overwrite, bbox=bbox
-        )
-    ]
+    """Routes to the land_ghg_inventory component selected by `flow_name` (see
+    LAND_GHG_INVENTORY_COMPONENT); runs all components if unset."""
+    return land_ghg_inventory_flow.land_ghg_inventory_area(
+        version=version,
+        overwrite=overwrite,
+        bbox=bbox,
+        component=LAND_GHG_INVENTORY_COMPONENT.get(flow_name),
+    )
 
 
 def _parse_bbox(bbox):
@@ -111,6 +122,8 @@ class UpdateFlow(str, Enum):
     TCL_UPDATE = "tcl_update"
     INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
     LAND_GHG_INVENTORY_UPDATE = "land_ghg_inventory_update"
+    LAND_GHG_INVENTORY_VEGETATION_UPDATE = "land_ghg_inventory_vegetation_update"
+    LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
 
 
 update_flows = {
@@ -118,10 +131,24 @@ update_flows = {
     UpdateFlow.TCL_UPDATE: run_tcl_update,
     UpdateFlow.INTEGRATED_ALERTS_UPDATE: run_integrated_alerts_update,
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.LAND_GHG_INVENTORY_VEGETATION_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE: run_land_ghg_inventory_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
-VERSION_REQUIRED_FLOWS = (UpdateFlow.TCL_UPDATE, UpdateFlow.LAND_GHG_INVENTORY_UPDATE)
+VERSION_REQUIRED_FLOWS = (
+    UpdateFlow.TCL_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_VEGETATION_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
+)
+
+# flow_name values that route into run_land_ghg_inventory_update
+LAND_GHG_INVENTORY_FLOWS = (
+    UpdateFlow.LAND_GHG_INVENTORY_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_VEGETATION_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
+)
 
 
 def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
@@ -184,8 +211,9 @@ def run_updates(
             report = nullcontext()
 
         kwargs = dict(version=version, overwrite=overwrite, is_latest=is_latest)
-        if flow_name == UpdateFlow.LAND_GHG_INVENTORY_UPDATE:
+        if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
+            kwargs["flow_name"] = flow_name.value
         with report:
             result_uris = flow_fn(**kwargs)
 
@@ -216,9 +244,10 @@ def run_updates(
     "--bbox",
     default=None,
     help=(
-        "minx,miny,maxx,maxy to clip land_ghg_inventory_update to one area; "
-        "writes a local parquet instead of the global S3 path. "
-        "land_ghg_inventory_update only."
+        "minx,miny,maxx,maxy to clip the reduce to one area; writes a local "
+        "parquet instead of the global S3 path. Only applies to "
+        "land_ghg_inventory_update, land_ghg_inventory_vegetation_update, and "
+        "land_ghg_inventory_agriculture_update."
     ),
 )
 @click.option(

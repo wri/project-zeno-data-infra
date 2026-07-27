@@ -13,6 +13,7 @@ import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
 
+from pipelines.land_ghg_inventory.common import align_to, clip
 from pipelines.land_ghg_inventory.land_state_categories import (
     LAND_STATE_TO_CATEGORY,
     VEGETATION_CATEGORIES,
@@ -110,22 +111,6 @@ def create_result_dataframe(
     return result
 
 
-def _align_to(reference: xr.Dataset, uri: str) -> xr.DataArray:
-    """Load a contextual band_data zarr and snap it to the reference grid."""
-    layer = _load_zarr(uri).band_data
-    if "band" in layer.dims:
-        layer = layer.isel(band=0, drop=True)
-    layer = layer.reindex_like(reference, method="nearest", tolerance=1e-4)
-    return xr.align(reference, layer, join="left")[1]
-
-
-def _clip(dataset: xr.Dataset, bbox: Optional[Polygon]) -> xr.Dataset:
-    if bbox is None:
-        return dataset
-    min_x, min_y, max_x, max_y = bbox.bounds
-    return dataset.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))
-
-
 def collapse_land_state(land_state: xr.DataArray) -> xr.DataArray:
     """Relabel land_state_node codes to vegetation category codes (0-4).
 
@@ -158,14 +143,14 @@ def load_data(
     veg = _load_zarr(vegetation_uri)[
         list(VEGETATION_SOURCE_VARS.values()) + [LAND_STATE_VAR]
     ]
-    veg = _clip(veg, bbox)
+    veg = clip(veg, bbox)
     veg = veg.rename({source: name for name, source in VEGETATION_SOURCE_VARS.items()})
     return (
         veg,
-        _align_to(veg, pixel_area_uri),
-        _align_to(veg, country_uri),
-        _align_to(veg, region_uri),
-        _align_to(veg, subregion_uri),
+        align_to(veg, pixel_area_uri),
+        align_to(veg, country_uri),
+        align_to(veg, region_uri),
+        align_to(veg, subregion_uri),
     )
 
 

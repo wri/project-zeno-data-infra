@@ -15,7 +15,7 @@ from pipelines.globals import (
     region_zarr_uri,
     subregion_zarr_uri,
 )
-from pipelines.land_ghg_inventory import stages
+from pipelines.land_ghg_inventory import vegetation_stages
 from pipelines.prefect_flows import common_stages
 
 # São Tomé & Príncipe: both islands, ocean elsewhere (isolated -> clean bbox).
@@ -30,7 +30,7 @@ EXPECTED_TOTALS = {
 
 
 def test_stp_reproduces_reference_totals():
-    datasets = stages.load_data(
+    datasets = vegetation_stages.load_data(
         land_ghg_inventory_vegetation_zarr_uri,
         pixel_area_zarr_uri,
         country_zarr_uri,
@@ -45,11 +45,11 @@ def test_stp_reproduces_reference_totals():
         np.array([0, 1, 2, 3, 4]),
         np.arange(9),
     )
-    cube, groupbys, out_expected_groups = stages.setup_vegetation_compute(
+    cube, groupbys, out_expected_groups = vegetation_stages.setup_vegetation_compute(
         datasets, expected_groups
     )
     reduced = common_stages.compute(cube, groupbys, out_expected_groups, "sum")
-    df = stages.vegetation_result_dataframe(reduced)
+    df = vegetation_stages.vegetation_result_dataframe(reduced)
 
     country = df[(df["aoi_id"] == "STP")]
     assert not country.empty
