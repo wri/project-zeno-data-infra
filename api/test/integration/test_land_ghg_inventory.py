@@ -123,7 +123,10 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
         data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
 
         assert data["status"] == "saved"
-        assert set(data["result"]).issuperset(
+        # tables are nested by category; only "vegetation" exists for now
+        assert set(data["result"]) == {"vegetation"}
+        vegetation = data["result"]["vegetation"]
+        assert set(vegetation).issuperset(
             {
                 "aoi_id",
                 "aoi_type",
@@ -135,7 +138,7 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
                 "area_ha",
             }
         )
-        assert set(data["result"]["aoi_type"]) == {"admin"}
+        assert set(vegetation["aoi_type"]) == {"admin"}
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():

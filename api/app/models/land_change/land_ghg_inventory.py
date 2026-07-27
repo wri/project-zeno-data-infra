@@ -38,15 +38,19 @@ class LandGHGInventoryAnalyticsResponse(Response):
             "examples": [
                 {
                     "data": {
-                        "result": {  # column oriented for loading into a dataframe
-                            "aoi_id": ["BRA.1", "BRA.1"],
-                            "aoi_type": ["admin", "admin"],
-                            "land_state_class": ["tree_loss", "tree_gain"],
-                            "year": [2016, 2016],
-                            "gross_emissions_MgCO2e": [438480933.0, 0.0],
-                            "gross_removals_MgCO2": [-29404371.0, -3213337.0],
-                            "net_flux_MgCO2e": [409076565.0, -3213337.0],
-                            "area_ha": [1086087.0, 518423.0],
+                        # tables grouped by category; "vegetation" only for now
+                        "result": {
+                            # column oriented for loading into a dataframe
+                            "vegetation": {
+                                "aoi_id": ["BRA.1", "BRA.1"],
+                                "aoi_type": ["admin", "admin"],
+                                "land_state_class": ["tree_loss", "tree_gain"],
+                                "year": [2016, 2016],
+                                "gross_emissions_MgCO2e": [438480933.0, 0.0],
+                                "gross_removals_MgCO2": [-29404371.0, -3213337.0],
+                                "net_flux_MgCO2e": [409076565.0, -3213337.0],
+                                "area_ha": [1086087.0, 518423.0],
+                            },
                         },
                         "metadata": {
                             "aoi": {

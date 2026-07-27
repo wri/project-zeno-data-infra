@@ -27,9 +27,12 @@ INPUT_URIS = {
 
 
 class LandGHGInventoryAnalyzer(Analyzer):
-    """Vegetation GHG flux (gross emissions / gross removals / net flux) and area by
+    """Land GHG flux (gross emissions / gross removals / net flux) and area by
     land_state_class x year for admin areas (by aoi_id), read from the precomputed
-    zonal-statistics parquet. Admin areas only, no on-the-fly computation."""
+    zonal-statistics parquet. Admin areas only, no on-the-fly computation.
+
+    The result groups tables by aggregation category. Only "vegetation" is
+    produced today; "agriculture" and "soil" become further keys later."""
 
     def __init__(
         self,
@@ -45,7 +48,9 @@ class LandGHGInventoryAnalyzer(Analyzer):
             raise Exception("Input URIs must be provided for actual analysis")
 
         analytics_in = LandGHGInventoryAnalyticsIn(**analysis.metadata)
-        analysis.result = await self.analyze_admin_areas(analytics_in.aoi.ids)
+        analysis.result = {
+            "vegetation": await self.analyze_admin_areas(analytics_in.aoi.ids)
+        }
 
     async def analyze_admin_areas(self, aoi_ids) -> Dict[str, Any]:
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in aoi_ids])

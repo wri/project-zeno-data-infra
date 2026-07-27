@@ -66,7 +66,9 @@ async def test_admin_query_returns_flux_by_land_state_and_year(
 
     await analyzer.analyze(analysis)
 
-    result = pd.DataFrame(analysis.result)
+    # the table is nested under the "vegetation" key (agriculture/soil added later)
+    assert set(analysis.result) == {"vegetation"}
+    result = pd.DataFrame(analysis.result["vegetation"])
     assert EXPECTED_COLUMNS.issubset(result.columns)
     # only the requested admin ids come back (PER is filtered out by the WHERE clause)
     assert set(result.aoi_id) == {"BRA.1", "COL"}
