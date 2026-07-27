@@ -2,7 +2,12 @@ import pytest
 
 from pipelines.globals import gadm_country_code_count
 from pipelines.prefect_flows.common_stages import numeric_to_alpha3
-from pipelines.run_updates import UpdateFlow, _parse_bbox, _validate_flow_args
+from pipelines.run_updates import (
+    VERSION_REQUIRED_FLOWS,
+    UpdateFlow,
+    _parse_bbox,
+    _validate_flow_args,
+)
 
 
 def test_parse_bbox_parses_minx_miny_maxx_maxy():
@@ -19,17 +24,19 @@ def test_parse_bbox_rejects_wrong_coordinate_count():
         _parse_bbox("-74,-11.2,-66.5")
 
 
-@pytest.mark.parametrize(
-    "flow_name",
-    [UpdateFlow.TCL_UPDATE, UpdateFlow.LAND_GHG_INVENTORY_UPDATE],
-)
+@pytest.mark.parametrize("flow_name", VERSION_REQUIRED_FLOWS, ids=lambda f: f.value)
 def test_version_required_for_versioned_flows(flow_name):
     with pytest.raises(ValueError):
         _validate_flow_args(flow_name, version=None)
 
 
-def test_version_not_required_for_dist_update():
-    _validate_flow_args(UpdateFlow.DIST_UPDATE, version=None)  # must not raise
+@pytest.mark.parametrize(
+    "flow_name",
+    [f for f in UpdateFlow if f not in VERSION_REQUIRED_FLOWS],
+    ids=lambda f: f.value,
+)
+def test_version_not_required_for_unversioned_flows(flow_name):
+    _validate_flow_args(flow_name, version=None)  # must not raise
 
 
 def test_country_expected_groups_covers_every_iso_code():
