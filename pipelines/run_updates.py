@@ -215,7 +215,7 @@ def run_updates(
                 logger.warning("performance report skipped: no cluster (local run)")
             report = nullcontext()
 
-        kwargs = dict(version=version, overwrite=overwrite, is_latest=is_latest)
+        kwargs = {"version": version, "overwrite": overwrite, "is_latest": is_latest}
         if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
             kwargs["flow_name"] = flow_name.value
