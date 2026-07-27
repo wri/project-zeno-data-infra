@@ -8,6 +8,12 @@ region_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/
 region_10m_zarr_uri = "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm1.10m.zarr"
 subregion_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm2.zarr"
 subregion_10m_zarr_uri = "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm2.10m.zarr"
+# Upper bound (exclusive) on the numeric code at each GADM admin level, for sizing
+# flox reduce group axes. flox silently drops any label at or above the bound, so
+# these must exceed the GADM v4.1 code maxima (bump on a GADM version change).
+gadm_country_code_count = 999  # numeric ISO; largest mapped code is 894
+gadm_region_code_count = 86  # adm1 index within a country
+gadm_subregion_code_count = 854  # adm2 index within an adm1
 pixel_area_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/umd-area-2013/v1.10/area_ha_30m_f64.zarr"
 )
@@ -15,6 +21,20 @@ pixel_area_10m_zarr_uri = (
     # f"s3://{ANALYTICS_BUCKET}/zarr/umd-area-2013/v1.10/pixel_area_ha.zarr"
     "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/area_m_10m_f32"
 )
+# AFOLU GHG flux model — vegetation outputs (v1.0.5), annual 2016-2024, 30m.
+# Published by the AFOLU_GHG_flux_model team on gfw2-data; per-hectare fluxes.
+land_ghg_inventory_vegetation_zarr_uri = (
+    "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_vegetation/"
+    "version_1_0_5__standard__global/mega_zarr/annual_intervals/4000_pixels/"
+    "20260130/vegetation_zarr.zarr"
+)
+# Mineral soil organic carbon (SOC v1.0.1). 5-year interval axis (index 0..4);
+# per-hectare stock-change rates. (Organic peat soil is a follow-up.)
+land_ghg_inventory_soc_zarr_uri = (
+    "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/"
+    "version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr"
+)
+
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
 sbtn_natural_lands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr"
 sbtn_natural_forests_zarr_uri = (

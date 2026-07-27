@@ -160,7 +160,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         title   = "Flow Name"
         type    = "string"
         default = "dist_update"
-        enum    = ["dist_update", "tcl_update", "integrated_alerts_update"]
+        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update"]
       }
     }
   })
@@ -206,6 +206,52 @@ resource "prefect_automation" "run_pipelines_on_dist_update" {
         version   = "{{ event.payload.version }}"
         is_latest = "{{ event.payload.is_latest }}"
         flow_name = "dist_update"
+      })
+      job_variables = jsonencode({})
+    },
+  ]
+}
+
+
+resource "prefect_webhook" "intdist_update_event" {
+  name        = "intdist-updated-event${local.name_suffix}"
+  description = "Fire an event when a new integrated (intdist) alerts version is published."
+  enabled     = true
+  template = jsonencode({
+    event = "intdist_updated${local.name_suffix}"
+    payload = {
+      dataset = "{{body.dataset}}"
+      version = "{{body.version}}"
+      is_latest = "{{body.is_latest}}"
+    }
+    resource = {
+      "prefect.resource.id"   = "{{body.dataset}}/{{ body.version }}"
+      "prefect.resource.name" = "Integrated Alerts update for v{{ body.version }}"
+    }
+  })
+}
+
+resource "prefect_automation" "run_pipelines_on_intdist_update" {
+  name    = "run-gnw-zonal-stats-on-intdist-update${local.name_suffix}"
+  enabled = terraform.workspace == "default"
+
+  trigger = {
+    event = {
+      posture   = "Reactive"
+      expect    = ["intdist_updated${local.name_suffix}"]
+      threshold = 1
+      within    = 0
+    }
+  }
+  actions = [
+    {
+      type          = "run-deployment"
+      source        = "selected"
+      deployment_id = prefect_deployment.gnw_zonal_stats_update.id
+      parameters    = jsonencode({
+        version   = "{{ event.payload.version }}"
+        is_latest = "{{ event.payload.is_latest }}"
+        flow_name = "integrated_alerts_update"
       })
       job_variables = jsonencode({})
     },
