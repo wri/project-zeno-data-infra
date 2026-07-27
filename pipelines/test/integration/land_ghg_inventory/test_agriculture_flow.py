@@ -23,8 +23,8 @@ STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
 # Reference totals for STP, computed directly against the real zarr (no reduce over
 # 999/86/854 admin codes changes these, since STP's own codes are within range).
 EXPECTED_TOTALS = {
-    "cropland_emissions": 2.279192e08,
-    "livestock_emissions": 1.382426e09,
+    "cropland": 2.279192e08,
+    "livestock": 1.382426e09,
 }
 
 
@@ -47,12 +47,8 @@ def test_stp_reproduces_reference_totals():
     reduced = common_stages.compute(cube, groupbys, out_expected_groups, "sum")
     df = agriculture_stages.agriculture_result_dataframe(reduced)
 
-    country = df[(df["aoi_id"] == "STP")]
+    country = df[df["aoi_id"] == "STP"]
     assert not country.empty
-    totals = country[["cropland_emissions", "livestock_emissions"]].sum()
-    assert totals["cropland_emissions"] == pytest.approx(
-        EXPECTED_TOTALS["cropland_emissions"], rel=0.02
-    )
-    assert totals["livestock_emissions"] == pytest.approx(
-        EXPECTED_TOTALS["livestock_emissions"], rel=0.02
-    )
+    totals = country.groupby("category")["gross_emissions_MgCO2e"].sum()
+    assert totals["cropland"] == pytest.approx(EXPECTED_TOTALS["cropland"], rel=0.02)
+    assert totals["livestock"] == pytest.approx(EXPECTED_TOTALS["livestock"], rel=0.02)
