@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict
 
 import newrelic.agent as nr_agent
@@ -57,10 +58,11 @@ class LandGHGInventoryAnalyzer(Analyzer):
 
         analytics_in = LandGHGInventoryAnalyticsIn(**analysis.metadata)
         aoi_ids = analytics_in.aoi.ids
-        analysis.result = {
-            "vegetation": await self.analyze_vegetation(aoi_ids),
-            "agriculture": await self.analyze_agriculture(aoi_ids),
-        }
+        vegetation, agriculture = await asyncio.gather(
+            self.analyze_vegetation(aoi_ids),
+            self.analyze_agriculture(aoi_ids),
+        )
+        analysis.result = {"vegetation": vegetation, "agriculture": agriculture}
 
     async def analyze_vegetation(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "land_state_class", "year") + VEGETATION_MEASURES
