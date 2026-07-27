@@ -1,9 +1,9 @@
 """Zonal-statistics stages for Land GHG inventory agriculture emissions.
 
 Sums already-absolute per-pixel cropland + livestock emissions grouped by admin
-unit only (no land_state_class, no year — a single static snapshot), then rolls up
-to aoi_id. The reduce and GADM roll-up are reused from
-``pipelines.prefect_flows.common_stages``.
+unit x category (cropland / livestock) only (no land_state_class, no year — a
+single static snapshot), then rolls up to aoi_id. The reduce and GADM roll-up are
+reused from ``pipelines.prefect_flows.common_stages``.
 """
 
 from typing import Optional, Tuple
@@ -23,10 +23,10 @@ from pipelines.prefect_flows.common_stages import (
     rollup_by_gadm_and_convert_to_aoi,
 )
 
-# canonical measure -> source variable in the agriculture zarr
+# canonical category -> source variable in the agriculture zarr
 AGRICULTURE_SOURCE_VARS = {
-    "cropland_emissions": "cropland_emissions",
-    "livestock_emissions": "livestock_emissions",
+    "cropland": "cropland_emissions",
+    "livestock": "livestock_emissions",
 }
 AGRICULTURE_ZARR_GROUP = "pipeline"
 
@@ -58,18 +58,11 @@ def load_agriculture(
 def setup_agriculture_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
     """Build the agriculture measure cube + admin group-by layers for the reduce.
 
-    Unlike vegetation, agriculture values are already per-pixel absolute totals (no
-    pixel-area multiplication), and there is no land_state_class or year axis —
-    grouping is admin-only (country x region x subregion).
+    Stacks the per-pixel absolute cropland/livestock totals into a ``category``
+    dim; grouping is admin-only (country x region x subregion).
     """
     ag, country, region, subregion = datasets
-    layers = [
-        ag[name].fillna(0).astype("float64").rename(name)
-        for name in AGRICULTURE_SOURCE_VARS
-    ]
-    cube = xr.concat(layers, dim="analysis_layer").assign_coords(
-        analysis_layer=list(AGRICULTURE_SOURCE_VARS)
-    )
+    cube = ag.fillna(0).astype("float64").to_dataarray(dim="category")
     groupbys = (
         country.rename("country"),
         region.rename("region"),
@@ -79,23 +72,15 @@ def setup_agriculture_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
 
 
 def agriculture_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
-    """Reshape the sparse agriculture reduce into tidy aoi_id rows.
+    """Reshape the sparse agriculture reduce into tidy aoi_id x category rows.
 
-    Mirrors vegetation's ``create_result_dataframe`` and carbon_flux's pivot (see
-    ``pipelines/carbon_flux/stages.py``): ``common_create_result_dataframe`` only
-    supports a single ``DataArray`` with the measures stacked on ``analysis_layer``
-    (not a multi-variable ``Dataset``), so they're pivoted back into columns here.
+    Cropland and livestock emissions stay as separate rows (one per admin unit
+    x category) rather than columns, so consumers group/filter by ``category``.
     """
     df = common_create_result_dataframe(reduced)
-    df = df.pivot_table(
-        index=["country", "region", "subregion"],
-        columns="analysis_layer",
-        values="value",
-        aggfunc="sum",
-    ).reset_index()
-    df.columns.name = None
+    df = df.rename(columns={"value": "gross_emissions_MgCO2e"})
 
-    result = rollup_by_gadm_and_convert_to_aoi(df, [])
-    value_columns = list(AGRICULTURE_SOURCE_VARS)
+    result = rollup_by_gadm_and_convert_to_aoi(df, ["category"])
+    value_columns = ["gross_emissions_MgCO2e"]
     result[value_columns] = result.reindex(columns=value_columns).fillna(0.0)
     return result

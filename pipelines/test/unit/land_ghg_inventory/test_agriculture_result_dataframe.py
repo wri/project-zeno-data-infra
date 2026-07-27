@@ -14,18 +14,25 @@ def test_agriculture_result_dataframe_rolls_up(synthetic_agriculture_datasets):
     assert {
         "aoi_id",
         "aoi_type",
-        "cropland_emissions",
-        "livestock_emissions",
+        "category",
+        "gross_emissions_MgCO2e",
     }.issubset(df.columns)
     assert "land_state_class" not in df.columns
     assert "year" not in df.columns
+    assert set(df["category"]) == {"cropland", "livestock"}
 
-    # subregion-level totals: top row pixels (10+20, 1+2)
-    subregion_row = df[df.aoi_id == "BRA.1.1"].iloc[0]
-    assert subregion_row.cropland_emissions == 30.0
-    assert subregion_row.livestock_emissions == 3.0
+    # subregion-level totals: top row pixels (10+20, 1+2), one row per
+    # category
+    subregion_rows = df[df.aoi_id == "BRA.1.1"]
+    cropland_row = subregion_rows[subregion_rows.category == "cropland"].iloc[0]
+    assert cropland_row.gross_emissions_MgCO2e == 30.0
+    livestock_row = subregion_rows[subregion_rows.category == "livestock"].iloc[0]
+    assert livestock_row.gross_emissions_MgCO2e == 3.0
 
-    # country-level roll-up: subregion (30, 3) + region-only bottom-left pixel (30, 3)
-    country_row = df[df.aoi_id == "BRA"].iloc[0]
-    assert country_row.cropland_emissions == 60.0
-    assert country_row.livestock_emissions == 6.0
+    # country-level roll-up: subregion (30, 3) + region-only bottom-left
+    # pixel (30, 3)
+    country_rows = df[df.aoi_id == "BRA"]
+    cropland_country = country_rows[country_rows.category == "cropland"].iloc[0]
+    assert cropland_country.gross_emissions_MgCO2e == 60.0
+    livestock_country = country_rows[country_rows.category == "livestock"].iloc[0]
+    assert livestock_country.gross_emissions_MgCO2e == 6.0
