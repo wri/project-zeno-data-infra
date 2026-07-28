@@ -33,6 +33,8 @@ class AnalysisService:
 
     @nr_agent.background_task(name="AnalysisService.do", group="Task")
     async def do(self) -> None:
+        if self.analytics_resource_id is None:
+            raise Exception("Set analytics_resource before calling this method")
         try:
             if self.analytics_resource.metadata is None:
                 raise Exception("Set analytics_resource before calling this method")
