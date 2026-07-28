@@ -6,6 +6,9 @@ from prefect import task
 from shapely.geometry import Polygon
 
 from pipelines.land_ghg_inventory import agriculture_stages, vegetation_stages
+from pipelines.land_ghg_inventory.create_agriculture_zarr import (
+    create_agriculture_zarr,
+)
 
 
 @task
@@ -30,6 +33,11 @@ def setup_vegetation_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
 @task
 def vegetation_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
     return vegetation_stages.vegetation_result_dataframe(reduced)
+
+
+@task
+def prepare_agriculture_zarr(overwrite: bool = False) -> str:
+    return create_agriculture_zarr(overwrite=overwrite)
 
 
 @task

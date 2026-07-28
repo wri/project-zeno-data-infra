@@ -15,6 +15,7 @@ dependencies = [
     "numba>=0.61.2",
     "numbagg",
     "numpy",
+    "odc-geo",
     "pandas",
     "pandera[pandas]",
     "prefect",

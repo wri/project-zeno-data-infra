@@ -11,7 +11,6 @@ from pipelines.globals import (
     gadm_country_code_count,
     gadm_region_code_count,
     gadm_subregion_code_count,
-    land_ghg_inventory_agriculture_zarr_uri,
     land_ghg_inventory_vegetation_zarr_uri,
     pixel_area_zarr_uri,
     region_zarr_uri,
@@ -113,10 +112,15 @@ def land_ghg_inventory_agriculture(
         np.arange(gadm_region_code_count),
         np.arange(gadm_subregion_code_count),
     )
+    agriculture_zarr_uri = (
+        land_ghg_inventory_tasks.prepare_agriculture_zarr.with_options(
+            name="land_ghg_inventory-agriculture-resample-source-zarr"
+        )(overwrite=overwrite)
+    )
     datasets = land_ghg_inventory_tasks.load_agriculture.with_options(
         name="land_ghg_inventory-agriculture-load-data"
     )(
-        land_ghg_inventory_agriculture_zarr_uri,
+        agriculture_zarr_uri,
         country_zarr_uri,
         region_zarr_uri,
         subregion_zarr_uri,
