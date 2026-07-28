@@ -4,6 +4,20 @@ Sums per-hectare fluxes (converted to per-pixel totals by multiplying by pixel a
 grouped by admin unit x land_state_class x year, then rolls up to aoi_id. The reduce
 and GADM roll-up are reused from ``pipelines.prefect_flows.common_stages``. Soil is a
 separate pipeline with its own output parquet.
+
+Output parquet schema (one row per aoi_id x land_state_class x year)::
+
+    aoi_id                     str    admin unit, e.g. "BRA", "BRA.1", "BRA.1.1"
+    aoi_type                   str    always "admin"
+    land_state_class           str    "tree_loss" | "tree_gain" |
+                                       "trees_remaining_trees" |
+                                       "non_trees_remaining_non_trees"
+                                       ("excluded" rows are dropped)
+    year                       int    calendar year, 2016-2024
+    gross_emissions_MgCO2e     float  summed gross emissions
+    gross_removals_MgCO2       float  summed gross removals
+    net_flux_MgCO2e            float  summed net flux (emissions - removals)
+    area_ha                    float  summed area, hectares
 """
 
 from typing import Dict, Optional, Tuple

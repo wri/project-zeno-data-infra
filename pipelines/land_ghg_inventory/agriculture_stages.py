@@ -4,6 +4,13 @@ Sums already-absolute per-pixel cropland + livestock emissions grouped by admin
 unit x category (cropland / livestock) only (no land_state_class, no year — a
 single static snapshot), then rolls up to aoi_id. The reduce and GADM roll-up are
 reused from ``pipelines.prefect_flows.common_stages``.
+
+Output parquet schema (one row per aoi_id x category)::
+
+    aoi_id                    str    admin unit, e.g. "BRA", "BRA.1", "BRA.1.1"
+    aoi_type                  str    always "admin"
+    category                  str    "cropland" | "livestock"
+    gross_emissions_MgCO2e    float  summed emissions for aoi_id x category
 """
 
 from typing import Optional, Tuple
