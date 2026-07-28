@@ -8,7 +8,7 @@ from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
 )
-from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (
+from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_query_builder import (  # noqa: E501
     PrecalcSqlQueryBuilder,
 )
 from app.domain.models.analysis import Analysis
@@ -57,7 +57,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
             ]
         },
         # Should match result_uri in tcl_flow.py in pipelines.
-        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260609.parquet",
+        "admin_results_uri": "s3://lcl-analytics/zonal-statistics/tcl/v1.13/admin-tree-cover-loss_v20260609.parquet",  # noqa: E501
     },
 }
 
@@ -169,6 +169,9 @@ class TreeCoverLossAnalyzer(Analyzer):
         self,
         analytics_in: TreeCoverLossAnalyticsIn,
     ) -> Dict:
+        if self.input_uris is None:
+            raise Exception("Input URIs must be provided for actual analysis")
+
         query_service = DuckDbPrecalcQueryService(self.input_uris["admin_results_uri"])
 
         query: DatasetQuery = _build_query(analytics_in)
