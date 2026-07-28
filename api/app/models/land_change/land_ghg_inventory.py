@@ -38,7 +38,7 @@ class LandGHGInventoryAnalyticsResponse(Response):
             "examples": [
                 {
                     "data": {
-                        # tables grouped by category; "vegetation" only for now
+                        # one table per category, each aggregated differently
                         "result": {
                             # column oriented for loading into a dataframe
                             "vegetation": {
@@ -50,6 +50,16 @@ class LandGHGInventoryAnalyticsResponse(Response):
                                 "gross_removals_MgCO2": [-29404371.0, -3213337.0],
                                 "net_flux_MgCO2e": [409076565.0, -3213337.0],
                                 "area_ha": [1086087.0, 518423.0],
+                            },
+                            # coarse snapshot: emissions only, by category
+                            "agriculture": {
+                                "aoi_id": ["BRA.1", "BRA.1"],
+                                "aoi_type": ["admin", "admin"],
+                                "category": ["cropland", "livestock"],
+                                "gross_emissions_MgCO2e": [
+                                    123234500000.0,
+                                    1060033000000.0,
+                                ],
                             },
                         },
                         "metadata": {
