@@ -2,18 +2,18 @@ import dask.array as da
 import numpy as np
 import xarray as xr
 
-from pipelines.land_ghg_inventory import stages
+from pipelines.land_ghg_inventory import vegetation_stages
 from pipelines.prefect_flows import common_stages
 
 
 def test_result_dataframe_rolls_up_and_maps(synthetic_datasets):
     datasets, expected_groups = synthetic_datasets
 
-    cube, groupbys, out_expected_groups = stages.setup_vegetation_compute(
+    cube, groupbys, out_expected_groups = vegetation_stages.setup_vegetation_compute(
         datasets, expected_groups
     )
     reduced = common_stages.compute(cube, groupbys, out_expected_groups, "sum")
-    df = stages.vegetation_result_dataframe(reduced)
+    df = vegetation_stages.vegetation_result_dataframe(reduced)
 
     assert {
         "aoi_id",
@@ -105,11 +105,11 @@ def test_structurally_zero_measure_is_zero_not_nan():
         np.array([0, 1, 2, 3, 4]),
         np.array([0]),
     )
-    cube, groupbys, out_expected_groups = stages.setup_vegetation_compute(
+    cube, groupbys, out_expected_groups = vegetation_stages.setup_vegetation_compute(
         datasets, expected_groups
     )
     reduced = common_stages.compute(cube, groupbys, out_expected_groups, "sum")
-    df = stages.vegetation_result_dataframe(reduced)
+    df = vegetation_stages.vegetation_result_dataframe(reduced)
 
     measures = ["gross_emissions_MgCO2e", "gross_removals_MgCO2", "net_flux_MgCO2e"]
     assert df[measures + ["area_ha"]].notna().all().all()

@@ -1,10 +1,10 @@
-from pipelines.land_ghg_inventory import stages
+from pipelines.land_ghg_inventory import vegetation_stages
 
 
 def test_setup_compute_builds_flux_cube_and_groupbys(synthetic_datasets):
     datasets, expected_groups = synthetic_datasets
 
-    cube, groupbys, out_expected_groups = stages.setup_vegetation_compute(
+    cube, groupbys, out_expected_groups = vegetation_stages.setup_vegetation_compute(
         datasets, expected_groups
     )
 
