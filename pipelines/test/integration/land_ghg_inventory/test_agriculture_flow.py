@@ -10,6 +10,9 @@ from shapely.geometry import box
 
 from pipelines.globals import (
     country_zarr_uri,
+    gadm_country_code_count,
+    gadm_region_code_count,
+    gadm_subregion_code_count,
     land_ghg_inventory_agriculture_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
@@ -21,7 +24,8 @@ from pipelines.prefect_flows import common_stages
 STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
 
 # Reference totals for STP, computed directly against the real zarr (no reduce over
-# 999/86/854 admin codes changes these, since STP's own codes are within range).
+# the full gadm_*_code_count admin codes changes these, since STP's own codes are
+# within range).
 EXPECTED_TOTALS = {
     "cropland": 2.279192e08,
     "livestock": 1.382426e09,
@@ -37,9 +41,9 @@ def test_stp_reproduces_reference_totals():
         bbox=STP_BBOX,
     )
     expected_groups = (
-        np.arange(999),
-        np.arange(86),
-        np.arange(854),
+        np.arange(gadm_country_code_count),
+        np.arange(gadm_region_code_count),
+        np.arange(gadm_subregion_code_count),
     )
     cube, groupbys, out_expected_groups = agriculture_stages.setup_agriculture_compute(
         datasets, expected_groups
