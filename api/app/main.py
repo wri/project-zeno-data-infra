@@ -104,23 +104,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Browser clients only: CORS is off by default (empty origin list) so it stays
-# inert in prod unless CORS_ALLOW_ORIGINS is set. Set it to "*" in dev to let a
-# standalone browser page call the API; scope it to known origins before prod,
-# and note this does not replace auth on the resource-creating POST.
-cors_origins = [
-    origin.strip()
-    for origin in os.getenv("CORS_ALLOW_ORIGINS", "").split(",")
-    if origin.strip()
-]
-if cors_origins:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["*"],
-        expose_headers=["Retry-After"],
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Retry-After"],
+)
 
 
 @app.exception_handler(RequestValidationError)
