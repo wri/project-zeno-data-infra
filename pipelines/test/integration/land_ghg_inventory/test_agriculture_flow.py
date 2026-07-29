@@ -6,6 +6,8 @@ the global scope and the S3 write.
 
 import numpy as np
 import pytest
+from shapely.geometry import box
+
 from pipelines.globals import (
     country_zarr_uri,
     gadm_country_code_count,
@@ -17,7 +19,6 @@ from pipelines.globals import (
 )
 from pipelines.land_ghg_inventory import agriculture_stages
 from pipelines.prefect_flows import common_stages
-from shapely.geometry import box
 
 # São Tomé & Príncipe: both islands, ocean elsewhere (isolated -> clean bbox).
 STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
@@ -25,11 +26,8 @@ STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
 # Reference totals for STP, computed directly against the real zarr (no reduce over
 # the full gadm_*_code_count admin codes changes these, since STP's own codes are
 # within range).
-# NOTE: cropland's source COG changed from absolute kg to a per-hectare rate
-# (see create_agriculture_zarr.CROPLAND_COG_URI); this reference total must be
-# recomputed against the rebuilt zarr before this test is trustworthy again.
 EXPECTED_TOTALS = {
-    "cropland": 2.279192e08,
+    "cropland": 1.7105374e04,
 }
 
 
