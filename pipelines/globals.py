@@ -34,8 +34,8 @@ land_ghg_inventory_soc_zarr_uri = (
     "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/"
     "version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr"
 )
-# Agriculture emissions (cropland + livestock). Single static snapshot, no year
-# axis; per-pixel absolute totals (not per-hectare). group="pipeline".
+# Agriculture emissions (cropland). Single static snapshot, no year axis;
+# per-pixel absolute totals (not per-hectare). group="pipeline".
 land_ghg_inventory_agriculture_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-ghg-monitoring-system/"
     "cropland_livestock_emissions.zarr"

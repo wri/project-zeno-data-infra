@@ -62,10 +62,10 @@ def agriculture_parquet(tmp_path):
     """Agriculture snapshot parquet; carries its own aoi_type (unlike vegetation)."""
     df = pd.DataFrame(
         {
-            "category": ["cropland", "livestock", "cropland", "livestock", "cropland"],
-            "gross_emissions_MgCO2e": [10.0, 20.0, 5.0, 6.0, 1.0],
-            "aoi_id": ["BRA.1", "BRA.1", "COL", "COL", "PER"],
-            "aoi_type": ["admin", "admin", "admin", "admin", "admin"],
+            "category": ["cropland", "cropland", "cropland"],
+            "gross_emissions_MgCO2e": [10.0, 5.0, 1.0],
+            "aoi_id": ["BRA.1", "COL", "PER"],
+            "aoi_type": ["admin", "admin", "admin"],
         }
     )
     parquet_file = tmp_path / "agriculture.parquet"
@@ -134,7 +134,7 @@ async def test_agriculture_query_returns_emissions_by_category(
     assert set(result.columns) == EXPECTED_AGRICULTURE_COLUMNS
     # only the requested admin ids come back (PER filtered out)
     assert set(result.aoi_id) == {"BRA.1", "COL"}
-    assert set(result.category) == {"cropland", "livestock"}
+    assert set(result.category) == {"cropland"}
     assert set(result.aoi_type) == {"admin"}
 
 

@@ -53,13 +53,10 @@ class LandGHGInventoryAnalyticsResponse(Response):
                             },
                             # coarse snapshot: emissions only, by category
                             "agriculture": {
-                                "aoi_id": ["BRA.1", "BRA.1"],
-                                "aoi_type": ["admin", "admin"],
-                                "category": ["cropland", "livestock"],
-                                "gross_emissions_MgCO2e": [
-                                    123234500000.0,
-                                    1060033000000.0,
-                                ],
+                                "aoi_id": ["BRA.1"],
+                                "aoi_type": ["admin"],
+                                "category": ["cropland"],
+                                "gross_emissions_MgCO2e": [123234500000.0],
                             },
                         },
                         "metadata": {
