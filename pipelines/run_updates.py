@@ -92,6 +92,8 @@ LAND_GHG_INVENTORY_COMPONENT = {
     "land_ghg_inventory_update": None,
     "land_ghg_inventory_vegetation_update": "vegetation",
     "land_ghg_inventory_agriculture_update": "agriculture",
+    "land_ghg_inventory_mineral_soil_update": "mineral_soil",
+    "land_ghg_inventory_organic_soil_update": "organic_soil",
 }
 
 
@@ -129,6 +131,8 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_UPDATE = "land_ghg_inventory_update"
     LAND_GHG_INVENTORY_VEGETATION_UPDATE = "land_ghg_inventory_vegetation_update"
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
+    LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
+    LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
 
 
 update_flows = {
@@ -138,6 +142,8 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_VEGETATION_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -146,6 +152,8 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_VEGETATION_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
 
 # flow_name values that route into run_land_ghg_inventory_update
@@ -153,6 +161,8 @@ LAND_GHG_INVENTORY_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_VEGETATION_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
+    UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
 
 
