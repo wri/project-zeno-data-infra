@@ -9,6 +9,7 @@ from fastapi.exception_handlers import (
     request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
@@ -103,6 +104,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Retry-After"],
+)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -123,7 +133,7 @@ async def profile_request(request: Request, call_next):
         profiler = Profiler(async_mode="enabled")
         profiler.start()
         try:
-            response = await call_next(request)
+            await call_next(request)
         finally:
             profiler.stop()
         return HTMLResponse(profiler.output_html())

@@ -71,7 +71,7 @@ def synthetic_agriculture_datasets():
 
     Agriculture values are already per-pixel absolute totals (no pixel-area
     multiplication, no year/land_state axis). Per-pixel totals are known:
-    cropland=[[10, 20], [30, 0]], livestock=[[1, 2], [3, 0]].
+    cropland=[[10, 20], [30, 0]].
     """
     coords2 = {"y": [0.0, 1.0], "x": [0.0, 1.0]}
 
@@ -85,7 +85,6 @@ def synthetic_agriculture_datasets():
     ag = xr.Dataset(
         {
             "cropland": layer([[10.0, 20.0], [30.0, 0.0]]),
-            "livestock": layer([[1.0, 2.0], [3.0, 0.0]]),
         }
     )
 
