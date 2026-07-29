@@ -11,6 +11,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 
+from app.authentication import get_authenticator
 from app.domain.analyzers.land_ghg_inventory_analyzer import (
     INPUT_URIS,
     LandGHGInventoryAnalyzer,
@@ -22,6 +23,7 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
 )
 from app.main import app
 from app.models.common.areas_of_interest import AdminAreaOfInterest
+from app.models.common.authentication import User
 from app.models.land_change.land_ghg_inventory import (
     ANALYTICS_NAME,
     LandGHGInventoryAnalyticsIn,
@@ -60,6 +62,14 @@ AGRICULTURE_PAYLOAD = {
     "category": ["cropland", "livestock"],
     "gross_emissions_MgCO2e": [123.0, 456.0],
 }
+
+
+class FakeAdminAuthenticator:
+    """Authenticates any token as a ResourceWatch admin, so the flow tests focus
+    on behavior rather than a live RW call."""
+
+    async def get_user(self, token):
+        return User(id="admin", role="ADMIN", extraUserData={})
 
 
 def get_file_system_analysis_repository() -> AnalysisRepository:
@@ -101,11 +111,14 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
         app.dependency_overrides[get_analysis_repository] = (
             get_file_system_analysis_repository
         )
+        app.dependency_overrides[get_authenticator] = FakeAdminAuthenticator
         delete_resource_files(ANALYTICS_NAME, resource_tp)
 
         async with LifespanManager(app):
             async with AsyncClient(
-                transport=ASGITransport(app), base_url="http://testserver"
+                transport=ASGITransport(app),
+                base_url="http://testserver",
+                headers={"Authorization": "Bearer test-admin"},
             ) as client:
                 test_request = await client.post(
                     f"/v0/land_change/{ANALYTICS_NAME}/analytics",
@@ -162,6 +175,28 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
             {"aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e"}
         )
         assert set(agriculture["category"]) == {"cropland", "livestock"}
+
+
+@pytest.mark.asyncio
+async def test_requests_without_a_token_are_unauthorized():
+    app.dependency_overrides[create_analysis_service] = (
+        create_analysis_service_for_tests
+    )
+    app.dependency_overrides[get_analysis_repository] = (
+        get_file_system_analysis_repository
+    )
+    try:
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://testserver"
+            ) as client:
+                response = await client.post(
+                    f"/v0/land_change/{ANALYTICS_NAME}/analytics",
+                    json={"aoi": {"type": "admin", "ids": ["BRA.1"]}},
+                )
+        assert response.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():

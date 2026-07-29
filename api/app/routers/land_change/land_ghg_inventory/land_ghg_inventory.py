@@ -3,6 +3,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
+from app.authentication import require_resource_watch_admin
 from app.dependencies import get_environment
 from app.domain.analyzers.land_ghg_inventory_analyzer import (
     INPUT_URIS,
@@ -27,7 +28,12 @@ from app.models.land_change.land_ghg_inventory import (
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 
-router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
+# ResourceWatch admin only: gates both the analysis-creating POST and the
+# result-polling GET on this router.
+router = APIRouter(
+    prefix=f"/{ANALYTICS_NAME}",
+    dependencies=[Depends(require_resource_watch_admin)],
+)
 
 
 def get_analysis_repository(request: Request) -> AnalysisRepository:
