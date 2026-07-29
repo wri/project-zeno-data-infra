@@ -1,22 +1,15 @@
 import logging
-import os
 import traceback
 from typing import Callable
 from uuid import UUID
 
-import duckdb
 from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
-    AwsDynamoDbS3AnalysisRepository,
-)
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn, AnalyticsOut
-from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
-from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 from app.use_cases.analysis.analysis_service import AnalysisService
 
 
@@ -38,8 +31,6 @@ async def create_analysis(
             }
         )
         background_tasks.add_task(service.do)
-        # background_tasks.add_task(test_s3_access)
-        # background_tasks.add_task(test_dynamodb_s3_repository, service)
         link_url = resource_link_callback(request=request, service=service)
         link = DataMartResourceLink(link=link_url)
         return DataMartResourceLinkResponse(data=link, status=service.get_status())
@@ -104,68 +95,3 @@ async def get_analysis(
         result=analysis.result,
         metadata={k: v for k, v in analysis.metadata.items() if not k.startswith("_")},
     )
-
-
-# TODO - Remove this once duckdb's s3 access in zeno is verified
-def test_s3_access():
-    """Testing connectivity without breaking the existing deployment"""
-    try:
-        duckdb.query(
-            """
-            CREATE OR REPLACE SECRET secret (
-                TYPE s3,
-                PROVIDER credential_chain,
-                CHAIN 'instance;env;config'
-            );
-        """
-        )
-        dataset = "s3://lcl-analytics/zonal-statistics/admin-dist_alerts.parquet"
-        df = duckdb.sql(f"SELECT * FROM '{dataset}' LIMIT 2").df()
-        logging.info({"event": "verify_s3_access_by_duckdb", "details": df})
-    except Exception as e:
-        logging.error(
-            {
-                "event": "s3_access_by_duckdb_failure",
-                "severity": "high",
-                "error_type": e.__class__.__name__,
-                "environment_variables": f"KEY: {os.getenv('AWS_ACCESS_KEY_ID')}",
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
-
-
-async def test_dynamodb_s3_repository(service: AnalysisService):
-    """Testing new resource repository"""
-    try:
-        # FIXME: This call appears broken (not enough args), but not sure
-        # how to fix. Do we even need this function anymore?
-        repo = AwsDynamoDbS3AnalysisRepository("integration_test")
-        analytics_in = TreeCoverLossAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["TST"]),
-            start_year="2020",
-            end_year="2021",
-            canopy_cover=30,
-            intersections=[],
-        )
-        thumbprint = service.resource_thumbprint()
-        await repo.store_analysis(
-            thumbprint,
-            Analysis(
-                result=["test"],
-                metadata=analytics_in.model_dump(),
-                status=AnalysisStatus.saved,
-            ),
-        )
-        analysis = await repo.load_analysis(thumbprint)
-        logging.info({"event": "test_dynamodb_s3_repository", "details": analysis})
-    except Exception as e:
-        logging.error(
-            {
-                "event": "aws_dynamodb_s3_analysis_repo_failure",
-                "severity": "high",
-                "error_type": e.__class__.__name__,
-                "error_details": str(e),
-                "traceback": traceback.format_exc(),
-            }
-        )
