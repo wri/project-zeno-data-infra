@@ -40,7 +40,7 @@ class LandGHGInventoryAnalyzer(Analyzer):
       - "vegetation": gross emissions / removals / net flux / area by
         land_state_class x year.
       - "agriculture": a coarse snapshot of gross emissions by category
-        (cropland / livestock) only - no year, removals, net flux, or area.
+        (cropland) only - no year, removals, net flux, or area.
     "soil" is added as a further key later."""
 
     def __init__(
