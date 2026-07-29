@@ -2,9 +2,6 @@ import logging
 from typing import Optional
 
 import numpy as np
-from prefect import flow
-from shapely.geometry import Polygon
-
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     country_zarr_uri,
@@ -19,6 +16,8 @@ from pipelines.globals import (
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
+from prefect import flow
+from shapely.geometry import Polygon
 
 # Pipeline-specific reduce group axes (the admin axes come from globals). flox
 # silently drops labels at or above a bound, so these must cover the real range.
@@ -88,9 +87,9 @@ def land_ghg_inventory_agriculture(
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
 ) -> str:
-    """Land GHG inventory agriculture zonal stats: cropland + livestock emissions,
-    admin-only (no land_state_class, no year axis -- a single static snapshot),
-    rolled up to aoi_id.
+    """Land GHG inventory agriculture zonal stats: cropland emissions, admin-only
+    (no land_state_class, no year axis -- a single static snapshot), rolled up to
+    aoi_id.
 
     ``bbox`` clips the reduce to one area for a laptop-friendly local run; the
     result is written to a local parquet

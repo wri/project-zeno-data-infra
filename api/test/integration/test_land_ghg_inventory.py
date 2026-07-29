@@ -55,10 +55,10 @@ VEGETATION_PAYLOAD = {
 }
 
 AGRICULTURE_PAYLOAD = {
-    "aoi_id": ["BRA.1", "BRA.1"],
-    "aoi_type": ["admin", "admin"],
-    "category": ["cropland", "livestock"],
-    "gross_emissions_MgCO2e": [123.0, 456.0],
+    "aoi_id": ["BRA.1"],
+    "aoi_type": ["admin"],
+    "category": ["cropland"],
+    "gross_emissions_MgCO2e": [123.0],
 }
 
 
@@ -161,7 +161,7 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
         assert set(agriculture).issuperset(
             {"aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e"}
         )
-        assert set(agriculture["category"]) == {"cropland", "livestock"}
+        assert set(agriculture["category"]) == {"cropland"}
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():
