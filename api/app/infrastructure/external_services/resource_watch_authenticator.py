@@ -1,4 +1,5 @@
-from typing import Callable, Optional
+import time
+from typing import Callable, Dict, Optional, Tuple
 
 import httpx
 
@@ -8,6 +9,43 @@ from app.models.common.authentication import User
 class UpstreamAuthError(Exception):
     """The authorization server could not be reached or gave an unusable
     response, so no authentication decision can be made."""
+
+
+class TokenValidationCache:
+    """A short-lived TTL cache of token -> resolved identity.
+
+    Caches negative results (``None``) too, so a flood of invalid tokens cannot
+    hammer the authorization server. The TTL bounds how long a revoked token
+    keeps working, so keep it short.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: float = 120.0,
+        max_size: int = 1024,
+        clock: Callable[[], float] = time.monotonic,
+    ):
+        self.ttl_seconds = ttl_seconds
+        self.max_size = max_size
+        self.clock = clock
+        self.entries: Dict[str, Tuple[float, Optional[User]]] = {}
+
+    def get(self, token: str) -> Tuple[bool, Optional[User]]:
+        """Return ``(hit, user)``. ``hit`` distinguishes a cached ``None`` from a
+        miss."""
+        entry = self.entries.get(token)
+        if entry is None:
+            return False, None
+        expires_at, user = entry
+        if self.clock() >= expires_at:
+            del self.entries[token]
+            return False, None
+        return True, user
+
+    def set(self, token: str, user: Optional[User]) -> None:
+        if len(self.entries) >= self.max_size:
+            self.entries.clear()  # crude but bounded; avoids unbounded growth
+        self.entries[token] = (self.clock() + self.ttl_seconds, user)
 
 
 class ResourceWatchAuthenticator:
@@ -23,15 +61,32 @@ class ResourceWatchAuthenticator:
         api_url: str,
         timeout_seconds: float = 10.0,
         client_factory: Callable[[], httpx.AsyncClient] = httpx.AsyncClient,
+        cache: Optional[TokenValidationCache] = None,
     ):
         self.api_url = api_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
         self.client_factory = client_factory
+        self.cache = cache
 
     async def get_user(self, token: str) -> Optional[User]:
         """Return the authenticated user, or ``None`` if the token is invalid or
         expired. Raises ``UpstreamAuthError`` if the RW API is unreachable or
-        returns an unexpected status."""
+        returns an unexpected status.
+
+        Successful decisions (a user or ``None``) are cached; upstream failures
+        are not, so a transient RW blip does not stick."""
+        if self.cache is not None:
+            hit, cached_user = self.cache.get(token)
+            if hit:
+                return cached_user
+
+        user = await self._fetch_user(token)
+
+        if self.cache is not None:
+            self.cache.set(token, user)
+        return user
+
+    async def _fetch_user(self, token: str) -> Optional[User]:
         headers = {"Authorization": f"Bearer {token}"}
         url = f"{self.api_url}/auth/check-logged"
 
