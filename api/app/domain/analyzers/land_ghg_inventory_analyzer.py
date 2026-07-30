@@ -16,6 +16,14 @@ VEGETATION_MEASURES = (
     "area_ha",
 )
 
+# mineral soil measures returned per aoi_id (single static snapshot, no year axis)
+MINERAL_SOIL_MEASURES = (
+    "gross_emissions_MgCO2e",
+    "gross_removals_MgCO2",
+    "net_flux_MgCO2e",
+    "area_ha",
+)
+
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
@@ -26,6 +34,14 @@ INPUT_URIS = {
         "admin_agriculture_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-agriculture/"
             "v20260727/admin-land_ghg_inventory-agriculture.parquet"
+        ),
+        "admin_mineral_soil_results_uri": (
+            "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-mineral_soil/"
+            "v20260729/admin-land_ghg_inventory-mineral_soil.parquet"
+        ),
+        "admin_organic_soil_results_uri": (
+            "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-organic_soil/"
+            "v20260729/admin-land_ghg_inventory-organic_soil.parquet"
         ),
     },
 }
@@ -41,7 +57,13 @@ class LandGHGInventoryAnalyzer(Analyzer):
         land_state_class x year.
       - "agriculture": a coarse snapshot of gross emissions by category
         (cropland) only - no year, removals, net flux, or area.
-    "soil" is added as a further key later."""
+      - "mineral_soil": gross emissions / removals / net flux / area by
+        aoi_id only - a single static snapshot (the 2015-2020 SOC change
+        interval), no year axis.
+      - "organic_soil": gross emissions / area by aoi_id x interval_end_year
+        (2020 or 2024 - the zarr's native 5-year block labels, covering the
+        2016-2020 and 2021-2024 vegetation periods respectively), not
+        broadcast to annual years."""
 
     def __init__(
         self,
@@ -58,11 +80,18 @@ class LandGHGInventoryAnalyzer(Analyzer):
 
         analytics_in = LandGHGInventoryAnalyticsIn(**analysis.metadata)
         aoi_ids = analytics_in.aoi.ids
-        vegetation, agriculture = await asyncio.gather(
+        vegetation, agriculture, mineral_soil, organic_soil = await asyncio.gather(
             self.analyze_vegetation(aoi_ids),
             self.analyze_agriculture(aoi_ids),
+            self.analyze_mineral_soil(aoi_ids),
+            self.analyze_organic_soil(aoi_ids),
         )
-        analysis.result = {"vegetation": vegetation, "agriculture": agriculture}
+        analysis.result = {
+            "vegetation": vegetation,
+            "agriculture": agriculture,
+            "mineral_soil": mineral_soil,
+            "organic_soil": organic_soil,
+        }
 
     async def analyze_vegetation(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "land_state_class", "year") + VEGETATION_MEASURES
@@ -74,6 +103,20 @@ class LandGHGInventoryAnalyzer(Analyzer):
     async def analyze_agriculture(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e")
         return await self._select(self.query_services["agriculture"], columns, aoi_ids)
+
+    async def analyze_mineral_soil(self, aoi_ids) -> Dict[str, Any]:
+        columns = ("aoi_id", "aoi_type") + MINERAL_SOIL_MEASURES
+        return await self._select(self.query_services["mineral_soil"], columns, aoi_ids)
+
+    async def analyze_organic_soil(self, aoi_ids) -> Dict[str, Any]:
+        columns = (
+            "aoi_id",
+            "aoi_type",
+            "interval_end_year",
+            "gross_emissions_MgCO2e",
+            "area_ha",
+        )
+        return await self._select(self.query_services["organic_soil"], columns, aoi_ids)
 
     @staticmethod
     async def _select(query_service, columns, aoi_ids) -> Dict[str, Any]:

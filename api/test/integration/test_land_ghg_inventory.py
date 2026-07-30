@@ -61,6 +61,23 @@ AGRICULTURE_PAYLOAD = {
     "gross_emissions_MgCO2e": [123.0],
 }
 
+MINERAL_SOIL_PAYLOAD = {
+    "aoi_id": ["BRA.1"],
+    "aoi_type": ["admin"],
+    "gross_emissions_MgCO2e": [100.0],
+    "gross_removals_MgCO2": [-10.0],
+    "net_flux_MgCO2e": [90.0],
+    "area_ha": [1.0],
+}
+
+ORGANIC_SOIL_PAYLOAD = {
+    "aoi_id": ["BRA.1", "BRA.1"],
+    "aoi_type": ["admin", "admin"],
+    "interval_end_year": [2020, 2024],
+    "gross_emissions_MgCO2e": [10.0, 20.0],
+    "area_ha": [1.0, 1.0],
+}
+
 
 def get_file_system_analysis_repository() -> AnalysisRepository:
     return FileSystemAnalysisRepository(ANALYTICS_NAME)
@@ -77,6 +94,8 @@ def create_analysis_service_for_tests(
             query_services={
                 "vegetation": FakeQueryService(VEGETATION_PAYLOAD),
                 "agriculture": FakeQueryService(AGRICULTURE_PAYLOAD),
+                "mineral_soil": FakeQueryService(MINERAL_SOIL_PAYLOAD),
+                "organic_soil": FakeQueryService(ORGANIC_SOIL_PAYLOAD),
             },
             input_uris=INPUT_URIS[Environment.production],
         ),
@@ -140,7 +159,12 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
 
         assert data["status"] == "saved"
         # one table per category
-        assert set(data["result"]) == {"vegetation", "agriculture"}
+        assert set(data["result"]) == {
+            "vegetation",
+            "agriculture",
+            "mineral_soil",
+            "organic_soil",
+        }
 
         vegetation = data["result"]["vegetation"]
         assert set(vegetation).issuperset(
@@ -162,6 +186,32 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
             {"aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e"}
         )
         assert set(agriculture["category"]) == {"cropland"}
+
+        mineral_soil = data["result"]["mineral_soil"]
+        assert set(mineral_soil).issuperset(
+            {
+                "aoi_id",
+                "aoi_type",
+                "gross_emissions_MgCO2e",
+                "gross_removals_MgCO2",
+                "net_flux_MgCO2e",
+                "area_ha",
+            }
+        )
+        assert "year" not in mineral_soil
+        assert "interval_end_year" not in mineral_soil
+
+        organic_soil = data["result"]["organic_soil"]
+        assert set(organic_soil).issuperset(
+            {
+                "aoi_id",
+                "aoi_type",
+                "interval_end_year",
+                "gross_emissions_MgCO2e",
+                "area_ha",
+            }
+        )
+        assert set(organic_soil["interval_end_year"]) == {2020, 2024}
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():

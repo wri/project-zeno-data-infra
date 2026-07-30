@@ -37,6 +37,26 @@ EXPECTED_AGRICULTURE_COLUMNS = {
     "gross_emissions_MgCO2e",
 }
 
+# mineral_soil is a single static snapshot: no year/category axis
+EXPECTED_MINERAL_SOIL_COLUMNS = {
+    "aoi_id",
+    "aoi_type",
+    "gross_emissions_MgCO2e",
+    "gross_removals_MgCO2",
+    "net_flux_MgCO2e",
+    "area_ha",
+}
+
+# organic_soil is grouped by interval_end_year (native 2020/2024 block labels),
+# emissions + area only - no removals/net flux/land_state_class
+EXPECTED_ORGANIC_SOIL_COLUMNS = {
+    "aoi_id",
+    "aoi_type",
+    "interval_end_year",
+    "gross_emissions_MgCO2e",
+    "area_ha",
+}
+
 
 @pytest.fixture
 def vegetation_parquet(tmp_path):
@@ -73,38 +93,94 @@ def agriculture_parquet(tmp_path):
     return parquet_file
 
 
-def build_analyzer(vegetation_parquet, agriculture_parquet):
+@pytest.fixture
+def mineral_soil_parquet(tmp_path):
+    """Mineral soil static snapshot parquet: one row per aoi_id, no year axis."""
+    df = pd.DataFrame(
+        {
+            "aoi_id": ["BRA.1", "COL", "PER"],
+            "aoi_type": ["admin", "admin", "admin"],
+            "gross_emissions_MgCO2e": [100.0, 50.0, 5.0],
+            "gross_removals_MgCO2": [-10.0, -5.0, -1.0],
+            "net_flux_MgCO2e": [90.0, 45.0, 4.0],
+            "area_ha": [1.0, 3.0, 4.0],
+        }
+    )
+    parquet_file = tmp_path / "mineral_soil.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
+
+
+@pytest.fixture
+def organic_soil_parquet(tmp_path):
+    """Organic soil parquet: one row per aoi_id x interval_end_year (2020, 2024)."""
+    df = pd.DataFrame(
+        {
+            "aoi_id": ["BRA.1", "BRA.1", "COL", "COL", "PER", "PER"],
+            "aoi_type": ["admin"] * 6,
+            "interval_end_year": [2020, 2024, 2020, 2024, 2020, 2024],
+            "gross_emissions_MgCO2e": [10.0, 20.0, 5.0, 6.0, 1.0, 2.0],
+            "area_ha": [1.0, 1.0, 3.0, 3.0, 4.0, 4.0],
+        }
+    )
+    parquet_file = tmp_path / "organic_soil.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
+
+
+def build_analyzer(
+    vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
+):
     return LandGHGInventoryAnalyzer(
         query_services={
             "vegetation": DuckDbPrecalcQueryService(table_uri=vegetation_parquet),
             "agriculture": DuckDbPrecalcQueryService(table_uri=agriculture_parquet),
+            "mineral_soil": DuckDbPrecalcQueryService(table_uri=mineral_soil_parquet),
+            "organic_soil": DuckDbPrecalcQueryService(table_uri=organic_soil_parquet),
         },
         input_uris=INPUT_URIS[Environment.production],
     )
 
 
 @pytest.mark.asyncio
-async def test_result_has_a_table_per_category(vegetation_parquet, agriculture_parquet):
-    analytics_in = LandGHGInventoryAnalyticsIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
-    ).model_dump()
-    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
-
-    await build_analyzer(vegetation_parquet, agriculture_parquet).analyze(analysis)
-
-    assert set(analysis.result) == {"vegetation", "agriculture"}
-
-
-@pytest.mark.asyncio
-async def test_vegetation_query_returns_flux_by_land_state_and_year(
-    vegetation_parquet, agriculture_parquet
+async def test_result_has_a_table_per_category(
+    vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
         aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
-    await build_analyzer(vegetation_parquet, agriculture_parquet).analyze(analysis)
+    await build_analyzer(
+        vegetation_parquet,
+        agriculture_parquet,
+        mineral_soil_parquet,
+        organic_soil_parquet,
+    ).analyze(analysis)
+
+    assert set(analysis.result) == {
+        "vegetation",
+        "agriculture",
+        "mineral_soil",
+        "organic_soil",
+    }
+
+
+@pytest.mark.asyncio
+async def test_vegetation_query_returns_flux_by_land_state_and_year(
+    vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
+):
+    analytics_in = LandGHGInventoryAnalyticsIn(
+        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+    ).model_dump()
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    await build_analyzer(
+        vegetation_parquet,
+        agriculture_parquet,
+        mineral_soil_parquet,
+        organic_soil_parquet,
+    ).analyze(analysis)
 
     result = pd.DataFrame(analysis.result["vegetation"])
     assert EXPECTED_VEGETATION_COLUMNS.issubset(result.columns)
@@ -121,14 +197,19 @@ async def test_vegetation_query_returns_flux_by_land_state_and_year(
 
 @pytest.mark.asyncio
 async def test_agriculture_query_returns_emissions_by_category(
-    vegetation_parquet, agriculture_parquet
+    vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
         aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
-    await build_analyzer(vegetation_parquet, agriculture_parquet).analyze(analysis)
+    await build_analyzer(
+        vegetation_parquet,
+        agriculture_parquet,
+        mineral_soil_parquet,
+        organic_soil_parquet,
+    ).analyze(analysis)
 
     result = pd.DataFrame(analysis.result["agriculture"])
     assert set(result.columns) == EXPECTED_AGRICULTURE_COLUMNS
@@ -136,6 +217,63 @@ async def test_agriculture_query_returns_emissions_by_category(
     assert set(result.aoi_id) == {"BRA.1", "COL"}
     assert set(result.category) == {"cropland"}
     assert set(result.aoi_type) == {"admin"}
+
+
+@pytest.mark.asyncio
+async def test_mineral_soil_query_returns_flux_by_aoi(
+    vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
+):
+    analytics_in = LandGHGInventoryAnalyticsIn(
+        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+    ).model_dump()
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    await build_analyzer(
+        vegetation_parquet,
+        agriculture_parquet,
+        mineral_soil_parquet,
+        organic_soil_parquet,
+    ).analyze(analysis)
+
+    result = pd.DataFrame(analysis.result["mineral_soil"])
+    assert set(result.columns) == EXPECTED_MINERAL_SOIL_COLUMNS
+    assert "year" not in result.columns
+    assert "interval_end_year" not in result.columns
+    # only the requested admin ids come back (PER filtered out)
+    assert set(result.aoi_id) == {"BRA.1", "COL"}
+    assert set(result.aoi_type) == {"admin"}
+    bra = result[result.aoi_id == "BRA.1"].iloc[0]
+    assert bra.gross_emissions_MgCO2e == 100.0
+    assert bra.net_flux_MgCO2e == 90.0
+
+
+@pytest.mark.asyncio
+async def test_organic_soil_query_returns_emissions_by_interval_end_year(
+    vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
+):
+    analytics_in = LandGHGInventoryAnalyticsIn(
+        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+    ).model_dump()
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    await build_analyzer(
+        vegetation_parquet,
+        agriculture_parquet,
+        mineral_soil_parquet,
+        organic_soil_parquet,
+    ).analyze(analysis)
+
+    result = pd.DataFrame(analysis.result["organic_soil"])
+    assert set(result.columns) == EXPECTED_ORGANIC_SOIL_COLUMNS
+    # only the requested admin ids come back (PER filtered out)
+    assert set(result.aoi_id) == {"BRA.1", "COL"}
+    assert set(result.aoi_type) == {"admin"}
+    # native block labels, not expanded to vegetation calendar years
+    assert set(result.interval_end_year) == {2020, 2024}
+    bra_2024 = result[
+        (result.aoi_id == "BRA.1") & (result.interval_end_year == 2024)
+    ].iloc[0]
+    assert bra_2024.gross_emissions_MgCO2e == 20.0
 
 
 def test_rejects_non_admin_aoi():
