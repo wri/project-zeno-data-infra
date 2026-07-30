@@ -5,6 +5,11 @@ multiplying by pixel area) grouped by admin unit x interval_end_year, then rolls
 up to aoi_id. The reduce and GADM roll-up are reused from
 ``pipelines.prefect_flows.common_stages``.
 
+``area_ha`` is restricted to organic-soil-extent pixels (the zarr's
+``organic_soil`` mask), not every pixel in the admin unit -- burned/drained are
+already zero outside that extent, so this only affects the area total, not the
+emissions total.
+
 Only the last two 5-year blocks (zarr ``year`` values 2020 and 2024) are used --
 see ``pipelines.globals.land_ghg_inventory_organic_soil_zarr_uri``. These are
 persisted at their native block resolution, not broadcast to vegetation's 9
@@ -22,7 +27,7 @@ Output parquet schema (one row per aoi_id x interval_end_year)::
     area_ha                    float  summed area, hectares
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 import pandas as pd
 import xarray as xr
@@ -45,10 +50,12 @@ BLOCK_YEAR_INDICES = [3, 4]  # zarr year values 2020 (2016-2020), 2024 (2021-202
 
 # per-hectare source variables summed together into the single emissions measure
 ORGANIC_SOIL_SOURCE_VARS = ["burned_total_Mg_CO2e_ha_yr", "drained_total_Mg_CO2e_ha_yr"]
+ORGANIC_SOIL_MASK_VAR = "organic_soil"
 
 
 def setup_compute(
     emissions: xr.DataArray,
+    organic_soil_mask: xr.DataArray,
     pixel_area: xr.DataArray,
     country: xr.DataArray,
     region: xr.DataArray,
@@ -60,13 +67,14 @@ def setup_compute(
 
     ``emissions`` (burned + drained, per-hectare) is multiplied by ``pixel_area``
     (hectares) to get per-pixel totals and stacked with an ``area_ha`` layer along
-    ``analysis_layer``. Grouping is admin x interval_end_year (the zarr's native
-    2020/2024 block labels, not vegetation calendar years).
+    ``analysis_layer``. The ``area_ha`` layer is restricted to organic-soil-extent
+    pixels via ``organic_soil_mask``. Grouping is admin x interval_end_year (the
+    zarr's native 2020/2024 block labels, not vegetation calendar years).
     """
     pixel_area = pixel_area.fillna(0)
     layers = [
         (emissions.fillna(0) * pixel_area).astype("float64").rename(MEASURES[0]),
-        pixel_area.astype("float64").rename(AREA_LAYER),
+        (pixel_area * organic_soil_mask.fillna(0)).astype("float64").rename(AREA_LAYER),
     ]
     cube = xr.concat(layers, dim="analysis_layer").assign_coords(
         analysis_layer=MEASURES + [AREA_LAYER]
@@ -108,9 +116,12 @@ def load_data(
     subregion_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> Tuple[xr.Dataset, xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]:
-    """Load the organic soil fluxes at the 2020/2024 blocks, pixel area, and GADM
-    layers, aligned to the organic soil grid (native 30m, so alignment is 1:1)."""
-    org = _load_zarr(organic_soil_uri)[ORGANIC_SOIL_SOURCE_VARS]
+    """Load the organic soil fluxes and extent mask at the 2020/2024 blocks, pixel
+    area, and GADM layers, aligned to the organic soil grid (native 30m, so
+    alignment is 1:1)."""
+    org = _load_zarr(organic_soil_uri)[
+        ORGANIC_SOIL_SOURCE_VARS + [ORGANIC_SOIL_MASK_VAR]
+    ]
     org = org.isel(year=BLOCK_YEAR_INDICES)
     org = clip(org, bbox)
     return (
@@ -127,6 +138,7 @@ def setup_organic_soil_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple
     emissions = sum(org[var] for var in ORGANIC_SOIL_SOURCE_VARS)
     return setup_compute(
         emissions,
+        org[ORGANIC_SOIL_MASK_VAR],
         pixel_area,
         country,
         region,

@@ -146,13 +146,17 @@ def synthetic_organic_soil_datasets():
     """Tiny 2-block, 2x2 scene with a year dim of exactly 2 values [2020, 2024]
 
     Per-hectare burned/drained fluxes are constant (burned=6, drained=4, so
-    emissions=10) and each 2 ha pixel maps to the same admin unit, so grouped
-    per-pixel totals are known: emissions=20, area=2, for each block year.
+    emissions=10) on 3 of the 4 pixels; the 4th pixel is outside the
+    organic_soil extent mask and has zero burned/drained (matching the real
+    zarr's invariant that fluxes are zero outside the mask). Each 2 ha pixel
+    maps to the same admin unit, so grouped per-pixel totals are known:
+    emissions=60 (3 pixels x 20), area=6 ha (3 pixels x 2 ha, mask excludes
+    the 4th), for each block year.
     """
     coords3 = {"year": [2020, 2024], "y": [0.0, 1.0], "x": [0.0, 1.0]}
 
-    def cube(value):
-        arr = np.full((2, 2, 2), value, dtype="float32")
+    def cube3(values):
+        arr = np.array([values, values], dtype="float32")
         return xr.DataArray(
             da.from_array(arr, chunks=(1, 2, 2)),
             dims=["year", "y", "x"],
@@ -161,8 +165,9 @@ def synthetic_organic_soil_datasets():
 
     org = xr.Dataset(
         {
-            "burned_total_Mg_CO2e_ha_yr": cube(6.0),
-            "drained_total_Mg_CO2e_ha_yr": cube(4.0),
+            "burned_total_Mg_CO2e_ha_yr": cube3([[6.0, 6.0], [6.0, 0.0]]),
+            "drained_total_Mg_CO2e_ha_yr": cube3([[4.0, 4.0], [4.0, 0.0]]),
+            "organic_soil": cube3([[1, 1], [1, 0]]).astype("uint8"),
         }
     )
 

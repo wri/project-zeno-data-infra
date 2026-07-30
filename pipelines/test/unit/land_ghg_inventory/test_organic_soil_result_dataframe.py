@@ -25,16 +25,17 @@ def test_organic_soil_result_dataframe_rolls_up(synthetic_organic_soil_datasets)
     # native block labels persisted as-is, not expanded to vegetation years
     assert set(df["interval_end_year"]) == {2020, 2024}
 
-    # subregion-level totals: all 4 pixels, one row per block year
+    # subregion-level totals: 3 of 4 pixels are in the organic_soil mask (the
+    # 4th has zero flux and is excluded from area), one row per block year
     subregion_rows = df[df.aoi_id == "BRA.1.1"]
     for year in (2020, 2024):
         row = subregion_rows[subregion_rows.interval_end_year == year].iloc[0]
-        assert row.gross_emissions_MgCO2e == 80.0
-        assert row.area_ha == 8.0
+        assert row.gross_emissions_MgCO2e == 60.0
+        assert row.area_ha == 6.0
 
     # country-level roll-up equals the same total (only one admin unit present)
     country_rows = df[df.aoi_id == "BRA"]
     for year in (2020, 2024):
         row = country_rows[country_rows.interval_end_year == year].iloc[0]
-        assert row.gross_emissions_MgCO2e == 80.0
-        assert row.area_ha == 8.0
+        assert row.gross_emissions_MgCO2e == 60.0
+        assert row.area_ha == 6.0
