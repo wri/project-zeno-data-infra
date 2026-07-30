@@ -67,11 +67,7 @@ def setup_compute(
         (measures[name].fillna(0) * pixel_area).astype("float64").rename(name)
         for name in measures
     ]
-    layers.append(
-        (pixel_area * xr.ones_like(measures[MEASURES[0]]))
-        .astype("float64")
-        .rename(AREA_LAYER)
-    )
+    layers.append(pixel_area.astype("float64").rename(AREA_LAYER))
     cube = xr.concat(layers, dim="analysis_layer").assign_coords(
         analysis_layer=list(measures) + [AREA_LAYER]
     )
