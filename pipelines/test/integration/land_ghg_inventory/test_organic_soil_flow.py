@@ -1,15 +1,11 @@
 """Integration test: the organic_soil stages run against the real global zarr,
-clipped to São Tomé & Príncipe, must reproduce known reference totals. Exercises
-the same chain the flow runs (load -> setup -> reduce -> result dataframe), minus
+clipped to Singapore, must reproduce known reference emissions. Exercises the
+same chain the flow runs (load -> setup -> reduce -> result dataframe), minus
 the global scope and the S3 write.
-
-Only emissions are asserted here, not area_ha: STP has zero organic_soil-extent
-pixels in the current zarr, so after the area-mask fix its masked area is 0 ha,
-not the country's total land area -- emissions are unaffected by that mask (they
-were already zero outside the extent) and stay a stable, meaningful check.
 """
 
 import numpy as np
+import pytest
 from shapely.geometry import box
 
 from pipelines.globals import (
@@ -25,18 +21,26 @@ from pipelines.globals import (
 from pipelines.land_ghg_inventory import organic_soil_stages
 from pipelines.prefect_flows import common_stages
 
-# São Tomé & Príncipe: both islands, ocean elsewhere (isolated -> clean bbox).
-STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
+# Singapore: compact city-state, isolated by water -> clean bbox.
+SGP_BBOX = box(103.6, 1.15, 104.1, 1.48)
+
+# Reference emissions for SGP, computed directly against the real zarr (no
+# reduce over the full gadm_*_code_count admin codes changes these, since SGP's
+# own codes are within range).
+EXPECTED_EMISSIONS_MgCO2e = {
+    2020: 45987.43,
+    2024: 67217.00,
+}
 
 
-def test_stp_reproduces_reference_totals():
+def test_sgp_reproduces_reference_totals():
     datasets = organic_soil_stages.load_data(
         land_ghg_inventory_organic_soil_zarr_uri,
         pixel_area_zarr_uri,
         country_zarr_uri,
         region_zarr_uri,
         subregion_zarr_uri,
-        bbox=STP_BBOX,
+        bbox=SGP_BBOX,
     )
     expected_groups = (
         np.arange(gadm_country_code_count),
@@ -50,9 +54,11 @@ def test_stp_reproduces_reference_totals():
     reduced = common_stages.compute(cube, groupbys, out_expected_groups, "sum")
     df = organic_soil_stages.organic_soil_result_dataframe(reduced)
 
-    country = df[df["aoi_id"] == "STP"]
+    country = df[df["aoi_id"] == "SGP"]
     assert not country.empty
     assert set(country["interval_end_year"]) == {2020, 2024}
     for year in (2020, 2024):
         row = country[country["interval_end_year"] == year].iloc[0]
-        assert row["gross_emissions_MgCO2e"] == 0.0
+        assert row["gross_emissions_MgCO2e"] == pytest.approx(
+            EXPECTED_EMISSIONS_MgCO2e[year], rel=0.02
+        )
