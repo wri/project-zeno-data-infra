@@ -120,9 +120,7 @@ class LandGHGInventoryAnalyzer(Analyzer):
 
     async def analyze_mineral_soil(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "aoi_type") + MINERAL_SOIL_MEASURES
-        result = await self._select(
-            self.query_services["mineral_soil"], columns, aoi_ids
-        )
+        result = await self._select(self.query_services["mineral_soil"], columns, aoi_ids)
         df = pd.DataFrame(result)
         df["year"] = [ANNUALIZED_YEARS] * len(df)
         return df.explode("year", ignore_index=True).to_dict(orient="list")
@@ -135,9 +133,7 @@ class LandGHGInventoryAnalyzer(Analyzer):
             "gross_emissions_MgCO2e",
             "area_ha",
         )
-        result = await self._select(
-            self.query_services["organic_soil"], columns, aoi_ids
-        )
+        result = await self._select(self.query_services["organic_soil"], columns, aoi_ids)
         df = pd.DataFrame(result)
         df["year"] = df["interval_end_year"].map(ORGANIC_SOIL_INTERVAL_YEARS)
         df = df.explode("year", ignore_index=True).drop(columns="interval_end_year")
