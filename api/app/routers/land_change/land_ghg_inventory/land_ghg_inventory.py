@@ -51,6 +51,12 @@ def create_analysis_service(
                 "agriculture": DuckDbPrecalcQueryService(
                     table_uri=input_uris["admin_agriculture_results_uri"]
                 ),
+                "mineral_soil": DuckDbPrecalcQueryService(
+                    table_uri=input_uris["admin_mineral_soil_results_uri"]
+                ),
+                "organic_soil": DuckDbPrecalcQueryService(
+                    table_uri=input_uris["admin_organic_soil_results_uri"]
+                ),
             },
             input_uris=input_uris,
         ),

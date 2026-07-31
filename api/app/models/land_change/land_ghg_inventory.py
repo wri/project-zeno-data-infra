@@ -11,7 +11,7 @@ ANALYTICS_NAME = "land_ghg_inventory"
 
 class LandGHGInventoryAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
-    _version: str = PrivateAttr(default="v20260723")
+    _version: str = PrivateAttr(default="v20260730")
     aoi: AdminAreaOfInterest = Field(
         ...,
         title="AOI",
@@ -57,6 +57,25 @@ class LandGHGInventoryAnalyticsResponse(Response):
                                 "aoi_type": ["admin"],
                                 "category": ["cropland"],
                                 "gross_emissions_MgCO2e": [123234500000.0],
+                            },
+                            # single static snapshot (2015-2020 SOC change
+                            # interval): no year axis
+                            "mineral_soil": {
+                                "aoi_id": ["BRA.1"],
+                                "aoi_type": ["admin"],
+                                "gross_emissions_MgCO2e": [4533948.0],
+                                "gross_removals_MgCO2": [-2740651.0],
+                                "net_flux_MgCO2e": [1793298.0],
+                                "area_ha": [8509086.0],
+                            },
+                            # native 5-year block labels (2020, 2024), not
+                            # broadcast to annual vegetation years
+                            "organic_soil": {
+                                "aoi_id": ["BRA.1", "BRA.1"],
+                                "aoi_type": ["admin", "admin"],
+                                "interval_end_year": [2020, 2024],
+                                "gross_emissions_MgCO2e": [11.6, 313515.6],
+                                "area_ha": [8509086.0, 8509086.0],
                             },
                         },
                         "metadata": {

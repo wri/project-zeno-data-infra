@@ -8,6 +8,8 @@ from pipelines.globals import (
     gadm_country_code_count,
     gadm_region_code_count,
     gadm_subregion_code_count,
+    land_ghg_inventory_organic_soil_zarr_uri,
+    land_ghg_inventory_soc_zarr_uri,
     land_ghg_inventory_vegetation_zarr_uri,
     pixel_area_zarr_uri,
     region_zarr_uri,
@@ -139,11 +141,125 @@ def land_ghg_inventory_agriculture(
     )(result_df, result_uri)
 
 
+@flow(name="Land GHG inventory mineral soil", retries=2, retry_delay_seconds=120)
+def land_ghg_inventory_mineral_soil(
+    version: str,
+    overwrite: bool = False,
+    bbox: Optional[Polygon] = None,
+) -> str:
+    """Land GHG inventory mineral soil organic carbon (SOC) zonal stats: gross
+    emissions / removals / net flux and area, admin-only (no year axis -- only
+    the 2015-2020 change interval is used, applied uniformly across all
+    vegetation years), rolled up to aoi_id.
+
+    ``bbox`` clips the reduce to one area for a laptop-friendly local run; the
+    result is written to a local parquet
+    (``admin-land_ghg_inventory-mineral_soil-{version}.parquet``) instead of the
+    canonical global S3 path (which would be a partial write)."""
+    if bbox is None:
+        result_uri = (
+            f"s3://{ANALYTICS_BUCKET}/zonal-statistics/land_ghg_inventory-mineral_soil/"
+            f"{version}/admin-land_ghg_inventory-mineral_soil.parquet"
+        )
+        if not overwrite and s3_uri_exists(result_uri):
+            return result_uri
+    else:
+        # local bbox test run
+        result_uri = f"admin-land_ghg_inventory-mineral_soil-{version}.parquet"
+
+    expected_groups = (
+        np.arange(gadm_country_code_count),
+        np.arange(gadm_region_code_count),
+        np.arange(gadm_subregion_code_count),
+    )
+    datasets = land_ghg_inventory_tasks.load_mineral_soil.with_options(
+        name="land_ghg_inventory-mineral_soil-load-data"
+    )(
+        land_ghg_inventory_soc_zarr_uri,
+        pixel_area_zarr_uri,
+        country_zarr_uri,
+        region_zarr_uri,
+        subregion_zarr_uri,
+        bbox,
+    )
+    compute_input = land_ghg_inventory_tasks.setup_mineral_soil_compute.with_options(
+        name="set-up-land_ghg_inventory-mineral_soil-compute"
+    )(datasets, expected_groups)
+    reduced = common_tasks.compute_zonal_stat.with_options(
+        name="land_ghg_inventory-mineral_soil-compute-zonal-stats"
+    )(*compute_input, funcname="sum")
+    result_df = land_ghg_inventory_tasks.mineral_soil_result_dataframe.with_options(
+        name="land_ghg_inventory-mineral_soil-postprocess-result"
+    )(reduced)
+    return common_tasks.save_result.with_options(
+        name="land_ghg_inventory-mineral_soil-save-result"
+    )(result_df, result_uri)
+
+
+@flow(name="Land GHG inventory organic soil", retries=2, retry_delay_seconds=120)
+def land_ghg_inventory_organic_soil(
+    version: str,
+    overwrite: bool = False,
+    bbox: Optional[Polygon] = None,
+) -> str:
+    """Land GHG inventory organic (peat) soil zonal stats: burned + drained gross
+    emissions and area, grouped by admin unit x ``interval_end_year`` (the source
+    zarr's native 2020/2024 block labels, covering the 2016-2020 and 2021-2024
+    vegetation periods respectively -- not broadcast to annual years), rolled up
+    to aoi_id.
+
+    ``bbox`` clips the reduce to one area for a laptop-friendly local run; the
+    result is written to a local parquet
+    (``admin-land_ghg_inventory-organic_soil-{version}.parquet``) instead of the
+    canonical global S3 path (which would be a partial write)."""
+    if bbox is None:
+        result_uri = (
+            f"s3://{ANALYTICS_BUCKET}/zonal-statistics/land_ghg_inventory-organic_soil/"
+            f"{version}/admin-land_ghg_inventory-organic_soil.parquet"
+        )
+        if not overwrite and s3_uri_exists(result_uri):
+            return result_uri
+    else:
+        # local bbox test run
+        result_uri = f"admin-land_ghg_inventory-organic_soil-{version}.parquet"
+
+    expected_groups = (
+        np.arange(gadm_country_code_count),
+        np.arange(gadm_region_code_count),
+        np.arange(gadm_subregion_code_count),
+        np.array([2020, 2024]),
+    )
+    datasets = land_ghg_inventory_tasks.load_organic_soil.with_options(
+        name="land_ghg_inventory-organic_soil-load-data"
+    )(
+        land_ghg_inventory_organic_soil_zarr_uri,
+        pixel_area_zarr_uri,
+        country_zarr_uri,
+        region_zarr_uri,
+        subregion_zarr_uri,
+        bbox,
+    )
+    compute_input = land_ghg_inventory_tasks.setup_organic_soil_compute.with_options(
+        name="set-up-land_ghg_inventory-organic_soil-compute"
+    )(datasets, expected_groups)
+    reduced = common_tasks.compute_zonal_stat.with_options(
+        name="land_ghg_inventory-organic_soil-compute-zonal-stats"
+    )(*compute_input, funcname="sum")
+    result_df = land_ghg_inventory_tasks.organic_soil_result_dataframe.with_options(
+        name="land_ghg_inventory-organic_soil-postprocess-result"
+    )(reduced)
+    return common_tasks.save_result.with_options(
+        name="land_ghg_inventory-organic_soil-save-result"
+    )(result_df, result_uri)
+
+
 # component name -> its subflow. Add new components (e.g. soil) here to expose
 # them through `component`, without touching run_updates.py.
 COMPONENT_FLOWS = {
     "vegetation": land_ghg_inventory_vegetation,
     "agriculture": land_ghg_inventory_agriculture,
+    "mineral_soil": land_ghg_inventory_mineral_soil,
+    "organic_soil": land_ghg_inventory_organic_soil,
 }
 ALL_COMPONENTS = tuple(COMPONENT_FLOWS)
 
