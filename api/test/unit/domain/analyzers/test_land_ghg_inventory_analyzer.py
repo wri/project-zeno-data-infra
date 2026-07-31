@@ -37,22 +37,22 @@ EXPECTED_AGRICULTURE_COLUMNS = {
     "gross_emissions_MgCO2e",
 }
 
-# mineral_soil is a single static snapshot: no year/category axis
+# mineral_soil's static snapshot is broadcast to a year per row (2016-2024)
 EXPECTED_MINERAL_SOIL_COLUMNS = {
     "aoi_id",
     "aoi_type",
+    "year",
     "gross_emissions_MgCO2e",
     "gross_removals_MgCO2",
     "net_flux_MgCO2e",
     "area_ha",
 }
 
-# organic_soil is grouped by interval_end_year (native 2020/2024 block labels),
-# emissions + area only - no removals/net flux/land_state_class
+# organic_soil's two blocks are broadcast to a year per row (2016-2024)
 EXPECTED_ORGANIC_SOIL_COLUMNS = {
     "aoi_id",
     "aoi_type",
-    "interval_end_year",
+    "year",
     "gross_emissions_MgCO2e",
     "area_ha",
 }
@@ -220,7 +220,7 @@ async def test_agriculture_query_returns_emissions_by_category(
 
 
 @pytest.mark.asyncio
-async def test_mineral_soil_query_returns_flux_by_aoi(
+async def test_mineral_soil_query_broadcasts_snapshot_to_years(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
@@ -237,18 +237,19 @@ async def test_mineral_soil_query_returns_flux_by_aoi(
 
     result = pd.DataFrame(analysis.result["mineral_soil"])
     assert set(result.columns) == EXPECTED_MINERAL_SOIL_COLUMNS
-    assert "year" not in result.columns
     assert "interval_end_year" not in result.columns
     # only the requested admin ids come back (PER filtered out)
     assert set(result.aoi_id) == {"BRA.1", "COL"}
     assert set(result.aoi_type) == {"admin"}
-    bra = result[result.aoi_id == "BRA.1"].iloc[0]
-    assert bra.gross_emissions_MgCO2e == 100.0
-    assert bra.net_flux_MgCO2e == 90.0
+    # the static snapshot is broadcast across every vegetation year
+    bra = result[result.aoi_id == "BRA.1"]
+    assert set(bra.year) == set(range(2016, 2025))
+    assert (bra.gross_emissions_MgCO2e == 100.0).all()
+    assert (bra.net_flux_MgCO2e == 90.0).all()
 
 
 @pytest.mark.asyncio
-async def test_organic_soil_query_returns_emissions_by_interval_end_year(
+async def test_organic_soil_query_broadcasts_blocks_to_years(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
@@ -268,12 +269,12 @@ async def test_organic_soil_query_returns_emissions_by_interval_end_year(
     # only the requested admin ids come back (PER filtered out)
     assert set(result.aoi_id) == {"BRA.1", "COL"}
     assert set(result.aoi_type) == {"admin"}
-    # native block labels, not expanded to vegetation calendar years
-    assert set(result.interval_end_year) == {2020, 2024}
-    bra_2024 = result[
-        (result.aoi_id == "BRA.1") & (result.interval_end_year == 2024)
-    ].iloc[0]
-    assert bra_2024.gross_emissions_MgCO2e == 20.0
+    bra = result[result.aoi_id == "BRA.1"]
+    # broadcast across every vegetation year: 2016-2020 repeats the first
+    # block's value, 2021-2024 repeats the second block's value
+    assert set(bra.year) == set(range(2016, 2025))
+    assert (bra[bra.year <= 2020].gross_emissions_MgCO2e == 10.0).all()
+    assert (bra[bra.year >= 2021].gross_emissions_MgCO2e == 20.0).all()
 
 
 def test_rejects_non_admin_aoi():
