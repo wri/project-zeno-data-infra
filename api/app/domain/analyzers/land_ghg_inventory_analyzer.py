@@ -2,6 +2,7 @@ import asyncio
 from typing import Any, Dict
 
 import newrelic.agent as nr_agent
+import pandas as pd
 
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
@@ -24,6 +25,18 @@ MINERAL_SOIL_MEASURES = (
     "area_ha",
 )
 
+# vegetation years soil measures are annualized across (see analyze_mineral_soil,
+# analyze_organic_soil): both soils are modeled at coarser-than-annual resolution
+# (a single change interval, or two 5-year blocks) but are broadcast to match
+# vegetation's per-year shape so consumers can treat all components uniformly.
+ANNUALIZED_YEARS = tuple(range(2016, 2025))
+
+# organic soil interval_end_year -> the vegetation years its block covers
+ORGANIC_SOIL_INTERVAL_YEARS = {
+    2020: tuple(range(2016, 2021)),
+    2024: tuple(range(2021, 2025)),
+}
+
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
@@ -41,7 +54,7 @@ INPUT_URIS = {
         ),
         "admin_organic_soil_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-organic_soil/"
-            "v20260729/admin-land_ghg_inventory-organic_soil.parquet"
+            "v20260730/admin-land_ghg_inventory-organic_soil.parquet"
         ),
     },
 }
@@ -58,12 +71,13 @@ class LandGHGInventoryAnalyzer(Analyzer):
       - "agriculture": a coarse snapshot of gross emissions by category
         (cropland) only - no year, removals, net flux, or area.
       - "mineral_soil": gross emissions / removals / net flux / area by
-        aoi_id only - a single static snapshot (the 2015-2020 SOC change
-        interval), no year axis.
-      - "organic_soil": gross emissions / area by aoi_id x interval_end_year
-        (2020 or 2024 - the zarr's native 5-year block labels, covering the
-        2016-2020 and 2021-2024 vegetation periods respectively), not
-        broadcast to annual years."""
+        aoi_id x year (2016-2024). The underlying data is a single static
+        snapshot (the 2015-2020 SOC change interval); the same value is
+        broadcast across every year for a vegetation-year-aligned shape.
+      - "organic_soil": gross emissions / area by aoi_id x year (2016-2024).
+        The underlying data has two 5-year blocks (covering 2016-2020 and
+        2021-2024); each block's value is broadcast across its covered
+        years."""
 
     def __init__(
         self,
@@ -106,7 +120,12 @@ class LandGHGInventoryAnalyzer(Analyzer):
 
     async def analyze_mineral_soil(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "aoi_type") + MINERAL_SOIL_MEASURES
-        return await self._select(self.query_services["mineral_soil"], columns, aoi_ids)
+        result = await self._select(
+            self.query_services["mineral_soil"], columns, aoi_ids
+        )
+        df = pd.DataFrame(result)
+        df["year"] = [ANNUALIZED_YEARS] * len(df)
+        return df.explode("year", ignore_index=True).to_dict(orient="list")
 
     async def analyze_organic_soil(self, aoi_ids) -> Dict[str, Any]:
         columns = (
@@ -116,7 +135,13 @@ class LandGHGInventoryAnalyzer(Analyzer):
             "gross_emissions_MgCO2e",
             "area_ha",
         )
-        return await self._select(self.query_services["organic_soil"], columns, aoi_ids)
+        result = await self._select(
+            self.query_services["organic_soil"], columns, aoi_ids
+        )
+        df = pd.DataFrame(result)
+        df["year"] = df["interval_end_year"].map(ORGANIC_SOIL_INTERVAL_YEARS)
+        df = df.explode("year", ignore_index=True).drop(columns="interval_end_year")
+        return df.to_dict(orient="list")
 
     @staticmethod
     async def _select(query_service, columns, aoi_ids) -> Dict[str, Any]:

@@ -192,26 +192,30 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
             {
                 "aoi_id",
                 "aoi_type",
+                "year",
                 "gross_emissions_MgCO2e",
                 "gross_removals_MgCO2",
                 "net_flux_MgCO2e",
                 "area_ha",
             }
         )
-        assert "year" not in mineral_soil
         assert "interval_end_year" not in mineral_soil
+        # the static snapshot is broadcast across every vegetation year
+        assert set(mineral_soil["year"]) == set(range(2016, 2025))
 
         organic_soil = data["result"]["organic_soil"]
         assert set(organic_soil).issuperset(
             {
                 "aoi_id",
                 "aoi_type",
-                "interval_end_year",
+                "year",
                 "gross_emissions_MgCO2e",
                 "area_ha",
             }
         )
-        assert set(organic_soil["interval_end_year"]) == {2020, 2024}
+        assert "interval_end_year" not in organic_soil
+        # both blocks are broadcast across every vegetation year
+        assert set(organic_soil["year"]) == set(range(2016, 2025))
 
 
 def test_endpoint_is_hidden_from_openapi_schema_but_registered():
