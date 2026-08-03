@@ -4,6 +4,7 @@ import dask.array as da
 import numpy as np
 import pytest
 import xarray as xr
+
 from pipelines.globals import land_ghg_inventory_agriculture_zarr_uri
 from pipelines.land_ghg_inventory import create_agriculture_zarr as mod
 from pipelines.land_ghg_inventory.agriculture_stages import AGRICULTURE_SOURCE_VARS
@@ -68,7 +69,7 @@ def test_create_agriculture_zarr_writes_expected_shape(
             "open_rasterio",
             side_effect=[_fake_cog(10_000.0), _fake_cog(2_000.0)],
         ),
-        patch.object(mod, "align_to", return_value=pixel_area_layer),
+        patch.object(mod, "align_to", return_value=pixel_area_layer) as mock_align_to,
         patch.object(xr.Dataset, "to_zarr", fake_to_zarr),
     ):
         result_uri = mod.create_agriculture_zarr(overwrite=False)
@@ -77,6 +78,10 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert captured["uri"] == land_ghg_inventory_agriculture_zarr_uri
     assert captured["group"] == "pipeline"
     assert captured["mode"] == "w"
+
+    # pixel area is aligned once and reused for both categories, since both
+    # source rasters are reprojected onto the same geobox.
+    mock_align_to.assert_called_once()
 
     ds = captured["ds"].compute()
     # matches what agriculture_stages.load_agriculture expects: cropland +

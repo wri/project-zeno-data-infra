@@ -14,6 +14,7 @@ import rasterio
 import rioxarray as rio
 import xarray as xr
 from odc.geo.xr import xr_reproject
+
 from pipelines.globals import (
     land_ghg_inventory_agriculture_zarr_uri,
     land_ghg_inventory_vegetation_zarr_uri,
@@ -87,12 +88,13 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
     geobox = _reference_geobox()
 
     cropland_kg_ha = _resample(CROPLAND_COG_URI, geobox)
-    cropland_pixel_area_ha = align_to(cropland_kg_ha, pixel_area_zarr_uri)
-    cropland = (cropland_kg_ha * cropland_pixel_area_ha) / KG_PER_MG
-
     livestock_kg_ha = _resample(LIVESTOCK_COG_URI, geobox)
-    livestock_pixel_area_ha = align_to(livestock_kg_ha, pixel_area_zarr_uri)
-    livestock = (livestock_kg_ha * livestock_pixel_area_ha) / KG_PER_MG
+    # both are already reprojected onto the same geobox, so pixel area only
+    # needs aligning once and can be reused for both conversions.
+    pixel_area_ha = align_to(cropland_kg_ha, pixel_area_zarr_uri)
+
+    cropland = (cropland_kg_ha * pixel_area_ha) / KG_PER_MG
+    livestock = (livestock_kg_ha * pixel_area_ha) / KG_PER_MG
 
     combined = xr.Dataset(
         {
