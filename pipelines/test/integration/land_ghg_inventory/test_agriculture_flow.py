@@ -28,6 +28,7 @@ STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
 # within range).
 EXPECTED_TOTALS = {
     "cropland": 1.7105374e04,
+    "livestock": 1.2441838e04,
 }
 
 
@@ -54,3 +55,4 @@ def test_stp_reproduces_reference_totals():
     assert not country.empty
     totals = country.groupby("category")["gross_emissions_MgCO2e"].sum()
     assert totals["cropland"] == pytest.approx(EXPECTED_TOTALS["cropland"], rel=0.02)
+    assert totals["livestock"] == pytest.approx(EXPECTED_TOTALS["livestock"], rel=0.02)
