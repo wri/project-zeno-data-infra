@@ -183,9 +183,11 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
 
         agriculture = data["result"]["agriculture"]
         assert set(agriculture).issuperset(
-            {"aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e"}
+            {"aoi_id", "aoi_type", "category", "year", "gross_emissions_MgCO2e"}
         )
         assert set(agriculture["category"]) == {"cropland", "livestock"}
+        # the static snapshot is broadcast across every vegetation year, per category
+        assert set(agriculture["year"]) == set(range(2016, 2025))
 
         mineral_soil = data["result"]["mineral_soil"]
         assert set(mineral_soil).issuperset(
