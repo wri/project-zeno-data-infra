@@ -6,8 +6,8 @@ def test_setup_agriculture_compute_builds_measure_cube_and_groupbys(
 ):
     datasets, expected_groups = synthetic_agriculture_datasets
 
-    cube, groupbys, out_expected_groups = (
-        agriculture_stages.setup_agriculture_compute(datasets, expected_groups)
+    cube, groupbys, out_expected_groups = agriculture_stages.setup_agriculture_compute(
+        datasets, expected_groups
     )
 
     assert list(cube.category.values) == ["cropland", "livestock"]
