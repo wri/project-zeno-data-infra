@@ -1,12 +1,12 @@
 """Builds the agriculture emissions zarr consumed by ``agriculture_stages``.
 
-Cropland emissions are published as a global COG on its own native grid (~10km,
-WGS84), carrying a per-hectare rate in kg/ha. This resamples it onto the
-vegetation zarr's 30m grid (the reference grid for the whole Land GHG inventory)
-via ``odc.geo``'s dask-parallel nearest-neighbor reprojection, multiplies by the
-UMD pixel-area zarr (already on the 30m grid, snapped on via
-``common.align_to``) to recover an absolute per-pixel total, converts kg -> Mg,
-and writes a single-variable zarr matching
+Cropland and livestock emissions are each published as a global COG on their
+own native grid (~10km, WGS84), carrying a per-hectare rate in kg/ha. This
+resamples each onto the vegetation zarr's 30m grid (the reference grid for the
+whole Land GHG inventory) via ``odc.geo``'s dask-parallel nearest-neighbor
+reprojection, multiplies by the UMD pixel-area zarr (already on the 30m grid,
+snapped on via ``common.align_to``) to recover an absolute per-pixel total,
+converts kg -> Mg, and writes a two-variable zarr matching
 ``agriculture_stages.AGRICULTURE_SOURCE_VARS``.
 """
 
@@ -30,13 +30,18 @@ from pipelines.utils import s3_uri_exists
 # only its geobox (30m, EPSG:4326) is used, not its values.
 REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 
-# Source COG: a static snapshot (single year, no versioning scheme), published by
-# Cornell. Per-hectare rate in kg/ha.
+# Source COGs: static snapshots (single year, no versioning scheme), published
+# by Cornell. Per-hectare rate in kg/ha.
 CROPLAND_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/processed/"
     "Cornell_v20250828/year_2020/global_COG/all_sources/"
     "Global_grid_all_GHGs_cropland_mean_rate_physical_area_CO2eq_all_crops_"
     "NonPeatland_2019_kg_ha_CO2_COG.tif"
+)
+LIVESTOCK_COG_URI = (
+    "s3://gfw2-data/climate/AFOLU_flux_model/livestock_emissions/"
+    "raw__from_Cornell/20260731_emis_per_ha_only/Total_GHG_Emissions/"
+    "Tot_CO2eq_kg_livestock_GHG_emissions_kgCO2e_ha.tif"
 )
 KG_PER_MG = 1_000
 
@@ -70,9 +75,9 @@ def _resample(cog_uri: str, geobox) -> xr.DataArray:
 
 
 def create_agriculture_zarr(overwrite: bool = False) -> str:
-    """Resample cropland emissions onto the vegetation grid, convert per-hectare
-    rates to absolute per-pixel Mg totals, and write the zarr consumed by
-    ``agriculture_stages.load_agriculture``."""
+    """Resample cropland and livestock emissions onto the vegetation grid,
+    convert per-hectare rates to absolute per-pixel Mg totals, and write the
+    zarr consumed by ``agriculture_stages.load_agriculture``."""
     marker_uri = (
         f"{land_ghg_inventory_agriculture_zarr_uri}/{AGRICULTURE_ZARR_GROUP}/zarr.json"
     )
@@ -80,11 +85,21 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
         return land_ghg_inventory_agriculture_zarr_uri
 
     geobox = _reference_geobox()
-    cropland_kg_ha = _resample(CROPLAND_COG_URI, geobox)
-    pixel_area_ha = align_to(cropland_kg_ha, pixel_area_zarr_uri)
-    cropland = (cropland_kg_ha * pixel_area_ha) / KG_PER_MG
 
-    combined = xr.Dataset({AGRICULTURE_SOURCE_VARS["cropland"]: cropland})
+    cropland_kg_ha = _resample(CROPLAND_COG_URI, geobox)
+    cropland_pixel_area_ha = align_to(cropland_kg_ha, pixel_area_zarr_uri)
+    cropland = (cropland_kg_ha * cropland_pixel_area_ha) / KG_PER_MG
+
+    livestock_kg_ha = _resample(LIVESTOCK_COG_URI, geobox)
+    livestock_pixel_area_ha = align_to(livestock_kg_ha, pixel_area_zarr_uri)
+    livestock = (livestock_kg_ha * livestock_pixel_area_ha) / KG_PER_MG
+
+    combined = xr.Dataset(
+        {
+            AGRICULTURE_SOURCE_VARS["cropland"]: cropland,
+            AGRICULTURE_SOURCE_VARS["livestock"]: livestock,
+        }
+    )
     combined.to_zarr(
         land_ghg_inventory_agriculture_zarr_uri, group=AGRICULTURE_ZARR_GROUP, mode="w"
     )

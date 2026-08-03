@@ -46,7 +46,7 @@ INPUT_URIS = {
         ),
         "admin_agriculture_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-agriculture/"
-            "v20260727/admin-land_ghg_inventory-agriculture.parquet"
+            "v20260803/admin-land_ghg_inventory-agriculture.parquet"
         ),
         "admin_mineral_soil_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-mineral_soil/"
@@ -69,7 +69,7 @@ class LandGHGInventoryAnalyzer(Analyzer):
       - "vegetation": gross emissions / removals / net flux / area by
         land_state_class x year.
       - "agriculture": a coarse snapshot of gross emissions by category
-        (cropland) only - no year, removals, net flux, or area.
+        (cropland, livestock) only - no year, removals, net flux, or area.
       - "mineral_soil": gross emissions / removals / net flux / area by
         aoi_id x year (2016-2024). The underlying data is a single static
         snapshot (the 2015-2020 SOC change interval); the same value is

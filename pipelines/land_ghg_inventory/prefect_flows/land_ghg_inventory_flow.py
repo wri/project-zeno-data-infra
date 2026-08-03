@@ -89,9 +89,9 @@ def land_ghg_inventory_agriculture(
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
 ) -> str:
-    """Land GHG inventory agriculture zonal stats: cropland emissions, admin-only
-    (no land_state_class, no year axis -- a single static snapshot), rolled up to
-    aoi_id.
+    """Land GHG inventory agriculture zonal stats: cropland and livestock
+    emissions, admin-only (no land_state_class, no year axis -- a single
+    static snapshot), rolled up to aoi_id.
 
     ``bbox`` clips the reduce to one area for a laptop-friendly local run; the
     result is written to a local parquet

@@ -11,7 +11,7 @@ ANALYTICS_NAME = "land_ghg_inventory"
 
 class LandGHGInventoryAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
-    _version: str = PrivateAttr(default="v20260731")
+    _version: str = PrivateAttr(default="v20260803")
     aoi: AdminAreaOfInterest = Field(
         ...,
         title="AOI",
@@ -53,10 +53,13 @@ class LandGHGInventoryAnalyticsResponse(Response):
                             },
                             # coarse snapshot: emissions only, by category
                             "agriculture": {
-                                "aoi_id": ["BRA.1"],
-                                "aoi_type": ["admin"],
-                                "category": ["cropland"],
-                                "gross_emissions_MgCO2e": [123234500000.0],
+                                "aoi_id": ["BRA.1", "BRA.1"],
+                                "aoi_type": ["admin", "admin"],
+                                "category": ["cropland", "livestock"],
+                                "gross_emissions_MgCO2e": [
+                                    123234500000.0,
+                                    45123400000.0,
+                                ],
                             },
                             # single static snapshot (2015-2020 SOC change
                             # interval), broadcast across every vegetation

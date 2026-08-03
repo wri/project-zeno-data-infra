@@ -66,7 +66,7 @@ def test_create_agriculture_zarr_writes_expected_shape(
         patch.object(
             mod.rio,
             "open_rasterio",
-            side_effect=[_fake_cog(10_000.0)],
+            side_effect=[_fake_cog(10_000.0), _fake_cog(2_000.0)],
         ),
         patch.object(mod, "align_to", return_value=pixel_area_layer),
         patch.object(xr.Dataset, "to_zarr", fake_to_zarr),
@@ -79,8 +79,8 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert captured["mode"] == "w"
 
     ds = captured["ds"].compute()
-    # matches what agriculture_stages.load_agriculture expects: only this
-    # variable, dims (y, x) with no leftover band dim.
+    # matches what agriculture_stages.load_agriculture expects: cropland +
+    # livestock variables, dims (y, x) with no leftover band dim.
     assert set(ds.data_vars) == set(AGRICULTURE_SOURCE_VARS.values())
     assert ds.sizes.keys() == {"y", "x"}
     assert "band" not in ds.dims
@@ -89,9 +89,13 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert list(ds.y.values) == [1.0, 0.5, 0.0, -0.5]
     assert list(ds.x.values) == [0.0, 0.5, 1.0, 1.5]
 
-    # kg/ha -> ha-multiplied -> Mg conversion applied: 10_000 kg/ha * 5 ha / 1000
+    # kg/ha -> ha-multiplied -> Mg conversion applied:
+    # cropland: 10_000 kg/ha * 5 ha / 1000 = 50
+    # livestock: 2_000 kg/ha * 5 ha / 1000 = 10
     cropland = ds[AGRICULTURE_SOURCE_VARS["cropland"]].values
     assert cropland[0, 0] == pytest.approx(50.0)
+    livestock = ds[AGRICULTURE_SOURCE_VARS["livestock"]].values
+    assert livestock[0, 0] == pytest.approx(10.0)
 
 
 def test_create_agriculture_zarr_skips_when_present_and_not_overwrite():
@@ -117,7 +121,7 @@ def test_create_agriculture_zarr_overwrite_skips_exists_check(
         patch.object(
             mod.rio,
             "open_rasterio",
-            side_effect=[_fake_cog(1_000.0)],
+            side_effect=[_fake_cog(1_000.0), _fake_cog(500.0)],
         ),
         patch.object(mod, "align_to", return_value=pixel_area_layer),
         patch.object(xr.Dataset, "to_zarr"),
