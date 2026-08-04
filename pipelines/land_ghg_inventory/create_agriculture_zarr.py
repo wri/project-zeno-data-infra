@@ -34,10 +34,10 @@ REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 # Source COGs: static snapshots (single year, no versioning scheme), published
 # by Cornell. Per-hectare rate in kg/ha.
 CROPLAND_COG_URI = (
-    "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/processed/"
-    "Cornell_v20250828/year_2020/global_COG/all_sources/"
-    "Global_grid_all_GHGs_cropland_mean_rate_physical_area_CO2eq_all_crops_"
-    "NonPeatland_2019_kg_ha_CO2_COG.tif"
+    "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/"
+    "raw__from_Cornell/20250828/year_2020/all_sources/"
+    "Global_grid_cropland_emissions_mean_rate_physical_area_CO2eq_all_crops_"
+    "without_peat_burn_kg_ha_CO2__20260803.tif"
 )
 LIVESTOCK_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/livestock_emissions/"
