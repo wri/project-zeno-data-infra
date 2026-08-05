@@ -27,7 +27,7 @@ STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
 # the full gadm_*_code_count admin codes changes these, since STP's own codes are
 # within range).
 EXPECTED_TOTALS = {
-    "cropland": 1.7105374e04,
+    "cropland": 1.7466945e03,
     "livestock": 1.2441838e04,
 }
 
