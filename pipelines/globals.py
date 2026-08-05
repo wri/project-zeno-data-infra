@@ -44,11 +44,20 @@ land_ghg_inventory_organic_soil_zarr_uri = (
     "mega_zarr/ogh_mixed_f1_f15_f2_20260513/five_year/4000_pixels/20260525/mega.zarr"
 )
 # Agriculture emissions (cropland + livestock). Single static snapshot, no year
-# axis. Source COGs are per-hectare (kg/ha); this zarr stores the converted
-# per-pixel absolute totals (Mg). group="pipeline".
+# axis. Livestock's source COG is per-hectare (kg/ha); cropland's is an
+# absolute per-pixel total (kg), mass-conserving-resampled -- see
+# create_agriculture_zarr.py. This zarr stores the converted per-pixel
+# absolute totals (Mg). group="pipeline".
+#
+# v2: cropland switched from area-weighting a per-hectare rate (which
+# overstated totals ~5.3x against an independent QC reference, since the
+# rate's area denominator was physical cropland area, not full pixel area)
+# to the mass-conserving uniform-split resample of the absolute total COG.
+# Kept as a new sibling path rather than overwriting the original so the old
+# zarr stays available until the new one is QC'd.
 land_ghg_inventory_agriculture_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-ghg-monitoring-system/"
-    "cropland_livestock_emissions.zarr"
+    "cropland_livestock_emissions_v2.zarr"
 )
 
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
