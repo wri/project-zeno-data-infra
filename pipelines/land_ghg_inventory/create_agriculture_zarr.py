@@ -150,9 +150,16 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
 
     flat_index = reprojected_index.data.ravel()
     child_counts = da.bincount(flat_index, minlength=src.size + 1)[:-1]
-    per_dst_count = da.where(
-        flat_index < src.size, child_counts[da.minimum(flat_index, src.size - 1)], 1
-    ).reshape(reprojected_index.shape)
+    # ravel/reshape doesn't preserve reprojected_index's original 2D block
+    # chunking (it comes out re-chunked along a flattened layout instead);
+    # rechunk back to match, since a mismatched chunking here against
+    # reprojected_value below fails at zarr-write time ("Zarr requires
+    # uniform chunk sizes").
+    per_dst_count = (
+        da.where(flat_index < src.size, child_counts[da.minimum(flat_index, src.size - 1)], 1)
+        .reshape(reprojected_index.shape)
+        .rechunk(reprojected_index.data.chunks)
+    )
 
     reprojected_value = xr_reproject(
         src,
