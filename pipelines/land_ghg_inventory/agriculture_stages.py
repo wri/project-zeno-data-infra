@@ -1,15 +1,15 @@
 """Zonal-statistics stages for Land GHG inventory agriculture emissions.
 
-Sums already-absolute per-pixel cropland emissions grouped by admin unit x
-category (cropland) only (no land_state_class, no year — a single static
-snapshot), then rolls up to aoi_id. The reduce and GADM roll-up are reused from
-``pipelines.prefect_flows.common_stages``.
+Sums already-absolute per-pixel cropland and livestock emissions grouped by
+admin unit x category (cropland, livestock) only (no land_state_class, no
+year — a single static snapshot), then rolls up to aoi_id. The reduce and GADM
+roll-up are reused from ``pipelines.prefect_flows.common_stages``.
 
 Output parquet schema (one row per aoi_id x category)::
 
     aoi_id                    str    admin unit, e.g. "BRA", "BRA.1", "BRA.1.1"
     aoi_type                  str    always "admin"
-    category                  str    "cropland"
+    category                  str    "cropland" or "livestock"
     gross_emissions_MgCO2e    float  summed emissions for aoi_id x category
 """
 
@@ -32,6 +32,7 @@ from shapely.geometry import Polygon
 # canonical category -> source variable in the agriculture zarr
 AGRICULTURE_SOURCE_VARS = {
     "cropland": "cropland_emissions",
+    "livestock": "livestock_emissions",
 }
 AGRICULTURE_ZARR_GROUP = "pipeline"
 
@@ -43,8 +44,9 @@ def load_agriculture(
     subregion_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> Tuple[xr.Dataset, xr.DataArray, xr.DataArray, xr.DataArray]:
-    """Load the agriculture emissions (already per-pixel absolute totals, no year
-    axis) and GADM layers, aligned to the agriculture grid."""
+    """Load the agriculture emissions (cropland + livestock, already per-pixel
+    absolute totals, no year axis) and GADM layers, aligned to the agriculture
+    grid."""
     ag = _load_zarr(agriculture_uri, group=AGRICULTURE_ZARR_GROUP)[
         list(AGRICULTURE_SOURCE_VARS.values())
     ]
@@ -63,8 +65,8 @@ def load_agriculture(
 def setup_agriculture_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
     """Build the agriculture measure cube + admin group-by layers for the reduce.
 
-    Stacks the per-pixel absolute cropland totals into a ``category``
-    dim; grouping is admin-only (country x region x subregion).
+    Stacks the per-pixel absolute cropland and livestock totals into a
+    ``category`` dim; grouping is admin-only (country x region x subregion).
     """
     ag, country, region, subregion = datasets
     cube = ag.fillna(0).astype("float64").to_dataarray(dim="category")
@@ -79,8 +81,9 @@ def setup_agriculture_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
 def agriculture_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
     """Reshape the sparse agriculture reduce into tidy aoi_id x category rows.
 
-    Cropland emissions stay as their own row (one per admin unit x category)
-    rather than a column, so consumers group/filter by ``category``.
+    Cropland and livestock emissions each stay as their own row (one per admin
+    unit x category) rather than a column, so consumers group/filter by
+    ``category``.
     """
     df = common_create_result_dataframe(reduced)
     df = df.rename(columns={"value": "gross_emissions_MgCO2e"})

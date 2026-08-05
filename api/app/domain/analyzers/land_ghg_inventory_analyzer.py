@@ -25,9 +25,10 @@ MINERAL_SOIL_MEASURES = (
     "area_ha",
 )
 
-# vegetation years soil measures are annualized across (see analyze_mineral_soil,
-# analyze_organic_soil): both soils are modeled at coarser-than-annual resolution
-# (a single change interval, or two 5-year blocks) but are broadcast to match
+# vegetation years agriculture and soil measures are annualized across (see
+# analyze_agriculture, analyze_mineral_soil, analyze_organic_soil): all three
+# are modeled at coarser-than-annual resolution (a single snapshot, a single
+# change interval, or two 5-year blocks) but are broadcast to match
 # vegetation's per-year shape so consumers can treat all components uniformly.
 ANNUALIZED_YEARS = tuple(range(2016, 2025))
 
@@ -46,7 +47,7 @@ INPUT_URIS = {
         ),
         "admin_agriculture_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-agriculture/"
-            "v20260727/admin-land_ghg_inventory-agriculture.parquet"
+            "v20260803/admin-land_ghg_inventory-agriculture.parquet"
         ),
         "admin_mineral_soil_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-mineral_soil/"
@@ -68,8 +69,10 @@ class LandGHGInventoryAnalyzer(Analyzer):
     differently:
       - "vegetation": gross emissions / removals / net flux / area by
         land_state_class x year.
-      - "agriculture": a coarse snapshot of gross emissions by category
-        (cropland) only - no year, removals, net flux, or area.
+      - "agriculture": gross emissions by aoi_id x category (cropland,
+        livestock) x year (2016-2024). The underlying data is a single
+        static snapshot; the same value is broadcast across every year for
+        a vegetation-year-aligned shape. No removals, net flux, or area.
       - "mineral_soil": gross emissions / removals / net flux / area by
         aoi_id x year (2016-2024). The underlying data is a single static
         snapshot (the 2015-2020 SOC change interval); the same value is
@@ -116,11 +119,18 @@ class LandGHGInventoryAnalyzer(Analyzer):
 
     async def analyze_agriculture(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e")
-        return await self._select(self.query_services["agriculture"], columns, aoi_ids)
+        result = await self._select(
+            self.query_services["agriculture"], columns, aoi_ids
+        )
+        df = pd.DataFrame(result)
+        df["year"] = [ANNUALIZED_YEARS] * len(df)
+        return df.explode("year", ignore_index=True).to_dict(orient="list")
 
     async def analyze_mineral_soil(self, aoi_ids) -> Dict[str, Any]:
         columns = ("aoi_id", "aoi_type") + MINERAL_SOIL_MEASURES
-        result = await self._select(self.query_services["mineral_soil"], columns, aoi_ids)
+        result = await self._select(
+            self.query_services["mineral_soil"], columns, aoi_ids
+        )
         df = pd.DataFrame(result)
         df["year"] = [ANNUALIZED_YEARS] * len(df)
         return df.explode("year", ignore_index=True).to_dict(orient="list")
@@ -133,7 +143,9 @@ class LandGHGInventoryAnalyzer(Analyzer):
             "gross_emissions_MgCO2e",
             "area_ha",
         )
-        result = await self._select(self.query_services["organic_soil"], columns, aoi_ids)
+        result = await self._select(
+            self.query_services["organic_soil"], columns, aoi_ids
+        )
         df = pd.DataFrame(result)
         df["year"] = df["interval_end_year"].map(ORGANIC_SOIL_INTERVAL_YEARS)
         df = df.explode("year", ignore_index=True).drop(columns="interval_end_year")

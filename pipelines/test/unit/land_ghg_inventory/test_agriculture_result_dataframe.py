@@ -19,14 +19,20 @@ def test_agriculture_result_dataframe_rolls_up(synthetic_agriculture_datasets):
     }.issubset(df.columns)
     assert "land_state_class" not in df.columns
     assert "year" not in df.columns
-    assert set(df["category"]) == {"cropland"}
+    assert set(df["category"]) == {"cropland", "livestock"}
 
-    # subregion-level totals: top row pixels (10+20), one row per category
+    # subregion-level totals: top row pixels (10+20 cropland, 5+0 livestock),
+    # one row per category
     subregion_rows = df[df.aoi_id == "BRA.1.1"]
     cropland_row = subregion_rows[subregion_rows.category == "cropland"].iloc[0]
     assert cropland_row.gross_emissions_MgCO2e == 30.0
+    livestock_row = subregion_rows[subregion_rows.category == "livestock"].iloc[0]
+    assert livestock_row.gross_emissions_MgCO2e == 5.0
 
-    # country-level roll-up: subregion (30) + region-only bottom-left pixel (30)
+    # country-level roll-up: subregion + region-only bottom-left pixel
+    # cropland: 30 + 30 = 60; livestock: 5 + 15 = 20
     country_rows = df[df.aoi_id == "BRA"]
     cropland_country = country_rows[country_rows.category == "cropland"].iloc[0]
     assert cropland_country.gross_emissions_MgCO2e == 60.0
+    livestock_country = country_rows[country_rows.category == "livestock"].iloc[0]
+    assert livestock_country.gross_emissions_MgCO2e == 20.0

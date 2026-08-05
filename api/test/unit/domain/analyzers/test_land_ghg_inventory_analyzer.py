@@ -29,11 +29,12 @@ EXPECTED_VEGETATION_COLUMNS = {
     "area_ha",
 }
 
-# agriculture is a coarse snapshot: emissions only, by category, no year/area/removals
+# agriculture's static snapshot is broadcast to a year per row (2016-2024)
 EXPECTED_AGRICULTURE_COLUMNS = {
     "aoi_id",
     "aoi_type",
     "category",
+    "year",
     "gross_emissions_MgCO2e",
 }
 
@@ -82,10 +83,17 @@ def agriculture_parquet(tmp_path):
     """Agriculture snapshot parquet; carries its own aoi_type (unlike vegetation)."""
     df = pd.DataFrame(
         {
-            "category": ["cropland", "cropland", "cropland"],
-            "gross_emissions_MgCO2e": [10.0, 5.0, 1.0],
-            "aoi_id": ["BRA.1", "COL", "PER"],
-            "aoi_type": ["admin", "admin", "admin"],
+            "category": [
+                "cropland",
+                "cropland",
+                "cropland",
+                "livestock",
+                "livestock",
+                "livestock",
+            ],
+            "gross_emissions_MgCO2e": [10.0, 5.0, 1.0, 8.0, 4.0, 2.0],
+            "aoi_id": ["BRA.1", "COL", "PER", "BRA.1", "COL", "PER"],
+            "aoi_type": ["admin"] * 6,
         }
     )
     parquet_file = tmp_path / "agriculture.parquet"
@@ -196,7 +204,7 @@ async def test_vegetation_query_returns_flux_by_land_state_and_year(
 
 
 @pytest.mark.asyncio
-async def test_agriculture_query_returns_emissions_by_category(
+async def test_agriculture_query_broadcasts_snapshot_to_years(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
@@ -215,8 +223,17 @@ async def test_agriculture_query_returns_emissions_by_category(
     assert set(result.columns) == EXPECTED_AGRICULTURE_COLUMNS
     # only the requested admin ids come back (PER filtered out)
     assert set(result.aoi_id) == {"BRA.1", "COL"}
-    assert set(result.category) == {"cropland"}
+    assert set(result.category) == {"cropland", "livestock"}
     assert set(result.aoi_type) == {"admin"}
+    # the static snapshot is broadcast across every vegetation year, per category
+    bra_cropland = result[(result.aoi_id == "BRA.1") & (result.category == "cropland")]
+    assert set(bra_cropland.year) == set(range(2016, 2025))
+    assert (bra_cropland.gross_emissions_MgCO2e == 10.0).all()
+    bra_livestock = result[
+        (result.aoi_id == "BRA.1") & (result.category == "livestock")
+    ]
+    assert set(bra_livestock.year) == set(range(2016, 2025))
+    assert (bra_livestock.gross_emissions_MgCO2e == 8.0).all()
 
 
 @pytest.mark.asyncio

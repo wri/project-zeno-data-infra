@@ -11,7 +11,7 @@ ANALYTICS_NAME = "land_ghg_inventory"
 
 class LandGHGInventoryAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
-    _version: str = PrivateAttr(default="v20260731")
+    _version: str = PrivateAttr(default="v20260803")
     aoi: AdminAreaOfInterest = Field(
         ...,
         title="AOI",
@@ -51,12 +51,25 @@ class LandGHGInventoryAnalyticsResponse(Response):
                                 "net_flux_MgCO2e": [409076565.0, -3213337.0],
                                 "area_ha": [1086087.0, 518423.0],
                             },
-                            # coarse snapshot: emissions only, by category
+                            # single static snapshot per category (cropland,
+                            # livestock), broadcast across every vegetation
+                            # year (2016-2024) so the shape matches vegetation
                             "agriculture": {
-                                "aoi_id": ["BRA.1"],
-                                "aoi_type": ["admin"],
-                                "category": ["cropland"],
-                                "gross_emissions_MgCO2e": [123234500000.0],
+                                "aoi_id": ["BRA.1", "BRA.1", "BRA.1", "BRA.1"],
+                                "aoi_type": ["admin", "admin", "admin", "admin"],
+                                "category": [
+                                    "cropland",
+                                    "cropland",
+                                    "livestock",
+                                    "livestock",
+                                ],
+                                "year": [2016, 2017, 2016, 2017],
+                                "gross_emissions_MgCO2e": [
+                                    123234500000.0,
+                                    123234500000.0,
+                                    45123400000.0,
+                                    45123400000.0,
+                                ],
                             },
                             # single static snapshot (2015-2020 SOC change
                             # interval), broadcast across every vegetation
