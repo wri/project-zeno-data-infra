@@ -121,8 +121,18 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     # out-of-bounds destination pixels get index ``src.size`` (an extra,
     # discarded bin) instead of a sentinel like -1, so bincount/take need no
     # boolean masking -- awkward on dask arrays with unknown chunk sizes.
+    #
+    # Built as a dask array (matching src's own chunking) rather than a plain
+    # numpy array: xr_reproject only dask-parallelizes a dask-backed input --
+    # given a numpy array it allocates the full (non-chunked) destination
+    # array eagerly, which at the real ~720000x1440000 reference grid tried
+    # to allocate 7.5 TiB and OOM'd. src itself is small (~10km resolution),
+    # so building the index eagerly in numpy and rechunking it is cheap.
     src_index = xr.DataArray(
-        np.arange(src.size, dtype="int64").reshape(src.shape),
+        da.from_array(
+            np.arange(src.size, dtype="int64").reshape(src.shape),
+            chunks=src.data.chunks,
+        ),
         dims=src.dims,
         coords={"y": src["y"], "x": src["x"]},
     )
