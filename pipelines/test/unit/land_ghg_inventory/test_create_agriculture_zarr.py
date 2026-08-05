@@ -27,11 +27,15 @@ def reference_veg_dataset():
 
 def _fake_cropland_cog(value):
     """A coarser source raster (absolute kg total per pixel), matching the
-    reference grid 2:1 per axis so each source pixel has exactly 4 children."""
+    reference grid 2:1 per axis so each source pixel has exactly 4 children.
+    Pixel centers are offset (0.75/-0.25, 0.25/1.25) rather than aligned with
+    the reference grid's origin, so its bounds (-0.5..1.5) fully cover the
+    reference grid's bounds (-0.25..1.75, -0.75..1.25) -- ``_resample_total_uniformly``
+    assumes full coverage, as the real global-to-global grids have."""
     arr = xr.DataArray(
         da.from_array(np.full((1, 2, 2), value, dtype="float32"), chunks=(1, 2, 2)),
         dims=["band", "y", "x"],
-        coords={"band": [1], "y": [1.0, 0.0], "x": [0.0, 1.0]},
+        coords={"band": [1], "y": [0.75, -0.25], "x": [0.25, 1.25]},
     )
     arr.rio.write_crs("EPSG:4326", inplace=True)
     return arr
@@ -106,14 +110,13 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert list(ds.y.values) == [1.0, 0.5, 0.0, -0.5]
     assert list(ds.x.values) == [0.0, 0.5, 1.0, 1.5]
 
-    # cropland: absolute per-pixel total (400 kg), split across however many
-    # 30m reference pixels a nearest-neighbor reprojection maps each of the
-    # 4 source pixels onto (uneven here due to grid misalignment: child
-    # counts of 1, 2, 2, 4 for the 4 source pixels), then kg -> Mg. Summing
-    # over each source pixel's own children reproduces that source pixel's
-    # 400 kg / 1000 = 0.4 Mg; the grand total is 4 source pixels x 0.4 Mg.
+    # cropland: absolute per-pixel total (400 kg), divided by the (here,
+    # exact: 1.0/0.5 = 2 per axis) child count per source pixel -- 4 children
+    # each get 400/4=100 kg, then kg -> Mg: 0.1. Each 2x2 block of the 4x4
+    # destination grid corresponds to one of the 4 (identical-valued) source
+    # pixels, so the grand total is 4 source pixels x 0.4 Mg.
     cropland = ds[AGRICULTURE_SOURCE_VARS["cropland"]].values
-    assert cropland[0, 0] == pytest.approx(400.0 / mod.KG_PER_MG)
+    assert cropland[0, 0] == pytest.approx(400.0 / 4 / mod.KG_PER_MG)
     assert np.nansum(cropland) == pytest.approx(4 * 400.0 / mod.KG_PER_MG)
 
     # livestock: kg/ha -> ha-multiplied -> Mg conversion applied:
@@ -155,23 +158,27 @@ def test_create_agriculture_zarr_overwrite_skips_exists_check(
     mock_exists.assert_not_called()
 
 
-def test_resample_total_uniformly_conserves_mass_per_source_pixel(reference_veg_dataset):
+def test_resample_total_uniformly_conserves_mass_per_source_pixel(
+    reference_veg_dataset,
+):
     """Each source pixel keeps a distinct value, so that summing the
     reprojected output over just the children of one source pixel (not the
     whole grid) is a meaningful check -- verifies conservation isn't masked
-    by every source pixel happening to carry the same value. Grid
-    misalignment gives the source pixels uneven child counts (1, 2, 2, 4 out
-    of 16 destination pixels; the rest fall outside the source and are 0),
-    so an unweighted nearest-neighbor replication (no division) would
-    over-count the pixels with more children -- this checks each source
-    pixel's own total is reproduced regardless of its child count."""
+    by every source pixel happening to carry the same value. This fixture's
+    resolution ratio (1.0 source / 0.5 destination = 2 per axis, 4 children
+    per source pixel) is an exact integer, so conservation holds exactly per
+    source pixel here (the real cropland grids' ratio isn't a whole number,
+    so real per-pixel conservation is only approximate -- see the module
+    docstring)."""
     distinct_cog = xr.DataArray(
         da.from_array(
-            np.array([[100.0, 200.0], [300.0, 400.0]], dtype="float32").reshape(1, 2, 2),
+            np.array([[100.0, 200.0], [300.0, 400.0]], dtype="float32").reshape(
+                1, 2, 2
+            ),
             chunks=(1, 2, 2),
         ),
         dims=["band", "y", "x"],
-        coords={"band": [1], "y": [1.0, 0.0], "x": [0.0, 1.0]},
+        coords={"band": [1], "y": [0.75, -0.25], "x": [0.25, 1.25]},
     )
     distinct_cog.rio.write_crs("EPSG:4326", inplace=True)
 
@@ -181,13 +188,13 @@ def test_resample_total_uniformly_conserves_mass_per_source_pixel(reference_veg_
     with patch.object(mod.rio, "open_rasterio", return_value=distinct_cog):
         result = mod._resample_total_uniformly("fake_uri", geobox).compute()
 
-    # source pixel (0,0)=100 -> destination (0,0) only (1 child)
-    assert result.values[0, 0] == pytest.approx(100.0)
-    # source pixel (0,1)=200 -> destination (0,1),(0,2) (2 children)
-    assert np.nansum(result.values[0, 1:3]) == pytest.approx(200.0)
-    # source pixel (1,0)=300 -> destination (1,0),(2,0) (2 children)
-    assert np.nansum(result.values[1:3, 0]) == pytest.approx(300.0)
-    # source pixel (1,1)=400 -> destination (1,1),(1,2),(2,1),(2,2) (4 children)
-    assert np.nansum(result.values[1:3, 1:3]) == pytest.approx(400.0)
-    # row/col 3 (y=-0.5, x=1.5) fall outside the source raster entirely
-    assert np.all(result.values[3, :] == 0) or np.all(np.isnan(result.values[3, :]))
+    # source pixel (0,0)=100 (covers y=[1.25,0.25], x=[-0.25,0.75]) ->
+    # destination (0,0),(0,1),(1,0),(1,1) (4 children)
+    assert np.nansum(result.values[0:2, 0:2]) == pytest.approx(100.0)
+    # source pixel (0,1)=200 -> destination (0,2),(0,3),(1,2),(1,3)
+    assert np.nansum(result.values[0:2, 2:4]) == pytest.approx(200.0)
+    # source pixel (1,0)=300 -> destination (2,0),(2,1),(3,0),(3,1)
+    assert np.nansum(result.values[2:4, 0:2]) == pytest.approx(300.0)
+    # source pixel (1,1)=400 -> destination (2,2),(2,3),(3,2),(3,3)
+    assert np.nansum(result.values[2:4, 2:4]) == pytest.approx(400.0)
+    assert np.nansum(result.values) == pytest.approx(100.0 + 200.0 + 300.0 + 400.0)

@@ -17,14 +17,13 @@ cropland, which is almost everywhere (QC against an independent country-level
 reference table showed pipeline totals ~5.3x too high). Cornell also
 publishes the same data as an already-absolute ``total_amount`` COG (kg CO2e
 per ~10km pixel, no area normalization). This is used instead: each parent
-pixel's total is split evenly across however many 30m reference-grid pixels
-fall inside it (a mass-conserving nearest-neighbor downscale, via
-``_resample_total_uniformly``), so the sum over children exactly reproduces
-the parent's original total rather than replicating it.
+pixel's total is divided by its (unrounded) number of 30m reference-grid
+children before an ordinary nearest-neighbor reprojection (``_resample_total_uniformly``),
+so replication approximately splits rather than multiplies each parent's
+total -- exact for no single pixel (the real child count alternates by +/-1
+around the average), but unbiased in aggregate.
 """
 
-import dask.array as da
-import numpy as np
 import rasterio
 import rioxarray as rio
 import xarray as xr
@@ -92,9 +91,8 @@ def _resample(cog_uri: str, geobox) -> xr.DataArray:
 
 
 def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
-    """Downscale an absolute per-pixel total COG onto ``geobox``, splitting each
-    source pixel's total evenly across however many destination pixels a
-    nearest-neighbor reprojection maps onto it.
+    """Downscale an absolute per-pixel total COG onto ``geobox`` by splitting
+    each source pixel's total evenly across its destination children.
 
     Plain nearest-neighbor resampling (as ``_resample`` does) replicates a
     source pixel's value into every destination pixel that maps to it, which
@@ -102,77 +100,37 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     replicating an absolute total would multiply it by the number of
     destination pixels instead of splitting it among them.
 
-    To get an exact per-source-pixel child count that's guaranteed to match
-    what ``xr_reproject`` actually does (rather than reimplementing its
-    nearest-neighbor + bounds-clipping rules independently, which is easy to
-    get subtly wrong at edge/boundary pixels), this reprojects the source
-    pixels' own linear index onto ``geobox`` with the same call used for the
-    value, then counts how many destination pixels each source index actually
-    landed on. Dividing the source total by that count before a second,
-    ordinary nearest-neighbor reprojection makes the replication
-    mass-conserving: summing a source pixel's children reproduces its
-    original total.
+    The true child count per source pixel alternates by +/-1 around
+    ``(src_res / dst_res) ** 2`` (e.g. 333 or 334 here, since 0.08333.../0.00025
+    isn't an integer ratio) depending on where a given source pixel happens to
+    land relative to the destination grid. Rather than computing that exact,
+    varying count, this divides by the unrounded ratio everywhere -- a single
+    global constant. Any one source pixel's children then sum to only
+    approximately (not exactly) its original total, off by however far its
+    actual child count deviates from the mean ratio (~0.3% here in the
+    worst case); summed over the whole raster this has no systematic
+    direction, so the aggregate (e.g. a country total) is unaffected.
     """
     with rasterio.Env(AWS_REQUEST_PAYER="requester"):
         src = rio.open_rasterio(cog_uri, chunks={"x": 10000, "y": 10000})
     if "band" in src.dims:
         src = src.isel(band=0, drop=True)
 
-    # out-of-bounds destination pixels get index ``src.size`` (an extra,
-    # discarded bin) instead of a sentinel like -1, so bincount/take need no
-    # boolean masking -- awkward on dask arrays with unknown chunk sizes.
-    #
-    # Built as a dask array (matching src's own chunking) rather than a plain
-    # numpy array: xr_reproject only dask-parallelizes a dask-backed input --
-    # given a numpy array it allocates the full (non-chunked) destination
-    # array eagerly, which at the real ~720000x1440000 reference grid tried
-    # to allocate 7.5 TiB and OOM'd. src itself is small (~10km resolution),
-    # so building the index eagerly in numpy and rechunking it is cheap.
-    src_index = xr.DataArray(
-        da.from_array(
-            np.arange(src.size, dtype="int64").reshape(src.shape),
-            chunks=src.data.chunks,
-        ),
-        dims=src.dims,
-        coords={"y": src["y"], "x": src["x"]},
-    )
-    src_index.rio.write_crs(src.rio.crs, inplace=True)
-    reprojected_index = xr_reproject(
-        src_index,
-        geobox,
-        resampling="nearest",
-        dst_nodata=src.size,
-        chunks=(10000, 10000),
-        always_yx=True,
-    )
-    if "band" in reprojected_index.dims:
-        reprojected_index = reprojected_index.isel(band=0, drop=True)
+    children_per_row = abs(src.rio.resolution()[1]) / abs(geobox.resolution.y)
+    children_per_col = abs(src.rio.resolution()[0]) / abs(geobox.resolution.x)
+    per_child_value = src / (children_per_row * children_per_col)
 
-    flat_index = reprojected_index.data.ravel()
-    child_counts = da.bincount(flat_index, minlength=src.size + 1)[:-1]
-    # ravel/reshape doesn't preserve reprojected_index's original 2D block
-    # chunking (it comes out re-chunked along a flattened layout instead);
-    # rechunk back to match, since a mismatched chunking here against
-    # reprojected_value below fails at zarr-write time ("Zarr requires
-    # uniform chunk sizes").
-    per_dst_count = (
-        da.where(flat_index < src.size, child_counts[da.minimum(flat_index, src.size - 1)], 1)
-        .reshape(reprojected_index.shape)
-        .rechunk(reprojected_index.data.chunks)
-    )
-
-    reprojected_value = xr_reproject(
-        src,
+    reprojected = xr_reproject(
+        per_child_value,
         geobox,
         resampling="nearest",
         dst_nodata=0,
         chunks=(10000, 10000),
         always_yx=True,
     )
-    if "band" in reprojected_value.dims:
-        reprojected_value = reprojected_value.isel(band=0, drop=True)
-
-    return reprojected_value.copy(data=reprojected_value.data / per_dst_count)
+    if "band" in reprojected.dims:
+        reprojected = reprojected.isel(band=0, drop=True)
+    return reprojected
 
 
 def create_agriculture_zarr(overwrite: bool = False) -> str:
