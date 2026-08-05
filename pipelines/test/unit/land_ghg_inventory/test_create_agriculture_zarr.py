@@ -25,8 +25,20 @@ def reference_veg_dataset():
     return xr.Dataset({mod.REFERENCE_GRID_VAR: ref})
 
 
-def _fake_cog(value):
-    """A coarser source raster (kg/ha), band dim included like a real GeoTIFF read."""
+def _fake_cropland_cog(value):
+    """A coarser source raster (absolute kg total per pixel), matching the
+    reference grid 2:1 per axis so each source pixel has exactly 4 children."""
+    arr = xr.DataArray(
+        da.from_array(np.full((1, 2, 2), value, dtype="float32"), chunks=(1, 2, 2)),
+        dims=["band", "y", "x"],
+        coords={"band": [1], "y": [1.0, 0.0], "x": [0.0, 1.0]},
+    )
+    arr.rio.write_crs("EPSG:4326", inplace=True)
+    return arr
+
+
+def _fake_livestock_cog(value):
+    """A coarser source raster (kg/ha rate), band dim included like a real GeoTIFF read."""
     arr = xr.DataArray(
         da.from_array(np.full((1, 2, 2), value, dtype="float32"), chunks=(1, 2, 2)),
         dims=["band", "y", "x"],
@@ -67,7 +79,7 @@ def test_create_agriculture_zarr_writes_expected_shape(
         patch.object(
             mod.rio,
             "open_rasterio",
-            side_effect=[_fake_cog(10_000.0), _fake_cog(2_000.0)],
+            side_effect=[_fake_cropland_cog(400.0), _fake_livestock_cog(2_000.0)],
         ),
         patch.object(mod, "align_to", return_value=pixel_area_layer) as mock_align_to,
         patch.object(xr.Dataset, "to_zarr", fake_to_zarr),
@@ -79,8 +91,8 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert captured["group"] == "pipeline"
     assert captured["mode"] == "w"
 
-    # pixel area is aligned once and reused for both categories, since both
-    # source rasters are reprojected onto the same geobox.
+    # pixel area is only needed for livestock now (cropland uses the
+    # mass-conserving uniform-split path instead of an area multiply).
     mock_align_to.assert_called_once()
 
     ds = captured["ds"].compute()
@@ -94,11 +106,18 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert list(ds.y.values) == [1.0, 0.5, 0.0, -0.5]
     assert list(ds.x.values) == [0.0, 0.5, 1.0, 1.5]
 
-    # kg/ha -> ha-multiplied -> Mg conversion applied:
-    # cropland: 10_000 kg/ha * 5 ha / 1000 = 50
-    # livestock: 2_000 kg/ha * 5 ha / 1000 = 10
+    # cropland: absolute per-pixel total (400 kg), split across however many
+    # 30m reference pixels a nearest-neighbor reprojection maps each of the
+    # 4 source pixels onto (uneven here due to grid misalignment: child
+    # counts of 1, 2, 2, 4 for the 4 source pixels), then kg -> Mg. Summing
+    # over each source pixel's own children reproduces that source pixel's
+    # 400 kg / 1000 = 0.4 Mg; the grand total is 4 source pixels x 0.4 Mg.
     cropland = ds[AGRICULTURE_SOURCE_VARS["cropland"]].values
-    assert cropland[0, 0] == pytest.approx(50.0)
+    assert cropland[0, 0] == pytest.approx(400.0 / mod.KG_PER_MG)
+    assert np.nansum(cropland) == pytest.approx(4 * 400.0 / mod.KG_PER_MG)
+
+    # livestock: kg/ha -> ha-multiplied -> Mg conversion applied:
+    # 2_000 kg/ha * 5 ha / 1000 = 10
     livestock = ds[AGRICULTURE_SOURCE_VARS["livestock"]].values
     assert livestock[0, 0] == pytest.approx(10.0)
 
@@ -126,7 +145,7 @@ def test_create_agriculture_zarr_overwrite_skips_exists_check(
         patch.object(
             mod.rio,
             "open_rasterio",
-            side_effect=[_fake_cog(1_000.0), _fake_cog(500.0)],
+            side_effect=[_fake_cropland_cog(100.0), _fake_livestock_cog(500.0)],
         ),
         patch.object(mod, "align_to", return_value=pixel_area_layer),
         patch.object(xr.Dataset, "to_zarr"),
@@ -134,3 +153,41 @@ def test_create_agriculture_zarr_overwrite_skips_exists_check(
         mod.create_agriculture_zarr(overwrite=True)
 
     mock_exists.assert_not_called()
+
+
+def test_resample_total_uniformly_conserves_mass_per_source_pixel(reference_veg_dataset):
+    """Each source pixel keeps a distinct value, so that summing the
+    reprojected output over just the children of one source pixel (not the
+    whole grid) is a meaningful check -- verifies conservation isn't masked
+    by every source pixel happening to carry the same value. Grid
+    misalignment gives the source pixels uneven child counts (1, 2, 2, 4 out
+    of 16 destination pixels; the rest fall outside the source and are 0),
+    so an unweighted nearest-neighbor replication (no division) would
+    over-count the pixels with more children -- this checks each source
+    pixel's own total is reproduced regardless of its child count."""
+    distinct_cog = xr.DataArray(
+        da.from_array(
+            np.array([[100.0, 200.0], [300.0, 400.0]], dtype="float32").reshape(1, 2, 2),
+            chunks=(1, 2, 2),
+        ),
+        dims=["band", "y", "x"],
+        coords={"band": [1], "y": [1.0, 0.0], "x": [0.0, 1.0]},
+    )
+    distinct_cog.rio.write_crs("EPSG:4326", inplace=True)
+
+    with patch.object(mod.xr, "open_zarr", return_value=reference_veg_dataset):
+        geobox = mod._reference_geobox()
+
+    with patch.object(mod.rio, "open_rasterio", return_value=distinct_cog):
+        result = mod._resample_total_uniformly("fake_uri", geobox).compute()
+
+    # source pixel (0,0)=100 -> destination (0,0) only (1 child)
+    assert result.values[0, 0] == pytest.approx(100.0)
+    # source pixel (0,1)=200 -> destination (0,1),(0,2) (2 children)
+    assert np.nansum(result.values[0, 1:3]) == pytest.approx(200.0)
+    # source pixel (1,0)=300 -> destination (1,0),(2,0) (2 children)
+    assert np.nansum(result.values[1:3, 0]) == pytest.approx(300.0)
+    # source pixel (1,1)=400 -> destination (1,1),(1,2),(2,1),(2,2) (4 children)
+    assert np.nansum(result.values[1:3, 1:3]) == pytest.approx(400.0)
+    # row/col 3 (y=-0.5, x=1.5) fall outside the source raster entirely
+    assert np.all(result.values[3, :] == 0) or np.all(np.isnan(result.values[3, :]))

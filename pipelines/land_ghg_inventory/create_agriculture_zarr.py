@@ -1,15 +1,30 @@
 """Builds the agriculture emissions zarr consumed by ``agriculture_stages``.
 
-Cropland and livestock emissions are each published as a global COG on their
-own native grid (~10km, WGS84), carrying a per-hectare rate in kg/ha. This
-resamples each onto the vegetation zarr's 30m grid (the reference grid for the
-whole Land GHG inventory) via ``odc.geo``'s dask-parallel nearest-neighbor
-reprojection, multiplies by the UMD pixel-area zarr (already on the 30m grid,
-snapped on via ``common.align_to``) to recover an absolute per-pixel total,
-converts kg -> Mg, and writes a two-variable zarr matching
-``agriculture_stages.AGRICULTURE_SOURCE_VARS``.
+Livestock emissions are published as a global COG on their native grid
+(~10km, WGS84), carrying a per-hectare rate in kg/ha. This resamples it onto
+the vegetation zarr's 30m grid (the reference grid for the whole Land GHG
+inventory) via ``odc.geo``'s dask-parallel nearest-neighbor reprojection,
+multiplies by the UMD pixel-area zarr (already on the 30m grid, snapped on via
+``common.align_to``) to recover an absolute per-pixel total, converts kg ->
+Mg, and writes it into the agriculture zarr alongside cropland.
+
+Cropland emissions use a different source and resampling strategy. Cornell's
+per-hectare cropland rate (``mean_rate_physical_area``) is normalized by the
+physical cropland area within each pixel (e.g. SPAM2020), not by the pixel's
+full geographic area -- so multiplying that rate by the UMD pixel-area zarr
+(full pixel area) overstates absolute totals wherever a pixel isn't 100%
+cropland, which is almost everywhere (QC against an independent country-level
+reference table showed pipeline totals ~5.3x too high). Cornell also
+publishes the same data as an already-absolute ``total_amount`` COG (kg CO2e
+per ~10km pixel, no area normalization). This is used instead: each parent
+pixel's total is split evenly across however many 30m reference-grid pixels
+fall inside it (a mass-conserving nearest-neighbor downscale, via
+``_resample_total_uniformly``), so the sum over children exactly reproduces
+the parent's original total rather than replicating it.
 """
 
+import dask.array as da
+import numpy as np
 import rasterio
 import rioxarray as rio
 import xarray as xr
@@ -32,12 +47,13 @@ from pipelines.utils import s3_uri_exists
 REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 
 # Source COGs: static snapshots (single year, no versioning scheme), published
-# by Cornell. Per-hectare rate in kg/ha.
+# by Cornell. Cropland is the absolute per-pixel total (kg CO2e); livestock is
+# a per-hectare rate (kg/ha).
 CROPLAND_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/"
     "raw__from_Cornell/20250828/year_2020/all_sources/"
-    "Global_grid_cropland_emissions_mean_rate_physical_area_CO2eq_all_crops_"
-    "without_peat_burn_kg_ha_CO2__20260803.tif"
+    "Global_grid_cropland_emissions_total_amount_CO2eq_all_crops_"
+    "without_peat_burn_kg_CO2__20260803.tif"
 )
 LIVESTOCK_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/livestock_emissions/"
@@ -75,10 +91,77 @@ def _resample(cog_uri: str, geobox) -> xr.DataArray:
     return reprojected
 
 
+def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
+    """Downscale an absolute per-pixel total COG onto ``geobox``, splitting each
+    source pixel's total evenly across however many destination pixels a
+    nearest-neighbor reprojection maps onto it.
+
+    Plain nearest-neighbor resampling (as ``_resample`` does) replicates a
+    source pixel's value into every destination pixel that maps to it, which
+    is only mass-conserving for rates (kg/ha), not for absolute totals (kg) --
+    replicating an absolute total would multiply it by the number of
+    destination pixels instead of splitting it among them.
+
+    To get an exact per-source-pixel child count that's guaranteed to match
+    what ``xr_reproject`` actually does (rather than reimplementing its
+    nearest-neighbor + bounds-clipping rules independently, which is easy to
+    get subtly wrong at edge/boundary pixels), this reprojects the source
+    pixels' own linear index onto ``geobox`` with the same call used for the
+    value, then counts how many destination pixels each source index actually
+    landed on. Dividing the source total by that count before a second,
+    ordinary nearest-neighbor reprojection makes the replication
+    mass-conserving: summing a source pixel's children reproduces its
+    original total.
+    """
+    with rasterio.Env(AWS_REQUEST_PAYER="requester"):
+        src = rio.open_rasterio(cog_uri, chunks={"x": 10000, "y": 10000})
+    if "band" in src.dims:
+        src = src.isel(band=0, drop=True)
+
+    # out-of-bounds destination pixels get index ``src.size`` (an extra,
+    # discarded bin) instead of a sentinel like -1, so bincount/take need no
+    # boolean masking -- awkward on dask arrays with unknown chunk sizes.
+    src_index = xr.DataArray(
+        np.arange(src.size, dtype="int64").reshape(src.shape),
+        dims=src.dims,
+        coords={"y": src["y"], "x": src["x"]},
+    )
+    src_index.rio.write_crs(src.rio.crs, inplace=True)
+    reprojected_index = xr_reproject(
+        src_index,
+        geobox,
+        resampling="nearest",
+        dst_nodata=src.size,
+        chunks=(10000, 10000),
+        always_yx=True,
+    )
+    if "band" in reprojected_index.dims:
+        reprojected_index = reprojected_index.isel(band=0, drop=True)
+
+    flat_index = reprojected_index.data.ravel()
+    child_counts = da.bincount(flat_index, minlength=src.size + 1)[:-1]
+    per_dst_count = da.where(
+        flat_index < src.size, child_counts[da.minimum(flat_index, src.size - 1)], 1
+    ).reshape(reprojected_index.shape)
+
+    reprojected_value = xr_reproject(
+        src,
+        geobox,
+        resampling="nearest",
+        dst_nodata=0,
+        chunks=(10000, 10000),
+        always_yx=True,
+    )
+    if "band" in reprojected_value.dims:
+        reprojected_value = reprojected_value.isel(band=0, drop=True)
+
+    return reprojected_value.copy(data=reprojected_value.data / per_dst_count)
+
+
 def create_agriculture_zarr(overwrite: bool = False) -> str:
     """Resample cropland and livestock emissions onto the vegetation grid,
-    convert per-hectare rates to absolute per-pixel Mg totals, and write the
-    zarr consumed by ``agriculture_stages.load_agriculture``."""
+    convert to absolute per-pixel Mg totals, and write the zarr consumed by
+    ``agriculture_stages.load_agriculture``."""
     marker_uri = (
         f"{land_ghg_inventory_agriculture_zarr_uri}/{AGRICULTURE_ZARR_GROUP}/zarr.json"
     )
@@ -87,13 +170,13 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
 
     geobox = _reference_geobox()
 
-    cropland_kg_ha = _resample(CROPLAND_COG_URI, geobox)
+    # cropland is already an absolute per-pixel total (kg); split each source
+    # pixel's total evenly across its 30m children rather than area-weighting.
+    cropland_kg = _resample_total_uniformly(CROPLAND_COG_URI, geobox)
     livestock_kg_ha = _resample(LIVESTOCK_COG_URI, geobox)
-    # both are already reprojected onto the same geobox, so pixel area only
-    # needs aligning once and can be reused for both conversions.
-    pixel_area_ha = align_to(cropland_kg_ha, pixel_area_zarr_uri)
+    pixel_area_ha = align_to(livestock_kg_ha, pixel_area_zarr_uri)
 
-    cropland = (cropland_kg_ha * pixel_area_ha) / KG_PER_MG
+    cropland = cropland_kg / KG_PER_MG
     livestock = (livestock_kg_ha * pixel_area_ha) / KG_PER_MG
 
     combined = xr.Dataset(
