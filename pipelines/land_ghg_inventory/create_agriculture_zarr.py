@@ -1,27 +1,20 @@
 """Builds the agriculture emissions zarr consumed by ``agriculture_stages``.
 
-Livestock emissions are published as a global COG on their native grid
-(~10km, WGS84), carrying a per-hectare rate in kg/ha. This resamples it onto
-the vegetation zarr's 30m grid (the reference grid for the whole Land GHG
-inventory) via ``odc.geo``'s dask-parallel nearest-neighbor reprojection,
-multiplies by the UMD pixel-area zarr (already on the 30m grid, snapped on via
-``common.align_to``) to recover an absolute per-pixel total, converts kg ->
-Mg, and writes it into the agriculture zarr alongside cropland.
-
-Cropland emissions use a different source and resampling strategy. Cornell's
-per-hectare cropland rate (``mean_rate_physical_area``) is normalized by the
-physical cropland area within each pixel (e.g. SPAM2020), not by the pixel's
-full geographic area -- so multiplying that rate by the UMD pixel-area zarr
-(full pixel area) overstates absolute totals wherever a pixel isn't 100%
-cropland, which is almost everywhere (QC against an independent country-level
-reference table showed pipeline totals ~5.3x too high). Cornell also
-publishes the same data as an already-absolute ``total_amount`` COG (kg CO2e
-per ~10km pixel, no area normalization). This is used instead: each parent
-pixel's total is divided by its (unrounded) number of 30m reference-grid
-children before an ordinary nearest-neighbor reprojection (``_resample_total_uniformly``),
-so replication approximately splits rather than multiplies each parent's
-total -- exact for no single pixel (the real child count alternates by +/-1
-around the average), but unbiased in aggregate.
+Both cropland and livestock emissions are published by Cornell as
+already-absolute ``total_amount`` COGs (kg CO2e per ~10km pixel, no area
+normalization) on their native grid. Each parent pixel's total is divided by
+its (unrounded) number of 30m reference-grid children before an ordinary
+nearest-neighbor reprojection (``_resample_total_uniformly``), so replication
+approximately splits rather than multiplies each parent's total -- exact for
+no single pixel (the real child count alternates by +/-1 around the average),
+but unbiased in aggregate. This avoids needing the UMD pixel-area zarr:
+per-hectare rate COGs (e.g. Cornell's ``mean_rate_physical_area`` for
+cropland) are normalized by the physical area actually occupied within each
+pixel, not by the pixel's full geographic area, so multiplying by the
+UMD pixel-area zarr (full pixel area) overstates absolute totals wherever a
+pixel isn't 100% covered by the source class, which is almost everywhere (QC
+against an independent country-level reference table showed pipeline
+cropland totals ~5.3x too high with that approach).
 """
 
 import rasterio
@@ -32,13 +25,11 @@ from odc.geo.xr import xr_reproject
 from pipelines.globals import (
     land_ghg_inventory_agriculture_zarr_uri,
     land_ghg_inventory_vegetation_zarr_uri,
-    pixel_area_zarr_uri,
 )
 from pipelines.land_ghg_inventory.agriculture_stages import (
     AGRICULTURE_SOURCE_VARS,
     AGRICULTURE_ZARR_GROUP,
 )
-from pipelines.land_ghg_inventory.common import align_to
 from pipelines.utils import s3_uri_exists
 
 # Any per-hectare flux variable in the vegetation zarr works as the reference grid --
@@ -46,8 +37,7 @@ from pipelines.utils import s3_uri_exists
 REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 
 # Source COGs: static snapshots (single year, no versioning scheme), published
-# by Cornell. Cropland is the absolute per-pixel total (kg CO2e); livestock is
-# a per-hectare rate (kg/ha).
+# by Cornell as absolute per-pixel totals (kg CO2e).
 CROPLAND_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/"
     "raw__from_Cornell/20250828/year_2020/all_sources/"
@@ -56,8 +46,8 @@ CROPLAND_COG_URI = (
 )
 LIVESTOCK_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/livestock_emissions/"
-    "raw__from_Cornell/20260731_emis_per_ha_only/Total_GHG_Emissions/"
-    "Tot_CO2eq_kg_livestock_GHG_emissions_kgCO2e_ha.tif"
+    "raw__from_Cornell/20251223/Total_GHG_Emissions/"
+    "Tot_CO2eq_kg_livestock_GHG_emissions.tif"
 )
 KG_PER_MG = 1_000
 
@@ -73,32 +63,15 @@ def _reference_geobox():
     return ref.odc.geobox
 
 
-def _resample(cog_uri: str, geobox) -> xr.DataArray:
-    """Reproject one source COG (kg/ha) onto ``geobox`` via nearest-neighbor."""
-    with rasterio.Env(AWS_REQUEST_PAYER="requester"):
-        src = rio.open_rasterio(cog_uri, chunks={"x": 10000, "y": 10000})
-    reprojected = xr_reproject(
-        src,
-        geobox,
-        resampling="nearest",
-        dst_nodata=0,
-        chunks=(10000, 10000),
-        always_yx=True,
-    )
-    if "band" in reprojected.dims:
-        reprojected = reprojected.isel(band=0, drop=True)
-    return reprojected
-
-
 def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     """Downscale an absolute per-pixel total COG onto ``geobox`` by splitting
     each source pixel's total evenly across its destination children.
 
-    Plain nearest-neighbor resampling (as ``_resample`` does) replicates a
-    source pixel's value into every destination pixel that maps to it, which
-    is only mass-conserving for rates (kg/ha), not for absolute totals (kg) --
-    replicating an absolute total would multiply it by the number of
-    destination pixels instead of splitting it among them.
+    Plain nearest-neighbor resampling replicates a source pixel's value into
+    every destination pixel that maps to it, which is only mass-conserving
+    for rates (kg/ha), not for absolute totals (kg) -- replicating an
+    absolute total would multiply it by the number of destination pixels
+    instead of splitting it among them.
 
     The true child count per source pixel alternates by +/-1 around
     ``(src_res / dst_res) ** 2`` (e.g. 333 or 334 here, since 0.08333.../0.00025
@@ -145,14 +118,14 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
 
     geobox = _reference_geobox()
 
-    # cropland is already an absolute per-pixel total (kg); split each source
-    # pixel's total evenly across its 30m children rather than area-weighting.
+    # cropland and livestock are both already absolute per-pixel totals (kg);
+    # split each source pixel's total evenly across its 30m children rather
+    # than area-weighting.
     cropland_kg = _resample_total_uniformly(CROPLAND_COG_URI, geobox)
-    livestock_kg_ha = _resample(LIVESTOCK_COG_URI, geobox)
-    pixel_area_ha = align_to(livestock_kg_ha, pixel_area_zarr_uri)
+    livestock_kg = _resample_total_uniformly(LIVESTOCK_COG_URI, geobox)
 
     cropland = cropland_kg / KG_PER_MG
-    livestock = (livestock_kg_ha * pixel_area_ha) / KG_PER_MG
+    livestock = livestock_kg / KG_PER_MG
 
     combined = xr.Dataset(
         {
