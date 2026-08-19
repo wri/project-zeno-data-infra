@@ -35,7 +35,7 @@ def s3_uri_exists(s3_uri):
 
 def copy_s3_directory(src_uri, dst_uri, max_workers=100):
     """Recursively copy every object under src_uri to dst_uri using
-    server-side S3 copies, so data never leaves S3."""
+    parallel server-side S3 copies, so data never leaves S3."""
     src_bucket, src_prefix = parse_s3_uri(src_uri)
     dst_bucket, dst_prefix = parse_s3_uri(dst_uri)
     if not src_prefix.endswith("/"):
