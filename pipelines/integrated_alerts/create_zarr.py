@@ -19,8 +19,13 @@ def decode_alert_data(band_data) -> xr.Dataset:
     return xr.merge((alert_conf, alert_date))
 
 
-def create_zarr(version, overwrite=False) -> str:
-    """create a full extent zarr file in s3."""
+def create_zarr(version, overwrite=False) -> tuple[str, bool]:
+    """Create a full extent zarr file in s3.
+
+    Returns (zarr_uri, freshly_created). The second value tells the caller
+    whether this call actually built a new zarr, as opposed to finding one
+    already there
+    """
     base_folder = f"gfw_integrated_dist_alerts/{version}/raster/epsg-4326"
     # zarr_uri if we were going to write it back to gfw-data-lake
     # zarr_uri = f"s3://{DATA_LAKE_BUCKET}/{base_folder}/zarr/date_conf.zarr"
@@ -30,7 +35,7 @@ def create_zarr(version, overwrite=False) -> str:
     )
 
     if s3_uri_exists(f"{zarr_uri}/zarr.json") and not overwrite:
-        return zarr_uri
+        return zarr_uri, False
 
     # Use get_object rather than pd.read_json(), so we can use RequestPayer config.
     # tiles = pd.read_json(tiles_uri)
@@ -67,4 +72,4 @@ def create_zarr(version, overwrite=False) -> str:
         decoded_alert_data.to_zarr(zarr_uri, mode="w")
         print("Done to_zarr")
 
-    return zarr_uri
+    return zarr_uri, True
