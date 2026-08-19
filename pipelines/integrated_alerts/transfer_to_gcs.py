@@ -68,39 +68,32 @@ def transfer_s3_to_gcs(
     include_prefixes=None,
     poll_interval=60,
 ) -> str:
-    """Copy objects from an S3 uri to a GCS uri via a one-time Storage
-    Transfer Service job, and block until the transfer completes.
+    """Copy objects from an S3 uri to a GCS uri via a one-time Storage Transfer
+    Service job, and block until the transfer completes.
 
     Authenticates as `project`'s service account (see PROJECT_CONFIG in
-    register_gee_asset.py) so that account's permissions are used for the
-    GCS destination; source_creds_secret_id is the AWS Secrets Manager
-    secret (same JSON form as gcloud's own AwsAccessKey format) holding the
-    separate AWS credentials Storage Transfer Service needs to read the S3
-    source.
+    register_gee_asset.py) so that account's permissions are used for the GCS
+    destination; source_creds_secret_id is the AWS Secrets Manager secret (same JSON
+    form as gcloud's own AwsAccessKey format) holding the separate AWS credentials
+    Storage Transfer Service needs to read the S3 source.
 
-    Polls `gcloud transfer operations describe` every poll_interval
-    seconds, printing status/progress each time, until the operation
-    reaches a terminal status or timeout seconds have elapsed -- there's no
-    non-blocking "check once" mode in gcloud's own `jobs monitor` command
-    (it only offers a real-time, blocking progress display), so this polls
-    the same underlying resource directly instead.
+    Polls `gcloud transfer operations describe` every poll_interval seconds, printing
+    status/progress each time, until the operation reaches a terminal status or
+    timeout seconds have elapsed
 
-    This is a one-time (non-recurring) job, so it only ever has a single
-    operation (Storage Transfer's per-run resource, distinct from the job
-    itself -- see `_get_latest_operation_name`'s docstring). Its name is
-    looked up once, waiting only if the job hasn't started running yet;
-    once found, the name is fixed for the rest of this call, so the actual
-    polling loop below only re-checks that one operation's status.
+    This is a one-time (non-recurring) job, so it only ever has a single operation.
+    Its name is looked up once, waiting only if the job hasn't started running yet;
+    once found, the name is fixed for the rest of this call, so the actual polling
+    loop below only re-checks that one operation's status.
 
-    Authentication is via the CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE
-    environment variable, scoped to each `gcloud` subprocess call's own
-    environment only -- unlike `gcloud auth activate-service-account`, this
-    never touches gcloud's persistent config, so there's no active-account
-    state to capture or restore. That variable and `--source-creds-file`
-    both need an actual file (not raw JSON), so both secrets -- fetched
-    from AWS Secrets Manager, not read from local files -- are each written
-    to their own temporary file for the duration of this call only, then
-    removed.
+    Authentication is via the CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE environment
+    variable, scoped to each `gcloud` subprocess call's own environment only --
+    unlike `gcloud auth activate-service-account`, this never touches gcloud's
+    persistent config, so there's no active-account state to capture or restore. That
+    variable and `--source-creds-file` both need an actual file (not raw JSON), so
+    both secrets -- fetched from AWS Secrets Manage -- are each written to their own
+    temporary file for the duration of this call only, then removed.
+
     """
     config = PROJECT_CONFIG[project]
     project_flag = f"--project={project}"

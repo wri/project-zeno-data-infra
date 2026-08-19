@@ -18,12 +18,6 @@ def parse_s3_uri(s3_uri):
     return match.groups()
 
 
-def get_secret(secret_id):
-    """Fetch a secret's string value from AWS Secrets Manager."""
-    client = boto3.client("secretsmanager")
-    return client.get_secret_value(SecretId=secret_id)["SecretString"]
-
-
 def s3_uri_exists(s3_uri):
     bucket_name, object_key = parse_s3_uri(s3_uri)
     try:
@@ -74,3 +68,9 @@ def copy_s3_directory(src_uri, dst_uri, max_workers=100):
         ]
         for future in futures:
             future.result()
+
+
+def get_secret(secret_id):
+    """Fetch a secret's string value from AWS Secrets Manager."""
+    client = boto3.client("secretsmanager")
+    return client.get_secret_value(SecretId=secret_id)["SecretString"]

@@ -31,12 +31,12 @@ def register_gee_asset(
 ) -> str:
     """Register a COG-backed GEE image asset from a GCS uri.
 
-    gcs_uri is the gs:// path to the source COG; gee_asset_path is the
-    asset's path within the GEE project (without the projects/.../assets/
-    prefix). project selects forma-250 or landandcarbon (mirroring gee.py's
-    -l flag); force overwrites an existing asset at the same path (mirroring
-    gee.py's -f flag). end_time defaults to today (UTC) if not given, since
-    this asset represents a continuously updated dataset.
+    gcs_uri is the gs:// path to the source COG; gee_asset_path is the asset's path
+    within the GEE project (without the projects/.../assets/ prefix). project selects
+    forma-250 or landandcarbon; force overwrites an existing asset at the same path.
+    end_time defaults to today (UTC) if not given, since this asset represents a
+    continuously updated dataset.
+
     """
     if project not in PROJECT_CONFIG:
         raise ValueError(
