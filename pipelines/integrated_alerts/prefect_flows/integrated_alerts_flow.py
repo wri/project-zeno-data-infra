@@ -6,7 +6,11 @@ from prefect.logging import get_run_logger
 
 from pipelines.integrated_alerts.prefect_flows.gadm_integrated_alerts import integrated_alerts_area
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
-from pipelines.integrated_alerts.create_zarr import create_zarr, first_sunday_processing
+from pipelines.integrated_alerts.create_zarr import create_zarr
+from pipelines.integrated_alerts.extra_processing import (
+    extra_processing_tasks,
+    is_first_sunday_week,
+)
 from pipelines.globals import ANALYTICS_BUCKET
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
@@ -23,8 +27,8 @@ def create_zarr_task(dist_version: str, overwrite=False) -> tuple[str, bool]:
 
 
 @task
-def first_sunday_processing_task(version, zarr_uri) -> None:
-    first_sunday_processing(version, zarr_uri)
+def extra_processing_task(version, zarr_uri) -> None:
+    extra_processing_tasks(version, zarr_uri)
 
 
 @task
@@ -52,18 +56,18 @@ def integrated_alerts_zarr_flow(version=None, overwrite=False, is_latest=False) 
         version = get_new_integrated_alerts_version()
         logger.info(f"Latest int-dist version: {version}")
 
-    integrated_alerts_zarr_uri, run_first_sunday_processing = create_zarr_task(
+    integrated_alerts_zarr_uri, freshly_created = create_zarr_task(
         version, overwrite=overwrite
     )
 
-    # The processing for the first Sunday of the month only depends on the
+    # The extra processing for the first Sunday of the month only depends on the
     # intdist_tropics.tif being created by the datapump and the int-dist zarr just
     # being created above. It may take a while because it does several copies of
     # large files (the zarr and the COG). So, we run it in parallel with the main
     # computation of the integrated alerts parquet.
-    first_sunday_future = None
-    if run_first_sunday_processing:
-        first_sunday_future = first_sunday_processing_task.submit(
+    extra_processing_future = None
+    if freshly_created and is_first_sunday_week(version):
+        extra_processing_future = extra_processing_task.submit(
             version, integrated_alerts_zarr_uri
         )
 
@@ -76,9 +80,9 @@ def integrated_alerts_zarr_flow(version=None, overwrite=False, is_latest=False) 
     if is_latest:
         write_int_latest_version(version)
 
-    if first_sunday_future is not None:
-        # propagates failure, so fails the flow if the first sunday processing
+    if extra_processing_future is not None:
+        # Propagates failure, so fails the flow if the extra processing
         # fails, but only after the parquet processing.
-        first_sunday_future.result()
+        extra_processing_future.result()
 
     return result_uris
