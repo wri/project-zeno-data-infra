@@ -83,6 +83,8 @@ class TestGrasslandsPreComputedAnalysis:
             [gadm_id], 2000, 2022
         )
 
+        assert result_df["aoi_type"] == ["admin"] * len(result_df["aoi_id"])
+
         # Aggregated yearly data
         data = [
             [2000, 3.485880],
