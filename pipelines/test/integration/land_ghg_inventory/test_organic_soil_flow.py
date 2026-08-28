@@ -33,6 +33,9 @@ EXPECTED_EMISSIONS_MgCO2e = {
 }
 
 
+@pytest.mark.skip(
+    reason="Upstream data was overwritten, need to recompute or mock out checked values"
+)
 def test_sgp_reproduces_reference_totals():
     datasets = organic_soil_stages.load_data(
         land_ghg_inventory_organic_soil_zarr_uri,
