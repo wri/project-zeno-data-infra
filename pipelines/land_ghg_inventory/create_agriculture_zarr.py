@@ -45,9 +45,10 @@ from pipelines.utils import s3_uri_exists
 # only its geobox (30m, EPSG:4326) is used, not its values.
 REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 
-# Source COGs: static snapshots (single year, no versioning scheme), published
-# by Cornell. Cropland is the absolute per-pixel total (kg CO2e); livestock is
-# a per-hectare rate (kg/ha).
+# Source COGs: static snapshots (single year, no versioning scheme). Livestock
+# is aggregated in-house from WRI's per-animal-type delivery (see
+# notebooks/land_ghg_inventory_livestock_animal_aggregation.ipynb); its kg/ha
+# unit is assumed from the source filename, not independently verified.
 CROPLAND_COG_URI = (
     "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/"
     "raw__from_Cornell/20250828/year_2020/all_sources/"
@@ -55,9 +56,8 @@ CROPLAND_COG_URI = (
     "without_peat_burn_kg_CO2__20260803.tif"
 )
 LIVESTOCK_COG_URI = (
-    "s3://gfw2-data/climate/AFOLU_flux_model/livestock_emissions/"
-    "raw__from_Cornell/20260731_emis_per_ha_only/Total_GHG_Emissions/"
-    "Tot_CO2eq_kg_livestock_GHG_emissions_kgCO2e_ha.tif"
+    "s3://gfw-data-lake/wri_land_ghg_monitoring_system/v1.0.3/raw_data/"
+    "Total_GHG_kg_CO2e_ha_yr_AllAnimals.tif"
 )
 KG_PER_MG = 1_000
 
@@ -145,8 +145,6 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
 
     geobox = _reference_geobox()
 
-    # cropland is already an absolute per-pixel total (kg); split each source
-    # pixel's total evenly across its 30m children rather than area-weighting.
     cropland_kg = _resample_total_uniformly(CROPLAND_COG_URI, geobox)
     livestock_kg_ha = _resample(LIVESTOCK_COG_URI, geobox)
     pixel_area_ha = align_to(livestock_kg_ha, pixel_area_zarr_uri)
