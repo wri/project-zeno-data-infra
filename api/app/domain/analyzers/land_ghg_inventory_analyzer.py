@@ -47,7 +47,7 @@ INPUT_URIS = {
         ),
         "admin_agriculture_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-agriculture/"
-            "v20260803/admin-land_ghg_inventory-agriculture.parquet"
+            "v20260908/admin-land_ghg_inventory-agriculture.parquet"
         ),
         "admin_mineral_soil_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-mineral_soil/"
