@@ -2,8 +2,8 @@
 
 Cropland and livestock emissions are both published as absolute per-pixel
 totals (kg CO2e) on their native ~10km grid, resampled onto the vegetation
-zarr's 30m grid (the reference grid for the whole Land GHG inventory) via
-``_resample_total_uniformly``. Livestock's source COG is aggregated in-house
+zarr's 30m grid (the reference grid for the whole Land GHG inventory).
+Livestock's source COG is aggregated in-house
 from Cornell's per-animal-type delivery -- see
 notebooks/land_ghg_inventory_livestock_animal_aggregation.ipynb.
 """
