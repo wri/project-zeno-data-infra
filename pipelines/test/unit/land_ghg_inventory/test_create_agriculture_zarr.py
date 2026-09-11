@@ -25,13 +25,14 @@ def reference_veg_dataset():
     return xr.Dataset({mod.REFERENCE_GRID_VAR: ref})
 
 
-def _fake_cropland_cog(value):
+def _fake_total_cog(value):
     """A coarser source raster (absolute kg total per pixel), matching the
     reference grid 2:1 per axis so each source pixel has exactly 4 children.
     Pixel centers are offset (0.75/-0.25, 0.25/1.25) rather than aligned with
     the reference grid's origin, so its bounds (-0.5..1.5) fully cover the
     reference grid's bounds (-0.25..1.75, -0.75..1.25) -- ``_resample_total_uniformly``
-    assumes full coverage, as the real global-to-global grids have."""
+    assumes full coverage, as the real global-to-global grids have. Used for
+    both cropland and livestock now, since both sources are absolute totals."""
     arr = xr.DataArray(
         da.from_array(np.full((1, 2, 2), value, dtype="float32"), chunks=(1, 2, 2)),
         dims=["band", "y", "x"],
@@ -41,34 +42,7 @@ def _fake_cropland_cog(value):
     return arr
 
 
-def _fake_livestock_cog(value):
-    """A coarser source raster (kg/ha rate), band dim included like a real GeoTIFF read."""
-    arr = xr.DataArray(
-        da.from_array(np.full((1, 2, 2), value, dtype="float32"), chunks=(1, 2, 2)),
-        dims=["band", "y", "x"],
-        coords={"band": [1], "y": [1.0, 0.0], "x": [0.0, 1.0]},
-    )
-    arr.rio.write_crs("EPSG:4326", inplace=True)
-    return arr
-
-
-@pytest.fixture
-def pixel_area_layer():
-    """4x4 pixel-area layer (hectares), matching the reference grid 1:1 --
-    the shape ``common.align_to`` returns after loading + snapping."""
-    return xr.DataArray(
-        da.from_array(np.full((4, 4), 5.0, dtype="float64"), chunks=(4, 4)),
-        dims=["y", "x"],
-        coords={
-            "y": [1.0, 0.5, 0.0, -0.5],
-            "x": [0.0, 0.5, 1.0, 1.5],
-        },
-    )
-
-
-def test_create_agriculture_zarr_writes_expected_shape(
-    reference_veg_dataset, pixel_area_layer
-):
+def test_create_agriculture_zarr_writes_expected_shape(reference_veg_dataset):
     captured = {}
 
     def fake_to_zarr(self, uri, group=None, mode=None):
@@ -83,9 +57,8 @@ def test_create_agriculture_zarr_writes_expected_shape(
         patch.object(
             mod.rio,
             "open_rasterio",
-            side_effect=[_fake_cropland_cog(400.0), _fake_livestock_cog(2_000.0)],
+            side_effect=[_fake_total_cog(400.0), _fake_total_cog(2_000.0)],
         ),
-        patch.object(mod, "align_to", return_value=pixel_area_layer) as mock_align_to,
         patch.object(xr.Dataset, "to_zarr", fake_to_zarr),
     ):
         result_uri = mod.create_agriculture_zarr(overwrite=False)
@@ -94,10 +67,6 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert captured["uri"] == land_ghg_inventory_agriculture_zarr_uri
     assert captured["group"] == "pipeline"
     assert captured["mode"] == "w"
-
-    # pixel area is only needed for livestock now (cropland uses the
-    # mass-conserving uniform-split path instead of an area multiply).
-    mock_align_to.assert_called_once()
 
     ds = captured["ds"].compute()
     # matches what agriculture_stages.load_agriculture expects: cropland +
@@ -119,10 +88,12 @@ def test_create_agriculture_zarr_writes_expected_shape(
     assert cropland[0, 0] == pytest.approx(400.0 / 4 / mod.KG_PER_MG)
     assert np.nansum(cropland) == pytest.approx(4 * 400.0 / mod.KG_PER_MG)
 
-    # livestock: kg/ha -> ha-multiplied -> Mg conversion applied:
-    # 2_000 kg/ha * 5 ha / 1000 = 10
+    # livestock: same mass-conserving uniform-split path as cropland now
+    # (absolute per-pixel total, not a per-hectare rate) -- 2_000 kg / 4
+    # children / 1000 = 0.5 Mg.
     livestock = ds[AGRICULTURE_SOURCE_VARS["livestock"]].values
-    assert livestock[0, 0] == pytest.approx(10.0)
+    assert livestock[0, 0] == pytest.approx(2_000.0 / 4 / mod.KG_PER_MG)
+    assert np.nansum(livestock) == pytest.approx(4 * 2_000.0 / mod.KG_PER_MG)
 
 
 def test_create_agriculture_zarr_skips_when_present_and_not_overwrite():
@@ -139,18 +110,15 @@ def test_create_agriculture_zarr_skips_when_present_and_not_overwrite():
     mock_geobox.assert_not_called()
 
 
-def test_create_agriculture_zarr_overwrite_skips_exists_check(
-    reference_veg_dataset, pixel_area_layer
-):
+def test_create_agriculture_zarr_overwrite_skips_exists_check(reference_veg_dataset):
     with (
         patch.object(mod, "s3_uri_exists") as mock_exists,
         patch.object(mod.xr, "open_zarr", return_value=reference_veg_dataset),
         patch.object(
             mod.rio,
             "open_rasterio",
-            side_effect=[_fake_cropland_cog(100.0), _fake_livestock_cog(500.0)],
+            side_effect=[_fake_total_cog(100.0), _fake_total_cog(500.0)],
         ),
-        patch.object(mod, "align_to", return_value=pixel_area_layer),
         patch.object(xr.Dataset, "to_zarr"),
     ):
         mod.create_agriculture_zarr(overwrite=True)
