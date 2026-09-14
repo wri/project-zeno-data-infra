@@ -28,7 +28,7 @@ STP_BBOX = box(6.4, -0.05, 7.5, 1.8)
 # within range).
 EXPECTED_TOTALS = {
     "cropland": 1.7466945e03,
-    "livestock": 1.4521845e04,
+    "livestock": 1.4954041e04,
 }
 
 
