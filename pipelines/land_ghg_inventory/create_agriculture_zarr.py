@@ -61,6 +61,12 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     absolute total would multiply it by the number of destination pixels
     instead of splitting it among them.
 
+    ``masked=True`` converts the source's nodata sentinel (e.g. -9999) to
+    NaN before it's divided and reprojected; without it, a large-magnitude
+    sentinel gets treated as real data and reprojected as a huge negative
+    "emissions" value. The result's NaN (source nodata) and reprojection
+    dst_nodata are both then filled with 0.
+
     The true child count per source pixel alternates by +/-1 around
     ``(src_res / dst_res) ** 2`` (e.g. 333 or 334 here, since 0.08333.../0.00025
     isn't an integer ratio) depending on where a given source pixel happens to
@@ -73,7 +79,7 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     direction, so the aggregate (e.g. a country total) is unaffected.
     """
     with rasterio.Env(AWS_REQUEST_PAYER="requester"):
-        src = rio.open_rasterio(cog_uri, chunks={"x": 10000, "y": 10000})
+        src = rio.open_rasterio(cog_uri, chunks={"x": 10000, "y": 10000}, masked=True)
     if "band" in src.dims:
         src = src.isel(band=0, drop=True)
 
@@ -91,7 +97,7 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     )
     if "band" in reprojected.dims:
         reprojected = reprojected.isel(band=0, drop=True)
-    return reprojected
+    return reprojected.fillna(0)
 
 
 def create_agriculture_zarr(overwrite: bool = False) -> str:

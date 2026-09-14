@@ -166,3 +166,42 @@ def test_resample_total_uniformly_conserves_mass_per_source_pixel(
     # source pixel (1,1)=400 -> destination (2,2),(2,3),(3,2),(3,3)
     assert np.nansum(result.values[2:4, 2:4]) == pytest.approx(400.0)
     assert np.nansum(result.values) == pytest.approx(100.0 + 200.0 + 300.0 + 400.0)
+
+
+def test_resample_total_uniformly_masks_nodata_sentinel(reference_veg_dataset):
+    """A source pixel holding the nodata sentinel (e.g. -9999, as Cornell's
+    livestock COG uses) must not be treated as real data: dividing and
+    reprojecting a large-magnitude sentinel produces a huge, spurious
+    negative "total" in the output. It should come out as 0, like any other
+    empty/no-coverage pixel."""
+    cog_with_nodata = xr.DataArray(
+        da.from_array(
+            np.array([[100.0, -9999.0], [-9999.0, 400.0]], dtype="float32").reshape(
+                1, 2, 2
+            ),
+            chunks=(1, 2, 2),
+        ),
+        dims=["band", "y", "x"],
+        coords={"band": [1], "y": [0.75, -0.25], "x": [0.25, 1.25]},
+    )
+    cog_with_nodata.rio.write_crs("EPSG:4326", inplace=True)
+    cog_with_nodata.rio.write_nodata(-9999.0, inplace=True)
+
+    with patch.object(mod.xr, "open_zarr", return_value=reference_veg_dataset):
+        geobox = mod._reference_geobox()
+
+    def fake_open_rasterio(uri, chunks=None, masked=False):
+        return (
+            cog_with_nodata.where(cog_with_nodata != -9999.0)
+            if masked
+            else cog_with_nodata
+        )
+
+    with patch.object(mod.rio, "open_rasterio", side_effect=fake_open_rasterio):
+        result = mod._resample_total_uniformly("fake_uri", geobox).compute()
+
+    assert (result.values >= 0).all()
+    assert np.nansum(result.values[0:2, 2:4]) == pytest.approx(0.0)
+    assert np.nansum(result.values[2:4, 0:2]) == pytest.approx(0.0)
+    assert np.nansum(result.values[0:2, 0:2]) == pytest.approx(100.0)
+    assert np.nansum(result.values[2:4, 2:4]) == pytest.approx(400.0)
