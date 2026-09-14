@@ -3,9 +3,7 @@
 Cropland and livestock emissions are both published as absolute per-pixel
 totals (kg CO2e) on their native ~10km grid, resampled onto the vegetation
 zarr's 30m grid (the reference grid for the whole Land GHG inventory).
-Livestock's source COG is aggregated in-house
-from Cornell's per-animal-type delivery -- see
-notebooks/land_ghg_inventory_livestock_animal_aggregation.ipynb.
+Livestock's source COG is Cornell's pre-aggregated cross-animal total.
 """
 
 import rasterio
@@ -37,7 +35,7 @@ CROPLAND_COG_URI = (
 )
 LIVESTOCK_COG_URI = (
     "s3://gfw-data-lake/wri_land_ghg_monitoring_system/v1.0.3/raw_data/"
-    "Total_GHG_kg_CO2e_yr_AllAnimals.tif"
+    "Total_GHG_kg_CO2e_yr_Livestock_ALL.tif"
 )
 KG_PER_MG = 1_000
 
