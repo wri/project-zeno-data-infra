@@ -61,11 +61,9 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     absolute total would multiply it by the number of destination pixels
     instead of splitting it among them.
 
-    ``masked=True`` converts the source's nodata sentinel (e.g. -9999) to
-    NaN before it's divided and reprojected; without it, a large-magnitude
-    sentinel gets treated as real data and reprojected as a huge negative
-    "emissions" value. The result's NaN (source nodata) and reprojection
-    dst_nodata are both then filled with 0.
+    ``masked=True`` converts the source's nodata sentinel to NaN before it's
+    divided and reprojected, so nodata pixels don't get treated as real data.
+    The result's NaN and reprojection dst_nodata are both filled with 0.
 
     The true child count per source pixel alternates by +/-1 around
     ``(src_res / dst_res) ** 2`` (e.g. 333 or 334 here, since 0.08333.../0.00025
