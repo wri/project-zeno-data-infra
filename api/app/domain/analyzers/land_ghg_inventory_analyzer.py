@@ -38,6 +38,62 @@ ORGANIC_SOIL_INTERVAL_YEARS = {
     2024: tuple(range(2021, 2025)),
 }
 
+# The single row a global analysis collapses to.
+GLOBAL_AOI_ID = "GLOBAL"
+
+# Top (country) rollup tier only. Each parquet also holds the adm1 and adm2
+# rollups of the same pixels (see rollup_by_gadm_and_convert_to_aoi in
+# pipelines/prefect_flows/common_stages.py), so an unfiltered SUM would count
+# every value three times.
+ADM0_ONLY = "aoi_id not like '%.%'"
+
+
+def admin_query(dimensions, measures, aoi_ids) -> str:
+    """Rows for the named admin areas, one row per area."""
+    id_str = ", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])
+    # aoi_type is emitted as a literal rather than read from the parquet,
+    # where it is unconditionally 'admin' (and absent altogether from the
+    # vegetation table).
+    columns = ", ".join(("aoi_id", "'admin' as aoi_type", *dimensions, *measures))
+    return f"select {columns} from data_source where aoi_id in ({id_str})"
+
+
+def global_query(dimensions, measures) -> str:
+    """The country tier summed into a single world row.
+
+    Grouped by exactly the dimensions the caller reshapes on afterwards, so
+    the row count matches what one admin area returns and the downstream year
+    broadcast stays correct.
+    """
+    columns = ", ".join(
+        (
+            f"'{GLOBAL_AOI_ID}' as aoi_id",
+            "'global' as aoi_type",
+            *dimensions,
+            *[f"sum({m}) as {m}" for m in measures],
+        )
+    )
+    query = f"select {columns} from data_source where {ADM0_ONLY}"
+    if dimensions:
+        query += f" group by {', '.join(dimensions)}"
+    return query
+
+
+def _broadcast_years(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Repeat each row across every vegetation year.
+
+    The agriculture and mineral soil tables have no year axis of their own, so
+    the SUM behind a global row must already have happened here -- broadcasting
+    first and aggregating after would multiply the world total by the number of
+    years.
+    """
+    if not result["aoi_id"]:
+        return {key: [] for key in (*result, "year")}
+    df = pd.DataFrame(result)
+    df["year"] = [ANNUALIZED_YEARS] * len(df)
+    return df.explode("year", ignore_index=True).to_dict(orient="list")
+
+
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
@@ -62,8 +118,13 @@ INPUT_URIS = {
 
 
 class LandGHGInventoryAnalyzer(Analyzer):
-    """Land GHG inventory for admin areas (by aoi_id), read from precomputed
-    zonal-statistics parquets. Admin areas only, no on-the-fly computation.
+    """Land GHG inventory for admin areas (by aoi_id) or for the whole world,
+    read from precomputed zonal-statistics parquets. No on-the-fly computation.
+
+    A global AOI returns the same tables with the same dimensions, summed over
+    the country tier into a single row set carrying aoi_id "GLOBAL" -- one
+    world figure per land_state_class/category/year, not a per-country
+    breakdown.
 
     The result holds one table per aggregation category, each aggregated
     differently:
@@ -96,12 +157,12 @@ class LandGHGInventoryAnalyzer(Analyzer):
             raise Exception("Input URIs must be provided for actual analysis")
 
         analytics_in = LandGHGInventoryAnalyticsIn(**analysis.metadata)
-        aoi_ids = analytics_in.aoi.ids
+        aoi = analytics_in.aoi
         vegetation, agriculture, mineral_soil, organic_soil = await asyncio.gather(
-            self.analyze_vegetation(aoi_ids),
-            self.analyze_agriculture(aoi_ids),
-            self.analyze_mineral_soil(aoi_ids),
-            self.analyze_organic_soil(aoi_ids),
+            self.analyze_vegetation(aoi),
+            self.analyze_agriculture(aoi),
+            self.analyze_mineral_soil(aoi),
+            self.analyze_organic_soil(aoi),
         )
         analysis.result = {
             "vegetation": vegetation,
@@ -110,50 +171,45 @@ class LandGHGInventoryAnalyzer(Analyzer):
             "organic_soil": organic_soil,
         }
 
-    async def analyze_vegetation(self, aoi_ids) -> Dict[str, Any]:
-        columns = ("aoi_id", "land_state_class", "year") + VEGETATION_MEASURES
-        result = await self._select(self.query_services["vegetation"], columns, aoi_ids)
-        # vegetation parquet has no aoi_type column; every row is an admin area
-        result["aoi_type"] = ["admin"] * len(result["aoi_id"])
-        return result
+    async def analyze_vegetation(self, aoi) -> Dict[str, Any]:
+        return await self._select(
+            "vegetation", aoi, ("land_state_class", "year"), VEGETATION_MEASURES
+        )
 
-    async def analyze_agriculture(self, aoi_ids) -> Dict[str, Any]:
-        columns = ("aoi_id", "aoi_type", "category", "gross_emissions_MgCO2e")
+    async def analyze_agriculture(self, aoi) -> Dict[str, Any]:
         result = await self._select(
-            self.query_services["agriculture"], columns, aoi_ids
+            "agriculture", aoi, ("category",), ("gross_emissions_MgCO2e",)
         )
-        df = pd.DataFrame(result)
-        df["year"] = [ANNUALIZED_YEARS] * len(df)
-        return df.explode("year", ignore_index=True).to_dict(orient="list")
+        return _broadcast_years(result)
 
-    async def analyze_mineral_soil(self, aoi_ids) -> Dict[str, Any]:
-        columns = ("aoi_id", "aoi_type") + MINERAL_SOIL_MEASURES
-        result = await self._select(
-            self.query_services["mineral_soil"], columns, aoi_ids
-        )
-        df = pd.DataFrame(result)
-        df["year"] = [ANNUALIZED_YEARS] * len(df)
-        return df.explode("year", ignore_index=True).to_dict(orient="list")
+    async def analyze_mineral_soil(self, aoi) -> Dict[str, Any]:
+        result = await self._select("mineral_soil", aoi, (), MINERAL_SOIL_MEASURES)
+        return _broadcast_years(result)
 
-    async def analyze_organic_soil(self, aoi_ids) -> Dict[str, Any]:
-        columns = (
-            "aoi_id",
-            "aoi_type",
-            "interval_end_year",
-            "gross_emissions_MgCO2e",
-            "area_ha",
-        )
+    async def analyze_organic_soil(self, aoi) -> Dict[str, Any]:
         result = await self._select(
-            self.query_services["organic_soil"], columns, aoi_ids
+            "organic_soil",
+            aoi,
+            ("interval_end_year",),
+            ("gross_emissions_MgCO2e", "area_ha"),
         )
+        if not result["aoi_id"]:
+            return {key: [] for key in (*result, "year") if key != "interval_end_year"}
         df = pd.DataFrame(result)
         df["year"] = df["interval_end_year"].map(ORGANIC_SOIL_INTERVAL_YEARS)
         df = df.explode("year", ignore_index=True).drop(columns="interval_end_year")
         return df.to_dict(orient="list")
 
-    @staticmethod
-    async def _select(query_service, columns, aoi_ids) -> Dict[str, Any]:
-        id_str = ", ".join([f"'{aoi_id}'" for aoi_id in aoi_ids])
-        column_list = ", ".join(columns)
-        query = f"select {column_list} from data_source where aoi_id in ({id_str})"
-        return await query_service.execute(query)
+    async def _select(self, component, aoi, dimensions, measures) -> Dict[str, Any]:
+        """Read one component's table for `aoi`, at the grain the caller names.
+
+        The only place the admin/global split is decided: a global AOI sums
+        the country tier into one world row, an admin AOI reads its rows back
+        directly. Both shapes carry the same columns, so callers reshape the
+        result without caring which one they got.
+        """
+        if aoi.type == "global":
+            query = global_query(dimensions, measures)
+        else:
+            query = admin_query(dimensions, measures, aoi.ids)
+        return await self.query_services[component].execute(query)
