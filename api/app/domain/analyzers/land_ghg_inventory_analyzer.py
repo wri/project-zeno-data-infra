@@ -55,7 +55,7 @@ INPUT_URIS = {
         ),
         "admin_organic_soil_results_uri": (
             "s3://lcl-analytics/zonal-statistics/land_ghg_inventory-organic_soil/"
-            "v20260730/admin-land_ghg_inventory-organic_soil.parquet"
+            "v20260917/admin-land_ghg_inventory-organic_soil.parquet"
         ),
     },
 }
