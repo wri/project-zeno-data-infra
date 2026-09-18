@@ -55,9 +55,11 @@ land_ghg_inventory_organic_soil_zarr_uri = (
 # to the mass-conserving uniform-split resample of the absolute total COG.
 # Kept as a new sibling path rather than overwriting the original so the old
 # zarr stays available until the new one is QC'd.
+#
+# v3: livestock switched to Cornell's own pre-aggregated total COG.
 land_ghg_inventory_agriculture_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-ghg-monitoring-system/"
-    "cropland_livestock_emissions_v20260908.zarr"
+    "cropland_livestock_emissions_v20260914.zarr"
 )
 
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
