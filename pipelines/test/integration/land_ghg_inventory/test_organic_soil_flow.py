@@ -28,14 +28,11 @@ SGP_BBOX = box(103.6, 1.15, 104.1, 1.48)
 # reduce over the full gadm_*_code_count admin codes changes these, since SGP's
 # own codes are within range).
 EXPECTED_EMISSIONS_MgCO2e = {
-    2020: 45987.43,
+    2020: 62211.12,
     2024: 67217.00,
 }
 
 
-@pytest.mark.skip(
-    reason="Upstream data was overwritten, need to recompute or mock out checked values"
-)
 def test_sgp_reproduces_reference_totals():
     datasets = organic_soil_stages.load_data(
         land_ghg_inventory_organic_soil_zarr_uri,
