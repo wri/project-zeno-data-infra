@@ -1,6 +1,6 @@
 # Cornell livestock emissions v1.0.3
 
-External data referenced in place from https://gfw-data-lake.s3.amazonaws.com/wri_land_ghg_monitoring_system/v1.0.3/raw_data/Total_GHG_kg_CO2e_yr_Livestock_ALL.tif
+Cornell livestock emissions (v1.0.3): absolute per-pixel totals in kg CO2e per year on a ~10km grid, pre-aggregated across animals.
 
 ## Spatial Coverage
 

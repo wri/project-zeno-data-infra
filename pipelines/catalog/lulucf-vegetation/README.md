@@ -1,6 +1,6 @@
 # AFOLU LULUCF vegetation flux v1.0.5
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/LULUCF/outputs_vegetation/version_1_0_5__standard__global/mega_zarr/annual_intervals/4000_pixels/20260130/vegetation_zarr.zarr
+AFOLU GHG flux model vegetation outputs (v1.0.5): annual 2016-2024 per-hectare gross emissions, removals and net flux at 30m, published by the AFOLU GHG flux model team.
 
 ## Spatial Coverage
 

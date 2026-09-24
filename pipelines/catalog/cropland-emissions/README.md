@@ -1,6 +1,6 @@
 # Cornell cropland emissions 2020
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/cropland_emissions/raw__from_Cornell/20250828/year_2020/all_sources/Global_grid_cropland_emissions_total_amount_CO2eq_all_crops_without_peat_burn_kg_CO2__20260803.tif
+Cornell cropland emissions for 2020: absolute per-pixel totals in kg CO2e on a ~10km grid, excluding peat burning.
 
 ## Spatial Coverage
 

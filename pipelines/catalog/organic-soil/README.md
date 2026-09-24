@@ -1,6 +1,6 @@
 # AFOLU organic soil emissions v1.0.1
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/organic_soils/outputs/version_1_0_1/mega_zarr/ogh_mixed_f1_f15_f2_20260513/five_year/4000_pixels/20260525/mega.zarr
+AFOLU organic (peat) soil emissions (v1.0.1): per-hectare burned and drained rates on a 5-year block axis labelled by calendar year [2005, 2010, 2015, 2020, 2024].
 
 ## Spatial Coverage
 

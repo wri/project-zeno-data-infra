@@ -6,23 +6,23 @@ A Portolan-managed STAC catalog
 
 ### [Cornell cropland emissions 2020](catalog/cropland-emissions/)
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/cropland_emissions/raw__from_Cornell/20250828/year_2020/all_sources/Global_grid_cropland_emissions...
+Cornell cropland emissions for 2020: absolute per-pixel totals in kg CO2e on a ~10km grid, excluding peat burning.
 
 ### [Cornell livestock emissions v1.0.3](catalog/livestock-emissions/)
 
-External data referenced in place from https://gfw-data-lake.s3.amazonaws.com/wri_land_ghg_monitoring_system/v1.0.3/raw_data/Total_GHG_kg_CO2e_yr_Livestock_ALL.tif
+Cornell livestock emissions (v1.0.3): absolute per-pixel totals in kg CO2e per year on a ~10km grid, pre-aggregated across animals.
 
 ### [AFOLU LULUCF vegetation flux v1.0.5](catalog/lulucf-vegetation/)
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/LULUCF/outputs_vegetation/version_1_0_5__standard__global/mega_zarr/annual_intervals/4000_pixels/2...
+AFOLU GHG flux model vegetation outputs (v1.0.5): annual 2016-2024 per-hectare gross emissions, removals and net flux at 30m, published by the AFOLU GHG flux model team.
 
 ### [AFOLU mineral soil organic carbon v1.0.1](catalog/mineral-soil/)
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_z...
+AFOLU mineral soil organic carbon (v1.0.1): per-hectare stock-change rates on a 5-year change-interval index axis (0..4, not calendar years). Index 4 (2020-2022) is distrusted by the AFOLU GHG flux...
 
 ### [AFOLU organic soil emissions v1.0.1](catalog/organic-soil/)
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/organic_soils/outputs/version_1_0_1/mega_zarr/ogh_mixed_f1_f15_f2_20260513/five_year/4000_pixels/2...
+AFOLU organic (peat) soil emissions (v1.0.1): per-hectare burned and drained rates on a 5-year block axis labelled by calendar year [2005, 2010, 2015, 2020, 2024].
 
 ## Coverage
 

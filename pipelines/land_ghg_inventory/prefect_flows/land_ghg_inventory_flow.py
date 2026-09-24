@@ -2,24 +2,29 @@ import logging
 from typing import Optional
 
 import numpy as np
+from prefect import flow
+from prefect.assets import materialize
+from shapely.geometry import Polygon
+
 from pipelines.globals import (
     ANALYTICS_BUCKET,
     country_zarr_uri,
     gadm_country_code_count,
     gadm_region_code_count,
     gadm_subregion_code_count,
-    land_ghg_inventory_organic_soil_zarr_uri,
-    land_ghg_inventory_soc_zarr_uri,
-    land_ghg_inventory_vegetation_zarr_uri,
+    land_ghg_inventory_agriculture_zarr_uri,
     pixel_area_zarr_uri,
     region_zarr_uri,
     subregion_zarr_uri,
 )
+from pipelines.land_ghg_inventory.create_agriculture_zarr import (
+    create_agriculture_zarr,
+)
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_tasks
-from pipelines.prefect_flows import common_tasks
+from pipelines.prefect_flows import common_stages, common_tasks
+from pipelines.prefect_flows.assets import result_asset_key, source_asset
+from pipelines.sources.source_catalog import SourceCatalog
 from pipelines.utils import s3_uri_exists
-from prefect import flow
-from shapely.geometry import Polygon
 
 # Pipeline-specific reduce group axes (the admin axes come from globals). flox
 # silently drops labels at or above a bound, so these must cover the real range.
@@ -30,6 +35,7 @@ YEAR_COUNT = 9  # year index 0..8 -> 2016..2024
 @flow(name="Land GHG inventory vegetation", retries=2, retry_delay_seconds=120)
 def land_ghg_inventory_vegetation(
     version: str,
+    catalog: SourceCatalog,
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
 ) -> str:
@@ -59,10 +65,11 @@ def land_ghg_inventory_vegetation(
         np.arange(VEGETATION_CATEGORY_COUNT),
         np.arange(YEAR_COUNT),
     )
+    source = catalog.source("lulucf-vegetation")
     datasets = land_ghg_inventory_tasks.load_vegetation.with_options(
         name="land_ghg_inventory-vegetation-load-data"
     )(
-        land_ghg_inventory_vegetation_zarr_uri,
+        source.uri,
         pixel_area_zarr_uri,
         country_zarr_uri,
         region_zarr_uri,
@@ -78,14 +85,17 @@ def land_ghg_inventory_vegetation(
     result_df = land_ghg_inventory_tasks.vegetation_result_dataframe.with_options(
         name="land_ghg_inventory-vegetation-postprocess-result"
     )(reduced)
-    return common_tasks.save_result.with_options(
-        name="land_ghg_inventory-vegetation-save-result"
-    )(result_df, result_uri)
+    return materialize(
+        result_asset_key(result_uri),
+        asset_deps=[source_asset(source)],
+        name="land_ghg_inventory-vegetation-save-result",
+    )(common_stages.save_results)(result_df, result_uri)
 
 
 @flow(name="Land GHG inventory agriculture", retries=2, retry_delay_seconds=120)
 def land_ghg_inventory_agriculture(
     version: str,
+    catalog: SourceCatalog,
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
 ) -> str:
@@ -113,11 +123,19 @@ def land_ghg_inventory_agriculture(
         np.arange(gadm_region_code_count),
         np.arange(gadm_subregion_code_count),
     )
-    agriculture_zarr_uri = (
-        land_ghg_inventory_tasks.prepare_agriculture_zarr.with_options(
-            name="land_ghg_inventory-agriculture-resample-source-zarr"
-        )(overwrite=overwrite)
-    )
+    sources = [
+        catalog.source(source_id)
+        for source_id in (
+            "lulucf-vegetation",
+            "cropland-emissions",
+            "livestock-emissions",
+        )
+    ]
+    agriculture_zarr_uri = materialize(
+        land_ghg_inventory_agriculture_zarr_uri,
+        asset_deps=[source_asset(source) for source in sources],
+        name="land_ghg_inventory-agriculture-resample-source-zarr",
+    )(create_agriculture_zarr)(*(source.uri for source in sources), overwrite=overwrite)
     datasets = land_ghg_inventory_tasks.load_agriculture.with_options(
         name="land_ghg_inventory-agriculture-load-data"
     )(
@@ -136,14 +154,17 @@ def land_ghg_inventory_agriculture(
     result_df = land_ghg_inventory_tasks.agriculture_result_dataframe.with_options(
         name="land_ghg_inventory-agriculture-postprocess-result"
     )(reduced)
-    return common_tasks.save_result.with_options(
-        name="land_ghg_inventory-agriculture-save-result"
-    )(result_df, result_uri)
+    return materialize(
+        result_asset_key(result_uri),
+        asset_deps=[land_ghg_inventory_agriculture_zarr_uri],
+        name="land_ghg_inventory-agriculture-save-result",
+    )(common_stages.save_results)(result_df, result_uri)
 
 
 @flow(name="Land GHG inventory mineral soil", retries=2, retry_delay_seconds=120)
 def land_ghg_inventory_mineral_soil(
     version: str,
+    catalog: SourceCatalog,
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
 ) -> str:
@@ -172,10 +193,11 @@ def land_ghg_inventory_mineral_soil(
         np.arange(gadm_region_code_count),
         np.arange(gadm_subregion_code_count),
     )
+    source = catalog.source("mineral-soil")
     datasets = land_ghg_inventory_tasks.load_mineral_soil.with_options(
         name="land_ghg_inventory-mineral_soil-load-data"
     )(
-        land_ghg_inventory_soc_zarr_uri,
+        source.uri,
         pixel_area_zarr_uri,
         country_zarr_uri,
         region_zarr_uri,
@@ -191,14 +213,17 @@ def land_ghg_inventory_mineral_soil(
     result_df = land_ghg_inventory_tasks.mineral_soil_result_dataframe.with_options(
         name="land_ghg_inventory-mineral_soil-postprocess-result"
     )(reduced)
-    return common_tasks.save_result.with_options(
-        name="land_ghg_inventory-mineral_soil-save-result"
-    )(result_df, result_uri)
+    return materialize(
+        result_asset_key(result_uri),
+        asset_deps=[source_asset(source)],
+        name="land_ghg_inventory-mineral_soil-save-result",
+    )(common_stages.save_results)(result_df, result_uri)
 
 
 @flow(name="Land GHG inventory organic soil", retries=2, retry_delay_seconds=120)
 def land_ghg_inventory_organic_soil(
     version: str,
+    catalog: SourceCatalog,
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
 ) -> str:
@@ -229,10 +254,11 @@ def land_ghg_inventory_organic_soil(
         np.arange(gadm_subregion_code_count),
         np.array([2020, 2024]),
     )
+    source = catalog.source("organic-soil")
     datasets = land_ghg_inventory_tasks.load_organic_soil.with_options(
         name="land_ghg_inventory-organic_soil-load-data"
     )(
-        land_ghg_inventory_organic_soil_zarr_uri,
+        source.uri,
         pixel_area_zarr_uri,
         country_zarr_uri,
         region_zarr_uri,
@@ -248,9 +274,11 @@ def land_ghg_inventory_organic_soil(
     result_df = land_ghg_inventory_tasks.organic_soil_result_dataframe.with_options(
         name="land_ghg_inventory-organic_soil-postprocess-result"
     )(reduced)
-    return common_tasks.save_result.with_options(
-        name="land_ghg_inventory-organic_soil-save-result"
-    )(result_df, result_uri)
+    return materialize(
+        result_asset_key(result_uri),
+        asset_deps=[source_asset(source)],
+        name="land_ghg_inventory-organic_soil-save-result",
+    )(common_stages.save_results)(result_df, result_uri)
 
 
 # component name -> its subflow. Add new components (e.g. soil) here to expose
@@ -267,6 +295,7 @@ ALL_COMPONENTS = tuple(COMPONENT_FLOWS)
 @flow(name="Land GHG inventory area", retries=2, retry_delay_seconds=120)
 def land_ghg_inventory_area(
     version: str,
+    catalog: SourceCatalog,
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
     component: Optional[str] = None,
@@ -288,10 +317,12 @@ def land_ghg_inventory_area(
                 f"Accepted: {ALL_COMPONENTS}"
             )
         return [
-            COMPONENT_FLOWS[component](version=version, overwrite=overwrite, bbox=bbox)
+            COMPONENT_FLOWS[component](
+                version=version, catalog=catalog, overwrite=overwrite, bbox=bbox
+            )
         ]
 
     return [
-        flow_fn(version=version, overwrite=overwrite, bbox=bbox)
+        flow_fn(version=version, catalog=catalog, overwrite=overwrite, bbox=bbox)
         for flow_fn in COMPONENT_FLOWS.values()
     ]

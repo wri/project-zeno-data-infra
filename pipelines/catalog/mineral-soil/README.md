@@ -1,6 +1,6 @@
 # AFOLU mineral soil organic carbon v1.0.1
 
-External data referenced in place from https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr
+AFOLU mineral soil organic carbon (v1.0.1): per-hectare stock-change rates on a 5-year change-interval index axis (0..4, not calendar years). Index 4 (2020-2022) is distrusted by the AFOLU GHG flux model team for anomalously high gross loss and gain.
 
 ## Spatial Coverage
 

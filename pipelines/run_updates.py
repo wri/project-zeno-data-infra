@@ -12,10 +12,12 @@ from shapely.geometry import box
 
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
+from pipelines.globals import gnw_catalog_root
 from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
+from pipelines.sources.portolan_catalog import PortolanCatalog
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
@@ -110,6 +112,7 @@ def run_land_ghg_inventory_update(
         )
     return land_ghg_inventory_flow.land_ghg_inventory_area(
         version=version,
+        catalog=PortolanCatalog(gnw_catalog_root),
         overwrite=overwrite,
         bbox=bbox,
         component=LAND_GHG_INVENTORY_COMPONENT.get(flow_name),

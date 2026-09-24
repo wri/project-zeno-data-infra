@@ -11,12 +11,7 @@ import rioxarray as rio
 import xarray as xr
 from odc.geo.xr import xr_reproject
 
-from pipelines.catalog_sources import source_uri
-from pipelines.globals import (
-    gnw_catalog_root,
-    land_ghg_inventory_agriculture_zarr_uri,
-    land_ghg_inventory_vegetation_zarr_uri,
-)
+from pipelines.globals import land_ghg_inventory_agriculture_zarr_uri
 from pipelines.land_ghg_inventory.agriculture_stages import (
     AGRICULTURE_SOURCE_VARS,
     AGRICULTURE_ZARR_GROUP,
@@ -27,17 +22,13 @@ from pipelines.utils import s3_uri_exists
 # only its geobox (30m, EPSG:4326) is used, not its values.
 REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 
-# Source COGs: static snapshots (single year, no versioning scheme), both
-# absolute per-pixel totals in kg CO2e (see module docstring).
-CROPLAND_COG_URI = source_uri(gnw_catalog_root, "cropland-emissions")
-LIVESTOCK_COG_URI = source_uri(gnw_catalog_root, "livestock-emissions")
 KG_PER_MG = 1_000
 
 
-def _reference_geobox():
+def _reference_geobox(vegetation_uri: str):
     """The vegetation zarr's 30m grid, which the agriculture raster resamples to."""
     ref = xr.open_zarr(
-        land_ghg_inventory_vegetation_zarr_uri,
+        vegetation_uri,
         storage_options={"requester_pays": True},
     )[REFERENCE_GRID_VAR]
     ref = ref.isel(year=0, drop=True)
@@ -92,7 +83,12 @@ def _resample_total_uniformly(cog_uri: str, geobox) -> xr.DataArray:
     return reprojected.fillna(0)
 
 
-def create_agriculture_zarr(overwrite: bool = False) -> str:
+def create_agriculture_zarr(
+    vegetation_uri: str,
+    cropland_uri: str,
+    livestock_uri: str,
+    overwrite: bool = False,
+) -> str:
     """Resample cropland and livestock emissions onto the vegetation grid,
     convert to absolute per-pixel Mg totals, and write the zarr consumed by
     ``agriculture_stages.load_agriculture``."""
@@ -102,10 +98,10 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
     if not overwrite and s3_uri_exists(marker_uri):
         return land_ghg_inventory_agriculture_zarr_uri
 
-    geobox = _reference_geobox()
+    geobox = _reference_geobox(vegetation_uri)
 
-    cropland_kg = _resample_total_uniformly(CROPLAND_COG_URI, geobox)
-    livestock_kg = _resample_total_uniformly(LIVESTOCK_COG_URI, geobox)
+    cropland_kg = _resample_total_uniformly(cropland_uri, geobox)
+    livestock_kg = _resample_total_uniformly(livestock_uri, geobox)
 
     cropland = cropland_kg / KG_PER_MG
     livestock = livestock_kg / KG_PER_MG
