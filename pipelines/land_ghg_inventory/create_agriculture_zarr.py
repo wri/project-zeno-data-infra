@@ -11,7 +11,9 @@ import rioxarray as rio
 import xarray as xr
 from odc.geo.xr import xr_reproject
 
+from pipelines.catalog_sources import source_uri
 from pipelines.globals import (
+    gnw_catalog_root,
     land_ghg_inventory_agriculture_zarr_uri,
     land_ghg_inventory_vegetation_zarr_uri,
 )
@@ -27,16 +29,8 @@ REFERENCE_GRID_VAR = "gross_emissions__all_C_pools__all_gases__MgCO2e_ha_yr"
 
 # Source COGs: static snapshots (single year, no versioning scheme), both
 # absolute per-pixel totals in kg CO2e (see module docstring).
-CROPLAND_COG_URI = (
-    "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/"
-    "raw__from_Cornell/20250828/year_2020/all_sources/"
-    "Global_grid_cropland_emissions_total_amount_CO2eq_all_crops_"
-    "without_peat_burn_kg_CO2__20260803.tif"
-)
-LIVESTOCK_COG_URI = (
-    "s3://gfw-data-lake/wri_land_ghg_monitoring_system/v1.0.3/raw_data/"
-    "Total_GHG_kg_CO2e_yr_Livestock_ALL.tif"
-)
+CROPLAND_COG_URI = source_uri(gnw_catalog_root, "cropland-emissions")
+LIVESTOCK_COG_URI = source_uri(gnw_catalog_root, "livestock-emissions")
 KG_PER_MG = 1_000
 
 

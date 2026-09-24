@@ -1,6 +1,12 @@
+from pathlib import Path
+
+from pipelines.catalog_sources import source_uri
+
 DATA_LAKE_BUCKET = "gfw-data-lake"
 ANALYTICS_BUCKET = "lcl-analytics"
 GADM_VERSION = "v4.1.85"
+# Portolan catalog of the external sources the pipelines read.
+gnw_catalog_root = str(Path(__file__).parent / "catalog")
 
 country_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm0.zarr"
 country_10m_zarr_uri = "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm0.10m.zarr"
@@ -23,26 +29,18 @@ pixel_area_10m_zarr_uri = (
 )
 # AFOLU GHG flux model — vegetation outputs (v1.0.5), annual 2016-2024, 30m.
 # Published by the AFOLU_GHG_flux_model team on gfw2-data; per-hectare fluxes.
-land_ghg_inventory_vegetation_zarr_uri = (
-    "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_vegetation/"
-    "version_1_0_5__standard__global/mega_zarr/annual_intervals/4000_pixels/"
-    "20260130/vegetation_zarr.zarr"
+land_ghg_inventory_vegetation_zarr_uri = source_uri(
+    gnw_catalog_root, "lulucf-vegetation"
 )
 # Mineral soil organic carbon (SOC v1.0.1). 5-year change-interval index axis
 # (index 0..4, not calendar years); per-hectare stock-change rates. Only index 3
 # (the 2015-2020 change interval) is used -- index 4 (2020-2022) is distrusted
 # per the AFOLU_GHG_flux_model team (anomalously high gross loss/gain).
-land_ghg_inventory_soc_zarr_uri = (
-    "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/"
-    "version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr"
-)
+land_ghg_inventory_soc_zarr_uri = source_uri(gnw_catalog_root, "mineral-soil")
 # Organic (peat) soil emissions (v1.0.1). 5-year block axis with real calendar-year
 # labels [2005, 2010, 2015, 2020, 2024]; per-hectare rates. Only the last two blocks
 # (2020, 2024) are used, covering the 2016-2020 and 2021-2024 vegetation periods.
-land_ghg_inventory_organic_soil_zarr_uri = (
-    "s3://gfw2-data/climate/AFOLU_flux_model/organic_soils/outputs/version_1_0_1/"
-    "mega_zarr/ogh_mixed_f1_f15_f2_20260513/five_year/4000_pixels/20260525/mega.zarr"
-)
+land_ghg_inventory_organic_soil_zarr_uri = source_uri(gnw_catalog_root, "organic-soil")
 # Agriculture emissions (cropland + livestock). Single static snapshot, no year
 # axis. Livestock's source COG is per-hectare (kg/ha); cropland's is an
 # absolute per-pixel total (kg), mass-conserving-resampled -- see
