@@ -17,6 +17,11 @@ RUN apt-get update \
 
 RUN curl -LsSf https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh | sh
 
+# Install the Google Cloud CLI (gcloud), needed for the "gcloud transfer jobs"
+# commands used by pipelines/integrated_alerts/transfer_to_gcs.py.
+RUN curl -sSL https://sdk.cloud.google.com | bash -s -- --disable-prompts --install-dir=/opt
+ENV PATH=/opt/google-cloud-sdk/bin:${PATH}
+
 RUN useradd -m -s /bin/bash appuser
 RUN mkdir -p /app/pipelines
 RUN chown appuser:appuser /app/pipelines
