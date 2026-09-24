@@ -1,0 +1,78 @@
+{
+  "type": "Collection",
+  "id": "mineral-soil",
+  "stac_version": "1.1.0",
+  "description": "AFOLU mineral soil organic carbon (v1.0.1): per-hectare stock-change rates on a 5-year change-interval index axis (0..4, not calendar years). Index 4 (2020-2022) is distrusted by the AFOLU GHG flux model team for anomalously high gross loss and gain.",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "via",
+      "href": "https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr",
+      "type": "text/html",
+      "title": "AFOLU mineral soil organic carbon v1.0.1"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    }
+  ],
+  "title": "AFOLU mineral soil organic carbon v1.0.1",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180,
+          -90,
+          180,
+          90
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "CC-BY-4.0",
+  "assets": {
+    "data": {
+      "href": "https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr",
+      "type": "application/vnd+zarr",
+      "title": "AFOLU mineral soil organic carbon v1.0.1",
+      "roles": [
+        "data",
+        "external"
+      ],
+      "alternate": {
+        "s3": {
+          "href": "s3://gfw2-data/climate/AFOLU_flux_model/LULUCF/outputs_soil_organic_carbon/version_1_0_1__standard__global/zarr/4000_pixels/20260611/SOC_zarr.zarr"
+        }
+      }
+    }
+  },
+  "stac_extensions": [
+    "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
+  ]
+}

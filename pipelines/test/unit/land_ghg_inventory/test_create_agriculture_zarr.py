@@ -9,6 +9,12 @@ from pipelines.globals import land_ghg_inventory_agriculture_zarr_uri
 from pipelines.land_ghg_inventory import create_agriculture_zarr as mod
 from pipelines.land_ghg_inventory.agriculture_stages import AGRICULTURE_SOURCE_VARS
 
+SOURCES = {
+    "vegetation_uri": "s3://sources/vegetation.zarr",
+    "cropland_uri": "s3://sources/cropland.tif",
+    "livestock_uri": "s3://sources/livestock.tif",
+}
+
 
 @pytest.fixture
 def reference_veg_dataset():
@@ -53,15 +59,23 @@ def test_create_agriculture_zarr_writes_expected_shape(reference_veg_dataset):
 
     with (
         patch.object(mod, "s3_uri_exists", return_value=False),
-        patch.object(mod.xr, "open_zarr", return_value=reference_veg_dataset),
+        patch.object(
+            mod.xr, "open_zarr", return_value=reference_veg_dataset
+        ) as mock_open_zarr,
         patch.object(
             mod.rio,
             "open_rasterio",
             side_effect=[_fake_total_cog(400.0), _fake_total_cog(2_000.0)],
-        ),
+        ) as mock_open_rasterio,
         patch.object(xr.Dataset, "to_zarr", fake_to_zarr),
     ):
-        result_uri = mod.create_agriculture_zarr(overwrite=False)
+        result_uri = mod.create_agriculture_zarr(**SOURCES, overwrite=False)
+
+    assert mock_open_zarr.call_args.args[0] == SOURCES["vegetation_uri"]
+    assert [call.args[0] for call in mock_open_rasterio.call_args_list] == [
+        SOURCES["cropland_uri"],
+        SOURCES["livestock_uri"],
+    ]
 
     assert result_uri == land_ghg_inventory_agriculture_zarr_uri
     assert captured["uri"] == land_ghg_inventory_agriculture_zarr_uri
@@ -101,7 +115,7 @@ def test_create_agriculture_zarr_skips_when_present_and_not_overwrite():
         patch.object(mod, "s3_uri_exists", return_value=True) as mock_exists,
         patch.object(mod, "_reference_geobox") as mock_geobox,
     ):
-        result_uri = mod.create_agriculture_zarr(overwrite=False)
+        result_uri = mod.create_agriculture_zarr(**SOURCES, overwrite=False)
 
     assert result_uri == land_ghg_inventory_agriculture_zarr_uri
     mock_exists.assert_called_once_with(
@@ -121,7 +135,7 @@ def test_create_agriculture_zarr_overwrite_skips_exists_check(reference_veg_data
         ),
         patch.object(xr.Dataset, "to_zarr"),
     ):
-        mod.create_agriculture_zarr(overwrite=True)
+        mod.create_agriculture_zarr(**SOURCES, overwrite=True)
 
     mock_exists.assert_not_called()
 
@@ -151,7 +165,7 @@ def test_resample_total_uniformly_conserves_mass_per_source_pixel(
     distinct_cog.rio.write_crs("EPSG:4326", inplace=True)
 
     with patch.object(mod.xr, "open_zarr", return_value=reference_veg_dataset):
-        geobox = mod._reference_geobox()
+        geobox = mod._reference_geobox(SOURCES["vegetation_uri"])
 
     with patch.object(mod.rio, "open_rasterio", return_value=distinct_cog):
         result = mod._resample_total_uniformly("fake_uri", geobox).compute()
@@ -187,7 +201,7 @@ def test_resample_total_uniformly_masks_nodata_sentinel(reference_veg_dataset):
     cog_with_nodata.rio.write_nodata(-9999.0, inplace=True)
 
     with patch.object(mod.xr, "open_zarr", return_value=reference_veg_dataset):
-        geobox = mod._reference_geobox()
+        geobox = mod._reference_geobox(SOURCES["vegetation_uri"])
 
     def fake_open_rasterio(uri, chunks=None, masked=False):
         return (
