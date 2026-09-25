@@ -1,9 +1,8 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, Tuple
 
 import pandas as pd
 import xarray as xr
-from dateutil.relativedelta import relativedelta
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -24,7 +23,7 @@ def load_data(
     dist_zarr_uri: str,
     contextual_uri: Optional[str] = None,
 ) -> Tuple[xr.DataArray, ...]:
-    """Load in the Dist alert Zarr, the GADM zarrs, and possibly a contextual layer zarr"""
+    """Load the DIST alert zarr, the GADM zarrs, and possibly a contextual layer zarr"""
 
     dist_alerts = _load_zarr(dist_zarr_uri)
 
@@ -99,12 +98,16 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df.rename(columns={"value": "area_ha"}, inplace=True)
     df.rename(columns={"confidence": "dist_alert_confidence"}, inplace=True)
     df.rename(columns={"alert_date": "dist_alert_date"}, inplace=True)
-    df["dist_alert_date"] = df.sort_values(by="dist_alert_date").dist_alert_date.apply(
-        lambda x: date(2020, 12, 31) + relativedelta(days=x)
-    )
-    df["dist_alert_confidence"] = df.dist_alert_confidence.apply(
-        lambda x: alerts_confidence[x]
-    )
+    # Convert distinct values once; row-wise .apply is very slow at this row count.
+    day_to_date = {
+        d: date(2020, 12, 31) + timedelta(days=int(d))
+        for d in df["dist_alert_date"].unique()
+    }
+    df["dist_alert_date"] = df["dist_alert_date"].map(day_to_date)
+    confidence_labels = {
+        c: alerts_confidence[c] for c in df["dist_alert_confidence"].unique()
+    }
+    df["dist_alert_confidence"] = df["dist_alert_confidence"].map(confidence_labels)
     return df
 
 

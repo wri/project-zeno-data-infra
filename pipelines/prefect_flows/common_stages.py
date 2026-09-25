@@ -341,7 +341,7 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     }
     coord_dict["value"] = values
     df = pd.DataFrame(coord_dict)
-    df["country"] = df["country"].apply(lambda x: numeric_to_alpha3.get(x, None))
+    df["country"] = df["country"].map(numeric_to_alpha3)
     df.dropna(subset="country", inplace=True)
 
     return df
@@ -407,7 +407,9 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     results_with_ids = pd.concat([country_df, region_df, subregion_df])
     results_with_ids["aoi_type"] = "admin"
     print(
-        f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, {len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} -> {len(results_with_ids)}/{results_with_ids.size}"
+        f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, "
+        f"{len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} "
+        f"-> {len(results_with_ids)}/{results_with_ids.size}"
     )
 
     return results_with_ids
@@ -490,7 +492,8 @@ def create_zarr_from_tiles(
     if dtype:
         dataset = dataset.astype(dtype)
     for chunk_size, group in groups_to_write:
-        # `mode` applies to group, so `w` won't overwrite the whole store if the group already exists, just that group.
+        # `mode` applies to the group: `w` overwrites just that group if it
+        # already exists, not the whole store.
         dataset.chunk({"x": chunk_size, "y": chunk_size}).to_zarr(
             zarr_uri, mode="w", group=group
         )

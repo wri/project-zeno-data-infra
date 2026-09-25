@@ -12,7 +12,10 @@ from pipelines.utils import s3_uri_exists
 def dist_alerts_by_grasslands_area(
     dist_zarr_uri: str, dist_version: str, overwrite=False
 ):
-    result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-grassland-class.parquet"
+    result_uri = (
+        f"{dist_common_tasks.DIST_PREFIX}/{dist_version}"
+        "/admin-dist-alerts-by-grassland-class.parquet"
+    )
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
@@ -41,8 +44,8 @@ def dist_alerts_by_grasslands_area(
         name="dist-alerts-by-grasslands-postprocess-result"
     )(result_dataset)
 
-    result_df["grasslands"] = result_df["grasslands"].apply(
-        (lambda x: "grasslands" if x == 1 else "non-grasslands")
+    result_df["grasslands"] = np.where(
+        result_df["grasslands"] == 1, "grasslands", "non-grasslands"
     )
 
     result_uri = common_tasks.save_result.with_options(

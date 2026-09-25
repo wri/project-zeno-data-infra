@@ -18,7 +18,10 @@ DIST_DRIVERS = {
 
 @flow(name="DIST alerts area by drivers", retries=2, retry_delay_seconds=120)
 def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
-    result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-driver.parquet"
+    result_uri = (
+        f"{dist_common_tasks.DIST_PREFIX}/{dist_version}"
+        "/admin-dist-alerts-by-driver.parquet"
+    )
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
@@ -44,9 +47,7 @@ def dist_alerts_by_drivers_area(dist_zarr_uri: str, dist_version: str, overwrite
         name="dist-alerts-by-drivers-postprocess-result"
     )(result_dataset)
 
-    result_df["driver"] = result_df["driver"].apply(
-        lambda x: DIST_DRIVERS.get(x, "Unclassified")
-    )
+    result_df["driver"] = result_df["driver"].map(DIST_DRIVERS).fillna("Unclassified")
 
     common_tasks.save_result.with_options(name="dist-alerts-by-drivers-save-result")(
         result_df, result_uri
