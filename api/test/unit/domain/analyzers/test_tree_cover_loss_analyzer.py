@@ -21,6 +21,7 @@ from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepositor
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    ConcessionAreaOfInterest,
     CustomAreaOfInterest,
     ProtectedAreaOfInterest,
 )
@@ -28,7 +29,7 @@ from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
 class TestAoiGeometryRepository:
-    async def load(self, aoi_type, aoi_ids):
+    async def load(self, aoi):
         geometries = [box(10.1, -0.1, -0.1, 10.1)]
         areas_ha = [1000.0] * len(geometries)
         return geometries, areas_ha
@@ -182,6 +183,41 @@ async def test_flox_handler_happy_path():
 
 
 @pytest.mark.asyncio
+async def test_flox_handler_concession():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
+    class ConcessionGeometryRepository:
+        async def load(self, aoi):
+            assert aoi.concession_type == "oil_palm"
+            return [box(10.1, -0.1, -0.1, 10.1)], [1000.0]
+
+    aoi = ConcessionAreaOfInterest(concession_type="oil_palm", ids=["7"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        canopy_cover=30,
+        start_year="2010",
+        end_year="2022",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        dask_client_router=DaskClientRouter(dask_client, None),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=ConcessionGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
+    )
+    await analyzer.analyze(analysis)
+    results = pd.DataFrame(analysis.result)
+
+    assert results.aoi_id.to_list() == ["7"]
+    assert results.aoi_type.to_list() == ["concession"]
+    assert results.area_ha.to_list() == [pytest.approx(125000.0)]
+
+
+@pytest.mark.asyncio
 async def test_flox_handler_natural_forests():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
@@ -280,7 +316,7 @@ async def test_flox_handler_custom_area():
     dask_client = Client(dask_cluster)
 
     class TestAoiGeometryRepository:
-        async def load(self, aoi_type, aoi_ids):
+        async def load(self, aoi):
             raise ValueError("This should not be called for custom AOI!")
 
     feature_collection = {

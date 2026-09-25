@@ -51,6 +51,7 @@ packages = [
   "grasslands",
   "disturbance",
   "carbon_flux",
+  "concessions",
   "natural_lands",
   "prefect_flows",
   "tree_cover_loss",

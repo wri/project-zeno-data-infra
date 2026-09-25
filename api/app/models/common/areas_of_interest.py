@@ -107,6 +107,18 @@ class IndigenousAreaOfInterest(AreaOfInterest):
     )
 
 
+class ConcessionAreaOfInterest(AreaOfInterest):
+    type: Literal["concession"] = "concession"
+    concession_type: Literal["oil_palm"] = Field(..., title="Type of concession")
+    ids: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_OTF_FEATURES,
+        title="List of concession IDs",
+        examples=[["1"], ["1", "2"]],
+    )
+
+
 class CustomAreaOfInterest(AreaOfInterest):
     type: Literal["feature_collection"] = "feature_collection"
     feature_collection: Dict[str, Any] = Field(

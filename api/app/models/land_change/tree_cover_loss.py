@@ -10,6 +10,7 @@ from pydantic import (
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    ConcessionAreaOfInterest,
     CustomAreaOfInterest,
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
@@ -24,6 +25,7 @@ AoiUnion = Union[
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,
+    ConcessionAreaOfInterest,
     CustomAreaOfInterest,
 ]
 
@@ -107,6 +109,7 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
                     "natural_forest filter is not currently available for admin AOI type."
                 )
         return self
+
 
 class TreeCoverLossAnalytics(StrictBaseModel):
     result: Optional[dict] = None

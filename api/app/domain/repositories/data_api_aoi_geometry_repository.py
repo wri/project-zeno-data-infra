@@ -1,15 +1,17 @@
 import logging
 import os
-from typing import Iterable, List
+from typing import Iterable
 
 import httpx
 from shapely import wkb
 from shapely.geometry import shape
 
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 
-class DataApiAoiGeometryRepository:
-    async def load(self, aoi_type: str, aoi_ids: List[str]):
-        return await self._get_geojsons_from_data_api(aoi_type, aoi_ids)
+
+class DataApiAoiGeometryRepository(AoiGeometryRepository):
+    async def load(self, aoi):
+        return await self._get_geojsons_from_data_api(aoi.type, aoi.ids)
 
     async def _get_geojsons_from_data_api(self, aoi_type, aoi_ids):
         url, params = self._get_geojson_request_for_data_api(aoi_type, aoi_ids)

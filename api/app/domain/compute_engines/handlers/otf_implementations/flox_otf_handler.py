@@ -60,9 +60,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 aoi.feature_collection["features"]
             )
         else:
-            aoi_geometries, areas_ha = await self.aoi_geometry_repository.load(
-                aoi.type, aoi.ids
-            )
+            aoi_geometries, areas_ha = await self.aoi_geometry_repository.load(aoi)
             total_area_ha = sum(areas_ha)
 
         dask_client = self._resolve_dask_client(total_area_ha)

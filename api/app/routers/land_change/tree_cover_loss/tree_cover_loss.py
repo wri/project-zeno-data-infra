@@ -3,16 +3,14 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_environment
+from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.analyzers.tree_cover_loss_analyzer import (
     INPUT_URIS,
     TreeCoverLossAnalyzer,
 )
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.domain.repositories.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
@@ -41,6 +39,9 @@ def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
 ) -> AnalysisService:
 
     return AnalysisService(
@@ -48,7 +49,7 @@ def create_analysis_service(
         analyzer=TreeCoverLossAnalyzer(
             dask_client_router=request.app.state.dask_client_router,
             dataset_repository=ZarrDatasetRepository(),
-            aoi_geometry_repository=DataApiAoiGeometryRepository(),
+            aoi_geometry_repository=aoi_geometry_repository,
             input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,

@@ -19,9 +19,7 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
-from app.domain.repositories.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -129,7 +127,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         self,
         dask_client_router: DaskClientRouter | None = None,
         dataset_repository: ZarrDatasetRepository | None = None,
-        aoi_geometry_repository: DataApiAoiGeometryRepository | None = None,
+        aoi_geometry_repository: AoiGeometryRepository | None = None,
         input_uris: Dict[str, str] | None = None,
     ):
         self.dask_client_router = dask_client_router

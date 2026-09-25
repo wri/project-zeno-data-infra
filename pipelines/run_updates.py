@@ -6,17 +6,18 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
-
 from pipelines.carbon_flux.prefect_flows import carbon_flow
+from pipelines.concessions.concession_source import ConcessionSource
+from pipelines.concessions.prefect_flows import concessions_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -116,6 +117,16 @@ def run_land_ghg_inventory_update(
     )
 
 
+def concessions_update(source: ConcessionSource):
+    """Builds the update flow for one concession dataset."""
+
+    @flow(name=f"{source.concession_type} concessions update")
+    def run_concessions_update(version, overwrite=False, is_latest=False) -> list[str]:
+        return concessions_flow.concessions_flow(source, version, overwrite=overwrite)
+
+    return run_concessions_update
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -133,6 +144,7 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    OIL_PALM_CONCESSIONS_UPDATE = "oil_palm_concessions_update"
 
 
 update_flows = {
@@ -144,6 +156,16 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.OIL_PALM_CONCESSIONS_UPDATE: concessions_update(
+        ConcessionSource(
+            concession_type="oil_palm",
+            source_uri=(
+                "s3://gfw-data-lake/gfw_oil_palm/{version}/"
+                "gfw_global_oil_palm_concessions_{version}_public.zip"
+            ),
+            dropped_columns=("shape_leng", "shape_area"),
+        )
+    ),
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -154,6 +176,7 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
+    UpdateFlow.OIL_PALM_CONCESSIONS_UPDATE,
 )
 
 # flow_name values that route into run_land_ghg_inventory_update

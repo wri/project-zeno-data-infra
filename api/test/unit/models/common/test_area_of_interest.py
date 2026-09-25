@@ -2,6 +2,7 @@ import pytest
 
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    ConcessionAreaOfInterest,
     CustomAreaOfInterest,
 )
 
@@ -121,4 +122,21 @@ class TestCustomAreaOfInterestHash:
             }
             _ = CustomAreaOfInterest(
                 feature_collection=big_fc,
+            )
+
+
+class TestConcessionAreaOfInterest:
+    def test_happy_path(self):
+        aoi = ConcessionAreaOfInterest(concession_type="oil_palm", ids=["1", "2"])
+
+        assert aoi.type == "concession"
+
+    def test_unknown_concession_type_is_rejected(self):
+        with pytest.raises(ValueError):
+            ConcessionAreaOfInterest(concession_type="unicorn_farm", ids=["1"])
+
+    def test_over_max_ids_is_rejected(self):
+        with pytest.raises(ValueError):
+            ConcessionAreaOfInterest(
+                concession_type="oil_palm", ids=[str(i) for i in range(51)]
             )
