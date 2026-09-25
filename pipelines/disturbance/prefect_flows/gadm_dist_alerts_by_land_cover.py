@@ -24,7 +24,10 @@ LAND_COVER_MAPPING = {
 def dist_alerts_by_land_cover_area(
     dist_zarr_uri: str, dist_version: str, overwrite=False
 ):
-    result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-land-cover-class.parquet"
+    result_uri = (
+        f"{dist_common_tasks.DIST_PREFIX}/{dist_version}"
+        "/admin-dist-alerts-by-land-cover-class.parquet"
+    )
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
@@ -53,8 +56,8 @@ def dist_alerts_by_land_cover_area(
         name="dist-alerts-by-land-cover-postprocess-result"
     )(result_dataset)
 
-    result_df["land_cover"] = result_df["land_cover"].apply(
-        lambda x: LAND_COVER_MAPPING.get(x, "Unclassified")
+    result_df["land_cover"] = (
+        result_df["land_cover"].map(LAND_COVER_MAPPING).fillna("Unclassified")
     )
 
     result_uri = common_tasks.save_result.with_options(

@@ -57,12 +57,12 @@ def setup_compute(
     return stages.setup_compute(datasets, expected_groups)
 
 
-@task
+@task(persist_result=False)
 def postprocess_result(result: xr.DataArray) -> pd.DataFrame:
     return stages.postprocess_result(result)
 
 
-@task
+@task(persist_result=False)
 def qc_against_validation_source(
     result_df: pd.DataFrame, version: Optional[str] = None
 ) -> bool:

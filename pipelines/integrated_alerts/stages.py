@@ -1,10 +1,9 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from dateutil.relativedelta import relativedelta
 
 from pipelines.globals import (
     country_10m_zarr_uri,
@@ -105,10 +104,16 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df.rename(columns={"value": "area_ha"}, inplace=True)
     df.rename(columns={"confidence": "alert_confidence"}, inplace=True)
     df.rename(columns={"alert_date": "alert_date"}, inplace=True)
-    df["alert_date"] = df.sort_values(by="alert_date").alert_date.apply(
-        lambda x: date(2014, 12, 31) + relativedelta(days=x)
-    )
-    df["alert_confidence"] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
+    # Convert distinct values once; row-wise .apply is very slow at this row count.
+    day_to_date = {
+        d: date(2014, 12, 31) + timedelta(days=int(d))
+        for d in df["alert_date"].unique()
+    }
+    df["alert_date"] = df["alert_date"].map(day_to_date)
+    confidence_labels = {
+        c: alerts_confidence[c] for c in df["alert_confidence"].unique()
+    }
+    df["alert_confidence"] = df["alert_confidence"].map(confidence_labels)
     df = rollup_by_gadm_and_convert_to_aoi(df, ["alert_date", "alert_confidence"])
     return df
 

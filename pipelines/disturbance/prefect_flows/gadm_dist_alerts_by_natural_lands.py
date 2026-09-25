@@ -35,7 +35,10 @@ NATURAL_LANDS_CLASSES = {
 def dist_alerts_by_natural_lands_area(
     dist_zarr_uri: str, dist_version: str, overwrite=False
 ):
-    result_uri = f"{dist_common_tasks.DIST_PREFIX}/{dist_version}/admin-dist-alerts-by-natural-land-class.parquet"
+    result_uri = (
+        f"{dist_common_tasks.DIST_PREFIX}/{dist_version}"
+        "/admin-dist-alerts-by-natural-land-class.parquet"
+    )
     if not overwrite and s3_uri_exists(result_uri):
         return result_uri
 
@@ -62,8 +65,10 @@ def dist_alerts_by_natural_lands_area(
     )(result_dataset)
 
     # natural_land_class
-    result_df["natural_land_class"] = result_df["natural_land_class"].apply(
-        lambda x: NATURAL_LANDS_CLASSES.get(x, "Unclassified")
+    result_df["natural_land_class"] = (
+        result_df["natural_land_class"]
+        .map(NATURAL_LANDS_CLASSES)
+        .fillna("Unclassified")
     )
 
     result_uri = common_tasks.save_result.with_options(
