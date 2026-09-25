@@ -10,6 +10,7 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from shapely.geometry import box
 
+from pipelines.benchmarks.dist_alert_pixel_test import dist_alert_pixel_test
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
@@ -133,9 +134,11 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    DIST_ALERT_PIXEL_TEST = "dist_alert_pixel_test"
 
 
 update_flows = {
+    UpdateFlow.DIST_ALERT_PIXEL_TEST: dist_alert_pixel_test,
     UpdateFlow.DIST_UPDATE: run_dist_update,
     UpdateFlow.TCL_UPDATE: run_tcl_update,
     UpdateFlow.INTEGRATED_ALERTS_UPDATE: run_integrated_alerts_update,
@@ -176,10 +179,13 @@ def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
     name="GNW zonal stats update",
     log_prints=True,
     description=(
-        "This is the entry point to run updates via Prefect Cloud UI or CLI to update zonal statistics for various datasets for GADM areas."
+        "This is the entry point to run updates via Prefect Cloud UI or CLI to "
+        "update zonal statistics for various datasets for GADM areas."
         "Two flows are available currently: "
-        "-'dist_update' will just run an update on DIST alerts, and is the default for backward compatibility"
-        "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide all necessary updates for TCL."
+        "-'dist_update' will just run an update on DIST alerts, and is the "
+        "default for backward compatibility"
+        "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide "
+        "all necessary updates for TCL."
     ),
 )
 def run_updates(
@@ -190,12 +196,14 @@ def run_updates(
     bbox=None,
     local=False,
     performance_report_path=None,
+    dist_subflows=None,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
     result_uris = []
 
-    # when called from Prefect webhook, the booleans flags are passed as strings, so we need to convert them to booleans
+    # when called from Prefect webhook, the booleans flags are passed as strings,
+    # so we need to convert them to booleans
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
@@ -211,7 +219,8 @@ def run_updates(
         if flow_fn is None:
             accepted = [e.value for e in UpdateFlow]
             raise ValueError(
-                f"Unsupported flow selection: '{flow_name}'. Accepted values: {accepted}"
+                f"Unsupported flow selection: '{flow_name}'. "
+                f"Accepted values: {accepted}"
             )
 
         _validate_flow_args(flow_name, version)
@@ -229,6 +238,8 @@ def run_updates(
         if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
             kwargs["flow_name"] = flow_name.value
+        if flow_name == UpdateFlow.DIST_ALERT_PIXEL_TEST and dist_subflows:
+            kwargs["dist_subflows"] = dist_subflows
         with report:
             result_uris = flow_fn(**kwargs)
 
