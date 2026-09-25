@@ -3,8 +3,8 @@ from typing import Optional, Tuple
 import xarray as xr
 from prefect import task
 
-from pipelines.integrated_alerts import stages
 from pipelines.globals import ANALYTICS_BUCKET
+from pipelines.integrated_alerts import stages
 
 INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
 
@@ -25,6 +25,6 @@ def setup_compute(
     return stages.setup_compute(datasets, expected_groups, contextual_name)
 
 
-@task
+@task(persist_result=False)
 def postprocess_result(result: xr.DataArray):
     return stages.create_result_dataframe(result)
