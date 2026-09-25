@@ -1,7 +1,7 @@
 """Benchmark: postprocess + save on the flow process vs on the worker holding results.
 
-Throwaway: lives on a benchmark branch only. Rebuilds real DIST reduction results on
-a worker from published parquet, then times both placements end to end.
+Throwaway: lives on a benchmark branch only. Runs the real DIST reduction once, keeps
+its result on the cluster as a future, then times both placements from that result.
 """
 
 import gc
@@ -10,83 +10,75 @@ import shutil
 import tempfile
 import threading
 import time
-from datetime import date
 from pathlib import Path
 
 import fsspec
 import numpy as np
 import pandas as pd
 import psutil
-import sparse
 import xarray as xr
 from dask.distributed import get_client, wait
+from flox import ReindexArrayType, ReindexStrategy
+from flox.xarray import xarray_reduce
 from prefect import flow
 from prefect.logging import get_run_logger
 
 import pipelines
 from pipelines.disturbance import stages as dist_stages
+from pipelines.disturbance.create_zarr import create_zarr
 from pipelines.disturbance.prefect_flows.gadm_dist_alerts_by_natural_lands import (
     NATURAL_LANDS_CLASSES,
 )
+from pipelines.globals import sbtn_natural_lands_zarr_uri
 from pipelines.prefect_flows import common_stages
 
-SOURCE_PREFIX = "s3://lcl-analytics/zonal-statistics/dist-alerts/v20260912"
 SCRATCH_PREFIX = "s3://lcl-analytics/scratch/postprocess-placement-test"
+# output name -> (contextual column, contextual zarr, contextual expected groups)
 OUTPUTS = {
     "admin-dist-alerts": None,
-    "admin-dist-alerts-by-natural-land-class": "natural_land_class",
+    "admin-dist-alerts-by-natural-land-class": (
+        "natural_land_class",
+        sbtn_natural_lands_zarr_uri,
+        np.arange(22),
+    ),
 }
-COORD_VALUES = {
-    "country": np.arange(999),
-    "region": np.arange(86),
-    "subregion": np.arange(854),
-    "natural_land_class": np.arange(22),
-    "alert_date": np.arange(731, 3288),
-    "confidence": np.array([1, 2, 3]),
-}
+ADMIN_GROUPS = (np.arange(999), np.arange(86), np.arange(854))
+DATE_CONFIDENCE_GROUPS = (np.arange(731, 3288), [1, 2, 3])
 
 
-def rebuild_result(parquet_uri: str, contextual) -> xr.DataArray:
-    """Invert DIST postprocessing to recover the sparse array flox returns."""
-    df = pd.read_parquet(parquet_uri)
-    alpha3_to_numeric = {v: k for k, v in common_stages.numeric_to_alpha3.items()}
-    dims = ["country", "region", "subregion"]
-    dims += [contextual] if contextual else []
-    dims += ["alert_date", "confidence"]
-    days = (
-        pd.to_datetime(df.dist_alert_date) - pd.Timestamp(date(2020, 12, 31))
-    ).dt.days
-    idx = {
-        "country": df.country.map(alpha3_to_numeric).to_numpy(),
-        "region": df.region.to_numpy(),
-        "subregion": df.subregion.to_numpy(),
-        "alert_date": days.to_numpy() - 731,
-        "confidence": df.dist_alert_confidence.map({"low": 2, "high": 3}).to_numpy()
-        - 1,
-    }
-    if contextual == "natural_land_class":
-        codes = {v: k for k, v in NATURAL_LANDS_CLASSES.items()}
-        idx[contextual] = df[contextual].map(codes).fillna(0).astype(int).to_numpy()
-    coo = sparse.COO(
-        np.stack([idx[d] for d in dims]),
-        df.area_ha.to_numpy(),
-        shape=tuple(len(COORD_VALUES[d]) for d in dims),
+def lazy_reduction(dist_zarr_uri: str, contextual) -> xr.DataArray:
+    """The same load, setup and flox reduce as the DIST sub-flows, left lazy."""
+    name, uri, groups = contextual or (None, None, None)
+    expected_groups = ADMIN_GROUPS + ((groups,) if contextual else ())
+    expected_groups += DATE_CONFIDENCE_GROUPS
+    datasets = dist_stages.load_data(dist_zarr_uri, uri)
+    reduce_mask, groupbys, expected_groups = dist_stages.setup_compute(
+        datasets, expected_groups, name
     )
-    return xr.DataArray(coo, dims=dims, coords={d: COORD_VALUES[d] for d in dims})
+    return xarray_reduce(
+        reduce_mask,
+        *groupbys,
+        func="sum",
+        expected_groups=expected_groups,
+        reindex=ReindexStrategy(
+            blockwise=False, array_type=ReindexArrayType.SPARSE_COO
+        ),
+        fill_value=0,
+    )
 
 
-def postprocess(result: xr.DataArray, contextual) -> pd.DataFrame:
+def postprocess(result: xr.DataArray, contextual_name) -> pd.DataFrame:
     df = dist_stages.create_result_dataframe(result)
-    if contextual == "natural_land_class":
-        df[contextual] = (
-            df[contextual].map(NATURAL_LANDS_CLASSES).fillna("Unclassified")
+    if contextual_name == "natural_land_class":
+        df[contextual_name] = (
+            df[contextual_name].map(NATURAL_LANDS_CLASSES).fillna("Unclassified")
         )
     return df
 
 
-def postprocess_and_save(result: xr.DataArray, contextual, uri: str) -> dict:
+def postprocess_and_save(result: xr.DataArray, contextual_name, uri: str) -> dict:
     t0 = time.perf_counter()
-    df = postprocess(result, contextual)
+    df = postprocess(result, contextual_name)
     t1 = time.perf_counter()
     common_stages.save_results(df, uri)
     t2 = time.perf_counter()
@@ -143,27 +135,32 @@ def _timed(fn):
 
 @flow(name="Postprocess placement benchmark", log_prints=True)
 def postprocess_placement_benchmark(
-    version=None,
+    version="v20260919",
     overwrite=False,
     is_latest=False,
-    outputs=None,
+    outputs=("admin-dist-alerts-by-natural-land-class",),
     scratch_prefix=SCRATCH_PREFIX,
 ):
     logger = get_run_logger()
     client = get_client()
     upload_this_code(client)
+    version = version or "v20260919"  # run_updates passes version=None when unset
+    dist_zarr_uri = create_zarr(version, overwrite=False)
     results = {}
 
-    for name in outputs or list(OUTPUTS):
+    for name in outputs:
         contextual = OUTPUTS[name]
-        result_fut = client.submit(
-            rebuild_result, f"{SOURCE_PREFIX}/{name}.parquet", contextual
-        )
-        _, t_rebuild = _timed(lambda: wait(result_fut))
+        contextual_name = contextual[0] if contextual else None
+
+        # Real reduction; the result stays on the worker that finished it.
+        t0 = time.perf_counter()
+        result_fut = client.compute(lazy_reduction(dist_zarr_uri, contextual))
+        wait(result_fut)
+        t_reduce = time.perf_counter() - t0
         nbytes = client.submit(lambda r: r.data.nbytes, result_fut).result()
         logger.info(
-            f"{name}: sparse result rebuilt on worker in {t_rebuild:.0f}s "
-            f"({nbytes / 1e9:.2f} GB)"
+            f"{name}: reduction finished in {t_reduce / 60:.1f} min, result kept "
+            f"on the cluster ({nbytes / 1e9:.2f} GB)"
         )
 
         # Worker placement: postprocess + write where the result lives;
@@ -173,7 +170,7 @@ def postprocess_placement_benchmark(
                 lambda: client.submit(
                     postprocess_and_save,
                     result_fut,
-                    contextual,
+                    contextual_name,
                     f"{scratch_prefix}/{name}.worker.parquet",
                 ).result()
             )
@@ -185,7 +182,7 @@ def postprocess_placement_benchmark(
             t0 = time.perf_counter()
             result = result_fut.result()
             t1 = time.perf_counter()
-            df = postprocess(result, contextual)
+            df = postprocess(result, contextual_name)
             t2 = time.perf_counter()
             common_stages.save_results(df, flow_uri)
             t3 = time.perf_counter()
@@ -198,7 +195,9 @@ def postprocess_placement_benchmark(
         t_gather, t_post, t_save, t_readback = t1 - t0, t2 - t1, t3 - t2, t4 - t3
 
         results[name] = {
+            "version": version,
             "rows": rows,
+            "reduce_s": t_reduce,
             "sparse_result_gb": nbytes / 1e9,
             "flow": {
                 "gather_s": t_gather,
@@ -210,7 +209,7 @@ def postprocess_placement_benchmark(
             },
             "worker": {
                 "total_s": t_worker,
-                **{f"on_worker_{k}": v for k, v in worker_stats.items() if k != "rows"},
+                **{f"on_worker_{k}": v for k, v in worker_stats.items()},
                 "peak_extra_memory_gb": mem_worker.extra_gb,
             },
         }
