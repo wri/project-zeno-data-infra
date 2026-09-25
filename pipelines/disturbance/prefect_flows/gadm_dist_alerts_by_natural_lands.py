@@ -3,7 +3,6 @@ import pandas as pd
 from prefect import flow
 
 from pipelines.disturbance.prefect_flows import dist_common_tasks
-from pipelines.globals import sbtn_natural_lands_zarr_uri
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
 
@@ -50,9 +49,9 @@ def dist_alerts_by_natural_lands_area(
         np.arange(731, 3288),  # dates values, 2023/1/1 to 2030/1/1
         [1, 2, 3],  # confidence values
     )
-    datasets = dist_common_tasks.load_data.with_options(
+    datasets = dist_common_tasks.load_alert_pixels.with_options(
         name="dist-alerts-by-natural-lands-load-data"
-    )(dist_zarr_uri, contextual_uri=sbtn_natural_lands_zarr_uri)
+    )(dist_zarr_uri, contextual_name="natural_land_class")
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-by-natural-lands-compute"
     )(datasets, expected_groups, contextual_name="natural_land_class")

@@ -22,12 +22,9 @@ def dist_alerts_area(dist_zarr_uri: str, dist_version: str, overwrite=False):
         [1, 2, 3],  # confidence values
     )
 
-    # load zarrs and align with pixel_area
-    datasets = dist_common_tasks.load_data.with_options(name="dist-alerts-load_data")(
-        dist_zarr_uri
-    )
-    # Datasets returned as: (dist_alerts, country, region, subregion, pixel_area)
-
+    datasets = dist_common_tasks.load_alert_pixels.with_options(
+        name="dist-alerts-load_data"
+    )(dist_zarr_uri)
     compute_input = dist_common_tasks.setup_compute.with_options(
         name="set-up-dist-alerts-compute"
     )(datasets, expected_groups)
