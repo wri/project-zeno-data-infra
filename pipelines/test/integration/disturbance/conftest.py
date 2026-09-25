@@ -1,7 +1,46 @@
-import pytest
-import numpy as np
-import xarray as xr
 import dask.array as da
+import numpy as np
+import pytest
+import xarray as xr
+
+from pipelines import globals as zarr_uris
+from pipelines.disturbance import stages
+
+DIST_ZARR_URI = "s3://dummy_zarr_uri"
+
+
+@pytest.fixture(autouse=True)
+def fresh_alert_pixels():
+    stages.release_alert_pixels()
+    yield
+    stages.release_alert_pixels()
+
+
+@pytest.fixture
+def load_zarr_by_uri(
+    dist_ds,
+    country_ds,
+    region_ds,
+    subregion_ds,
+    pixel_area_ds,
+    natural_lands_ds,
+    dist_drivers_ds,
+    grasslands_ds,
+    land_cover_ds,
+):
+    """side_effect for a mocked stages._load_zarr, returning each fixture by URI."""
+    zarrs = {
+        DIST_ZARR_URI: dist_ds,
+        zarr_uris.country_zarr_uri: country_ds,
+        zarr_uris.region_zarr_uri: region_ds,
+        zarr_uris.subregion_zarr_uri: subregion_ds,
+        zarr_uris.pixel_area_zarr_uri: pixel_area_ds,
+        zarr_uris.sbtn_natural_lands_zarr_uri: natural_lands_ds,
+        zarr_uris.dist_driver_zarr_uri: dist_drivers_ds,
+        zarr_uris.grasslands_zarr_uri: grasslands_ds,
+        zarr_uris.land_cover_zarr_uri: land_cover_ds,
+    }
+    return lambda uri: zarrs[uri]
 
 
 @pytest.fixture
@@ -105,6 +144,7 @@ def dist_drivers_ds():
 
     return drivers
 
+
 @pytest.fixture
 def pixel_area_ds():
     pixel_area = xr.Dataset(
@@ -117,6 +157,7 @@ def pixel_area_ds():
     )
 
     return pixel_area
+
 
 @pytest.fixture
 def grasslands_ds():
@@ -132,10 +173,11 @@ def grasslands_ds():
             "y": ("y", [60.0, 59.99975], {}),
             "x": ("x", [-180.0, -179.99975], {}),
             "year": ("year", [2021, 2022], {}),
-        }
+        },
     )
 
     return grasslands
+
 
 @pytest.fixture
 def land_cover_ds():
@@ -151,7 +193,7 @@ def land_cover_ds():
             "y": ("y", [60.0, 59.99975], {}),
             "x": ("x", [-180.0, -179.99975], {}),
             "year": ("year", [2023, 2024], {}),
-        }
+        },
     )
 
     return land_cover
