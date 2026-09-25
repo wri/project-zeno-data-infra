@@ -1,7 +1,9 @@
 from typing import Callable, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 import xarray as xr
+
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
 )
@@ -56,11 +58,11 @@ def setup_compute(
 
 def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_count)
-    df["natural_lands_category"] = df.natural_lands.apply(
-        lambda x: "natural" if 1 < x < 12 else "non-natural"
+    df["natural_lands_category"] = np.where(
+        (df.natural_lands > 1) & (df.natural_lands < 12), "natural", "non-natural"
     )
-    df["natural_lands_class"] = df.natural_lands.apply(
-        lambda x: sbtn_natural_lands_classes.get(x, "unclassified")
+    df["natural_lands_class"] = df.natural_lands.map(sbtn_natural_lands_classes).fillna(
+        "unclassified"
     )
     del df["natural_lands"]
     return df
