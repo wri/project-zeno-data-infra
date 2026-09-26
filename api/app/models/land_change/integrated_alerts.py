@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
@@ -13,6 +13,10 @@ from ..common.areas_of_interest import (
 from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "integrated_alerts"
+
+# Only list filters that are implemented, so an unsupported one is rejected rather
+# than silently ignored.
+AllowedLandFilter = Literal["natural_lands"]
 
 # Full YYYY-MM-DD dates only; year-only values are not accepted.
 DATE_REGEX = r"^\d{4}-(0?[1-9]|1[012])-(0?[1-9]|[12][0-9]|3[01])$"
@@ -47,6 +51,15 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
         description="Must be in YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
         examples=["2024-12-31"],
+    )
+    land_filter: Optional[AllowedLandFilter] = Field(
+        default=None,
+        title="Land Filter",
+        description=(
+            "Only count alerts on this type of land. natural_lands is SBTN "
+            "natural lands (classes 2-11: natural forests, short vegetation, "
+            "water, mangroves, bare, snow, wetlands and peatlands)."
+        ),
     )
 
 

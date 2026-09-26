@@ -4,6 +4,7 @@ import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -420,7 +421,7 @@ def symmetric_relative_difference(a, b):
 
 
 def save_results(df: pd.DataFrame, results_uri: str) -> str:
-    print("Starting parquet")
+    print(f"Starting parquet {results_uri}")
 
     _save_parquet(df, results_uri)
     print("Finished parquet")
@@ -434,6 +435,18 @@ def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
 
 def _load_zarr(zarr_uri, group=None):
     return xr.open_zarr(zarr_uri, group=group, storage_options={"requester_pays": True})
+
+
+def clip_ds_to_bbox(dataset: xr.Dataset, bbox: Optional[Polygon]) -> xr.Dataset:
+    """Clip a dataset to a bbox, e.g. for a smaller local test run. Assumes y labels
+    in the zarr are in descending order, which happens naturally, because Geotiff
+    tiles (from which they are derived) start with row 0 at the northern edge.
+
+    """
+    if bbox is None:
+        return dataset
+    min_x, min_y, max_x, max_y = bbox.bounds
+    return dataset.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))
 
 
 def _get_tile_uris(tiles_geojson_uri: str) -> List[str]:

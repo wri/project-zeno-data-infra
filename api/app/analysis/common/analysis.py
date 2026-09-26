@@ -7,11 +7,17 @@ from typing import Iterable
 
 import duckdb
 import httpx
+import numpy as np
 import xarray as xr
 from rioxarray.exceptions import NoDataInBounds
 from shapely.geometry import shape
 
 JULIAN_DATE_2021 = 2459215
+
+# SBTN natural lands class codes that count as natural lands: natural forests,
+# short vegetation, water, mangroves, bare, snow, and wetland/peat forests and
+# short vegetation. Other groups (e.g. natural forests only) can be added later.
+NATURAL_LANDS_CLASSES = list(range(2, 12))
 
 
 class FeatureTooSmallError(Exception):
@@ -102,6 +108,41 @@ def read_zarr_clipped_to_geojson(uri, geojson, group: str | None = None):
 
 def read_zarr(uri, group: str | None = None):
     return _open_zarr(uri, group=group)
+
+
+def read_zarr_resampled_to_grid(uri, target) -> xr.DataArray:
+    """Read a zarr's band_data resampled to the target's grid (e.g. a 30m layer
+    onto the 10m alerts already clipped to an AOI).
+
+    Unlike read_zarr_clipped_to_geojson, this doesn't mask by the AOI geometry,
+    since the target is already clipped. Masking the coarser layer would drop its
+    pixels whose centers are just outside the AOI, even though finer target
+    pixels inside the AOI fall in them.
+    """
+    layer = read_zarr(uri).band_data
+    if "band" in layer.dims:
+        layer = layer.squeeze("band", drop=True)
+    return resample_to_grid(layer, target)
+
+
+def resample_to_grid(layer: xr.DataArray, target) -> xr.DataArray:
+    """Nearest-neighbor resample a (coarser) layer to the target's grid.
+
+    Each target pixel takes the value of the layer pixel its center falls in. The
+    tolerance is half a layer pixel, since e.g. 10m pixel centers never coincide
+    with 30m pixel centers, so a tiny tolerance like 1e-5 would match nothing.
+    Target pixels outside the layer's extent are set to 0.
+    """
+    layer_resolution = abs(float(layer.x[1] - layer.x[0]))
+    return layer.reindex_like(
+        target, method="nearest", tolerance=layer_resolution / 2, fill_value=0
+    ).astype(layer.dtype)
+
+
+def to_natural_lands_category(natural_lands: xr.DataArray) -> xr.DataArray:
+    """Convert SBTN natural lands classes to 1 (one of NATURAL_LANDS_CLASSES) or
+    0 (non-natural or no data)."""
+    return natural_lands.isin(NATURAL_LANDS_CLASSES).astype(np.uint8)
 
 
 def _open_zarr(uri, group: str | None = None):
