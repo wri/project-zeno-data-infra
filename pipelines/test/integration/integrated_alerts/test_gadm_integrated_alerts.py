@@ -150,6 +150,13 @@ def test_gadm_integrated_alerts_result(
     )
     assert area_by_class.to_dict() == {0: 2.5, 2: 2.5, 5: 2.5, 12: 2.5}
 
+    # sorted by aoi_id first, so admin queries (always by aoi_id) can skip most of
+    # the parquet using row group statistics
+    sort_columns = ["aoi_id", "natural_lands_class", "alert_confidence", "alert_date"]
+    assert result[sort_columns].equals(
+        result[sort_columns].sort_values(sort_columns, ignore_index=True)
+    )
+
 
 @pytest.mark.slow
 @pytest.mark.integration

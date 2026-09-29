@@ -430,6 +430,9 @@ def save_results(df: pd.DataFrame, results_uri: str) -> str:
 
 # _load_zarr and _save_parquet are the functions being mocked by the unit tests.
 def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
+    # For parquets sorted by aoi_id (e.g. integrated alerts), it would be useful to
+    # add row_group_size=100_000: API queries for one AOI would then read ~1-2 MB
+    # from S3 instead of a whole ~1M-row group (~10 MB).
     df.to_parquet(results_uri, index=False)
 
 

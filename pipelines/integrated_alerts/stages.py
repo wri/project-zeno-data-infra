@@ -128,7 +128,13 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df = rollup_by_gadm_and_convert_to_aoi(
         df, ["natural_lands_class", "alert_date", "alert_confidence"]
     )
-    return df
+    # Sort by aoi_id first, since API admin queries always filter by aoi_id, so
+    # DuckDB can skip most of the parquet's row groups using their aoi_id min/max
+    # statistics, and reads far less from S3.
+    return df.sort_values(
+        ["aoi_id", "natural_lands_class", "alert_confidence", "alert_date"],
+        ignore_index=True,
+    )
 
 
 def _load_zarr(zarr_uri):
