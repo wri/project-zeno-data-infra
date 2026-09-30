@@ -110,10 +110,7 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
         for d in df["alert_date"].unique()
     }
     df["alert_date"] = df["alert_date"].map(day_to_date)
-    confidence_labels = {
-        c: alerts_confidence[c] for c in df["alert_confidence"].unique()
-    }
-    df["alert_confidence"] = df["alert_confidence"].map(confidence_labels)
+    df["alert_confidence"] = df["alert_confidence"].map(alerts_confidence)
     df = rollup_by_gadm_and_convert_to_aoi(df, ["alert_date", "alert_confidence"])
     return df
 

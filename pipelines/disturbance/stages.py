@@ -104,10 +104,7 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
         for d in df["dist_alert_date"].unique()
     }
     df["dist_alert_date"] = df["dist_alert_date"].map(day_to_date)
-    confidence_labels = {
-        c: alerts_confidence[c] for c in df["dist_alert_confidence"].unique()
-    }
-    df["dist_alert_confidence"] = df["dist_alert_confidence"].map(confidence_labels)
+    df["dist_alert_confidence"] = df["dist_alert_confidence"].map(alerts_confidence)
     return df
 
 
