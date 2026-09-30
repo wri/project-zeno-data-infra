@@ -132,11 +132,28 @@ def resample_to_grid(layer: xr.DataArray, target) -> xr.DataArray:
     tolerance is half a layer pixel, since e.g. 10m pixel centers never coincide
     with 30m pixel centers, so a tiny tolerance like 1e-5 would match nothing.
     Target pixels outside the layer's extent are set to 0.
+
+    Matching is done on the x/y coordinates in degrees, so both must be in
+    EPSG:4326 (as all our zarrs are), and the layer's pixels must be square,
+    since the tolerance is taken from its x step and applied to both axes.
     """
+    check_square_pixels(layer, "layer")
     layer_resolution = abs(float(layer.x[1] - layer.x[0]))
     return layer.reindex_like(
         target, method="nearest", tolerance=layer_resolution / 2, fill_value=0
     ).astype(layer.dtype)
+
+
+def check_square_pixels(grid, name: str) -> None:
+    """Raise if grid's x and y pixel steps differ, since resampling takes its
+    tolerance from the x step and applies it to both axes."""
+    x_step = abs(float(grid.x[1] - grid.x[0]))
+    y_step = abs(float(grid.y[1] - grid.y[0]))
+    if not np.isclose(x_step, y_step, rtol=1e-6):
+        raise ValueError(
+            f"{name} must have square pixels, but its x step is {x_step} and "
+            f"its y step is {y_step}"
+        )
 
 
 def to_natural_lands_category(natural_lands: xr.DataArray) -> xr.DataArray:
