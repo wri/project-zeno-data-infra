@@ -3,8 +3,11 @@ import pytest
 from pydantic import ValidationError
 
 from app.domain.analyzers.land_ghg_inventory_analyzer import (
+    ANNUALIZED_YEARS,
     INPUT_URIS,
     LandGHGInventoryAnalyzer,
+    admin_query,
+    global_query,
 )
 from app.domain.models.analysis import Analysis
 from app.domain.models.environment import Environment
@@ -14,6 +17,7 @@ from app.infrastructure.external_services.duck_db_query_service import (
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    GlobalAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
 )
 from app.models.land_change.land_ghg_inventory import LandGHGInventoryAnalyticsIn
@@ -302,3 +306,234 @@ def test_rejects_non_admin_aoi():
                 type="key_biodiversity_area", ids=["8111"]
             )
         )
+
+
+def test_rejects_global_aoi_carrying_ids():
+    # The whole world is not a list of areas: ids are meaningless here, and
+    # StrictBaseModel rejects them rather than silently ignoring them.
+    with pytest.raises(ValidationError):
+        LandGHGInventoryAnalyticsIn(aoi={"type": "global", "ids": ["BRA"]})
+
+
+def test_global_and_admin_thumbprints_differ():
+    # Why _version is not bumped for the global AOI: the thumbprint already
+    # separates the two, so a global result can never collide with a cached
+    # admin one.
+    admin = LandGHGInventoryAnalyticsIn(aoi=AdminAreaOfInterest(ids=["BRA"]))
+    world = LandGHGInventoryAnalyticsIn(aoi=GlobalAreaOfInterest())
+
+    assert admin.thumbprint() != world.thumbprint()
+
+
+# Nested rollup tiers, as the real parquets carry them: the adm1/adm2 rows are
+# already counted inside their adm0 parent, so a global sum that fails to
+# filter them out would report roughly triple the true total. The numbers below
+# make that visible -- BRA's children sum to the same 100 the BRA row holds.
+GLOBAL_TIER_IDS = ["BRA", "BRA.1", "BRA.1.1", "COL", "COL.1"]
+# adm0 rows only: BRA + COL
+EXPECTED_GLOBAL_EMISSIONS = 100.0 + 50.0
+
+
+@pytest.fixture
+def tiered_vegetation_parquet(tmp_path):
+    df = pd.DataFrame(
+        {
+            "aoi_id": GLOBAL_TIER_IDS,
+            "land_state_class": ["tree_loss"] * 5,
+            "year": [2016] * 5,
+            "gross_emissions_MgCO2e": [100.0, 60.0, 40.0, 50.0, 50.0],
+            "gross_removals_MgCO2": [-10.0, -6.0, -4.0, -5.0, -5.0],
+            "net_flux_MgCO2e": [90.0, 54.0, 36.0, 45.0, 45.0],
+            "area_ha": [8.0, 5.0, 3.0, 4.0, 4.0],
+        }
+    )
+    parquet_file = tmp_path / "tiered_vegetation.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
+
+
+@pytest.fixture
+def tiered_agriculture_parquet(tmp_path):
+    df = pd.DataFrame(
+        {
+            "aoi_id": GLOBAL_TIER_IDS * 2,
+            "aoi_type": ["admin"] * 10,
+            "category": ["cropland"] * 5 + ["livestock"] * 5,
+            "gross_emissions_MgCO2e": [
+                100.0,
+                60.0,
+                40.0,
+                50.0,
+                50.0,
+                100.0,
+                60.0,
+                40.0,
+                50.0,
+                50.0,
+            ],
+        }
+    )
+    parquet_file = tmp_path / "tiered_agriculture.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
+
+
+@pytest.fixture
+def tiered_mineral_soil_parquet(tmp_path):
+    df = pd.DataFrame(
+        {
+            "aoi_id": GLOBAL_TIER_IDS,
+            "aoi_type": ["admin"] * 5,
+            "gross_emissions_MgCO2e": [100.0, 60.0, 40.0, 50.0, 50.0],
+            "gross_removals_MgCO2": [-10.0, -6.0, -4.0, -5.0, -5.0],
+            "net_flux_MgCO2e": [90.0, 54.0, 36.0, 45.0, 45.0],
+            "area_ha": [8.0, 5.0, 3.0, 4.0, 4.0],
+        }
+    )
+    parquet_file = tmp_path / "tiered_mineral_soil.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
+
+
+@pytest.fixture
+def tiered_organic_soil_parquet(tmp_path):
+    df = pd.DataFrame(
+        {
+            "aoi_id": [i for i in GLOBAL_TIER_IDS for _ in (0, 1)],
+            "aoi_type": ["admin"] * 10,
+            "interval_end_year": [2020, 2024] * 5,
+            "gross_emissions_MgCO2e": [
+                100.0,
+                200.0,
+                60.0,
+                120.0,
+                40.0,
+                80.0,
+                50.0,
+                100.0,
+                50.0,
+                100.0,
+            ],
+            "area_ha": [8.0, 8.0, 5.0, 5.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0],
+        }
+    )
+    parquet_file = tmp_path / "tiered_organic_soil.parquet"
+    df.to_parquet(parquet_file, index=False)
+    return parquet_file
+
+
+@pytest.fixture
+def global_analysis():
+    analytics_in = LandGHGInventoryAnalyticsIn(aoi=GlobalAreaOfInterest()).model_dump()
+    return Analysis(None, analytics_in, AnalysisStatus.saved)
+
+
+@pytest.fixture
+def tiered_analyzer(
+    tiered_vegetation_parquet,
+    tiered_agriculture_parquet,
+    tiered_mineral_soil_parquet,
+    tiered_organic_soil_parquet,
+):
+    return build_analyzer(
+        tiered_vegetation_parquet,
+        tiered_agriculture_parquet,
+        tiered_mineral_soil_parquet,
+        tiered_organic_soil_parquet,
+    )
+
+
+@pytest.mark.asyncio
+async def test_global_vegetation_sums_country_tier_only(
+    tiered_analyzer, global_analysis
+):
+    await tiered_analyzer.analyze(global_analysis)
+    df = pd.DataFrame(global_analysis.result["vegetation"])
+
+    # One world row per land_state_class x year, not one row per country.
+    assert len(df) == 1
+    assert df.aoi_id.tolist() == ["GLOBAL"]
+    assert df.aoi_type.tolist() == ["global"]
+    # 150, not the 300 an unfiltered sum over all three tiers would give.
+    assert df.gross_emissions_MgCO2e.iloc[0] == EXPECTED_GLOBAL_EMISSIONS
+    assert df.area_ha.iloc[0] == 12.0
+
+
+@pytest.mark.asyncio
+async def test_global_agriculture_repeats_one_world_total_per_year(
+    tiered_analyzer, global_analysis
+):
+    await tiered_analyzer.analyze(global_analysis)
+    df = pd.DataFrame(global_analysis.result["agriculture"])
+
+    # One row per category x broadcast year, and every year repeats the same
+    # world total -- the snapshot is summed before the broadcast, never after.
+    assert len(df) == 2 * len(ANNUALIZED_YEARS)
+    for category in ("cropland", "livestock"):
+        rows = df[df.category == category]
+        assert set(rows.year) == set(ANNUALIZED_YEARS)
+        assert (rows.gross_emissions_MgCO2e == EXPECTED_GLOBAL_EMISSIONS).all()
+    assert set(df.aoi_id) == {"GLOBAL"}
+    assert set(df.aoi_type) == {"global"}
+
+
+@pytest.mark.asyncio
+async def test_global_mineral_soil_repeats_one_world_total_per_year(
+    tiered_analyzer, global_analysis
+):
+    await tiered_analyzer.analyze(global_analysis)
+    df = pd.DataFrame(global_analysis.result["mineral_soil"])
+
+    assert len(df) == len(ANNUALIZED_YEARS)
+    assert set(df.year) == set(ANNUALIZED_YEARS)
+    assert (df.gross_emissions_MgCO2e == EXPECTED_GLOBAL_EMISSIONS).all()
+    assert set(df.aoi_id) == {"GLOBAL"}
+
+
+@pytest.mark.asyncio
+async def test_global_organic_soil_sums_each_block_separately(
+    tiered_analyzer, global_analysis
+):
+    await tiered_analyzer.analyze(global_analysis)
+    df = pd.DataFrame(global_analysis.result["organic_soil"])
+
+    # Each 5-year block keeps its own world total across the years it covers.
+    assert len(df) == len(ANNUALIZED_YEARS)
+    assert (df[df.year <= 2020].gross_emissions_MgCO2e == 150.0).all()
+    assert (df[df.year >= 2021].gross_emissions_MgCO2e == 300.0).all()
+    assert set(df.aoi_id) == {"GLOBAL"}
+
+
+@pytest.mark.asyncio
+async def test_global_result_has_a_table_per_category(tiered_analyzer, global_analysis):
+    await tiered_analyzer.analyze(global_analysis)
+
+    assert set(global_analysis.result) == {
+        "vegetation",
+        "agriculture",
+        "mineral_soil",
+        "organic_soil",
+    }
+
+
+def test_global_query_filters_to_the_country_tier():
+    query = global_query(("category",), ("gross_emissions_MgCO2e",))
+
+    assert "not like '%.%'" in query
+    assert "sum(gross_emissions_MgCO2e)" in query
+    assert "group by category" in query
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        global_query(("category",), ("gross_emissions_MgCO2e",)),
+        global_query((), ("area_ha",)),
+        admin_query(("category",), ("area_ha",), ["BRA"]),
+    ],
+)
+def test_query_names_the_table_placeholder_exactly_once(query):
+    # DuckDbPrecalcQueryService swaps the URI in with a plain str.replace over
+    # the whole query, so any second occurrence -- a CTE named data_source_adm0,
+    # say -- would be rewritten into a string literal and break the SQL.
+    assert query.count("data_source") == 1

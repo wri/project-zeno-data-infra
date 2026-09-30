@@ -1,21 +1,29 @@
-from typing import Optional
+from typing import Annotated, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
 from ..common.analysis import AnalysisStatus, AnalyticsIn
-from ..common.areas_of_interest import AdminAreaOfInterest
+from ..common.areas_of_interest import AdminAreaOfInterest, GlobalAreaOfInterest
 from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "land_ghg_inventory"
 
+AoiUnion = Union[AdminAreaOfInterest, GlobalAreaOfInterest]
+
 
 class LandGHGInventoryAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
+    # Not bumped for the global AOI: the thumbprint (see AnalyticsIn) already
+    # serializes the aoi, so a global request hashes to its own resource id.
+    # Bumping would needlessly invalidate every cached admin analysis.
     _version: str = PrivateAttr(default="v20260803")
-    aoi: AdminAreaOfInterest = Field(
+    aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
-        description="Admin area (by aoi_id). Admin areas only, no on-the-fly.",
+        description=(
+            "Admin area (by aoi_id), or the whole world as a single aggregate "
+            "(type='global'). Precomputed areas only, no on-the-fly."
+        ),
     )
 
 

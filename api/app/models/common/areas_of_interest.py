@@ -60,6 +60,20 @@ class AdminAreaOfInterest(AreaOfInterest):
         return v or "4.1"
 
 
+class GlobalAreaOfInterest(AreaOfInterest):
+    """The whole world as a single aggregate area.
+
+    Carries no ids: rather than naming areas to look up, it asks the analyzer
+    to sum the top (country) rollup tier of the precomputed admin tables into
+    one world row. Distinct from passing every country id, which yields one
+    row per country instead of one row for the world."""
+
+    type: Literal["global"] = "global"
+
+    async def get_geostore_id(self) -> Optional[UUID]:
+        return None
+
+
 class KeyBiodiversityAreaOfInterest(AreaOfInterest):
     type: Literal["key_biodiversity_area"] = "key_biodiversity_area"
     ids: List[str] = Field(
