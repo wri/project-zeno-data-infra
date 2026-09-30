@@ -17,8 +17,21 @@ def integrated_alerts_area(
     overwrite=False,
     bbox: Optional[Polygon] = None,
 ):
-    """``bbox`` clips the reduce to one area for a small local run; the result
-    is written to a local parquet (``admin-integrated-alerts-{version}.parquet``)"""
+    """Compute integrated alerts area by GADM admin area, date, confidence and
+    SBTN natural lands class, and save it as a parquet.
+
+    Args:
+        integrated_alerts_zarr_uri: URI of the integrated alerts date_conf zarr.
+        version: Integrated alerts version, used in the output S3 path.
+        overwrite: If True, recompute and overwrite an existing S3 parquet.
+        bbox: Optional polygon to clip the computation to, for a small local
+            test run. The result is then written to a local parquet
+            (``admin-integrated-alerts-{version}.parquet``) instead of the
+            global S3 path.
+
+    Returns:
+        The URI of the saved parquet.
+    """
     if bbox is None:
         result_uri = (
             f"{integrated_alerts_common_tasks.INTEGRATED_ALERTS_PREFIX}"

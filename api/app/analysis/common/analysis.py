@@ -14,10 +14,15 @@ from shapely.geometry import shape
 
 JULIAN_DATE_2021 = 2459215
 
-# SBTN natural lands class codes that count as natural lands: natural forests,
-# short vegetation, water, mangroves, bare, snow, and wetland/peat forests and
-# short vegetation. Other groups (e.g. natural forests only) can be added later.
-NATURAL_LANDS_CLASSES = list(range(2, 12))
+# SBTN natural lands class codes included by each land_filter value. To add a
+# filter, add an entry here and its value to the land_filter Literal.
+LAND_FILTER_CLASSES = {
+    # natural forests, short vegetation, water, mangroves, bare, snow, and
+    # wetland/peat forests and short vegetation
+    "natural_lands": list(range(2, 12)),
+    # natural forests, mangroves, wetland natural forests and natural peat forests
+    "natural_forests": [2, 5, 8, 9],
+}
 
 
 class FeatureTooSmallError(Exception):
@@ -156,10 +161,12 @@ def check_square_pixels(grid, name: str) -> None:
         )
 
 
-def to_natural_lands_category(natural_lands: xr.DataArray) -> xr.DataArray:
-    """Convert SBTN natural lands classes to 1 (one of NATURAL_LANDS_CLASSES) or
-    0 (non-natural or no data)."""
-    return natural_lands.isin(NATURAL_LANDS_CLASSES).astype(np.uint8)
+def to_land_filter_mask(
+    natural_lands_classes: xr.DataArray, land_filter: str
+) -> xr.DataArray:
+    """Convert SBTN natural lands classes to 1 (one of the land_filter's classes in
+    LAND_FILTER_CLASSES) or 0 (any other class, or no data)."""
+    return natural_lands_classes.isin(LAND_FILTER_CLASSES[land_filter]).astype(np.uint8)
 
 
 def _open_zarr(uri, group: str | None = None):

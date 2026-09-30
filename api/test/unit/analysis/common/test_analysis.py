@@ -8,7 +8,7 @@ from app.analysis.common.analysis import (
     clip_zarr_to_geojson,
     read_zarr_clipped_to_geojson,
     resample_to_grid,
-    to_natural_lands_category,
+    to_land_filter_mask,
 )
 
 GEOJSON = {
@@ -87,9 +87,9 @@ class TestResampleToGrid:
         assert (values[:, outside] == 0).all()
 
 
-def test_to_natural_lands_category_marks_classes_2_to_11_as_natural():
+def test_to_land_filter_mask_marks_classes_2_to_11_as_natural_lands():
     classes = xr.DataArray(np.array([0, 1, 2, 11, 12, 21], dtype=np.uint8))
 
     np.testing.assert_array_equal(
-        to_natural_lands_category(classes).values, [0, 0, 1, 1, 0, 0]
+        to_land_filter_mask(classes, "natural_lands").values, [0, 0, 1, 1, 0, 0]
     )

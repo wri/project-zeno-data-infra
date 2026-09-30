@@ -7,10 +7,10 @@ from flox.xarray import xarray_reduce
 
 from app.analysis.common.analysis import (
     JULIAN_DATE_2021,
-    NATURAL_LANDS_CLASSES,
+    LAND_FILTER_CLASSES,
     read_zarr_clipped_to_geojson,
     read_zarr_resampled_to_grid,
-    to_natural_lands_category,
+    to_land_filter_mask,
 )
 from app.domain.analyzers.zonal_statistics_analyzer import ZonalStatisticsAnalyzer
 from app.domain.models.dataset import Dataset
@@ -69,12 +69,11 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
         start_date = analytics_in.start_date
         end_date = analytics_in.end_date
         id_list = ", ".join(f"'{aoi_id}'" for aoi_id in analytics_in.aoi.ids)
-        natural_lands_class_list = ", ".join(str(c) for c in NATURAL_LANDS_CLASSES)
-        land_filter_clause = (
-            f"AND natural_lands_class IN ({natural_lands_class_list}) "
-            if analytics_in.land_filter == "natural_lands"
-            else ""
-        )
+        land_filter_clause = ""
+        if analytics_in.land_filter is not None:
+            classes = LAND_FILTER_CLASSES[analytics_in.land_filter]
+            class_list = ", ".join(str(c) for c in classes)
+            land_filter_clause = f"AND natural_lands_class IN ({class_list}) "
         return (
             "SELECT aoi_id, "
             "STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, "
@@ -123,14 +122,16 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
             / 10000
         )
 
-        if land_filter == "natural_lands":
-            # Count only natural lands pixels, by giving the others zero area.
-            natural_lands = to_natural_lands_category(
+        if land_filter is not None:
+            # Count only pixels on the filter's SBTN natural lands classes, by
+            # giving the others zero area.
+            land_filter_mask = to_land_filter_mask(
                 read_zarr_resampled_to_grid(
                     input_uris[str(Dataset.natural_lands)], alerts
-                )
+                ),
+                land_filter,
             )
-            pixel_area = pixel_area.where(natural_lands == 1, 0)
+            pixel_area = pixel_area.where(land_filter_mask == 1, 0)
 
         groupby_layers = [alerts.alert_date, alerts.confidence]
         expected_groups = [

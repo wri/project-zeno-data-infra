@@ -14,10 +14,6 @@ from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "integrated_alerts"
 
-# Only list filters that are implemented, so an unsupported one is rejected rather
-# than silently ignored.
-AllowedLandFilter = Literal["natural_lands"]
-
 # Full YYYY-MM-DD dates only; year-only values are not accepted.
 DATE_REGEX = r"^\d{4}-(0?[1-9]|1[012])-(0?[1-9]|[12][0-9]|3[01])$"
 
@@ -52,13 +48,14 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
         pattern=DATE_REGEX,
         examples=["2024-12-31"],
     )
-    land_filter: Optional[AllowedLandFilter] = Field(
+    land_filter: Optional[Literal["natural_lands", "natural_forests"]] = Field(
         default=None,
         title="Land Filter",
+        # Keep in sync with LAND_FILTER_CLASSES in app/analysis/common/analysis.py
         description=(
-            "Only count alerts on this type of land. natural_lands is SBTN "
-            "natural lands (classes 2-11: natural forests, short vegetation, "
-            "water, mangroves, bare, snow, wetlands and peatlands)."
+            "Only count alerts on these SBTN natural lands classes: "
+            "natural_lands = classes 2-11; "
+            "natural_forests = classes 2, 5, 8, 9."
         ),
     )
 
