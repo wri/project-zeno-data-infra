@@ -14,7 +14,6 @@ def load_data(
     return common_stages.load_data(base_zarr_uri, contextual_uri)
 
 
-# Multi-GB results: persisting fills local disk, and retries can't reuse them.
 @task(persist_result=False)
 def compute_zonal_stat(
     dataset: xr.DataArray,
