@@ -1,11 +1,17 @@
 from functools import partial
-from typing import Dict
+from typing import Dict, Optional
 
 import dask.dataframe as dd
 import numpy as np
 from flox.xarray import xarray_reduce
 
-from app.analysis.common.analysis import JULIAN_DATE_2021, read_zarr_clipped_to_geojson
+from app.analysis.common.analysis import (
+    JULIAN_DATE_2021,
+    LAND_FILTER_CLASSES,
+    read_zarr_clipped_to_geojson,
+    read_zarr_resampled_to_grid,
+    to_land_filter_mask,
+)
 from app.domain.analyzers.zonal_statistics_analyzer import ZonalStatisticsAnalyzer
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment, resolve_uris
@@ -24,9 +30,8 @@ JULIAN_DATE_2015 = JULIAN_DATE_2021 - 2192
 INPUT_URIS = {
     Environment.staging: {},
     Environment.production: {
-        str(Dataset.pixel_area_m2_10m): ZarrDatasetRepository.resolve_zarr_uri(
-            Dataset.pixel_area_m2_10m, Environment.production
-        ),
+        str(ds): ZarrDatasetRepository.resolve_zarr_uri(ds, Environment.production)
+        for ds in [Dataset.pixel_area_m2_10m, Dataset.natural_lands]
     },
 }
 
@@ -59,17 +64,26 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
     def build_admin_query(self, analytics_in) -> str:
         # The precomputed parquet is keyed by aoi_id and preaggregated to each
         # GADM level, so a single scan filtered by aoi_id serves every request.
+        # Rows are also split by natural_lands_class (the raw SBTN class code), so
+        # sum over it to get one row per aoi_id, alert_date and alert_confidence.
         start_date = analytics_in.start_date
         end_date = analytics_in.end_date
         id_list = ", ".join(f"'{aoi_id}'" for aoi_id in analytics_in.aoi.ids)
+        land_filter_clause = ""
+        if analytics_in.land_filter is not None:
+            classes = LAND_FILTER_CLASSES[analytics_in.land_filter]
+            class_list = ", ".join(str(c) for c in classes)
+            land_filter_clause = f"AND natural_lands_class IN ({class_list}) "
         return (
             "SELECT aoi_id, "
             "STRFTIME(alert_date, '%Y-%m-%d') AS alert_date, "
             "alert_confidence, "
-            "area_ha "
+            "SUM(area_ha) AS area_ha "
             "FROM data_source "
             f"WHERE aoi_id IN ({id_list}) "
             f"AND alert_date BETWEEN DATE '{start_date}' AND DATE '{end_date}' "
+            f"{land_filter_clause}"
+            "GROUP BY aoi_id, alert_date, alert_confidence "
             "ORDER BY aoi_id, alert_date, alert_confidence"
         )
 
@@ -79,11 +93,17 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
             self.input_uris,
             start_date=analytics_in.start_date,
             end_date=analytics_in.end_date,
+            land_filter=analytics_in.land_filter,
         )
 
     @staticmethod
     def analyze_area(
-        input_uris: Dict[str, str], aoi, geojson, start_date, end_date
+        input_uris: Dict[str, str],
+        aoi,
+        geojson,
+        start_date,
+        end_date,
+        land_filter: Optional[str] = None,
     ) -> dd.DataFrame:
         # Sadly, this method must be static because Dask can't serialize compute_engine
         # (a live Dask Task) in self
@@ -101,6 +121,17 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
             .reindex_like(alerts, method="nearest", tolerance=1e-5)
             / 10000
         )
+
+        if land_filter is not None:
+            # Count only pixels on the filter's SBTN natural lands classes, by
+            # giving the others zero area.
+            land_filter_mask = to_land_filter_mask(
+                read_zarr_resampled_to_grid(
+                    input_uris[str(Dataset.natural_lands)], alerts
+                ),
+                land_filter,
+            )
+            pixel_area = pixel_area.where(land_filter_mask == 1, 0)
 
         groupby_layers = [alerts.alert_date, alerts.confidence]
         expected_groups = [

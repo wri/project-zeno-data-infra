@@ -1,3 +1,4 @@
+
 import logging
 import os
 from contextlib import nullcontext
@@ -75,12 +76,12 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 
 @flow
 def run_integrated_alerts_update(
-    version, overwrite=False, is_latest=False
+    version, overwrite=False, is_latest=False, bbox=None
 ) -> list[str]:
     result_uris = []
 
     result = integrated_alerts_flow.integrated_alerts_zarr_flow(
-        version, overwrite=overwrite, is_latest=is_latest
+        version, overwrite=overwrite, is_latest=is_latest, bbox=bbox
     )
     result_uris.append(result)
 
@@ -199,8 +200,9 @@ def run_updates(
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
-    # bbox (land_ghg_inventory_update only) clips the reduce to one area. It is
-    # independent of where compute runs: Coiled by default, or local when local=True.
+    # bbox (land_ghg_inventory and integrated_alerts flows only) clips the reduce
+    # to one area. It is independent of where compute runs: Coiled by default, or
+    # local when local=True.
     bbox_geom = _parse_bbox(bbox)
 
     try:
@@ -229,6 +231,8 @@ def run_updates(
         if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
             kwargs["flow_name"] = flow_name.value
+        elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
+            kwargs["bbox"] = bbox_geom
         with report:
             result_uris = flow_fn(**kwargs)
 
@@ -260,9 +264,8 @@ def run_updates(
     default=None,
     help=(
         "minx,miny,maxx,maxy to clip the reduce to one area; writes a local "
-        "parquet instead of the global S3 path. Only applies to "
-        "land_ghg_inventory_update, land_ghg_inventory_vegetation_update, and "
-        "land_ghg_inventory_agriculture_update."
+        "parquet instead of the global S3 path. Only applies to the "
+        "land_ghg_inventory flows and integrated_alerts_update."
     ),
 )
 @click.option(

@@ -24,9 +24,10 @@ import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.land_ghg_inventory.common import align_to, clip
+from pipelines.land_ghg_inventory.common import align_to
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
+    clip_ds_to_bbox,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -110,7 +111,7 @@ def load_data(
     layers, aligned to the SOC grid (native 30m, so alignment is 1:1)."""
     soc = _load_zarr(soc_uri)[list(SOC_SOURCE_VARS.values())]
     soc = soc.isel(year=CHANGE_INTERVAL_INDEX, drop=True)
-    soc = clip(soc, bbox)
+    soc = clip_ds_to_bbox(soc, bbox)
     soc = soc.rename({source: name for name, source in SOC_SOURCE_VARS.items()})
     return (
         soc,

@@ -463,6 +463,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
     async def test_resource_calculate_results(self, setup):
         test_request, client, resource_tp = setup
         data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+        assert data["status"] == "saved", data["result"]
 
         assert len(data["result"].keys()) == 8
         assert "2024-08-15" in data["result"]["dist_alert_date"]
@@ -537,6 +538,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
     async def test_resource_calculate_results(self, setup):
         test_request, client, resource_tp = setup
         data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+        assert data["status"] == "saved", data["result"]
         result = pd.DataFrame(data["result"])
 
         # 1. Validate expected columns
@@ -623,6 +625,7 @@ async def test_gadm_dist_analytics_no_intersection():
             )
 
             data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+            assert data["status"] == "saved", data["result"]
 
     expected_df = pd.DataFrame(
         {
@@ -687,6 +690,7 @@ async def test_kba_dist_analytics_no_intersection():
             )
 
             data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+            assert data["status"] == "saved", data["result"]
 
     expected_df = pd.DataFrame(
         {
@@ -743,6 +747,7 @@ async def test_admin_dist_analytics_by_grasslands():
             )
 
             data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+            assert data["status"] == "saved", data["result"]
 
     expected_df = pd.DataFrame(
         {
@@ -802,6 +807,7 @@ async def test_admin_dist_analytics_by_land_cover():
             )
 
             data = await retry_getting_resource(ANALYTICS_NAME, resource_tp, client)
+            assert data["status"] == "saved", data["result"]
 
     expected_df = pd.DataFrame(
         {

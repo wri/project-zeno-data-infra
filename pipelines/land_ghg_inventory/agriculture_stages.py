@@ -17,9 +17,12 @@ from typing import Optional, Tuple
 
 import pandas as pd
 import xarray as xr
-from pipelines.land_ghg_inventory.common import align_to, clip
+from shapely.geometry import Polygon
+
+from pipelines.land_ghg_inventory.common import align_to
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
+    clip_ds_to_bbox,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -27,7 +30,6 @@ from pipelines.prefect_flows.common_stages import (
 from pipelines.prefect_flows.common_stages import (
     rollup_by_gadm_and_convert_to_aoi,
 )
-from shapely.geometry import Polygon
 
 # canonical category -> source variable in the agriculture zarr
 AGRICULTURE_SOURCE_VARS = {
@@ -52,7 +54,7 @@ def load_agriculture(
     ]
     if "band" in ag.dims:
         ag = ag.isel(band=0, drop=True)
-    ag = clip(ag, bbox)
+    ag = clip_ds_to_bbox(ag, bbox)
     ag = ag.rename({source: name for name, source in AGRICULTURE_SOURCE_VARS.items()})
     return (
         ag,

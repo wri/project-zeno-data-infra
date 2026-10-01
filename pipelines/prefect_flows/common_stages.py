@@ -4,6 +4,7 @@ import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -420,7 +421,7 @@ def symmetric_relative_difference(a, b):
 
 
 def save_results(df: pd.DataFrame, results_uri: str) -> str:
-    print("Starting parquet")
+    print(f"Starting parquet {results_uri}")
 
     _save_parquet(df, results_uri)
     print("Finished parquet")
@@ -429,11 +430,26 @@ def save_results(df: pd.DataFrame, results_uri: str) -> str:
 
 # _load_zarr and _save_parquet are the functions being mocked by the unit tests.
 def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
+    # For parquets sorted by aoi_id (e.g. integrated alerts), it would be useful to
+    # add row_group_size=100_000: API queries for one AOI would then read ~1-2 MB
+    # from S3 instead of a whole ~1M-row group (~10 MB).
     df.to_parquet(results_uri, index=False)
 
 
 def _load_zarr(zarr_uri, group=None):
     return xr.open_zarr(zarr_uri, group=group, storage_options={"requester_pays": True})
+
+
+def clip_ds_to_bbox(dataset: xr.Dataset, bbox: Optional[Polygon]) -> xr.Dataset:
+    """Clip a dataset to a bbox, e.g. for a smaller local test run. Assumes y labels
+    in the zarr are in descending order, which happens naturally, because Geotiff
+    tiles (from which they are derived) start with row 0 at the northern edge.
+
+    """
+    if bbox is None:
+        return dataset
+    min_x, min_y, max_x, max_y = bbox.bounds
+    return dataset.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))
 
 
 def _get_tile_uris(tiles_geojson_uri: str) -> List[str]:
