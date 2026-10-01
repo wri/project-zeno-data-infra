@@ -76,3 +76,13 @@ class TestTreeCoverAnalyticsInValidations:
             canopy_cover=15,
             forest_filter="primary_forest",
         )
+
+    def test_natural_forest_only_is_tree_cover_loss_only(self):
+        # natural_forest_only is only implemented for tree cover loss, so it must
+        # not be accepted (and silently treated as primary forest) here.
+        with pytest.raises(ValueError):
+            TreeCoverAnalyticsIn(
+                aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
+                canopy_cover=15,
+                forest_filter="natural_forest_only",
+            )

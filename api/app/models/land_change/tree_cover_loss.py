@@ -59,7 +59,15 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         default=None,
         title="Minimum percent of area covered by tree canopy to count as forest. Carbon model is only valid for carbon threshold 30% or greater, and will return NaN for carbon emissions if set lower.",
     )
-    forest_filter: Optional[AllowedForestFilter] | None = Field(
+    # natural_forest is a breakdown by SBTN natural forest class (kept for an
+    # existing app), while natural_forest_only filters to SBTN Natural Forest.
+    # natural_forest_only is only implemented for tree cover loss, so it isn't in
+    # the shared AllowedForestFilter used by tree cover and tree cover gain.
+    forest_filter: Optional[
+        Literal[
+            "primary_forest", "natural_forest", "intact_forest", "natural_forest_only"
+        ]
+    ] = Field(
         default=None,
         title="Forest Filter",
     )
@@ -91,6 +99,11 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
             raise ValueError(
                 "Must set a tree cover baseline using either canopy_cover or forest_filter."
             )
+        if self.forest_filter == "natural_forest_only" and int(self.start_year) < 2021:
+            raise ValueError(
+                "natural_forest_only filter is a snapshot of 2020, and is only valid "
+                "against loss after 2020."
+            )
         if self.forest_filter == "natural_forest":
             if int(self.start_year) < 2021:
                 raise ValueError(
@@ -107,6 +120,7 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
                     "natural_forest filter is not currently available for admin AOI type."
                 )
         return self
+
 
 class TreeCoverLossAnalytics(StrictBaseModel):
     result: Optional[dict] = None

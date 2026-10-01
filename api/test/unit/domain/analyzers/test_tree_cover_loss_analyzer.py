@@ -230,6 +230,98 @@ async def test_flox_handler_natural_forests():
 
 
 @pytest.mark.asyncio
+async def test_flox_handler_natural_forest_only():
+    dask_cluster = LocalCluster(asynchronous=True)
+    dask_client = Client(dask_cluster)
+
+    aoi = ProtectedAreaOfInterest(ids=["1234"])
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=aoi,
+        start_year="2021",
+        end_year="2024",
+        forest_filter="natural_forest_only",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(
+        dask_client_router=DaskClientRouter(dask_client, None),
+        dataset_repository=TestDatasetRepository(),
+        aoi_geometry_repository=TestAoiGeometryRepository(),
+        input_uris=INPUT_URIS[Environment.production],
+    )
+    await analyzer.analyze(analysis)
+    results = analysis.result
+
+    # Only the Natural Forest pixels (the middle 4 columns) are counted, and there
+    # is no natural_forests_class breakdown, unlike forest_filter="natural_forest".
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(results),
+        pd.DataFrame(
+            {
+                "tree_cover_loss_year": [2021],
+                "area_ha": [100000.0],
+                "carbon_emissions_MgCO2e": [30.0],
+                "aoi_id": ["1234"],
+                "aoi_type": ["protected_area"],
+            },
+        ),
+        check_like=True,
+        check_exact=False,  # Allow approximate comparison for numbers
+        atol=1e-8,  # Absolute tolerance
+        rtol=1e-4,  # Relative tolerance
+    )
+
+
+@pytest.mark.asyncio
+async def test_natural_forest_only_precalc_only_counts_natural_forest():
+    class MockParquetQueryService:
+        async def execute(self, query: str) -> Dict:
+            # DuckDB references this table implicitly bc its in scope when we run .sql()
+            data_source = pd.DataFrame(  # noqa
+                {
+                    "aoi_id": ["BRA", "BRA", "BRA", "BRA"],
+                    "aoi_type": ["admin", "admin", "admin", "admin"],
+                    "tree_cover_loss_year": [2022, 2022, 2022, 2023],
+                    "area_ha": [1.0, 10.0, 100.0, 1000.0],
+                    "canopy_cover": [30, 30, 30, 50],
+                    "carbon_emissions_MgCO2e": [0.1, 0.2, 0.3, 0.4],
+                    "natural_forests_class": [
+                        "Natural Forest",
+                        "Non-natural Forest",
+                        "Unknown",
+                        "Natural Forest",
+                    ],
+                }
+            )
+            return duckdb.sql(query).df().to_dict(orient="list")
+
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=AdminAreaOfInterest(ids=["BRA"]),
+        canopy_cover=30,
+        start_year="2021",
+        end_year="2024",
+        forest_filter="natural_forest_only",
+        intersections=[],
+    ).model_dump()
+
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+
+    analyzer = TreeCoverLossAnalyzer(input_uris=INPUT_URIS[Environment.production])
+    with patch(
+        "app.domain.analyzers.tree_cover_loss_analyzer.DuckDbPrecalcQueryService"
+    ) as mock_qs:
+        mock_qs.return_value.execute = MockParquetQueryService().execute
+        await analyzer.analyze(analysis)
+
+    results = pd.DataFrame(analysis.result).sort_values("tree_cover_loss_year")
+
+    assert results.tree_cover_loss_year.tolist() == [2022, 2023]
+    assert results.area_ha.tolist() == [1.0, 1000.0]
+
+
+@pytest.mark.asyncio
 async def test_flox_handler_intact_forest():
     dask_cluster = LocalCluster(asynchronous=True)
     dask_client = Client(dask_cluster)
