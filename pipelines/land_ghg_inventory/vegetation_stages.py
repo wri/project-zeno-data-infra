@@ -27,13 +27,14 @@ import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.land_ghg_inventory.common import align_to, clip
+from pipelines.land_ghg_inventory.common import align_to
 from pipelines.land_ghg_inventory.land_state_categories import (
     LAND_STATE_TO_CATEGORY,
     VEGETATION_CATEGORIES,
 )
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
+    clip_ds_to_bbox,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -157,7 +158,7 @@ def load_data(
     veg = _load_zarr(vegetation_uri)[
         list(VEGETATION_SOURCE_VARS.values()) + [LAND_STATE_VAR]
     ]
-    veg = clip(veg, bbox)
+    veg = clip_ds_to_bbox(veg, bbox)
     veg = veg.rename({source: name for name, source in VEGETATION_SOURCE_VARS.items()})
     return (
         veg,
