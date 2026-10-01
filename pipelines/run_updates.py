@@ -31,7 +31,8 @@ def create_cluster():
         scheduler_vm_types=["r7g.xlarge"],
         worker_vm_types=["r7g.2xlarge"],
         compute_purchase_option="on-demand",
-        no_client_timeout="5 seconds",
+        idle_timeout="2 hours",
+        no_client_timeout="5 minutes",
         container=os.getenv("PIPELINES_IMAGE"),
         environ={
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
@@ -176,10 +177,13 @@ def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
     name="GNW zonal stats update",
     log_prints=True,
     description=(
-        "This is the entry point to run updates via Prefect Cloud UI or CLI to update zonal statistics for various datasets for GADM areas."
+        "This is the entry point to run updates via Prefect Cloud UI or CLI to "
+        "update zonal statistics for various datasets for GADM areas."
         "Two flows are available currently: "
-        "-'dist_update' will just run an update on DIST alerts, and is the default for backward compatibility"
-        "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide all necessary updates for TCL."
+        "-'dist_update' will just run an update on DIST alerts, and is the "
+        "default for backward compatibility"
+        "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide "
+        "all necessary updates for TCL."
     ),
 )
 def run_updates(
@@ -195,7 +199,8 @@ def run_updates(
     dask_client = None
     result_uris = []
 
-    # when called from Prefect webhook, the booleans flags are passed as strings, so we need to convert them to booleans
+    # when called from Prefect webhook, the booleans flags are passed as strings,
+    # so we need to convert them to booleans
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
@@ -211,7 +216,8 @@ def run_updates(
         if flow_fn is None:
             accepted = [e.value for e in UpdateFlow]
             raise ValueError(
-                f"Unsupported flow selection: '{flow_name}'. Accepted values: {accepted}"
+                f"Unsupported flow selection: '{flow_name}'. "
+                f"Accepted values: {accepted}"
             )
 
         _validate_flow_args(flow_name, version)
