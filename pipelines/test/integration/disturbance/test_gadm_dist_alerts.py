@@ -15,21 +15,11 @@ from pipelines.disturbance.prefect_flows import dist_alerts_area
 def test_gadm_dist_alerts_happy_path(
     mock_load_zarr,
     mock_save_parquet,
-    dist_ds,
-    country_ds,
-    region_ds,
-    subregion_ds,
-    pixel_area_ds,
+    load_zarr_by_uri,
 ):
     """Test full workflow with in-memory dependencies"""
 
-    mock_load_zarr.side_effect = [
-        dist_ds,
-        country_ds,
-        region_ds,
-        subregion_ds,
-        pixel_area_ds,
-    ]
+    mock_load_zarr.side_effect = load_zarr_by_uri
 
     with prefect_test_harness():
         result_uri = dist_alerts_area(
@@ -38,8 +28,8 @@ def test_gadm_dist_alerts_happy_path(
         )
 
     assert (
-        result_uri
-        == "s3://lcl-analytics/zonal-statistics/dist-alerts/test_v1/admin-dist-alerts.parquet"
+        result_uri == "s3://lcl-analytics/zonal-statistics/dist-alerts/test_v1"
+        "/admin-dist-alerts.parquet"
     )
 
 
@@ -50,11 +40,7 @@ def test_gadm_dist_alerts_happy_path(
 def test_gadm_dist_alerts_result(
     mock_load_zarr,
     mock_save_parquet,
-    dist_ds,
-    country_ds,
-    region_ds,
-    subregion_ds,
-    pixel_area_ds,
+    load_zarr_by_uri,
 ):
     alert_schema = DataFrameSchema(
         name="GADM Dist Alerts",
@@ -95,13 +81,7 @@ def test_gadm_dist_alerts_result(
         ),
     )
 
-    mock_load_zarr.side_effect = [
-        dist_ds,
-        country_ds,
-        region_ds,
-        subregion_ds,
-        pixel_area_ds,
-    ]
+    mock_load_zarr.side_effect = load_zarr_by_uri
     dist_alerts_area(
         dist_zarr_uri="s3://dummy_zarr_uri",
         dist_version="test_v1",
