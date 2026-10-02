@@ -98,7 +98,7 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df.rename(columns={"value": "area_ha"}, inplace=True)
     df.rename(columns={"confidence": "dist_alert_confidence"}, inplace=True)
     df.rename(columns={"alert_date": "dist_alert_date"}, inplace=True)
-    # Convert distinct values once; row-wise .apply is very slow at this row count.
+    # fast vectorized mapping using .map
     day_to_date = {
         d: date(2020, 12, 31) + timedelta(days=int(d))
         for d in df["dist_alert_date"].unique()
