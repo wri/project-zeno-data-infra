@@ -214,7 +214,7 @@ async def test_flox_handler_natural_forests():
                 "natural_forests_class": [
                     "Unknown",
                     "Natural Forest",
-                    "Non-Natural Forest",
+                    "Non-natural Forest",
                 ],
                 "area_ha": [75000.0, 100000.0, 75000.0],
                 "carbon_emissions_MgCO2e": [22.5, 30.0, 22.5],

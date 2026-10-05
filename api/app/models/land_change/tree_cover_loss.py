@@ -100,13 +100,8 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
                 raise ValueError(
                     "Cannot specify both canopy cover from 2000 and natural forest from 2020 as filters."
                 )
-            elif self.aoi.type == "admin":
-                # TODO We don't have OTF set up for admin yet, so let's focus on the main use case of
-                # TODO of supporting custom AOI analysis on GFW
-                raise ValueError(
-                    "natural_forest filter is not currently available for admin AOI type."
-                )
         return self
+
 
 class TreeCoverLossAnalytics(StrictBaseModel):
     result: Optional[dict] = None
