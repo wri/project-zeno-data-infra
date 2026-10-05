@@ -10,6 +10,8 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from shapely.geometry import box
 
+from pipelines.aois.aoi_source import AoiSource
+from pipelines.aois.prefect_flows import aois_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
@@ -116,6 +118,69 @@ def run_land_ghg_inventory_update(
     )
 
 
+AOI_SOURCES = (
+    AoiSource(
+        source="wdpa",
+        version="v202512",
+        uri=(
+            "s3://gfw-data-lake/wdpa_protected_areas/v202512/raw/"
+            "WDPA_Dec2025_Public.gdb.zip"
+        ),
+        layer="WDPA_poly_Dec2025",
+        id_column="site_pid",
+        subtype="protected-area",
+        name_columns=("name", "desig", "iso3"),
+        iso3_column="iso3",
+    ),
+    AoiSource(
+        source="kba",
+        version="v20250911",
+        uri=(
+            "s3://gfw-data-lake/birdlife_key_biodiversity_areas/v20240904/raw/"
+            "KBAsGlobal_2024_September_03_POL.zip"
+        ),
+        layer=None,
+        id_column="sitrecid",
+        subtype="key-biodiversity-area",
+        name_columns=("natname", "intname", "iso3"),
+        iso3_column="iso3",
+    ),
+    AoiSource(
+        source="landmark",
+        version="v20260617",
+        uri="s3://wri-lcl-public-unsafe/20260617_IP_LC_and_Indicative.gdb.zip",
+        layer="IP_LC_Indicative_20260617",
+        id_column="landmark_id",
+        subtype="indigenous-and-community-land",
+        name_columns=("name", "category", "iso_code"),
+        iso3_column="iso_code",
+    ),
+)
+
+AOI_NAME_COLUMNS = [
+    "source",
+    "aoi_id",
+    "name",
+    "subtype",
+    "iso3",
+    "extent",
+    "area_ha",
+]
+
+
+@flow
+def run_aois_update(version, overwrite=False, is_latest=False) -> list[str]:
+    """Builds a GeoParquet per AOI source, then the combined names parquet
+    versioned by `version`."""
+    geoparquet_uris = [
+        aois_flow.aoi_flow(source, overwrite=overwrite) for source in AOI_SOURCES
+    ]
+    names_uri = aois_flow.aoi_names_flow(
+        geoparquet_uris, AOI_NAME_COLUMNS, version, overwrite=overwrite
+    )
+    return [*geoparquet_uris, names_uri]
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -133,6 +198,7 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    AOIS_UPDATE = "aois_update"
 
 
 update_flows = {
@@ -144,6 +210,7 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.AOIS_UPDATE: run_aois_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -154,7 +221,11 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
+    UpdateFlow.AOIS_UPDATE,
 )
+
+# flows that don't use Dask, so run on the flow's own machine
+CLUSTERLESS_FLOWS = (UpdateFlow.AOIS_UPDATE,)
 
 # flow_name values that route into run_land_ghg_inventory_update
 LAND_GHG_INVENTORY_FLOWS = (
@@ -164,6 +235,10 @@ LAND_GHG_INVENTORY_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
+
+
+def needs_cluster(flow_name: "UpdateFlow", local: bool) -> bool:
+    return not local and flow_name not in CLUSTERLESS_FLOWS
 
 
 def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
@@ -204,7 +279,7 @@ def run_updates(
     bbox_geom = _parse_bbox(bbox)
 
     try:
-        if not local:
+        if needs_cluster(flow_name, local):
             dask_client = create_cluster()
 
         flow_fn = update_flows.get(flow_name)

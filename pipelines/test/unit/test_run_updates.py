@@ -7,6 +7,7 @@ from pipelines.run_updates import (
     UpdateFlow,
     _parse_bbox,
     _validate_flow_args,
+    needs_cluster,
 )
 
 
@@ -37,6 +38,12 @@ def test_version_required_for_versioned_flows(flow_name):
 )
 def test_version_not_required_for_unversioned_flows(flow_name):
     _validate_flow_args(flow_name, version=None)  # must not raise
+
+
+def test_cluster_is_only_created_for_remote_dask_flows():
+    assert needs_cluster(UpdateFlow.DIST_UPDATE, local=False)
+    assert not needs_cluster(UpdateFlow.DIST_UPDATE, local=True)
+    assert not needs_cluster(UpdateFlow.AOIS_UPDATE, local=False)
 
 
 def test_country_expected_groups_covers_every_iso_code():
