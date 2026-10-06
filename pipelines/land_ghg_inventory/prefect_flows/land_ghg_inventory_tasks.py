@@ -35,7 +35,7 @@ def setup_vegetation_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
     return vegetation_stages.setup_vegetation_compute(datasets, expected_groups)
 
 
-@task
+@task(persist_result=False)
 def vegetation_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
     return vegetation_stages.vegetation_result_dataframe(reduced)
 
@@ -63,7 +63,7 @@ def setup_agriculture_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple:
     return agriculture_stages.setup_agriculture_compute(datasets, expected_groups)
 
 
-@task
+@task(persist_result=False)
 def agriculture_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
     return agriculture_stages.agriculture_result_dataframe(reduced)
 
@@ -87,7 +87,7 @@ def setup_mineral_soil_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple
     return mineral_soil_stages.setup_mineral_soil_compute(datasets, expected_groups)
 
 
-@task
+@task(persist_result=False)
 def mineral_soil_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
     return mineral_soil_stages.mineral_soil_result_dataframe(reduced)
 
@@ -111,6 +111,6 @@ def setup_organic_soil_compute(datasets: Tuple, expected_groups: Tuple) -> Tuple
     return organic_soil_stages.setup_organic_soil_compute(datasets, expected_groups)
 
 
-@task
+@task(persist_result=False)
 def organic_soil_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
     return organic_soil_stages.organic_soil_result_dataframe(reduced)

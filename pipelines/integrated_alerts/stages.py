@@ -1,10 +1,9 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import xarray as xr
-from dateutil.relativedelta import relativedelta
 from shapely.geometry import Polygon
 
 from pipelines.globals import (
@@ -134,11 +133,12 @@ def create_result_dataframe(alerts_area: xr.DataArray) -> pd.DataFrame:
     df = common_create_result_dataframe(alerts_area)
     df.rename(columns={"value": "area_ha"}, inplace=True)
     df.rename(columns={"confidence": "alert_confidence"}, inplace=True)
-    df.rename(columns={"alert_date": "alert_date"}, inplace=True)
-    df["alert_date"] = df.sort_values(by="alert_date").alert_date.apply(
-        lambda x: date(2014, 12, 31) + relativedelta(days=x)
-    )
-    df["alert_confidence"] = df.alert_confidence.apply(lambda x: alerts_confidence[x])
+    day_to_date = {
+        d: date(2014, 12, 31) + timedelta(days=int(d))
+        for d in df["alert_date"].unique()
+    }
+    df["alert_date"] = df["alert_date"].map(day_to_date)
+    df["alert_confidence"] = df["alert_confidence"].map(alerts_confidence)
     # Keep the raw SBTN class codes (0-21). The API maps them to labels and to
     # groups like natural lands (classes 2-11).
     df["natural_lands_class"] = df.natural_lands_class.astype(np.uint8)
