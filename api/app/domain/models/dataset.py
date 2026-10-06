@@ -47,10 +47,13 @@ class DatasetFilter(StrictBaseModel):
 
     def __str__(self):
         field = self.dataset.get_field_name()
-        # Supress trailing commas of monotuples
         match self.value:
             case (x,):
+                # Suppress trailing commas of monotuples
                 value_repr: str = f"('{x}')"
+            case str(x):
+                # Put single quotes around string values
+                value_repr = f"'{x}'"
             case x:
                 value_repr = str(x)
         return " ".join([field, self.op, value_repr])
