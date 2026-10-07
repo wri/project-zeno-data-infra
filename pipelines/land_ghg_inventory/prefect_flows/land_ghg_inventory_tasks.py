@@ -11,6 +11,9 @@ from pipelines.land_ghg_inventory import (
     organic_soil_stages,
     vegetation_stages,
 )
+from pipelines.land_ghg_inventory.create_agriculture_cogs import (
+    create_agriculture_cogs,
+)
 from pipelines.land_ghg_inventory.create_agriculture_zarr import (
     create_agriculture_zarr,
 )
@@ -43,6 +46,11 @@ def vegetation_result_dataframe(reduced: xr.DataArray) -> pd.DataFrame:
 @task
 def prepare_agriculture_zarr(overwrite: bool = False) -> str:
     return create_agriculture_zarr(overwrite=overwrite)
+
+
+@task
+def prepare_agriculture_cogs(overwrite: bool = False) -> Tuple[str, str]:
+    return create_agriculture_cogs(overwrite=overwrite)
 
 
 @task
