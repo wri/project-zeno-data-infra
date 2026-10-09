@@ -187,7 +187,10 @@ resource "prefect_webhook" "dist_update_event" {
 
 resource "prefect_automation" "run_pipelines_on_dist_update" {
   name    = "run-gnw-zonal-stats-on-dist-update${local.name_suffix}"
-  enabled = terraform.workspace == "default"
+  # Disabled: DIST alerts are no longer used by the agent, so new DIST versions no
+  # longer need to be processed. To re-enable, set back to
+  # terraform.workspace == "default".
+  enabled = false
 
   trigger = {
     event = {
