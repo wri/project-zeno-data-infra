@@ -160,3 +160,14 @@ To change the image:
 ### Automatic Triggers
 
 A **webhook + automation** is configured so that when a new DIST alerts version is published, the `dist_update` flow is triggered automatically with the version from the event payload. This is defined in `terraform/prefect.tf` as the `run-gnw-zonal-stats-on-dist-update` automation.
+
+**This automation is currently disabled** (`enabled = false`), since DIST alerts are
+no longer used by the agent. New DIST versions still reach the webhook, but no flow
+runs. The `dist_update` flow can still be run manually.
+
+Similarly, **webhook + automation** is configured so that when a new integrated dist
+alerts version is published on a Sunday (or the first version created after SundaY),
+the `integrated_alerts_update` flow is triggered automatically with the version in
+the event payload. This is defined in `terraform/prefect.tf` as the
+`run-gnw-zonal-stats-on-intdist-update` automation. This automation is enabled and
+runs weekly.
