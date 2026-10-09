@@ -1,0 +1,78 @@
+{
+  "type": "Collection",
+  "id": "cropland-emissions",
+  "stac_version": "1.1.0",
+  "description": "Cornell cropland emissions for 2020: absolute per-pixel totals in kg CO2e on a ~10km grid, excluding peat burning.",
+  "links": [
+    {
+      "rel": "root",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "parent",
+      "href": "../catalog.json",
+      "type": "application/json"
+    },
+    {
+      "rel": "agents",
+      "href": "./AGENTS.md",
+      "type": "text/markdown",
+      "title": "Agent/LLM usage guide"
+    },
+    {
+      "rel": "via",
+      "href": "https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/cropland_emissions/raw__from_Cornell/20250828/year_2020/all_sources/Global_grid_cropland_emissions_total_amount_CO2eq_all_crops_without_peat_burn_kg_CO2__20260803.tif",
+      "type": "text/html",
+      "title": "Cornell cropland emissions 2020"
+    },
+    {
+      "rel": "describedby",
+      "href": "./README.md",
+      "type": "text/markdown",
+      "title": "Human-readable documentation"
+    }
+  ],
+  "title": "Cornell cropland emissions 2020",
+  "extent": {
+    "spatial": {
+      "bbox": [
+        [
+          -180,
+          -90,
+          180,
+          90
+        ]
+      ]
+    },
+    "temporal": {
+      "interval": [
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  },
+  "license": "CC-BY-4.0",
+  "assets": {
+    "data": {
+      "href": "https://gfw2-data.s3.amazonaws.com/climate/AFOLU_flux_model/cropland_emissions/raw__from_Cornell/20250828/year_2020/all_sources/Global_grid_cropland_emissions_total_amount_CO2eq_all_crops_without_peat_burn_kg_CO2__20260803.tif",
+      "type": "image/tiff; application=geotiff; profile=cloud-optimized",
+      "title": "Cornell cropland emissions 2020",
+      "roles": [
+        "data",
+        "external"
+      ],
+      "alternate": {
+        "s3": {
+          "href": "s3://gfw2-data/climate/AFOLU_flux_model/cropland_emissions/raw__from_Cornell/20250828/year_2020/all_sources/Global_grid_cropland_emissions_total_amount_CO2eq_all_crops_without_peat_burn_kg_CO2__20260803.tif"
+        }
+      }
+    }
+  },
+  "stac_extensions": [
+    "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json",
+    "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
+  ]
+}
