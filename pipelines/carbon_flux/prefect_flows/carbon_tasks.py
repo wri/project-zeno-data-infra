@@ -41,11 +41,11 @@ def setup_compute(
     return stages.setup_compute(datasets, expected_groups, contextual_name)
 
 
-@task
+@task(persist_result=False)
 def postprocess_result(result: xr.DataArray):
     return stages.create_result_dataframe(result)
 
 
-@task
+@task(persist_result=False)
 def qc_against_validation_source(result_df) -> bool:
     return stages.qc_against_validation_source(result_df)

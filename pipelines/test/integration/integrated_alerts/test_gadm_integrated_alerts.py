@@ -22,6 +22,7 @@ def test_gadm_integrated_alerts_happy_path(
     region_ds,
     subregion_ds,
     pixel_area_ds,
+    natural_lands_ds,
 ):
     """Test full workflow with in-memory dependencies"""
 
@@ -31,6 +32,7 @@ def test_gadm_integrated_alerts_happy_path(
         region_ds,
         subregion_ds,
         pixel_area_ds,
+        natural_lands_ds,
     ]
 
     with prefect_test_harness():
@@ -57,6 +59,7 @@ def test_gadm_integrated_alerts_result(
     region_ds,
     subregion_ds,
     pixel_area_ds,
+    natural_lands_ds,
 ):
     alert_schema = DataFrameSchema(
         name="GADM Integrated Alerts",
@@ -75,12 +78,15 @@ def test_gadm_integrated_alerts_result(
                 ],
             ),
             "alert_confidence": Column(str, Check.isin(["low", "high", "highest"])),
+            # raw SBTN natural lands class codes
+            "natural_lands_class": Column("uint8", Check.isin(range(22))),
             "area_ha": Column("float64", Check.isin([2.5, 5.0])),
         },
         unique=[
             "aoi_id",
             "alert_date",
             "alert_confidence",
+            "natural_lands_class",
         ],
         checks=Check(
             lambda df: (
@@ -100,6 +106,7 @@ def test_gadm_integrated_alerts_result(
         region_ds,
         subregion_ds,
         pixel_area_ds,
+        natural_lands_ds,
     ]
 
     with prefect_test_harness():
@@ -137,6 +144,19 @@ def test_gadm_integrated_alerts_result(
     # all three confidence levels are represented, including highest (code 4)
     assert set(result["alert_confidence"]) == {"low", "high", "highest"}
 
+    # each of the 4 px has its own natural lands class (2, 12, 5 and 0), kept as is
+    area_by_class = (
+        result[result.aoi_id == "BRA"].groupby("natural_lands_class")["area_ha"].sum()
+    )
+    assert area_by_class.to_dict() == {0: 2.5, 2: 2.5, 5: 2.5, 12: 2.5}
+
+    # sorted by aoi_id first, so admin queries (always by aoi_id) can skip most of
+    # the parquet using row group statistics
+    sort_columns = ["aoi_id", "natural_lands_class", "alert_confidence", "alert_date"]
+    assert result[sort_columns].equals(
+        result[sort_columns].sort_values(sort_columns, ignore_index=True)
+    )
+
 
 @pytest.mark.slow
 @pytest.mark.integration
@@ -150,6 +170,7 @@ def test_gadm_integrated_alerts_multi_admin_rollup(
     multi_region_ds,
     multi_subregion_ds,
     pixel_area_ds,
+    natural_lands_ds,
 ):
     """Alerts across two countries with multiple regions/subregions roll up to
     every admin level, and area is conserved within each country across adm levels."""
@@ -159,6 +180,7 @@ def test_gadm_integrated_alerts_multi_admin_rollup(
         multi_region_ds,
         multi_subregion_ds,
         pixel_area_ds,
+        natural_lands_ds,
     ]
 
     with prefect_test_harness():
@@ -212,6 +234,7 @@ def test_gadm_integrated_alerts_filters_pixels_with_no_country(
     region_ds,
     subregion_ds,
     pixel_area_ds,
+    natural_lands_ds,
 ):
     """Pixels with no iso are dropped. When nothing remains, the flow still
     completes and saves an empty, correctly-shaped result"""
@@ -221,6 +244,7 @@ def test_gadm_integrated_alerts_filters_pixels_with_no_country(
         region_ds,
         subregion_ds,
         pixel_area_ds,
+        natural_lands_ds,
     ]
 
     with prefect_test_harness():

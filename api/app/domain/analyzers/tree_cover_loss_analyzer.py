@@ -72,12 +72,14 @@ def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
             DatasetFilter(
                 dataset=Dataset.tree_cover_loss,
                 op=">=",
-                value=analytics_in.start_year,
+                # DuckDB default conversions work either way, but cleaner if
+                # the years are ints, so they are not quoted unnecessarily.
+                value=int(analytics_in.start_year),
             ),
             DatasetFilter(
                 dataset=Dataset.tree_cover_loss,
                 op="<=",
-                value=analytics_in.end_year,
+                value=int(analytics_in.end_year),
             ),
         ],
     )
@@ -112,6 +114,23 @@ def _build_query(analytics_in: TreeCoverLossAnalyticsIn) -> DatasetQuery:
         )
     elif analytics_in.forest_filter == "natural_forest":
         query.group_bys.append(Dataset.natural_forests)
+
+    elif analytics_in.forest_filter == "natural_forest_only":
+        # Note on carbon: without canopy_cover, carbon is not computed the same way
+        # for admin and other AOIs. The precalculated admin parquet written by
+        # umd_tree_cover_loss_flow() only has carbon for canopy cover >= 30% (plus
+        # mangroves and tree cover gain from height), with 0 below 30%, while the
+        # on-the-fly calculation sums carbon over all pixels. So carbon for
+        # natural_forest_only without canopy_cover can differ between an admin area
+        # and the same area as a custom AOI. (The same is true for
+        # forest_filter="natural_forest" on the fly.)
+        query.filters.append(
+            DatasetFilter(
+                dataset=Dataset.natural_forests,
+                op="=",
+                value="Natural Forest",
+            )
+        )
 
     elif analytics_in.forest_filter == "intact_forest":
         query.filters.append(

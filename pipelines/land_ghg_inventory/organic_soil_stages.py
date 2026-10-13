@@ -33,9 +33,10 @@ import pandas as pd
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.land_ghg_inventory.common import align_to, clip
+from pipelines.land_ghg_inventory.common import align_to
 from pipelines.prefect_flows.common_stages import (
     _load_zarr,
+    clip_ds_to_bbox,
 )
 from pipelines.prefect_flows.common_stages import (
     create_result_dataframe as common_create_result_dataframe,
@@ -123,7 +124,7 @@ def load_data(
         ORGANIC_SOIL_SOURCE_VARS + [ORGANIC_SOIL_MASK_VAR]
     ]
     org = org.isel(year=BLOCK_YEAR_INDICES)
-    org = clip(org, bbox)
+    org = clip_ds_to_bbox(org, bbox)
     return (
         org,
         align_to(org, pixel_area_uri),

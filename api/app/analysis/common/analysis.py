@@ -7,11 +7,22 @@ from typing import Iterable
 
 import duckdb
 import httpx
+import numpy as np
 import xarray as xr
 from rioxarray.exceptions import NoDataInBounds
 from shapely.geometry import shape
 
 JULIAN_DATE_2021 = 2459215
+
+# SBTN natural lands class codes included by each land_filter value. To add a
+# filter, add an entry here and its value to the land_filter Literal.
+LAND_FILTER_CLASSES = {
+    # natural forests, short vegetation, water, mangroves, bare, snow, and
+    # wetland/peat forests and short vegetation
+    "natural_lands": list(range(2, 12)),
+    # natural forests, mangroves, wetland natural forests and natural peat forests
+    "natural_forests": [2, 5, 8, 9],
+}
 
 
 class FeatureTooSmallError(Exception):
@@ -102,6 +113,60 @@ def read_zarr_clipped_to_geojson(uri, geojson, group: str | None = None):
 
 def read_zarr(uri, group: str | None = None):
     return _open_zarr(uri, group=group)
+
+
+def read_zarr_resampled_to_grid(uri, target) -> xr.DataArray:
+    """Read a zarr's band_data resampled to the target's grid (e.g. a 30m layer
+    onto the 10m alerts already clipped to an AOI).
+
+    Unlike read_zarr_clipped_to_geojson, this doesn't mask by the AOI geometry,
+    since the target is already clipped. Masking the coarser layer would drop its
+    pixels whose centers are just outside the AOI, even though finer target
+    pixels inside the AOI fall in them.
+    """
+    layer = read_zarr(uri).band_data
+    if "band" in layer.dims:
+        layer = layer.squeeze("band", drop=True)
+    return resample_to_grid(layer, target)
+
+
+def resample_to_grid(layer: xr.DataArray, target) -> xr.DataArray:
+    """Nearest-neighbor resample a (coarser) layer to the target's grid.
+
+    Each target pixel takes the value of the layer pixel its center falls in. The
+    tolerance is half a layer pixel, since e.g. 10m pixel centers never coincide
+    with 30m pixel centers, so a tiny tolerance like 1e-5 would match nothing.
+    Target pixels outside the layer's extent are set to 0.
+
+    Matching is done on the x/y coordinates in degrees, so both must be in
+    EPSG:4326 (as all our zarrs are), and the layer's pixels must be square,
+    since the tolerance is taken from its x step and applied to both axes.
+    """
+    check_square_pixels(layer, "layer")
+    layer_resolution = abs(float(layer.x[1] - layer.x[0]))
+    return layer.reindex_like(
+        target, method="nearest", tolerance=layer_resolution / 2, fill_value=0
+    ).astype(layer.dtype)
+
+
+def check_square_pixels(grid, name: str) -> None:
+    """Raise if grid's x and y pixel steps differ, since resampling takes its
+    tolerance from the x step and applies it to both axes."""
+    x_step = abs(float(grid.x[1] - grid.x[0]))
+    y_step = abs(float(grid.y[1] - grid.y[0]))
+    if not np.isclose(x_step, y_step, rtol=1e-6):
+        raise ValueError(
+            f"{name} must have square pixels, but its x step is {x_step} and "
+            f"its y step is {y_step}"
+        )
+
+
+def to_land_filter_mask(
+    natural_lands_classes: xr.DataArray, land_filter: str
+) -> xr.DataArray:
+    """Convert SBTN natural lands classes to 1 (one of the land_filter's classes in
+    LAND_FILTER_CLASSES) or 0 (any other class, or no data)."""
+    return natural_lands_classes.isin(LAND_FILTER_CLASSES[land_filter]).astype(np.uint8)
 
 
 def _open_zarr(uri, group: str | None = None):

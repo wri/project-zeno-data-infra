@@ -222,7 +222,7 @@ class TestTreeCoverLossServiceCollaborators:
         mock_analyzer.analyze.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_analysis_exception_sets_status_to_failed(
+    async def test_analysis_exception_sets_status_to_failed_and_stores_error(
         self,
         stub_analysis_in,
         mock_analysis_repository,
@@ -259,7 +259,7 @@ class TestTreeCoverLossServiceCollaborators:
             expected_tp,
             Analysis(
                 metadata=stub_analysis_in.model_dump(),
-                result=None,
+                result={"error": "Test exception"},
                 status=AnalysisStatus.failed,
             ),
         )

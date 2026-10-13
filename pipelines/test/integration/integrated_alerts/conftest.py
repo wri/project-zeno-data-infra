@@ -161,3 +161,24 @@ def ocean_country_ds():
     )
 
     return country
+
+
+@pytest.fixture
+def natural_lands_ds():
+    # SBTN classes: 2 (natural forests) and 5 (mangroves) are natural, 12 (cropland)
+    # and 0 (no data) are not. Same grid as the alerts fixtures.
+    natural_lands = xr.Dataset(
+        data_vars={
+            "band_data": (
+                ("band", "y", "x"),
+                da.array([[[2, 12], [5, 0]]], dtype=np.uint8),
+            )
+        },
+        coords={
+            "band": ("band", [1], {}),
+            "y": ("y", [60.0, 59.99975], {}),
+            "x": ("x", [-180.0, -179.99975], {}),
+        },
+    )
+
+    return natural_lands

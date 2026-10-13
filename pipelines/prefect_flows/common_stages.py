@@ -4,6 +4,7 @@ import pandas as pd
 import xarray as xr
 from flox import ReindexArrayType, ReindexStrategy
 from flox.xarray import xarray_reduce
+from shapely.geometry import Polygon
 
 from pipelines.globals import (
     country_zarr_uri,
@@ -341,7 +342,7 @@ def create_result_dataframe(alerts_count: xr.DataArray) -> pd.DataFrame:
     }
     coord_dict["value"] = values
     df = pd.DataFrame(coord_dict)
-    df["country"] = df["country"].apply(lambda x: numeric_to_alpha3.get(x, None))
+    df["country"] = df["country"].map(numeric_to_alpha3)
     df.dropna(subset="country", inplace=True)
 
     return df
@@ -407,7 +408,9 @@ def rollup_by_gadm_and_convert_to_aoi(df, groupby_list):
     results_with_ids = pd.concat([country_df, region_df, subregion_df])
     results_with_ids["aoi_type"] = "admin"
     print(
-        f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, {len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} -> {len(results_with_ids)}/{results_with_ids.size}"
+        f"Lengths {len(df)}/{df.size}, {len(subregion_df)}/{subregion_df.size}, "
+        f"{len(region_df)}/{region_df.size}, {len(country_df)}/{country_df.size} "
+        f"-> {len(results_with_ids)}/{results_with_ids.size}"
     )
 
     return results_with_ids
@@ -420,7 +423,7 @@ def symmetric_relative_difference(a, b):
 
 
 def save_results(df: pd.DataFrame, results_uri: str) -> str:
-    print("Starting parquet")
+    print(f"Starting parquet {results_uri}")
 
     _save_parquet(df, results_uri)
     print("Finished parquet")
@@ -429,11 +432,26 @@ def save_results(df: pd.DataFrame, results_uri: str) -> str:
 
 # _load_zarr and _save_parquet are the functions being mocked by the unit tests.
 def _save_parquet(df: pd.DataFrame, results_uri: str) -> None:
+    # For parquets sorted by aoi_id (e.g. integrated alerts), it would be useful to
+    # add row_group_size=100_000: API queries for one AOI would then read ~1-2 MB
+    # from S3 instead of a whole ~1M-row group (~10 MB).
     df.to_parquet(results_uri, index=False)
 
 
 def _load_zarr(zarr_uri, group=None):
     return xr.open_zarr(zarr_uri, group=group, storage_options={"requester_pays": True})
+
+
+def clip_ds_to_bbox(dataset: xr.Dataset, bbox: Optional[Polygon]) -> xr.Dataset:
+    """Clip a dataset to a bbox, e.g. for a smaller local test run. Assumes y labels
+    in the zarr are in descending order, which happens naturally, because Geotiff
+    tiles (from which they are derived) start with row 0 at the northern edge.
+
+    """
+    if bbox is None:
+        return dataset
+    min_x, min_y, max_x, max_y = bbox.bounds
+    return dataset.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))
 
 
 def _get_tile_uris(tiles_geojson_uri: str) -> List[str]:
@@ -490,7 +508,8 @@ def create_zarr_from_tiles(
     if dtype:
         dataset = dataset.astype(dtype)
     for chunk_size, group in groups_to_write:
-        # `mode` applies to group, so `w` won't overwrite the whole store if the group already exists, just that group.
+        # `mode` applies to the group: `w` overwrites just that group if it
+        # already exists, not the whole store.
         dataset.chunk({"x": chunk_size, "y": chunk_size}).to_zarr(
             zarr_uri, mode="w", group=group
         )
