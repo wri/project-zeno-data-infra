@@ -11,10 +11,8 @@ from pipelines.land_ghg_inventory import (
     organic_soil_stages,
     vegetation_stages,
 )
-from pipelines.land_ghg_inventory.create_agriculture_cogs import (
+from pipelines.land_ghg_inventory.create_agriculture_assets import (
     create_agriculture_cogs,
-)
-from pipelines.land_ghg_inventory.create_agriculture_zarr import (
     create_agriculture_zarr,
 )
 

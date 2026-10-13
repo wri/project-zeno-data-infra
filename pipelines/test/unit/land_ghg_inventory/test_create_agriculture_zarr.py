@@ -6,7 +6,7 @@ import pytest
 import xarray as xr
 
 from pipelines.globals import land_ghg_inventory_agriculture_zarr_uri
-from pipelines.land_ghg_inventory import create_agriculture_zarr as mod
+from pipelines.land_ghg_inventory import create_agriculture_assets as mod
 from pipelines.land_ghg_inventory.agriculture_stages import AGRICULTURE_SOURCE_VARS
 
 
