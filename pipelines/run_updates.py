@@ -6,10 +6,7 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
-
+from pipelines.aois.aoi_ids import column_ids, gadm_ids
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.prefect_flows import aois_flow
 from pipelines.carbon_flux.prefect_flows import carbon_flow
@@ -19,6 +16,9 @@ from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -120,6 +120,17 @@ def run_land_ghg_inventory_update(
 
 AOI_SOURCES = (
     AoiSource(
+        source="gadm",
+        version="v4.1.85",
+        uri=(
+            "s3://gfw-data-lake/gadm_administrative_boundaries/raw/"
+            "7_with_fixed_gids.gpkg"
+        ),
+        layer="7_with_fixed_gids",
+        aoi_ids=gadm_ids,
+        where="CAST(ADM_LEVEL AS INTEGER) <= 2",
+    ),
+    AoiSource(
         source="wdpa",
         version="v202512",
         uri=(
@@ -127,10 +138,7 @@ AOI_SOURCES = (
             "WDPA_Dec2025_Public.gdb.zip"
         ),
         layer="WDPA_poly_Dec2025",
-        id_column="site_pid",
-        subtype="protected-area",
-        name_columns=("name", "desig", "iso3"),
-        iso3_column="iso3",
+        aoi_ids=column_ids("site_pid"),
     ),
     AoiSource(
         source="kba",
@@ -140,45 +148,38 @@ AOI_SOURCES = (
             "KBAsGlobal_2024_September_03_POL.zip"
         ),
         layer=None,
-        id_column="sitrecid",
-        subtype="key-biodiversity-area",
-        name_columns=("natname", "intname", "iso3"),
-        iso3_column="iso3",
+        aoi_ids=column_ids("sitrecid"),
     ),
     AoiSource(
         source="landmark",
         version="v20260617",
         uri="s3://wri-lcl-public-unsafe/20260617_IP_LC_and_Indicative.gdb.zip",
         layer="IP_LC_Indicative_20260617",
-        id_column="landmark_id",
-        subtype="indigenous-and-community-land",
-        name_columns=("name", "category", "iso_code"),
-        iso3_column="iso_code",
+        aoi_ids=column_ids("landmark_id"),
     ),
 )
 
-AOI_NAME_COLUMNS = [
-    "source",
-    "aoi_id",
-    "name",
-    "subtype",
-    "iso3",
-    "extent",
-    "area_ha",
-]
-
 
 @flow
-def run_aois_update(version, overwrite=False, is_latest=False) -> list[str]:
-    """Builds a GeoParquet per AOI source, then the combined names parquet
-    versioned by `version`."""
-    geoparquet_uris = [
-        aois_flow.aoi_flow(source, overwrite=overwrite) for source in AOI_SOURCES
+def run_aois_update(
+    version=None, overwrite=False, is_latest=False, aoi_source=None
+) -> list[str]:
+    """Builds a GeoParquet for the named AOI source, or for every source if
+    none is named. Each source pins its own version."""
+    return [
+        aois_flow.aoi_flow(source, overwrite=overwrite)
+        for source in select_aoi_sources(AOI_SOURCES, aoi_source)
     ]
-    names_uri = aois_flow.aoi_names_flow(
-        geoparquet_uris, AOI_NAME_COLUMNS, version, overwrite=overwrite
-    )
-    return [*geoparquet_uris, names_uri]
+
+
+def select_aoi_sources(sources, name):
+    if name is None:
+        return sources
+    selected = tuple(source for source in sources if source.source == name)
+    if not selected:
+        valid = ", ".join(source.source for source in sources)
+        raise ValueError(f"Unknown AOI source '{name}'. Accepted values: {valid}")
+    return selected
 
 
 def _parse_bbox(bbox):
@@ -221,7 +222,6 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
-    UpdateFlow.AOIS_UPDATE,
 )
 
 # flows that don't use Dask, so run on the flow's own machine
@@ -263,6 +263,7 @@ def run_updates(
     is_latest=False,
     flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
     bbox=None,
+    aoi_source=None,
     local=False,
     performance_report_path=None,
 ) -> list[str]:
@@ -304,6 +305,8 @@ def run_updates(
         if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
             kwargs["flow_name"] = flow_name.value
+        if flow_name == UpdateFlow.AOIS_UPDATE:
+            kwargs["aoi_source"] = aoi_source
         with report:
             result_uris = flow_fn(**kwargs)
 
@@ -341,6 +344,12 @@ def run_updates(
     ),
 )
 @click.option(
+    "--aoi-source",
+    type=click.Choice([source.source for source in AOI_SOURCES]),
+    default=None,
+    help="Build only this AOI source (aois_update only); builds all if omitted.",
+)
+@click.option(
     "--local",
     is_flag=True,
     help="Run compute on this machine instead of a Coiled cluster.",
@@ -352,13 +361,23 @@ def run_updates(
     help="Write a Dask performance report HTML here (Coiled runs only; "
     "ignored with --local).",
 )
-def cli(flow_name, version, overwrite, is_latest, bbox, local, performance_report_path):
+def cli(
+    flow_name,
+    version,
+    overwrite,
+    is_latest,
+    bbox,
+    aoi_source,
+    local,
+    performance_report_path,
+):
     run_updates(
         version=version,
         overwrite=overwrite,
         is_latest=is_latest,
         flow_name=UpdateFlow(flow_name),
         bbox=bbox,
+        aoi_source=aoi_source,
         local=local,
         performance_report_path=performance_report_path,
     )

@@ -11,15 +11,13 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.tree_cover_loss_analyzer import (
     INPUT_URIS,
     TreeCoverLossAnalyzer,
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.domain.repositories.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -53,7 +51,7 @@ def create_analysis_service_for_tests(
         analyzer=TreeCoverLossAnalyzer(
             dask_client_router=request.app.state.dask_client_router,
             dataset_repository=ZarrDatasetRepository(),
-            aoi_geometry_repository=DataApiAoiGeometryRepository(),
+            aoi_geometry_repository=get_aoi_geometry_repository(),
             input_uris=INPUT_URIS[Environment.production],
         ),
         event=ANALYTICS_NAME,

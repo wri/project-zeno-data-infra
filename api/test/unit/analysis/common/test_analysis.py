@@ -2,10 +2,16 @@ from unittest.mock import patch
 
 import pytest
 import xarray as xr
+from shapely.geometry import box, shape
 
 from app.analysis.common.analysis import (
     clip_zarr_to_geojson,
+    get_geojson,
     read_zarr_clipped_to_geojson,
+)
+from app.models.common.areas_of_interest import (
+    CustomAreaOfInterest,
+    ProtectedAreaOfInterest,
 )
 
 GEOJSON = {
@@ -47,3 +53,37 @@ class TestReadZarrClippedToGeojson:
 
         with pytest.raises(ValueError, match="opened with no dimensions"):
             read_zarr_clipped_to_geojson("s3://gfw-data-lake/any.zarr/", GEOJSON)
+
+
+class RecordingGeometryRepository:
+    def __init__(self):
+        self.requested_ids = None
+
+    async def load(self, aoi):
+        self.requested_ids = list(aoi.ids)
+        return [box(0, 0, int(i), int(i)) for i in aoi.ids], [0.0] * len(aoi.ids)
+
+
+class TestGetGeojson:
+    @pytest.mark.asyncio
+    async def test_predefined_aoi_geometries_follow_sorted_id_order(self):
+        # callers pair these geometries with the AOI's ids sorted as strings
+        repository = RecordingGeometryRepository()
+
+        geojsons = await get_geojson(
+            ProtectedAreaOfInterest(ids=["3", "10", "2"]), repository
+        )
+
+        assert repository.requested_ids == ["10", "2", "3"]
+        assert [shape(geojson).bounds[2] for geojson in geojsons] == [10, 2, 3]
+
+    @pytest.mark.asyncio
+    async def test_feature_collection_uses_its_own_features(self):
+        features = [
+            {"type": "Feature", "id": "a", "geometry": GEOJSON, "properties": {}}
+        ]
+        aoi = CustomAreaOfInterest(
+            feature_collection={"type": "FeatureCollection", "features": features}
+        )
+
+        assert await get_geojson(aoi, RecordingGeometryRepository()) == features

@@ -2,8 +2,11 @@ import pytest
 from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_environment
+from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.models.environment import Environment
+from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
+    GeoParquetAoiGeometryRepository,
+)
 
 # FastAPI dependencies can't be used directly as default values in path
 # functions without Depends() — use a thin wrapper instead.
@@ -54,3 +57,18 @@ class TestGetEnvironmentDependency:
                         f"(found in {method.upper()} {path}). "
                         "Add include_in_schema=False to the Header() in get_environment."
                     )
+
+
+def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
+    repository = get_aoi_geometry_repository()
+
+    assert set(repository.repositories) == {
+        "admin",
+        "key_biodiversity_area",
+        "protected_area",
+        "indigenous_land",
+    }
+    assert all(
+        isinstance(source, GeoParquetAoiGeometryRepository)
+        for source in repository.repositories.values()
+    )

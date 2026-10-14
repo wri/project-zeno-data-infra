@@ -1,41 +1,30 @@
 import geopandas as gpd
-import pandas as pd
 import pyarrow.parquet as pq
 import pytest
-from shapely import MultiPolygon, box
-
+from pipelines.aois.aoi_ids import column_ids, gadm_ids
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.stages import (
-    build_search_index,
     deduplicate,
     gdal_path,
     normalize,
     with_area_ha,
-    with_extent,
     write_geoparquet,
 )
+from shapely import box
 
 SOURCE = AoiSource(
     source="wdpa",
     version="v202512",
     uri="s3://bucket/wdpa.gdb.zip",
     layer="WDPA_poly",
-    id_column="site_pid",
-    subtype="protected-area",
-    name_columns=("name", "desig", "iso3"),
-    iso3_column="iso3",
+    aoi_ids=column_ids("site_pid"),
 )
 
 
 @pytest.fixture
 def raw_features():
     return gpd.GeoDataFrame(
-        {
-            "SITE_PID": [101, 102],
-            "NAME": ["Yosemite", "Iguazu"],
-            "DESIG": ["National Park", None],
-            "ISO3": ["USA", "ARG;BRA"],
-        },
+        {"SITE_PID": [101, 102], "NAME": ["Yosemite", "Iguazu"]},
         geometry=[box(0, 0, 1, 1), box(1, 1, 2, 2)],
         crs="EPSG:4326",
     )
@@ -47,42 +36,32 @@ def features(ids, geometries, **columns):
     )
 
 
-def test_normalize_assigns_string_ids_and_source_columns(raw_features):
-    normalized = normalize(raw_features, SOURCE)
-
-    assert list(normalized.aoi_id) == ["101", "102"]
-    assert set(normalized.source) == {"wdpa"}
-    assert set(normalized.subtype) == {"protected-area"}
-
-
-def test_normalize_joins_name_columns_skipping_missing_values(raw_features):
-    raw_features.loc[1, "ISO3"] = ""
-
-    normalized = normalize(raw_features, SOURCE)
-
-    assert list(normalized.name) == ["Yosemite, National Park, USA", "Iguazu"]
-
-
-def test_normalize_splits_multi_country_iso3(raw_features):
-    normalized = normalize(raw_features, SOURCE)
-
-    assert [list(codes) for codes in normalized.iso3] == [["USA"], ["ARG", "BRA"]]
-
-
-def test_normalize_keeps_clashing_source_attributes_under_source_prefix(
+def test_normalize_assigns_string_ids_and_keeps_lowercased_attributes(
     raw_features,
 ):
     normalized = normalize(raw_features, SOURCE)
 
-    assert list(normalized.wdpa_name) == ["Yosemite", "Iguazu"]
-    assert list(normalized.wdpa_iso3) == ["USA", "ARG;BRA"]
-    assert normalized.columns.is_unique
+    assert list(normalized.aoi_id) == ["101", "102"]
+    assert list(normalized.name) == ["Yosemite", "Iguazu"]
 
 
 def test_normalize_reprojects_to_wgs84(raw_features):
     normalized = normalize(raw_features.to_crs("EPSG:3857"), SOURCE)
 
     assert normalized.crs == "EPSG:4326"
+
+
+def test_gadm_ids_use_each_rows_own_level_without_version_suffix():
+    attributes = gpd.GeoDataFrame(
+        {
+            "adm_level": [0, 1, 2],
+            "gid_0": ["BRA", "BRA", "BRA"],
+            "gid_1": [None, "BRA.1_1", "BRA.1_1"],
+            "gid_2": [None, None, "BRA.1.12_1"],
+        }
+    )
+
+    assert list(gadm_ids(attributes)) == ["BRA", "BRA.1", "BRA.1.12"]
 
 
 def test_area_is_geodesic_hectares():
@@ -103,20 +82,6 @@ def test_deduplicate_keeps_largest_feature_per_id():
     assert deduplicated.set_index("aoi_id").geometry["1"].area == 4.0
 
 
-def test_extent_is_bounds_for_ordinary_geometry():
-    extent = with_extent(features(["1"], [box(10, -5, 20, 5)])).extent.iloc[0]
-
-    assert list(extent) == [10, -5, 20, 5]
-
-
-def test_extent_wraps_across_antimeridian():
-    fiji = MultiPolygon([box(177, -19, 180, -16), box(-180, -19, -178, -16)])
-
-    extent = with_extent(features(["1"], [fiji])).extent.iloc[0]
-
-    assert list(extent) == [177, -19, -178, -16]
-
-
 def test_gdal_path_reads_zipped_datasets_through_zip_file_system():
     assert gdal_path("/tmp/file.gdb.zip") == "/vsizip//tmp/file.gdb.zip"
     assert gdal_path("/tmp/file.gpkg") == "/tmp/file.gpkg"
@@ -131,20 +96,21 @@ def test_geoparquet_round_trips_with_covering_bbox(tmp_path):
     assert "bbox" in pq.read_schema(uri).names
 
 
-def test_search_index_combines_sources_without_geometry(tmp_path):
-    uris = []
-    for source in ("wdpa", "kba"):
-        uri = str(tmp_path / f"{source}.parquet")
-        write_geoparquet(
-            features(["1"], [box(0, 0, 1, 1)], source=[source], name=["A"]), uri
+def test_geoparquet_row_groups_hold_non_overlapping_id_ranges(tmp_path):
+    # lets id-filtered reads skip every row group that can't hold a requested id
+    uri = str(tmp_path / "aois.parquet")
+    ids = [str(i) for i in range(10)]
+
+    write_geoparquet(features(ids[::-1], [box(0, 0, 1, 1)] * 10), uri, row_group_size=3)
+
+    metadata = pq.ParquetFile(uri).metadata
+    id_column = metadata.schema.names.index("aoi_id")
+    ranges = [
+        (
+            metadata.row_group(group).column(id_column).statistics.min,
+            metadata.row_group(group).column(id_column).statistics.max,
         )
-        uris.append(uri)
-
-    index = build_search_index(uris, columns=["source", "aoi_id", "name"])
-
-    assert isinstance(index, pd.DataFrame)
-    assert not isinstance(index, gpd.GeoDataFrame)
-    assert index.to_dict("records") == [
-        {"source": "wdpa", "aoi_id": "1", "name": "A"},
-        {"source": "kba", "aoi_id": "1", "name": "A"},
+        for group in range(metadata.num_row_groups)
     ]
+    assert len(ranges) == 4
+    assert all(left[1] < right[0] for left, right in zip(ranges, ranges[1:]))

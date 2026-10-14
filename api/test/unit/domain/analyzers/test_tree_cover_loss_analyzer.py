@@ -28,7 +28,7 @@ from app.models.land_change.tree_cover_loss import TreeCoverLossAnalyticsIn
 
 
 class TestAoiGeometryRepository:
-    async def load(self, aoi_type, aoi_ids):
+    async def load(self, aoi):
         geometries = [box(10.1, -0.1, -0.1, 10.1)]
         areas_ha = [1000.0] * len(geometries)
         return geometries, areas_ha
@@ -280,7 +280,7 @@ async def test_flox_handler_custom_area():
     dask_client = Client(dask_cluster)
 
     class TestAoiGeometryRepository:
-        async def load(self, aoi_type, aoi_ids):
+        async def load(self, aoi):
             raise ValueError("This should not be called for custom AOI!")
 
     feature_collection = {
