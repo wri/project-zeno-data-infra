@@ -4,12 +4,16 @@ Cropland and livestock emissions are both published as absolute per-pixel
 totals (kg CO2e) on their native ~10km grid, resampled onto the vegetation
 zarr's 30m grid (the reference grid for the whole Land GHG inventory).
 Livestock's source COG is Cornell's pre-aggregated cross-animal total.
+
+Also writes per-hectare agriculture emission COGs for map visualization.
 """
 
 import rasterio
 import rioxarray as rio
 import xarray as xr
+import numpy as np
 from odc.geo.xr import xr_reproject
+
 
 from pipelines.globals import (
     land_ghg_inventory_agriculture_zarr_uri,
@@ -38,6 +42,21 @@ LIVESTOCK_COG_URI = (
     "Total_GHG_kg_CO2e_yr_Livestock_ALL.tif"
 )
 KG_PER_MG = 1_000
+
+# for generating visualization COGs
+AGRICULTURE_OUTPUT_PREFIX = "s3://lcl-cogs/lgms/v1.0.3"
+EARTH_RADIUS_M = 6_371_008.8
+CROPLAND_COG_NAME = "cropland_MgCO2e_ha-1.tif"
+LIVESTOCK_COG_NAME = "livestock_MgCO2e_ha-1.tif"
+
+def _cell_area_ha(lats, dlat, dlon):
+    """Area (ha) of each cell centred on ``lats``, for a spherical Earth.
+
+    Exact enough for display (WGS84 differs by <0.6%); depends only on latitude.
+    """
+    north, south = np.radians(lats + dlat / 2), np.radians(lats - dlat / 2)
+    area_m2 = EARTH_RADIUS_M**2 * np.radians(dlon) * (np.sin(north) - np.sin(south))
+    return np.abs(area_m2) / 1e4
 
 
 def _reference_geobox():
@@ -127,3 +146,72 @@ def create_agriculture_zarr(overwrite: bool = False) -> str:
     )
 
     return land_ghg_inventory_agriculture_zarr_uri
+
+
+def _agriculture_cog(source_uri: str, out_name: str, per_hectare_source: bool) -> str:
+    """Write one agriculture COG in MgCO2e/ha on the source's native grid.
+
+    ``per_hectare_source=True`` for livestock (kg/ha), False for cropland
+    (absolute kg, divided by per-cell area to get a rate). Zeros become nodata
+    so empty ocean/desert renders as no-data rather than a true zero.
+
+    Rates are MgCO2e per ha of total pixel area, not per ha of
+    cropland (differs from Cornell's intensity raster)
+    """
+    with rasterio.Env(AWS_REQUEST_PAYER="requester"):
+        src = (
+            rio.open_rasterio(source_uri, masked=True)
+            .squeeze(drop=True) # type: ignore[union-attr]
+            .astype("float64")
+        )
+
+    values = src / KG_PER_MG
+    if not per_hectare_source:
+        dlat = abs(float(src.y[1] - src.y[0]))
+        dlon = abs(float(src.x[1] - src.x[0]))
+        area = xr.DataArray(
+            _cell_area_ha(src.y.values, dlat, dlon),
+            dims="y",
+            coords={"y": src.y},
+        )
+        values = values / area
+
+    values = values.where(np.isfinite(values) & (values != 0)).astype("float32")
+    values = values.rio.write_crs("EPSG:4326").rio.write_nodata(float("nan"))
+
+    out = f"{AGRICULTURE_OUTPUT_PREFIX}/{out_name}"
+    values.rio.to_raster(
+        out,
+        driver="COG",
+        compress="deflate",
+        predictor=3,
+        blocksize=512,
+        overview_resampling="average",
+    )
+    valid = values.values[np.isfinite(values.values)]
+    print(
+        f"{out_name:28s} {values.shape} valid={valid.size / values.size:6.1%} "
+        f"max={valid.max():.4g} sum={valid.sum():.4g} MgCO2e/ha -> {out}"
+    )
+    return out
+
+
+def create_agriculture_cogs(overwrite: bool = False) -> tuple[str, str]:
+    """Write the cropland and livestock per-hectare visualization COGs.
+
+    Returns ``(cropland_uri, livestock_uri)``. Skips work when both already
+    exist unless ``overwrite`` is set.
+    """
+    cropland_uri = f"{AGRICULTURE_OUTPUT_PREFIX}/{CROPLAND_COG_NAME}"
+    livestock_uri = f"{AGRICULTURE_OUTPUT_PREFIX}/{LIVESTOCK_COG_NAME}"
+    if not overwrite and s3_uri_exists(cropland_uri) and s3_uri_exists(livestock_uri):
+        return cropland_uri, livestock_uri
+
+    livestock_uri = _agriculture_cog(
+        LIVESTOCK_COG_URI, LIVESTOCK_COG_NAME, per_hectare_source=False
+    )
+    cropland_uri = _agriculture_cog(
+        CROPLAND_COG_URI, CROPLAND_COG_NAME, per_hectare_source=False
+    )
+    return cropland_uri, livestock_uri
+
