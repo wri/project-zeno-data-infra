@@ -1,7 +1,9 @@
 import geopandas as gpd
 import pyarrow.parquet as pq
 import pytest
-from pipelines.aois.aoi_ids import column_ids, gadm_ids
+from shapely import box
+
+from pipelines.aois.aoi_ids import column_ids
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.stages import (
     deduplicate,
@@ -10,13 +12,11 @@ from pipelines.aois.stages import (
     with_area_ha,
     write_geoparquet,
 )
-from shapely import box
 
 SOURCE = AoiSource(
     source="wdpa",
     version="v202512",
-    uri="s3://bucket/wdpa.gdb.zip",
-    layer="WDPA_poly",
+    load=gpd.GeoDataFrame,
     aoi_ids=column_ids("site_pid"),
 )
 
@@ -45,23 +45,22 @@ def test_normalize_assigns_string_ids_and_keeps_lowercased_attributes(
     assert list(normalized.name) == ["Yosemite", "Iguazu"]
 
 
+def test_normalize_drops_rows_without_an_id(raw_features):
+    raw_features.loc[1, "SITE_PID"] = None
+    source = AoiSource(
+        source="wdpa",
+        version="v202512",
+        load=gpd.GeoDataFrame,
+        aoi_ids=lambda attributes: attributes["site_pid"],
+    )
+
+    assert list(normalize(raw_features, source).name) == ["Yosemite"]
+
+
 def test_normalize_reprojects_to_wgs84(raw_features):
     normalized = normalize(raw_features.to_crs("EPSG:3857"), SOURCE)
 
     assert normalized.crs == "EPSG:4326"
-
-
-def test_gadm_ids_use_each_rows_own_level_without_version_suffix():
-    attributes = gpd.GeoDataFrame(
-        {
-            "adm_level": [0, 1, 2],
-            "gid_0": ["BRA", "BRA", "BRA"],
-            "gid_1": [None, "BRA.1_1", "BRA.1_1"],
-            "gid_2": [None, None, "BRA.1.12_1"],
-        }
-    )
-
-    assert list(gadm_ids(attributes)) == ["BRA", "BRA.1", "BRA.1.12"]
 
 
 def test_area_is_geodesic_hectares():

@@ -1,13 +1,14 @@
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import boto3
 import geopandas as gpd
 import pandas as pd
+from pyproj import Geod
+
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.utils import parse_s3_uri
-from pyproj import Geod
 
 SQUARE_METERS_PER_HECTARE = 10_000
 
@@ -18,9 +19,14 @@ def gdal_path(path: str) -> str:
     return f"/vsizip/{path}" if path.endswith(".zip") else path
 
 
-def load_features(
-    uri: str, layer: Optional[str], where: Optional[str] = None
-) -> gpd.GeoDataFrame:
+def vector_file(
+    uri: str, layer: Optional[str] = None
+) -> Callable[[], gpd.GeoDataFrame]:
+    """Loads one layer of a vector dataset in a requester-pays S3 bucket."""
+    return lambda: load_features(uri, layer)
+
+
+def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
     """Read one layer of a vector dataset from a requester-pays S3 bucket. The
     file is downloaded first, since GDAL's random reads over S3 are very slow
     for GeoPackages and FileGDBs."""
@@ -30,19 +36,20 @@ def load_features(
         boto3.client("s3").download_file(
             bucket, key, str(local_path), ExtraArgs={"RequestPayer": "requester"}
         )
-        return gpd.read_file(gdal_path(str(local_path)), layer=layer, where=where)
+        return gpd.read_file(gdal_path(str(local_path)), layer=layer)
 
 
 def normalize(features: gpd.GeoDataFrame, source: AoiSource) -> gpd.GeoDataFrame:
     """Add each row's AOI id, keeping the source attributes (lowercased)
-    alongside it."""
+    alongside it. Rows without an id can't be requested, so are dropped."""
     features = features.to_crs("EPSG:4326").rename(columns=str.lower)
     attributes = features.drop(columns="geometry")
-    return gpd.GeoDataFrame(
+    identified = gpd.GeoDataFrame(
         attributes.assign(aoi_id=source.aoi_ids(attributes)),
         geometry=features.geometry,
         crs=features.crs,
-    ).reset_index(drop=True)
+    )
+    return identified[identified.aoi_id.notna()].reset_index(drop=True)
 
 
 def with_area_ha(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

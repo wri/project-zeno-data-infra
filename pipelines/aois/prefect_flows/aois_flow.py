@@ -1,11 +1,12 @@
 import logging
 
+from prefect import flow, task
+
 from pipelines.aois import stages
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.geometry_repair import repair_geometries
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.utils import s3_uri_exists
-from prefect import flow, task
 
 
 @flow(name="AOI vectors")
@@ -19,7 +20,7 @@ def aoi_flow(source: AoiSource, overwrite: bool = False) -> str:
     if not overwrite and s3_uri_exists(geoparquet_uri):
         return geoparquet_uri
 
-    raw = task(stages.load_features)(source.uri, source.layer, source.where)
+    raw = task(source.load, name=f"load {source.source}")()
     normalized = task(stages.normalize)(raw, source)
     repaired, report = task(repair_geometries)(normalized)
     log_unrepaired(source, report)

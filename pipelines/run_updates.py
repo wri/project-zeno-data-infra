@@ -6,9 +6,15 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from pipelines.aois.aoi_ids import column_ids, gadm_ids
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
+
+from pipelines.aois.aoi_ids import column_ids
 from pipelines.aois.aoi_source import AoiSource
+from pipelines.aois.gadm import gadm_ids, gadm_levels
 from pipelines.aois.prefect_flows import aois_flow
+from pipelines.aois.stages import vector_file
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
@@ -16,9 +22,6 @@ from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -122,39 +125,37 @@ AOI_SOURCES = (
     AoiSource(
         source="gadm",
         version="v4.1.85",
-        uri=(
-            "s3://gfw-data-lake/gadm_administrative_boundaries/raw/"
-            "7_with_fixed_gids.gpkg"
+        load=gadm_levels(
+            "https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip"
         ),
-        layer="7_with_fixed_gids",
         aoi_ids=gadm_ids,
-        where="CAST(ADM_LEVEL AS INTEGER) <= 2",
     ),
     AoiSource(
         source="wdpa",
         version="v202512",
-        uri=(
+        load=vector_file(
             "s3://gfw-data-lake/wdpa_protected_areas/v202512/raw/"
-            "WDPA_Dec2025_Public.gdb.zip"
+            "WDPA_Dec2025_Public.gdb.zip",
+            layer="WDPA_poly_Dec2025",
         ),
-        layer="WDPA_poly_Dec2025",
         aoi_ids=column_ids("site_pid"),
     ),
     AoiSource(
         source="kba",
         version="v20250911",
-        uri=(
+        load=vector_file(
             "s3://gfw-data-lake/birdlife_key_biodiversity_areas/v20240904/raw/"
             "KBAsGlobal_2024_September_03_POL.zip"
         ),
-        layer=None,
         aoi_ids=column_ids("sitrecid"),
     ),
     AoiSource(
         source="landmark",
         version="v20260617",
-        uri="s3://wri-lcl-public-unsafe/20260617_IP_LC_and_Indicative.gdb.zip",
-        layer="IP_LC_Indicative_20260617",
+        load=vector_file(
+            "s3://wri-lcl-public-unsafe/20260617_IP_LC_and_Indicative.gdb.zip",
+            layer="IP_LC_Indicative_20260617",
+        ),
         aoi_ids=column_ids("landmark_id"),
     ),
 )

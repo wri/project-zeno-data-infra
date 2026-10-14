@@ -1,18 +1,17 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable
+
+import geopandas as gpd
 
 from pipelines.aois.aoi_ids import AoiIds
 
 
 @dataclass(frozen=True)
 class AoiSource:
-    """Where an AOI dataset lives, which of its rows to read (`where` is a
-    filter in the dataset's own SQL dialect), and how each row's AOI id is
-    derived from its (lowercased) attribute columns."""
+    """An AOI dataset at a pinned version: how to load its features, and how
+    each row's AOI id is derived from its (lowercased) attribute columns."""
 
     source: str
     version: str
-    uri: str
-    layer: Optional[str]
+    load: Callable[[], gpd.GeoDataFrame]
     aoi_ids: AoiIds
-    where: Optional[str] = None
