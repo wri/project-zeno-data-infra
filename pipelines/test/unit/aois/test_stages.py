@@ -1,17 +1,19 @@
 import geopandas as gpd
+import pandas as pd
 import pyarrow.parquet as pq
 import pytest
-from shapely import box
-
 from pipelines.aois.aoi_ids import column_ids
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.stages import (
     deduplicate,
+    drop_missing_ids,
     gdal_path,
     normalize,
+    removed,
     with_area_ha,
     write_geoparquet,
 )
+from shapely import box
 
 SOURCE = AoiSource(
     source="wdpa",
@@ -45,16 +47,27 @@ def test_normalize_assigns_string_ids_and_keeps_lowercased_attributes(
     assert list(normalized.name) == ["Yosemite", "Iguazu"]
 
 
-def test_normalize_drops_rows_without_an_id(raw_features):
-    raw_features.loc[1, "SITE_PID"] = None
-    source = AoiSource(
-        source="wdpa",
-        version="v202512",
-        load=gpd.GeoDataFrame,
-        aoi_ids=lambda attributes: attributes["site_pid"],
-    )
+def test_missing_ids_stay_missing_instead_of_becoming_strings():
+    attributes = pd.DataFrame({"sitrecid": [101, None]})
 
-    assert list(normalize(raw_features, source).name) == ["Yosemite"]
+    assert column_ids("sitrecid")(attributes).tolist() == ["101", pd.NA]
+
+
+def test_rows_without_an_id_are_dropped():
+    identified = features(["1", None], [box(0, 0, 1, 1), box(1, 1, 2, 2)])
+
+    assert list(drop_missing_ids(identified).aoi_id) == ["1"]
+
+
+def test_removed_rows_are_reported_with_reason_and_without_geometry():
+    before = features(["1", "2"], [box(0, 0, 1, 1), box(1, 1, 2, 2)], name=["A", "B"])
+    after = before.iloc[[0]]
+
+    report = removed(before, after, "duplicate_id")
+
+    assert report.to_dict("records") == [
+        {"aoi_id": "2", "name": "B", "reason": "duplicate_id"}
+    ]
 
 
 def test_normalize_reprojects_to_wgs84(raw_features):

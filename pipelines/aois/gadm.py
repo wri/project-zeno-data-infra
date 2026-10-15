@@ -1,3 +1,4 @@
+import shutil
 import tempfile
 import urllib.request
 import zipfile
@@ -16,7 +17,7 @@ def gadm_levels(url: str, levels=(0, 1, 2)) -> Callable[[], gpd.GeoDataFrame]:
     def load() -> gpd.GeoDataFrame:
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / "gadm_levels.zip"
-            urllib.request.urlretrieve(url, archive)
+            download(url, archive)
             with zipfile.ZipFile(archive) as zipped:
                 geopackage = next(
                     name for name in zipped.namelist() if name.endswith(".gpkg")
@@ -26,6 +27,13 @@ def gadm_levels(url: str, levels=(0, 1, 2)) -> Callable[[], gpd.GeoDataFrame]:
         return fix_gadm_gids(features)
 
     return load
+
+
+def download(url: str, destination: Path, timeout_seconds: int = 600) -> None:
+    """Stream a file to disk, failing if the server stops responding."""
+    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+        with open(destination, "wb") as file:
+            shutil.copyfileobj(response, file)
 
 
 def read_gadm_levels(path: str, levels=(0, 1, 2)) -> gpd.GeoDataFrame:

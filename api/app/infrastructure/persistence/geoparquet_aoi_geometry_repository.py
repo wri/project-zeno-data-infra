@@ -10,11 +10,14 @@ class GeoParquetAoiGeometryRepository(AoiGeometryRepository):
     """Reads AOI geometries from a GeoParquet file with `aoi_id`, `area_ha`
     and WKB `geometry` columns."""
 
-    def __init__(self, uri: str):
+    def __init__(self, uri: str, timeout_seconds: float = 60):
         self.uri = uri
+        self.timeout_seconds = timeout_seconds
 
     async def load(self, aoi):
-        return await asyncio.to_thread(self._read, aoi.ids)
+        return await asyncio.wait_for(
+            asyncio.to_thread(self._read, aoi.ids), timeout=self.timeout_seconds
+        )
 
     def _read(self, aoi_ids):
         table = parquet.read_table(

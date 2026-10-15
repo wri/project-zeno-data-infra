@@ -5,10 +5,9 @@ from typing import Callable, Optional
 import boto3
 import geopandas as gpd
 import pandas as pd
-from pyproj import Geod
-
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.utils import parse_s3_uri
+from pyproj import Geod
 
 SQUARE_METERS_PER_HECTARE = 10_000
 
@@ -41,15 +40,27 @@ def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
 
 def normalize(features: gpd.GeoDataFrame, source: AoiSource) -> gpd.GeoDataFrame:
     """Add each row's AOI id, keeping the source attributes (lowercased)
-    alongside it. Rows without an id can't be requested, so are dropped."""
+    alongside it."""
     features = features.to_crs("EPSG:4326").rename(columns=str.lower)
     attributes = features.drop(columns="geometry")
-    identified = gpd.GeoDataFrame(
+    return gpd.GeoDataFrame(
         attributes.assign(aoi_id=source.aoi_ids(attributes)),
         geometry=features.geometry,
         crs=features.crs,
-    )
-    return identified[identified.aoi_id.notna()].reset_index(drop=True)
+    ).reset_index(drop=True)
+
+
+def drop_missing_ids(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Rows without an id can't be requested."""
+    return features[features.aoi_id.notna()]
+
+
+def removed(
+    before: gpd.GeoDataFrame, after: gpd.GeoDataFrame, reason: str
+) -> pd.DataFrame:
+    """Attributes of the rows a step dropped, and why."""
+    dropped = before.loc[before.index.difference(after.index)]
+    return pd.DataFrame(dropped.drop(columns="geometry")).assign(reason=reason)
 
 
 def with_area_ha(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
