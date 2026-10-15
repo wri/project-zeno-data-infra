@@ -1,9 +1,8 @@
 import geopandas as gpd
 import pandas as pd
 import pytest
-from shapely import box
-
 from pipelines.aois.gadm import fix_gadm_gids, gadm_ids, read_gadm_levels
+from shapely import box
 
 
 def gids(level, gid_0, gid_1=None, gid_2=None):
@@ -50,24 +49,23 @@ def test_gadm_ids_use_each_rows_own_level_without_version_suffix():
 
 
 def test_unaddressable_na_gadm_ids_are_missing():
-    attributes = pd.DataFrame({"adm_level": [0], "gid_0": ["NA"]})
+    attributes = pd.DataFrame(
+        {"adm_level": [0], "gid_0": ["NA"], "gid_1": [None], "gid_2": [None]}
+    )
 
     assert gadm_ids(attributes).isna().all()
 
 
 def test_levels_are_read_from_their_own_layers(tmp_path):
     path = str(tmp_path / "gadm_410-levels.gpkg")
-    for level, columns in enumerate(
-        [
+    for level in (0, 1, 2):
+        gpd.GeoDataFrame(
             {"GID_0": ["BRA"], "COUNTRY": ["Brazil"]},
-            {"GID_0": ["BRA"], "COUNTRY": ["Brazil"], "GID_1": ["BRA.1_1"]},
-        ]
-    ):
-        gpd.GeoDataFrame(columns, geometry=[box(0, 0, 1, 1)], crs="EPSG:4326").to_file(
-            path, layer=f"ADM_{level}"
-        )
+            geometry=[box(0, 0, 1, 1)],
+            crs="EPSG:4326",
+        ).to_file(path, layer=f"ADM_{level}")
 
-    levels = read_gadm_levels(path, levels=(0, 1))
+    levels = read_gadm_levels(path)
 
-    assert list(levels.ADM_LEVEL) == [0, 1]
-    assert list(levels.NAME_0) == ["Brazil", "Brazil"]
+    assert list(levels.ADM_LEVEL) == [0, 1, 2]
+    assert list(levels.NAME_0) == ["Brazil"] * 3

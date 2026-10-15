@@ -9,25 +9,15 @@ from pipelines.aois.aoi_source import AoiSource
 from pipelines.utils import parse_s3_uri
 from pyproj import Geod
 
-SQUARE_METERS_PER_HECTARE = 10_000
-
-
-def gdal_path(path: str) -> str:
-    """Zipped datasets (e.g. a zipped FileGDB) are read through GDAL's zip
-    virtual file system."""
-    return f"/vsizip/{path}" if path.endswith(".zip") else path
-
 
 def vector_file(
     uri: str, layer: Optional[str] = None
 ) -> Callable[[], gpd.GeoDataFrame]:
-    """Loads one layer of a vector dataset in a requester-pays S3 bucket."""
     return lambda: load_features(uri, layer)
 
 
 def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
-    """Read one layer of a vector dataset from a requester-pays S3 bucket. The
-    file is downloaded first, since GDAL's random reads over S3 are very slow
+    """Downloads the file first, since GDAL's random reads over S3 are very slow
     for GeoPackages and FileGDBs."""
     bucket, key = parse_s3_uri(uri)
     with tempfile.TemporaryDirectory() as directory:
@@ -35,30 +25,21 @@ def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
         boto3.client("s3").download_file(
             bucket, key, str(local_path), ExtraArgs={"RequestPayer": "requester"}
         )
-        return gpd.read_file(gdal_path(str(local_path)), layer=layer)
+        return gpd.read_file(local_path, layer=layer)
 
 
 def normalize(features: gpd.GeoDataFrame, source: AoiSource) -> gpd.GeoDataFrame:
-    """Add each row's AOI id, keeping the source attributes (lowercased)
-    alongside it."""
     features = features.to_crs("EPSG:4326").rename(columns=str.lower)
-    attributes = features.drop(columns="geometry")
-    return gpd.GeoDataFrame(
-        attributes.assign(aoi_id=source.aoi_ids(attributes)),
-        geometry=features.geometry,
-        crs=features.crs,
-    ).reset_index(drop=True)
+    return features.assign(aoi_id=source.aoi_ids(features)).reset_index(drop=True)
 
 
 def drop_missing_ids(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Rows without an id can't be requested."""
     return features[features.aoi_id.notna()]
 
 
 def removed(
     before: gpd.GeoDataFrame, after: gpd.GeoDataFrame, reason: str
 ) -> pd.DataFrame:
-    """Attributes of the rows a step dropped, and why."""
     dropped = before.loc[before.index.difference(after.index)]
     return pd.DataFrame(dropped.drop(columns="geometry")).assign(reason=reason)
 
@@ -67,14 +48,13 @@ def with_area_ha(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     geod = Geod(ellps="WGS84")
     return features.assign(
         area_ha=features.geometry.apply(
-            lambda geometry: abs(geod.geometry_area_perimeter(geometry)[0])
-            / SQUARE_METERS_PER_HECTARE
+            lambda geometry: abs(geod.geometry_area_perimeter(geometry)[0]) / 10_000
         )
     )
 
 
 def deduplicate(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Keep the largest feature for each id."""
+    """Keeps the largest feature for each id."""
     return (
         features.sort_values("area_ha", ascending=False, kind="stable")
         .drop_duplicates("aoi_id")
@@ -85,8 +65,8 @@ def deduplicate(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 def write_geoparquet(
     features: gpd.GeoDataFrame, uri: str, row_group_size: int = 500
 ) -> str:
-    """Write features sorted by id in small row groups, so a read filtered on a
-    few ids downloads only the row groups whose id range can hold them."""
+    """Sorted by id in small row groups, so reading a few ids only downloads the
+    row groups whose id range can contain them."""
     features.sort_values("aoi_id").to_parquet(
         uri, index=False, write_covering_bbox=True, row_group_size=row_group_size
     )

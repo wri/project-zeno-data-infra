@@ -6,12 +6,7 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
-
-from pipelines.aois.aoi_ids import column_ids
-from pipelines.aois.aoi_source import AoiSource
+from pipelines.aois.aoi_source import AoiSource, column_ids
 from pipelines.aois.gadm import gadm_ids, gadm_levels
 from pipelines.aois.prefect_flows import aois_flow
 from pipelines.aois.stages import vector_file
@@ -22,6 +17,9 @@ from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -165,8 +163,7 @@ AOI_SOURCES = (
 def run_aois_update(
     version=None, overwrite=False, is_latest=False, aoi_source=None
 ) -> list[str]:
-    """Builds a GeoParquet for the named AOI source, or for every source if
-    none is named. Each source pins its own version."""
+    """Builds every AOI source's GeoParquet, or only the named source's."""
     return [
         aois_flow.aoi_flow(source, overwrite=overwrite)
         for source in select_aoi_sources(AOI_SOURCES, aoi_source)
@@ -176,11 +173,12 @@ def run_aois_update(
 def select_aoi_sources(sources, name):
     if name is None:
         return sources
-    selected = tuple(source for source in sources if source.source == name)
-    if not selected:
-        valid = ", ".join(source.source for source in sources)
-        raise ValueError(f"Unknown AOI source '{name}'. Accepted values: {valid}")
-    return selected
+    by_name = {source.source: source for source in sources}
+    if name not in by_name:
+        raise ValueError(
+            f"Unknown AOI source '{name}'. Accepted values: {', '.join(by_name)}"
+        )
+    return (by_name[name],)
 
 
 def _parse_bbox(bbox):

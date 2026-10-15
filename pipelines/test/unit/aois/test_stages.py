@@ -2,12 +2,10 @@ import geopandas as gpd
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
-from pipelines.aois.aoi_ids import column_ids
-from pipelines.aois.aoi_source import AoiSource
+from pipelines.aois.aoi_source import AoiSource, column_ids
 from pipelines.aois.stages import (
     deduplicate,
     drop_missing_ids,
-    gdal_path,
     normalize,
     removed,
     with_area_ha,
@@ -92,11 +90,6 @@ def test_deduplicate_keeps_largest_feature_per_id():
 
     assert sorted(deduplicated.aoi_id) == ["1", "2"]
     assert deduplicated.set_index("aoi_id").geometry["1"].area == 4.0
-
-
-def test_gdal_path_reads_zipped_datasets_through_zip_file_system():
-    assert gdal_path("/tmp/file.gdb.zip") == "/vsizip//tmp/file.gdb.zip"
-    assert gdal_path("/tmp/file.gpkg") == "/tmp/file.gpkg"
 
 
 def test_geoparquet_round_trips_with_covering_bbox(tmp_path):
