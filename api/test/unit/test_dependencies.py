@@ -4,12 +4,6 @@ from fastapi.testclient import TestClient
 
 from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.models.environment import Environment
-from app.domain.repositories.fallback_aoi_geometry_repository import (
-    FallbackAoiGeometryRepository,
-)
-from app.infrastructure.external_services.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
 )
@@ -75,23 +69,6 @@ def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
         "indigenous_land",
     }
     assert all(
-        isinstance(primary_source(source), GeoParquetAoiGeometryRepository)
+        isinstance(source, GeoParquetAoiGeometryRepository)
         for source in repository.repositories.values()
     )
-
-
-def test_data_api_backs_up_types_it_serves():
-    sources = get_aoi_geometry_repository().repositories
-
-    assert {
-        aoi_type
-        for aoi_type, source in sources.items()
-        if isinstance(source, FallbackAoiGeometryRepository)
-        and isinstance(source.fallback, DataApiAoiGeometryRepository)
-    } == {"key_biodiversity_area", "protected_area", "indigenous_land"}
-
-
-def primary_source(source):
-    if isinstance(source, FallbackAoiGeometryRepository):
-        return source.primary
-    return source
