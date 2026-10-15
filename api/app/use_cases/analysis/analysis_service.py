@@ -145,6 +145,7 @@ class AnalysisService:
                 }
             )
             self.analytics_resource.status = AnalysisStatus.failed
+            self.analytics_resource.result = {"error": str(e)}
             await self.analysis_repository.store_analysis(
                 self.analytics_resource_id,
                 Analysis(

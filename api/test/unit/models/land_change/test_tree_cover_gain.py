@@ -79,3 +79,14 @@ class TestTreeCoverGainAnalyticsInValidations:
                 start_year="2001",
                 end_year="2005",
             )
+
+    def test_natural_forest_only_is_tree_cover_loss_only(self):
+        # natural_forest_only is only implemented for tree cover loss, so it must
+        # not be accepted (and silently ignored) here.
+        with pytest.raises(ValueError):
+            TreeCoverGainAnalyticsIn(
+                aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
+                start_year="2015",
+                end_year="2020",
+                forest_filter="natural_forest_only",
+            )

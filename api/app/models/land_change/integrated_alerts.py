@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
@@ -47,6 +47,16 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
         description="Must be in YYYY-MM-DD date format.",
         pattern=DATE_REGEX,
         examples=["2024-12-31"],
+    )
+    land_filter: Optional[Literal["natural_lands", "natural_forests"]] = Field(
+        default=None,
+        title="Land Filter",
+        # Keep in sync with LAND_FILTER_CLASSES in app/analysis/common/analysis.py
+        description=(
+            "Only count alerts on these SBTN natural lands classes: "
+            "natural_lands = classes 2-11; "
+            "natural_forests = classes 2, 5, 8, 9."
+        ),
     )
 
 

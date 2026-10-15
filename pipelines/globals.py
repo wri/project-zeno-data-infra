@@ -46,7 +46,7 @@ land_ghg_inventory_organic_soil_zarr_uri = (
 # Agriculture emissions (cropland + livestock). Single static snapshot, no year
 # axis. Livestock's source COG is per-hectare (kg/ha); cropland's is an
 # absolute per-pixel total (kg), mass-conserving-resampled -- see
-# create_agriculture_zarr.py. This zarr stores the converted per-pixel
+# create_agriculture_assets.py. This zarr stores the converted per-pixel
 # absolute totals (Mg). group="pipeline".
 #
 # v2: cropland switched from area-weighting a per-hectare rate (which

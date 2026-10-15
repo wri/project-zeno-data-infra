@@ -19,3 +19,12 @@ class TestDatasetFilterStr:
         )
 
         assert str(dsf) == "tree_cover_gain_period in ('2000-2005', '2005-2010')"
+
+    def test_dataset_filter_str_quotes_string_value(self):
+        dsf = DatasetFilter(
+            dataset=Dataset.natural_forests,
+            op="=",
+            value="Natural Forest",
+        )
+
+        assert str(dsf) == "natural_forests_class = 'Natural Forest'"

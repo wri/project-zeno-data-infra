@@ -1,6 +1,10 @@
+from typing import Optional
+
 import numpy as np
 from prefect import flow
+from shapely.geometry import Polygon
 
+from pipelines.globals import sbtn_natural_lands_zarr_uri
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_common_tasks
 from pipelines.prefect_flows import common_tasks
 from pipelines.utils import s3_uri_exists
@@ -8,19 +12,42 @@ from pipelines.utils import s3_uri_exists
 
 @flow(name="Integrated alerts area", retries=2, retry_delay_seconds=120)
 def integrated_alerts_area(
-    integrated_alerts_zarr_uri: str, version: str, overwrite=False
+    integrated_alerts_zarr_uri: str,
+    version: str,
+    overwrite=False,
+    bbox: Optional[Polygon] = None,
 ):
-    result_uri = (
-        f"{integrated_alerts_common_tasks.INTEGRATED_ALERTS_PREFIX}"
-        f"/{version}/admin-integrated-alerts.parquet"
-    )
-    if not overwrite and s3_uri_exists(result_uri):
-        return result_uri
+    """Compute integrated alerts area by GADM admin area, date, confidence and
+    SBTN natural lands class, and save it as a parquet.
+
+    Args:
+        integrated_alerts_zarr_uri: URI of the integrated alerts date_conf zarr.
+        version: Integrated alerts version, used in the output S3 path.
+        overwrite: If True, recompute and overwrite an existing S3 parquet.
+        bbox: Optional polygon to clip the computation to, for a small local
+            test run. The result is then written to a local parquet
+            (``admin-integrated-alerts-{version}.parquet``) instead of the
+            global S3 path.
+
+    Returns:
+        The URI of the saved parquet.
+    """
+    if bbox is None:
+        result_uri = (
+            f"{integrated_alerts_common_tasks.INTEGRATED_ALERTS_PREFIX}"
+            f"/{version}/admin-integrated-alerts.parquet"
+        )
+        if not overwrite and s3_uri_exists(result_uri):
+            return result_uri
+    else:
+        # local bbox test run
+        result_uri = f"admin-integrated-alerts-{version}.parquet"
 
     expected_groups = (
         np.arange(999),  # country ISO codes
         np.arange(86),  # region codes
         np.arange(854),  # subregion codes
+        np.arange(22),  # SBTN natural lands classes (0 = no data)
         np.arange(
             2923, 5000
         ),  # number of days since 2014/12/31 for (2023/1/1, 2028/9/8)
@@ -30,8 +57,9 @@ def integrated_alerts_area(
     # load zarrs and align with pixel_area
     datasets = integrated_alerts_common_tasks.load_data.with_options(
         name="integrated-alerts-load_data"
-    )(integrated_alerts_zarr_uri)
-    # Datasets returned as: (integrated_alerts, country, region, subregion, pixel_area)
+    )(integrated_alerts_zarr_uri, sbtn_natural_lands_zarr_uri, bbox)
+    # Datasets returned as: (integrated_alerts, country, region, subregion,
+    # pixel_area, natural_lands)
 
     compute_input = integrated_alerts_common_tasks.setup_compute.with_options(
         name="set-up-integrated-alerts-compute"

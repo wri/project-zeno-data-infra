@@ -42,3 +42,23 @@ class TestIntegratedAlertsAnalyticsIn:
                 start_date="2024",
                 end_date="2024-12-31",
             )
+
+    def test_land_filter_accepts_natural_lands(self):
+        analytics_in = IntegratedAlertsAnalyticsIn(
+            aoi={"type": "admin", "ids": ["IDN.24.9"]},
+            start_date="2024-01-01",
+            end_date="2024-12-31",
+            land_filter="natural_lands",
+        )
+        assert analytics_in.land_filter == "natural_lands"
+
+    def test_land_filter_rejects_unsupported_value(self):
+        # Only values that are actually implemented are allowed, so an
+        # unsupported filter can't be silently ignored.
+        with pytest.raises(ValidationError):
+            IntegratedAlertsAnalyticsIn(
+                aoi={"type": "admin", "ids": ["IDN.24.9"]},
+                start_date="2024-01-01",
+                end_date="2024-12-31",
+                land_filter="primary_forest",
+            )

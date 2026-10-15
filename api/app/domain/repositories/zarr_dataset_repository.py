@@ -111,7 +111,7 @@ class ZarrDatasetRepository:
                     return 0
                 case "Natural Forest":
                     return 1
-                case "Non-Natural Forest":
+                case "Non-natural Forest":
                     return 2
         elif dataset == Dataset.tree_cover_loss_drivers:
             match value:
@@ -173,7 +173,7 @@ class ZarrDatasetRepository:
             natural_forests_class = {
                 0: "Unknown",
                 1: "Natural Forest",
-                2: "Non-Natural Forest",
+                2: "Non-natural Forest",
             }
 
             return series.map(lambda pixel: natural_forests_class[pixel])

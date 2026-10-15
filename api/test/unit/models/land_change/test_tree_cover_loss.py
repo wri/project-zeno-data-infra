@@ -98,12 +98,22 @@ class TestTreeCoverLossAnalyticsIn:
                 intersections=["driver"],
             )
 
-    def test_natural_forest_admin_error(self, base_config):
+    def test_natural_forest_admin(self, base_config):
+        TreeCoverLossAnalyticsIn(
+            aoi={"type": "admin", "ids": ["IDN"]},
+            start_year="2021",
+            end_year="2024",
+            canopy_cover=30,
+            forest_filter="natural_forest_only",
+            intersections=["driver"],
+        )
+
+    def test_natural_forest_only_pre_2021_error(self, base_config):
         with pytest.raises(ValueError):
             TreeCoverLossAnalyticsIn(
                 aoi={"type": "admin", "ids": ["IDN"]},
                 start_year="2020",
                 end_year="2024",
-                forest_filter="natural_forest",
+                forest_filter="natural_forest_only",
                 intersections=["driver"],
             )

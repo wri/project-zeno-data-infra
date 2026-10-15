@@ -118,6 +118,11 @@ def land_ghg_inventory_agriculture(
             name="land_ghg_inventory-agriculture-resample-source-zarr"
         )(overwrite=overwrite)
     )
+    # Per-hectare visualization COGs: independent of the zonal-stats zarr (reads
+    # the same source COGs), so Prefect runs it concurrently.
+    land_ghg_inventory_tasks.prepare_agriculture_cogs.with_options(
+        name="land_ghg_inventory-agriculture-write-cogs"
+    )(overwrite=overwrite)
     datasets = land_ghg_inventory_tasks.load_agriculture.with_options(
         name="land_ghg_inventory-agriculture-load-data"
     )(

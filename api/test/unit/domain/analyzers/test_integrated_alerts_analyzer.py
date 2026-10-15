@@ -60,9 +60,11 @@ Y_VALS = np.linspace(48.0, 47.99775, 10)  # latitude, descending (matches clip s
 X_VALS = np.linspace(105.0, 105.00225, 10)  # longitude, ascending
 
 
-def make_analysis(aoi, start_date="2029-01-01", end_date="2032-12-31") -> Analysis:
+def make_analysis(
+    aoi, start_date="2029-01-01", end_date="2032-12-31", land_filter=None
+) -> Analysis:
     metadata = IntegratedAlertsAnalyticsIn(
-        aoi=aoi, start_date=start_date, end_date=end_date
+        aoi=aoi, start_date=start_date, end_date=end_date, land_filter=land_filter
     ).model_dump()
     return Analysis(result=None, metadata=metadata, status="pending")
 
@@ -100,14 +102,19 @@ class TestPrecomputedAdminAnalysis:
     @pytest.fixture
     def precomputed_admin_results(self, tmp_path):
         # Parquet keyed by aoi_id and preaggregated to grain
-        # (aoi_id, alert_date, alert_confidence).
+        # (aoi_id, alert_date, alert_confidence, natural_lands_class), where
+        # natural_lands_class is the raw SBTN class code (2-11 are natural lands).
         rows = [
-            ("BRA.1", "2024-01-01", "low", 10.0),
-            ("BRA.1", "2024-01-01", "high", 5.0),
-            ("BRA.1", "2024-06-15", "highest", 2.0),
-            ("BRA.1", "2024-12-31", "low", 1.0),
-            ("BRA.1", "2023-12-31", "high", 99.0),  # before window -> excluded
-            ("BRA.1.2", "2024-03-03", "low", 7.0),  # other aoi -> excluded
+            # split by natural lands class -> summed to 10.0
+            ("BRA.1", "2024-01-01", "low", 2, 6.0),
+            ("BRA.1", "2024-01-01", "low", 12, 4.0),  # just past natural lands
+            ("BRA.1", "2024-01-01", "high", 11, 5.0),  # last natural lands class
+            ("BRA.1", "2024-06-15", "highest", 1, 2.0),  # just before them
+            ("BRA.1", "2024-12-31", "low", 5, 1.0),
+            # before window -> excluded
+            ("BRA.1", "2023-12-31", "high", 2, 99.0),
+            # other aoi -> excluded
+            ("BRA.1.2", "2024-03-03", "low", 2, 7.0),
         ]
         df = pd.DataFrame(
             rows,
@@ -115,9 +122,11 @@ class TestPrecomputedAdminAnalysis:
                 "aoi_id",
                 "alert_date",
                 "alert_confidence",
+                "natural_lands_class",
                 "area_ha",
             ],
         )
+        df["natural_lands_class"] = df["natural_lands_class"].astype("uint8")
         df["alert_date"] = pd.to_datetime(df["alert_date"])
 
         parquet_file = tmp_path / "admin-integrated-alerts.parquet"
@@ -159,6 +168,39 @@ class TestPrecomputedAdminAnalysis:
 
         pd.testing.assert_frame_equal(expected, df, check_like=True, check_dtype=False)
 
+    @pytest.mark.asyncio
+    async def test_natural_lands_filter_only_counts_natural_rows(
+        self, precomputed_admin_results
+    ):
+        analyzer = IntegratedAlertsAnalyzer(
+            duckdb_query_service=DuckDbPrecalcQueryService(
+                table_uri=precomputed_admin_results
+            ),
+            input_uris={},
+        )
+        analysis = make_analysis(
+            {"type": "admin", "ids": ["BRA.1"]},
+            start_date="2024-01-01",
+            end_date="2024-12-31",
+            land_filter="natural_lands",
+        )
+
+        await analyzer.analyze(analysis)
+        df = pd.DataFrame(analysis.result)
+
+        # the classes 12 (4.0 on 2024-01-01 low) and 1 (2024-06-15) rows drop out
+        expected = pd.DataFrame(
+            {
+                "aoi_id": ["BRA.1", "BRA.1", "BRA.1"],
+                "alert_date": ["2024-01-01", "2024-01-01", "2024-12-31"],
+                "alert_confidence": ["high", "low", "low"],
+                "area_ha": [5.0, 6.0, 1.0],
+                "aoi_type": ["admin", "admin", "admin"],
+            }
+        )
+
+        pd.testing.assert_frame_equal(expected, df, check_like=True, check_dtype=False)
+
 
 class TestOtfAnalysis:
     @pytest.fixture
@@ -185,6 +227,65 @@ class TestOtfAnalysis:
             {"band_data": (["band", "y", "x"], areas_3d)},
             coords={"band": [1], "y": Y_VALS, "x": X_VALS},
         )
+
+    @pytest.fixture
+    def natural_lands(self):
+        # left 5 columns natural forests (class 2), right 5 cropland (class 12)
+        classes = np.hstack(
+            [np.full((10, 5), 2, dtype=np.uint8), np.full((10, 5), 12, dtype=np.uint8)]
+        )
+        return xr.Dataset(
+            {"band_data": (["band", "y", "x"], classes[np.newaxis, :, :])},
+            coords={"band": [1], "y": Y_VALS, "x": X_VALS},
+        )
+
+    @pytest.mark.asyncio
+    @patch("app.analysis.common.analysis.read_zarr")
+    async def test_otf_natural_lands_filter_only_counts_natural_pixels(
+        self, mock_read_zarr, alerts_datacube, pixel_area, natural_lands
+    ):
+        mock_read_zarr.side_effect = [alerts_datacube, pixel_area, natural_lands]
+
+        input_uris = {
+            "integrated_alerts_zarr_uri": "memory://alerts",
+            str(Dataset.pixel_area_m2_10m): "memory://area",
+            str(Dataset.natural_lands): "memory://natural_lands",
+        }
+        aoi = {"type": "Feature", "properties": {"id": "test_otf"}}
+        geojson = {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [104.9999, 47.9976],
+                    [105.0024, 47.9976],
+                    [105.0024, 48.0001],
+                    [104.9999, 48.0001],
+                    [104.9999, 47.9976],
+                ]
+            ],
+        }
+
+        with dask.config.set(scheduler="synchronous"):
+            result_df = IntegratedAlertsAnalyzer.analyze_area(
+                input_uris,
+                aoi,
+                geojson,
+                "2015-01-01",
+                "2099-12-31",
+                land_filter="natural_lands",
+            )
+            computed = result_df.compute()
+
+        computed = computed.sort_values("alert_confidence").reset_index(drop=True)
+
+        # only the 5 natural columns of each row count
+        expected_area_ha = [
+            5 * COLUMN_AREAS[3:7].sum() / 10000,  # high
+            5 * COLUMN_AREAS[7:10].sum() / 10000,  # highest
+            5 * COLUMN_AREAS[0:3].sum() / 10000,  # low
+        ]
+        assert computed["alert_confidence"].tolist() == ["high", "highest", "low"]
+        np.testing.assert_allclose(computed["area_ha"], expected_area_ha, rtol=1e-4)
 
     @pytest.mark.asyncio
     @patch("app.analysis.common.analysis.read_zarr")

@@ -4,14 +4,16 @@ import boto3
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.integrated_alerts.prefect_flows.gadm_integrated_alerts import integrated_alerts_area
 from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.integrated_alerts.create_zarr import create_zarr
 from pipelines.integrated_alerts.extra_processing import (
     extra_processing_tasks,
     is_first_sunday_week,
 )
-from pipelines.globals import ANALYTICS_BUCKET
+from pipelines.integrated_alerts.prefect_flows.gadm_integrated_alerts import (
+    integrated_alerts_area,
+)
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -47,7 +49,12 @@ def write_int_latest_version(version) -> None:
     log_prints=True,
     description="Create zarr from tiles of one version of the integrated disturbance alerts dataset",
 )
-def integrated_alerts_zarr_flow(version=None, overwrite=False, is_latest=False) -> list[str]:
+def integrated_alerts_zarr_flow(
+    version=None, overwrite=False, is_latest=False, bbox=None
+) -> list[str]:
+    """bbox (a shapely Polygon) only clips the GADM parquet computation, which is
+    then written to a local parquet file. The zarr is still created for the whole
+    world."""
     logger = get_run_logger()
     result_uris = []
 
@@ -71,13 +78,15 @@ def integrated_alerts_zarr_flow(version=None, overwrite=False, is_latest=False) 
             version, integrated_alerts_zarr_uri
         )
 
-    # Base GADM dist alerts
+    # Base GADM integrated alerts with breakdown by natural lands categories.
     gadm_dist_result = integrated_alerts_area(
-        integrated_alerts_zarr_uri, version, overwrite=overwrite
+        integrated_alerts_zarr_uri, version, overwrite=overwrite, bbox=bbox
     )
     result_uris.append(gadm_dist_result)
 
-    if is_latest:
+    # Don't mark a version as latest from a bbox run, since the API would then
+    # look for a global parquet for this version that may not exist.
+    if is_latest and bbox is None:
         write_int_latest_version(version)
 
     if extra_processing_future is not None:
