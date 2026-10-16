@@ -6,6 +6,7 @@ from app.infrastructure.external_services.duck_db_query_service import (
 )
 from app.use_cases.integrated_alerts.latest_alert_date import (
     IntegratedAlertsLatestDate,
+    LatestAlertDateNotFound,
 )
 
 
@@ -29,3 +30,17 @@ async def test_returns_latest_alert_date_across_all_row_groups(tmp_path):
     )
 
     assert await latest_date.get() == "2025-03-04"
+
+
+@pytest.mark.asyncio
+async def test_raises_when_parquet_has_no_alert_dates(tmp_path):
+    df = pd.DataFrame({"alert_date": pd.to_datetime([]), "area_ha": []})
+    parquet_file = tmp_path / "admin-integrated-alerts.parquet"
+    df.to_parquet(parquet_file, index=False)
+
+    latest_date = IntegratedAlertsLatestDate(
+        DuckDbPrecalcQueryService(table_uri=parquet_file)
+    )
+
+    with pytest.raises(LatestAlertDateNotFound):
+        await latest_date.get()

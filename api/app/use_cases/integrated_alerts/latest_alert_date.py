@@ -1,3 +1,7 @@
+class LatestAlertDateNotFound(Exception):
+    """The admin results have no alert dates to report."""
+
+
 class IntegratedAlertsLatestDate:
     """Latest date with any alert in the precomputed admin results."""
 
@@ -8,7 +12,10 @@ class IntegratedAlertsLatestDate:
         data = await self.duckdb_query_service.execute(
             self.build_latest_alert_date_query()
         )
-        return data["alert_date"][0]
+        alert_date = data["alert_date"][0]
+        if alert_date is None:
+            raise LatestAlertDateNotFound()
+        return alert_date
 
     @staticmethod
     def build_latest_alert_date_query() -> str:

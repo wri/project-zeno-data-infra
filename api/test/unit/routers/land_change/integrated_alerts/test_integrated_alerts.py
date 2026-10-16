@@ -8,6 +8,7 @@ from app.routers.land_change.integrated_alerts.integrated_alerts import (
     get_latest_alert_date,
     get_latest_integrated_alerts_version,
 )
+from app.use_cases.integrated_alerts.latest_alert_date import LatestAlertDateNotFound
 
 client = TestClient(app)
 
@@ -51,3 +52,31 @@ async def test_latest_alert_date_is_queried_once_per_version(monkeypatch):
 
     assert len(queried) == 2
     get_latest_alert_date.cache_clear()
+
+
+def test_latest_returns_503_and_retries_when_no_alert_date_found(monkeypatch):
+    queried = []
+
+    class FakeMissingLatestDate:
+        def __init__(self, duckdb_query_service):
+            pass
+
+        async def get(self) -> str:
+            queried.append(True)
+            raise LatestAlertDateNotFound()
+
+    monkeypatch.setattr(
+        integrated_alerts, "IntegratedAlertsLatestDate", FakeMissingLatestDate
+    )
+    app.dependency_overrides[get_latest_integrated_alerts_version] = lambda: "v1"
+    get_latest_alert_date.cache_clear()
+    try:
+        responses = [
+            client.get("/v0/land_change/integrated_alerts/latest") for _ in range(2)
+        ]
+    finally:
+        app.dependency_overrides.clear()
+        get_latest_alert_date.cache_clear()
+
+    assert [response.status_code for response in responses] == [503, 503]
+    assert len(queried) == 2

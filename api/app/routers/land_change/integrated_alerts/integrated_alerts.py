@@ -35,6 +35,7 @@ from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
 from app.use_cases.integrated_alerts.latest_alert_date import (
     IntegratedAlertsLatestDate,
+    LatestAlertDateNotFound,
 )
 
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
@@ -145,9 +146,15 @@ async def get_latest_alert_date(
     environment: Environment = Depends(get_environment),
 ) -> str:
     input_uris = build_input_uris(version, environment)
-    return await IntegratedAlertsLatestDate(
-        DuckDbPrecalcQueryService(table_uri=input_uris["admin_results_table_uri"])
-    ).get()
+    try:
+        return await IntegratedAlertsLatestDate(
+            DuckDbPrecalcQueryService(table_uri=input_uris["admin_results_table_uri"])
+        ).get()
+    except LatestAlertDateNotFound as error:
+        raise HTTPException(
+            status_code=503,
+            detail="No integrated alerts dates found for the latest version.",
+        ) from error
 
 
 @router.get(
