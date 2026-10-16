@@ -6,10 +6,10 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
-
+from pipelines.aois.aoi_source import AoiSource, column_ids
+from pipelines.aois.gadm import gadm_ids, gadm_levels
+from pipelines.aois.prefect_flows import aois_flow
+from pipelines.aois.stages import vector_file
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
@@ -17,6 +17,9 @@ from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -117,6 +120,68 @@ def run_land_ghg_inventory_update(
     )
 
 
+AOI_SOURCES = (
+    AoiSource(
+        source="gadm",
+        version="v4.1.85",
+        load=gadm_levels(
+            "https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip"
+        ),
+        aoi_ids=gadm_ids,
+    ),
+    AoiSource(
+        source="wdpa",
+        version="v202512",
+        load=vector_file(
+            "s3://gfw-data-lake/wdpa_protected_areas/v202512/raw/"
+            "WDPA_Dec2025_Public.gdb.zip",
+            layer="WDPA_poly_Dec2025",
+        ),
+        aoi_ids=column_ids("site_pid"),
+    ),
+    AoiSource(
+        source="kba",
+        version="v20250911",
+        load=vector_file(
+            "s3://gfw-data-lake/birdlife_key_biodiversity_areas/v20240904/raw/"
+            "KBAsGlobal_2024_September_03_POL.zip"
+        ),
+        aoi_ids=column_ids("sitrecid"),
+    ),
+    AoiSource(
+        source="landmark",
+        version="v20260617",
+        load=vector_file(
+            "s3://wri-lcl-public-unsafe/20260617_IP_LC_and_Indicative.gdb.zip",
+            layer="IP_LC_Indicative_20260617",
+        ),
+        aoi_ids=column_ids("landmark_id"),
+    ),
+)
+
+
+@flow
+def run_aois_update(
+    version=None, overwrite=False, is_latest=False, aoi_source=None
+) -> list[str]:
+    """Builds every AOI source's GeoParquet, or only the named source's."""
+    return [
+        aois_flow.aoi_flow(source, overwrite=overwrite)
+        for source in select_aoi_sources(AOI_SOURCES, aoi_source)
+    ]
+
+
+def select_aoi_sources(sources, name):
+    if name is None:
+        return sources
+    by_name = {source.source: source for source in sources}
+    if name not in by_name:
+        raise ValueError(
+            f"Unknown AOI source '{name}'. Accepted values: {', '.join(by_name)}"
+        )
+    return (by_name[name],)
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -134,6 +199,7 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    AOIS_UPDATE = "aois_update"
 
 
 update_flows = {
@@ -145,6 +211,7 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.AOIS_UPDATE: run_aois_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -157,6 +224,9 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
 
+# flows that don't use Dask, so run on the flow's own machine
+CLUSTERLESS_FLOWS = (UpdateFlow.AOIS_UPDATE,)
+
 # flow_name values that route into run_land_ghg_inventory_update
 LAND_GHG_INVENTORY_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE,
@@ -165,6 +235,10 @@ LAND_GHG_INVENTORY_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
+
+
+def needs_cluster(flow_name: "UpdateFlow", local: bool) -> bool:
+    return not local and flow_name not in CLUSTERLESS_FLOWS
 
 
 def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
@@ -192,6 +266,7 @@ def run_updates(
     is_latest=False,
     flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
     bbox=None,
+    aoi_source=None,
     local=False,
     performance_report_path=None,
 ) -> list[str]:
@@ -210,7 +285,7 @@ def run_updates(
     bbox_geom = _parse_bbox(bbox)
 
     try:
-        if not local:
+        if needs_cluster(flow_name, local):
             dask_client = create_cluster()
 
         flow_fn = update_flows.get(flow_name)
@@ -236,6 +311,8 @@ def run_updates(
         if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
             kwargs["flow_name"] = flow_name.value
+        if flow_name == UpdateFlow.AOIS_UPDATE:
+            kwargs["aoi_source"] = aoi_source
         elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
             kwargs["bbox"] = bbox_geom
         with report:
@@ -274,6 +351,12 @@ def run_updates(
     ),
 )
 @click.option(
+    "--aoi-source",
+    type=click.Choice([source.source for source in AOI_SOURCES]),
+    default=None,
+    help="Build only this AOI source (aois_update only); builds all if omitted.",
+)
+@click.option(
     "--local",
     is_flag=True,
     help="Run compute on this machine instead of a Coiled cluster.",
@@ -285,13 +368,23 @@ def run_updates(
     help="Write a Dask performance report HTML here (Coiled runs only; "
     "ignored with --local).",
 )
-def cli(flow_name, version, overwrite, is_latest, bbox, local, performance_report_path):
+def cli(
+    flow_name,
+    version,
+    overwrite,
+    is_latest,
+    bbox,
+    aoi_source,
+    local,
+    performance_report_path,
+):
     run_updates(
         version=version,
         overwrite=overwrite,
         is_latest=is_latest,
         flow_name=UpdateFlow(flow_name),
         bbox=bbox,
+        aoi_source=aoi_source,
         local=local,
         performance_report_path=performance_report_path,
     )

@@ -11,6 +11,7 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
@@ -62,9 +63,11 @@ class NaturalLandsAnalyzer(Analyzer):
         self,
         compute_engine=None,
         input_uris: Dict[str, str] | None = None,
+        aoi_geometry_repository: AoiGeometryRepository | None = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.input_uris = input_uris
+        self.aoi_geometry_repository = aoi_geometry_repository
 
     @nr_agent.function_trace(name="NaturalLandsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -78,7 +81,9 @@ class NaturalLandsAnalyzer(Analyzer):
             results = await self.analyze_admin_areas(gadm_ids)
         else:
             aois = natural_lands_analytics_in.aoi.model_dump()
-            geojsons = await get_geojson(aois)
+            geojsons = await get_geojson(
+                natural_lands_analytics_in.aoi, self.aoi_geometry_repository
+            )
             if aois["type"] != "feature_collection":
                 aoi_list = sorted(
                     [{"type": aois["type"], "id": id} for id in aois["ids"]],

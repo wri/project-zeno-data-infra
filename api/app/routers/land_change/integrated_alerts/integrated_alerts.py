@@ -8,13 +8,14 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_environment
+from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.analyzers.integrated_alerts_analyzer import (
     IntegratedAlertsAnalyzer,
     build_input_uris,
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -66,12 +67,16 @@ def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
     version: str = Depends(get_latest_integrated_alerts_version),
 ) -> AnalysisService:
     input_uris = build_input_uris(version, environment)
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=IntegratedAlertsAnalyzer(
+            aoi_geometry_repository=aoi_geometry_repository,
             compute_engine=request.app.state.dask_client,
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri=input_uris["admin_results_table_uri"]

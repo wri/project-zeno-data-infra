@@ -82,7 +82,7 @@ class TestOtfTimeout:
             async def compute(self, *args, **kwargs):
                 await asyncio.sleep(10)
 
-        async def fake_get_geojson(aois):
+        async def fake_get_geojson(aoi, aoi_geometry_repository):
             return [{"type": "Polygon", "coordinates": []}]
 
         monkeypatch.setattr(zonal_statistics_analyzer, "get_geojson", fake_get_geojson)
