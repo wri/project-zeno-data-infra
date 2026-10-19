@@ -38,11 +38,41 @@ def drop_missing_ids(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return features[features.aoi_id.notna()]
 
 
-def removed(
-    before: gpd.GeoDataFrame, after: gpd.GeoDataFrame, reason: str
+def changed_aois(
+    normalized: gpd.GeoDataFrame,
+    identified: gpd.GeoDataFrame,
+    repair_report: pd.DataFrame,
 ) -> pd.DataFrame:
-    dropped = before.loc[before.index.difference(after.index)]
-    return pd.DataFrame(dropped.drop(columns="geometry")).assign(reason=reason)
+    """One row per feature removed or repaired, with its source attributes so
+    features without an id can still be found in the source."""
+    missing_ids = normalized.loc[normalized.index.difference(identified.index)]
+    invalid = identified.loc[repair_report.index]
+    return pd.concat(
+        [
+            change_rows(missing_ids, "removed", "missing_id", None),
+            change_rows(
+                invalid,
+                repair_report.repaired.map({True: "repaired", False: "removed"}),
+                "invalid_geometry",
+                repair_report.invalid_reason,
+            ),
+        ],
+        ignore_index=True,
+    )
+
+
+def change_rows(features, change, reason, detail) -> pd.DataFrame:
+    attributes = pd.DataFrame(features.drop(columns=["geometry", "aoi_id"]))
+    return pd.DataFrame(
+        {
+            "aoi_id": features.aoi_id,
+            "change": change,
+            "reason": reason,
+            "detail": detail,
+            "source_attributes": attributes.apply(lambda row: row.to_json(), axis=1),
+        },
+        index=features.index,
+    )
 
 
 def with_area_ha(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

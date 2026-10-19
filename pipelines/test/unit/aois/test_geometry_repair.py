@@ -40,8 +40,8 @@ def test_unrepairable_geometry_is_reported_and_dropped():
     repaired, report = repair_geometries(features(box(0, 0, 1, 1), COLLINEAR))
 
     assert list(repaired.aoi_id) == ["1"]
-    assert report.loc[0, "aoi_id"] == "2"
-    assert not report.loc[0, "repaired"]
+    assert list(report.aoi_id) == ["2"]
+    assert not report.repaired.iloc[0]
 
 
 def test_missing_geometry_is_reported_and_dropped():

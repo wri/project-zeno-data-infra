@@ -11,7 +11,8 @@ def repair_geometries(
     """Make every geometry a valid 2D MultiPolygon, keeping only polygon parts.
 
     Returns the repaired features, without any that could not be repaired or had
-    no geometry, and a report with one row per originally invalid feature."""
+    no geometry, and a report of the originally invalid features, indexed like
+    the input."""
     features = features.set_geometry(shapely.force_2d(features.geometry.values))
     invalid = features[~features.is_valid]
     repaired_geometries = invalid.geometry.make_valid().apply(polygonal_part)
@@ -22,8 +23,9 @@ def repair_geometries(
             "aoi_id": invalid.aoi_id,
             "invalid_reason": shapely.is_valid_reason(invalid.geometry),
             "repaired": repaired,
-        }
-    ).reset_index(drop=True)
+        },
+        index=invalid.index,
+    )
 
     result = features.copy()
     result.loc[invalid.index, "geometry"] = repaired_geometries

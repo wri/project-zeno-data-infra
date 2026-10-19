@@ -2,13 +2,14 @@ import geopandas as gpd
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
-from shapely import box
+from shapely import Polygon, box
 
 from pipelines.aois.aoi_source import AoiSource, column_ids
+from pipelines.aois.geometry_repair import repair_geometries
 from pipelines.aois.stages import (
+    changed_aois,
     drop_missing_ids,
     normalize,
-    removed,
     with_area_ha,
     write_geoparquet,
 )
@@ -57,15 +58,40 @@ def test_rows_without_an_id_are_dropped():
     assert list(drop_missing_ids(identified).aoi_id) == ["1"]
 
 
-def test_removed_rows_are_reported_with_reason_and_without_geometry():
-    before = features(["1", "2"], [box(0, 0, 1, 1), box(1, 1, 2, 2)], name=["A", "B"])
-    after = before.iloc[[0]]
+def test_changed_aois_report_removed_and_repaired_features():
+    bowtie = Polygon([(0, 0), (2, 2), (2, 0), (0, 2), (0, 0)])
+    collinear = Polygon([(0, 0), (1, 1), (2, 2), (0, 0)])
+    normalized = features(
+        [None, "2", "3", "4"],
+        [box(0, 0, 1, 1), bowtie, collinear, box(0, 0, 1, 1)],
+        name=["A", "B", "C", "D"],
+    )
+    identified = drop_missing_ids(normalized)
+    _, repair_report = repair_geometries(identified)
 
-    report = removed(before, after, "missing_id")
+    report = changed_aois(normalized, identified, repair_report)
 
-    assert report.to_dict("records") == [
-        {"aoi_id": "2", "name": "B", "reason": "missing_id"}
+    assert report.drop(columns="detail").to_dict("records") == [
+        {
+            "aoi_id": None,
+            "change": "removed",
+            "reason": "missing_id",
+            "source_attributes": '{"name":"A"}',
+        },
+        {
+            "aoi_id": "2",
+            "change": "repaired",
+            "reason": "invalid_geometry",
+            "source_attributes": '{"name":"B"}',
+        },
+        {
+            "aoi_id": "3",
+            "change": "removed",
+            "reason": "invalid_geometry",
+            "source_attributes": '{"name":"C"}',
+        },
     ]
+    assert report.detail.tolist()[1] == "Self-intersection[1 1]"
 
 
 def test_normalize_reprojects_to_wgs84(raw_features):
@@ -108,3 +134,20 @@ def test_geoparquet_row_groups_hold_non_overlapping_id_ranges(tmp_path):
     ]
     assert len(ranges) == 4
     assert all(left[1] < right[0] for left, right in zip(ranges, ranges[1:]))
+
+
+def test_changed_aois_is_empty_with_columns_when_nothing_changed():
+    normalized = features(["1"], [box(0, 0, 1, 1)], name=["A"])
+    identified = drop_missing_ids(normalized)
+    _, repair_report = repair_geometries(identified)
+
+    report = changed_aois(normalized, identified, repair_report)
+
+    assert report.empty
+    assert list(report.columns) == [
+        "aoi_id",
+        "change",
+        "reason",
+        "detail",
+        "source_attributes",
+    ]
