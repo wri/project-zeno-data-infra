@@ -30,7 +30,8 @@ dependencies = [
     "shapely>=2.1.1",
     "sparse",
     "xarray",
-    "zarr"
+    "zarr",
+    "async-lru>=2.4.0",
 ]
 
 [tool.isort]
