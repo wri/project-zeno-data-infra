@@ -30,7 +30,8 @@ dependencies = [
     "shapely>=2.1.1",
     "sparse",
     "xarray",
-    "zarr"
+    "zarr",
+    "pyiceberg[pyarrow,sql-sqlite]>=0.9",
 ]
 
 [tool.isort]

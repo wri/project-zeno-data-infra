@@ -342,6 +342,30 @@ module "analytics" {
         {
           name  = "LOCAL_CLUSTER_AREA_THRESHOLD_HA"
           value = tostring(var.local_cluster_area_threshold_ha)
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__TYPE"
+          value = "rest"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__URI"
+          value = "https://s3tables.${data.aws_region.current.name}.amazonaws.com/iceberg"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__WAREHOUSE"
+          value = aws_s3tables_table_bucket.aois.arn
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__REST__SIGV4_ENABLED"
+          value = "true"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__REST__SIGNING_NAME"
+          value = "s3tables"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__REST__SIGNING_REGION"
+          value = data.aws_region.current.name
         }
       ]
       enable_cloudwatch_logging = true
@@ -848,6 +872,35 @@ data "aws_iam_policy_document" "ecs_task_analysis_access" {
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.analysis_results.arn]
   }
+  # Read and write the custom AOI Iceberg tables; the API creates the table on first write
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3tables:GetTableBucket",
+      "s3tables:GetNamespace",
+      "s3tables:ListTables",
+      "s3tables:CreateTable",
+      "s3tables:GetTable",
+      "s3tables:GetTableMetadataLocation",
+      "s3tables:UpdateTableMetadataLocation",
+      "s3tables:GetTableData",
+      "s3tables:PutTableData",
+    ]
+    resources = [
+      aws_s3tables_table_bucket.aois.arn,
+      "${aws_s3tables_table_bucket.aois.arn}/table/*",
+    ]
+  }
+}
+
+# Custom AOI geometries, as Iceberg tables that S3 Tables compacts and cleans up
+resource "aws_s3tables_table_bucket" "aois" {
+  name = "gnw-aois${local.name_suffix}"
+}
+
+resource "aws_s3tables_namespace" "custom" {
+  namespace        = "custom"
+  table_bucket_arn = aws_s3tables_table_bucket.aois.arn
 }
 
 resource "aws_iam_policy" "ecs_task_analysis" {

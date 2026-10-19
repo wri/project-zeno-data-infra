@@ -1,0 +1,20 @@
+image: ""
+
+replicaCount: 1
+
+service:
+  port: 8000
+
+environment: {}
+
+resources:
+  requests:
+    cpu: "8"
+    memory: "32Gi"
+  limits:
+    cpu: "8"
+    memory: "32Gi"
+
+ingress:
+  host: ""
+  certificateArn: ""

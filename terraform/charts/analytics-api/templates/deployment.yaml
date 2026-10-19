@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "analytics-api.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "analytics-api.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "analytics-api.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "analytics-api.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: api
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: Always
+          command:
+            - newrelic-admin
+            - run-program
+            - uvicorn
+            - app.main:app
+            - --host
+            - 0.0.0.0
+            - --port
+            - "8000"
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            {{- range $name, $value := .Values.environment }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
