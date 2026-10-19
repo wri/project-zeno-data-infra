@@ -5,9 +5,10 @@ from typing import Callable, Optional
 import boto3
 import geopandas as gpd
 import pandas as pd
+from pyproj import Geod
+
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.utils import parse_s3_uri
-from pyproj import Geod
 
 
 def vector_file(
@@ -50,15 +51,6 @@ def with_area_ha(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         area_ha=features.geometry.apply(
             lambda geometry: abs(geod.geometry_area_perimeter(geometry)[0]) / 10_000
         )
-    )
-
-
-def deduplicate(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Keeps the largest feature for each id."""
-    return (
-        features.sort_values("area_ha", ascending=False, kind="stable")
-        .drop_duplicates("aoi_id")
-        .sort_index()
     )
 
 

@@ -2,16 +2,16 @@ import geopandas as gpd
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+from shapely import box
+
 from pipelines.aois.aoi_source import AoiSource, column_ids
 from pipelines.aois.stages import (
-    deduplicate,
     drop_missing_ids,
     normalize,
     removed,
     with_area_ha,
     write_geoparquet,
 )
-from shapely import box
 
 SOURCE = AoiSource(
     source="wdpa",
@@ -61,10 +61,10 @@ def test_removed_rows_are_reported_with_reason_and_without_geometry():
     before = features(["1", "2"], [box(0, 0, 1, 1), box(1, 1, 2, 2)], name=["A", "B"])
     after = before.iloc[[0]]
 
-    report = removed(before, after, "duplicate_id")
+    report = removed(before, after, "missing_id")
 
     assert report.to_dict("records") == [
-        {"aoi_id": "2", "name": "B", "reason": "duplicate_id"}
+        {"aoi_id": "2", "name": "B", "reason": "missing_id"}
     ]
 
 
@@ -79,17 +79,6 @@ def test_area_is_geodesic_hectares():
     area_ha = with_area_ha(features(["1"], [box(0, 0, 1, 1)])).area_ha.iloc[0]
 
     assert area_ha == pytest.approx(1_230_000, rel=0.01)
-
-
-def test_deduplicate_keeps_largest_feature_per_id():
-    duplicated = features(
-        ["1", "1", "2"], [box(0, 0, 1, 1), box(0, 0, 2, 2), box(0, 0, 1, 1)]
-    )
-
-    deduplicated = deduplicate(with_area_ha(duplicated))
-
-    assert sorted(deduplicated.aoi_id) == ["1", "2"]
-    assert deduplicated.set_index("aoi_id").geometry["1"].area == 4.0
 
 
 def test_geoparquet_round_trips_with_covering_bbox(tmp_path):
