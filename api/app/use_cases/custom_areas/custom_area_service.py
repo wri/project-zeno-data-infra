@@ -37,14 +37,13 @@ class CustomAreaService:
 
 
 def polygonal(geometry: BaseGeometry) -> MultiPolygon:
-    geometry = shapely.make_valid(shapely.force_2d(geometry))
-    polygons = [
-        polygon
-        for part in shapely.get_parts(geometry)
-        for polygon in shapely.get_parts(part)
-        if polygon.geom_type == "Polygon"
-    ]
-    merged = shapely.union_all(polygons)
-    if merged.geom_type == "Polygon":
-        return MultiPolygon([merged])
-    return merged if merged.geom_type == "MultiPolygon" else MultiPolygon()
+    """A valid 2D MultiPolygon, without any parts that collapse to lines or
+    points when repaired. Empty if nothing with area is left."""
+    valid = shapely.make_valid(
+        shapely.force_2d(geometry), method="structure", keep_collapsed=False
+    )
+    if valid.is_empty:
+        return MultiPolygon()
+    if valid.geom_type == "Polygon":
+        return MultiPolygon([valid])
+    return valid
