@@ -1,8 +1,14 @@
 import geopandas as gpd
 import pandas as pd
 import pytest
-from pipelines.aois.gadm import fix_gadm_gids, gadm_ids, read_gadm_levels
 from shapely import box
+
+from pipelines.aois.gadm import (
+    fill_gadm_names,
+    fix_gadm_gids,
+    gadm_ids,
+    read_gadm_levels,
+)
 
 
 def gids(level, gid_0, gid_1=None, gid_2=None):
@@ -69,3 +75,34 @@ def test_levels_are_read_from_their_own_layers(tmp_path):
 
     assert list(levels.ADM_LEVEL) == [0, 1, 2]
     assert list(levels.NAME_0) == ["Brazil"] * 3
+
+
+def districts(name_2):
+    return pd.DataFrame(
+        {
+            "ADM_LEVEL": [2],
+            "GID_0": ["GBR"],
+            "GID_1": ["GBR.1_1"],
+            "GID_2": ["GBR.1.1_1"],
+            "NAME_2": [name_2],
+        }
+    )
+
+
+def fills(aoi_id="GBR.1.1", column="NAME_2", name="Barnsley"):
+    return pd.DataFrame({"aoi_id": [aoi_id], "column": [column], "name": [name]})
+
+
+def test_missing_names_are_filled_from_the_lookup_table():
+    assert fill_gadm_names(districts("NA"), fills()).NAME_2.tolist() == ["Barnsley"]
+
+
+def test_names_gadm_already_has_are_never_overwritten():
+    filled = fill_gadm_names(districts("Barnsley District"), fills())
+
+    assert filled.NAME_2.tolist() == ["Barnsley District"]
+
+
+def test_fills_for_unknown_ids_fail_loudly():
+    with pytest.raises(ValueError, match="GBR.9.9"):
+        fill_gadm_names(districts("NA"), fills(aoi_id="GBR.9.9"))
