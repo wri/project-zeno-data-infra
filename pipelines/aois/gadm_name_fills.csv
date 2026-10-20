@@ -1,0 +1,93 @@
+aoi_id,column,name,needs_review
+GBR.1,NAME_1,England,false
+GBR.1.19,NAME_1,England,false
+GBR.1.35,NAME_1,England,false
+IRL.4,NAME_1,Cork,false
+MHL.19,NAME_1,Kili / Bikini / Ejit,false
+NLD.14,NAME_1,Zuid-Holland,false
+ALA.1.1,NAME_2,Brändö,false
+ALA.2.2,NAME_2,Finström,false
+CHL.15.1,NAME_2,Iquique,false
+GBR.1.1,NAME_2,Barnsley,true
+GBR.1.100,NAME_2,Manchester,true
+GBR.1.104,NAME_2,Manchester,true
+GBR.1.106,NAME_2,Birmingham,true
+GBR.1.107,NAME_2,Halton,false
+GBR.1.108,NAME_2,Coventry,true
+GBR.1.111,NAME_2,Lancashire,false
+GBR.1.112,NAME_2,Swindon,false
+GBR.1.113,NAME_2,Surrey,false
+GBR.1.115,NAME_2,Reading,true
+GBR.1.117,NAME_2,Birmingham,true
+GBR.1.12,NAME_2,"Bristol, City of",true
+GBR.1.13,NAME_2,Buckinghamshire,true
+GBR.1.14,NAME_2,Bolton,true
+GBR.1.16,NAME_2,Cambridgeshire,false
+GBR.1.17,NAME_2,Bedford,false
+GBR.1.18,NAME_2,Cheshire East,true
+GBR.1.19,NAME_2,Cheshire East,true
+GBR.1.20,NAME_2,Cornwall,false
+GBR.1.21,NAME_2,Coventry,true
+GBR.1.25,NAME_2,Derby,false
+GBR.1.26,NAME_2,Devon,false
+GBR.1.27,NAME_2,Barnsley,true
+GBR.1.28,NAME_2,"Bournemouth, Christchurch and Po",false
+GBR.1.29,NAME_2,Dudley,true
+GBR.1.31,NAME_2,East Riding of Yorkshire,false
+GBR.1.32,NAME_2,Brighton and Hove,false
+GBR.1.33,NAME_2,Essex,false
+GBR.1.35,NAME_2,Gloucestershire,false
+GBR.1.36,NAME_2,Greater London,false
+GBR.1.38,NAME_2,Hampshire,true
+GBR.1.4,NAME_2,Birmingham,true
+GBR.1.41,NAME_2,Buckinghamshire,true
+GBR.1.47,NAME_2,Knowsley,true
+GBR.1.48,NAME_2,Blackpool,false
+GBR.1.50,NAME_2,Leicester,true
+GBR.1.51,NAME_2,Leicester,true
+GBR.1.52,NAME_2,Lincolnshire,true
+GBR.1.54,NAME_2,Bury,false
+GBR.1.56,NAME_2,Middlesbrough,true
+GBR.1.58,NAME_2,Gateshead,false
+GBR.1.59,NAME_2,Norfolk,false
+GBR.1.60,NAME_2,Lincolnshire,true
+GBR.1.61,NAME_2,"Bristol, City of",true
+GBR.1.62,NAME_2,North Tyneside,false
+GBR.1.64,NAME_2,Leicestershire,false
+GBR.1.65,NAME_2,County Durham,true
+GBR.1.66,NAME_2,Nottingham,false
+GBR.1.67,NAME_2,Derbyshire,true
+GBR.1.69,NAME_2,Oxfordshire,false
+GBR.1.7,NAME_2,Bolton,true
+GBR.1.73,NAME_2,Hampshire,true
+GBR.1.74,NAME_2,Reading,true
+GBR.1.75,NAME_2,Middlesbrough,true
+GBR.1.76,NAME_2,Oldham,false
+GBR.1.77,NAME_2,Derbyshire,true
+GBR.1.78,NAME_2,Lincolnshire,true
+GBR.1.80,NAME_2,Salford,false
+GBR.1.81,NAME_2,Birmingham,true
+GBR.1.82,NAME_2,Knowsley,true
+GBR.1.84,NAME_2,Shropshire,false
+GBR.1.85,NAME_2,Slough,false
+GBR.1.86,NAME_2,Birmingham,true
+GBR.1.89,NAME_2,South Tyneside,false
+GBR.1.90,NAME_2,Hampshire,true
+GBR.1.92,NAME_2,Dudley,true
+GBR.1.93,NAME_2,Manchester,true
+GBR.1.95,NAME_2,Staffordshire,false
+GBR.1.97,NAME_2,County Durham,true
+GBR.2.4,NAME_2,Causeway Coast and Glens,false
+GBR.2.7,NAME_2,Belfast,false
+GBR.3.21,NAME_2,Argyll and Bute,false
+GBR.4.11,NAME_2,Gwynedd,false
+GBR.4.12,NAME_2,Merthyr Tydfil,false
+GBR.4.14,NAME_2,Bridgend,true
+GBR.4.19,NAME_2,Neath Port Talbot,false
+GBR.4.2,NAME_2,Blaenau Gwent,true
+GBR.4.20,NAME_2,Blaenau Gwent,true
+GBR.4.21,NAME_2,Cardiff,false
+GBR.4.22,NAME_2,Flintshire,false
+GBR.4.3,NAME_2,Bridgend,true
+GBR.4.9,NAME_2,Conwy,false
+UKR.27.15,NAME_2,Malyn,false

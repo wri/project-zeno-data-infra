@@ -9,9 +9,9 @@ import geopandas as gpd
 import pandas as pd
 
 
-def gadm_levels(url: str) -> Callable[[], gpd.GeoDataFrame]:
+def gadm_levels(url: str, name_fills: pd.DataFrame) -> Callable[[], gpd.GeoDataFrame]:
     """GADM admin levels 0-2 from the official by-level distribution, with GIDs
-    fixed the same way as the Data API's GADM 4.1 import."""
+    and missing names fixed the same way as the Data API's GADM 4.1 import."""
 
     def load() -> gpd.GeoDataFrame:
         with tempfile.TemporaryDirectory() as directory:
@@ -20,7 +20,7 @@ def gadm_levels(url: str) -> Callable[[], gpd.GeoDataFrame]:
             with zipfile.ZipFile(archive) as zipped:
                 geopackage = next(n for n in zipped.namelist() if n.endswith(".gpkg"))
                 path = zipped.extract(geopackage, directory)
-            return fix_gadm_gids(read_gadm_levels(path))
+            return fill_gadm_names(fix_gadm_gids(read_gadm_levels(path)), name_fills)
 
     return load
 
@@ -66,6 +66,21 @@ def fix_gadm_gids(features: pd.DataFrame) -> pd.DataFrame:
         .str.replace(r"^GHA(?=\d)", "GHA.", regex=True)
     )
     return features.assign(GID_1=gid_1, GID_2=gid_2)
+
+
+def fill_gadm_names(features: pd.DataFrame, fills: pd.DataFrame) -> pd.DataFrame:
+    """Names GADM leaves as "NA", from a table of (aoi_id, column, name). A fill
+    never replaces a name GADM has, and one for an unknown id raises."""
+    ids = gadm_ids(
+        features[["ADM_LEVEL", "GID_0", "GID_1", "GID_2"]].rename(columns=str.lower)
+    )
+    filled = features.copy()
+    for fill in fills.itertuples():
+        rows = ids == fill.aoi_id
+        if not rows.any():
+            raise ValueError(f"No GADM feature {fill.aoi_id} for name fill {fill.name}")
+        filled.loc[rows & (filled[fill.column] == "NA"), fill.column] = fill.name
+    return filled
 
 
 def gadm_ids(attributes: pd.DataFrame) -> pd.Series:

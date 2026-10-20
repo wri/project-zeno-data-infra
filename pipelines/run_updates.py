@@ -2,10 +2,16 @@ import logging
 import os
 from contextlib import nullcontext
 from enum import Enum
+from pathlib import Path
 
 import click
 import coiled
+import pandas as pd
 from dask.distributed import performance_report
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
+
 from pipelines.aois.aoi_source import AoiSource, column_ids
 from pipelines.aois.gadm import gadm_ids, gadm_levels
 from pipelines.aois.prefect_flows import aois_flow
@@ -17,9 +23,6 @@ from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -125,7 +128,8 @@ AOI_SOURCES = (
         source="gadm",
         version="v4.1.85",
         load=gadm_levels(
-            "https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip"
+            "https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip",
+            name_fills=pd.read_csv(Path(__file__).parent / "aois/gadm_name_fills.csv"),
         ),
         aoi_ids=gadm_ids,
     ),
