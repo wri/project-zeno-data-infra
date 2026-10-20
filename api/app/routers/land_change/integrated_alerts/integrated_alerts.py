@@ -1,6 +1,7 @@
 import os
 
 import boto3
+from async_lru import alru_cache
 from cachetools.func import ttl_cache
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi import Response as FastAPIResponse
@@ -28,9 +29,15 @@ from app.models.land_change.integrated_alerts import (
     IntegratedAlertsAnalytics,
     IntegratedAlertsAnalyticsIn,
     IntegratedAlertsAnalyticsResponse,
+    IntegratedAlertsLatest,
+    IntegratedAlertsLatestResponse,
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
+from app.use_cases.integrated_alerts.latest_alert_date import (
+    IntegratedAlertsLatestDate,
+    LatestAlertDateNotFound,
+)
 
 router = APIRouter(prefix=f"/{ANALYTICS_NAME}")
 
@@ -134,4 +141,38 @@ async def get_integrated_alerts_analytics_result(
 
     return IntegratedAlertsAnalyticsResponse(
         data=IntegratedAlertsAnalytics(**analytics_out.model_dump()), status="success"
+    )
+
+
+# A version's latest alert date never changes, so cache by version.
+@alru_cache(maxsize=1)
+async def get_latest_alert_date(
+    version: str = Depends(get_latest_integrated_alerts_version),
+    environment: Environment = Depends(get_environment),
+) -> str:
+    input_uris = build_input_uris(version, environment)
+    try:
+        return await IntegratedAlertsLatestDate(
+            DuckDbPrecalcQueryService(table_uri=input_uris["admin_results_table_uri"])
+        ).get()
+    except LatestAlertDateNotFound as error:
+        raise HTTPException(
+            status_code=503,
+            detail="No integrated alerts dates found for the latest version.",
+        ) from error
+
+
+@router.get(
+    "/latest",
+    response_class=ORJSONResponse,
+    response_model=IntegratedAlertsLatestResponse,
+    status_code=200,
+    summary="Get Latest Integrated Alerts Date",
+)
+async def get_latest(
+    latest_alert_date: str = Depends(get_latest_alert_date),
+    version: str = Depends(get_latest_integrated_alerts_version),
+):
+    return IntegratedAlertsLatestResponse(
+        data=IntegratedAlertsLatest(alert_date=latest_alert_date, version=version)
     )

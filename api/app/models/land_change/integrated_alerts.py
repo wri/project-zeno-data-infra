@@ -80,3 +80,18 @@ class IntegratedAlertsAnalytics(StrictBaseModel):
 
 class IntegratedAlertsAnalyticsResponse(Response):
     data: IntegratedAlertsAnalytics
+
+
+class IntegratedAlertsLatest(StrictBaseModel):
+    alert_date: str = Field(
+        ...,
+        description="Latest date with any alert, in YYYY-MM-DD format.",
+        examples=["2026-10-12"],
+    )
+    version: str = Field(
+        ..., description="Data version the date comes from.", examples=["v20261014"]
+    )
+
+
+class IntegratedAlertsLatestResponse(Response):
+    data: IntegratedAlertsLatest
