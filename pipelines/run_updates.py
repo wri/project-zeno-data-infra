@@ -128,7 +128,9 @@ AOI_SOURCES = (
         source="gadm",
         version="v4.1.85",
         load=gadm_levels(
-            "https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip",
+            levels_url="https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip",
+            all_in_one_url="https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-gpkg.zip",
+            cache_prefix="s3://lcl-analytics/vectors/aois/gadm/v4.1.85/source",
             name_fills=pd.read_csv(Path(__file__).parent / "aois/gadm_name_fills.csv"),
         ),
         aoi_ids=gadm_ids,
