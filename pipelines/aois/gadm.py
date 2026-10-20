@@ -1,3 +1,4 @@
+import posixpath
 import shutil
 import tempfile
 import urllib.request
@@ -5,24 +6,54 @@ import zipfile
 from pathlib import Path
 from typing import Callable
 
+import fsspec
 import geopandas as gpd
 import pandas as pd
 
 
-def gadm_levels(url: str, name_fills: pd.DataFrame) -> Callable[[], gpd.GeoDataFrame]:
-    """GADM admin levels 0-2 from the official by-level distribution, with GIDs
-    and missing names fixed the same way as the Data API's GADM 4.1 import."""
+def gadm_levels(
+    levels_url: str,
+    all_in_one_url: str,
+    cache_prefix: str,
+    name_fills: pd.DataFrame,
+) -> Callable[[], gpd.GeoDataFrame]:
+    """GADM admin levels 0-2 from the official by-level distribution, with the
+    disputed flag, GIDs and missing names set the same way as the Data API's
+    GADM 4.1 import. Source files are cached under `cache_prefix`."""
 
     def load() -> gpd.GeoDataFrame:
         with tempfile.TemporaryDirectory() as directory:
-            archive = Path(directory) / "gadm_levels.zip"
-            download(url, archive)
-            with zipfile.ZipFile(archive) as zipped:
-                geopackage = next(n for n in zipped.namelist() if n.endswith(".gpkg"))
-                path = zipped.extract(geopackage, directory)
-            return fill_gadm_names(fix_gadm_gids(read_gadm_levels(path)), name_fills)
+            levels = read_gadm_levels(
+                source_geopackage(levels_url, cache_prefix, directory)
+            )
+            pieces = read_gadm_pieces(
+                source_geopackage(all_in_one_url, cache_prefix, directory)
+            )
+            disputed = mark_disputed(levels, pieces)
+            return fill_gadm_names(fix_gadm_gids(disputed), name_fills)
 
     return load
+
+
+def source_geopackage(url: str, cache_prefix: str, directory: str) -> str:
+    """Extracts the GeoPackage from a GADM source zip, downloading it only if it
+    isn't cached yet."""
+    archive = Path(directory) / Path(url).name
+    cached_download(url, f"{cache_prefix}/{archive.name}", archive)
+    with zipfile.ZipFile(archive) as zipped:
+        geopackage = next(n for n in zipped.namelist() if n.endswith(".gpkg"))
+        return zipped.extract(geopackage, directory)
+
+
+def cached_download(url: str, cache_uri: str, destination: Path) -> None:
+    """Copies a file from its cache, or downloads it and fills the cache."""
+    cache, cache_path = fsspec.core.url_to_fs(cache_uri)
+    if cache.exists(cache_path):
+        cache.get_file(cache_path, str(destination))
+        return
+    download(url, destination)
+    cache.makedirs(posixpath.dirname(cache_path), exist_ok=True)
+    cache.put_file(str(destination), cache_path)
 
 
 def download(url: str, destination: Path, timeout_seconds: int = 600) -> None:
@@ -42,6 +73,43 @@ def read_gadm_levels(path: str) -> gpd.GeoDataFrame:
         geometry="geometry",
         crs=layers[0].crs,
     )
+
+
+def read_gadm_pieces(path: str) -> pd.DataFrame:
+    """The all-in-one distribution's smallest units, with only the fields the
+    disputed flag needs."""
+    return gpd.read_file(
+        path,
+        columns=["GID_0", "GID_1", "GID_2", "DISPUTEDBY"],
+        ignore_geometry=True,
+    )
+
+
+def mark_disputed(units: pd.DataFrame, pieces: pd.DataFrame) -> pd.DataFrame:
+    """A unit is disputed if it has pieces and every one of them is disputed.
+    Pieces are matched on the GIDs the unit has (country, region, subregion),
+    as in the Data API's GADM 4.1 import."""
+    gid_columns = ["GID_0", "GID_1", "GID_2"]
+    pieces = pieces.assign(piece_disputed=has_value(pieces.DISPUTEDBY))
+    gid_count = sum(has_value(units[column]).astype(int) for column in gid_columns)
+
+    is_disputed = pd.Series(False, index=units.index)
+    for prefix_length in (1, 2, 3):
+        prefix = gid_columns[:prefix_length]
+        all_pieces_disputed = (
+            pieces.astype({column: "string" for column in prefix})
+            .groupby(prefix, as_index=False)
+            .piece_disputed.all()
+        )
+        rows = gid_count == prefix_length
+        unit_gids = units.loc[rows, prefix].astype("string")
+        matched = unit_gids.merge(all_pieces_disputed, on=prefix, how="left")
+        is_disputed[rows] = matched.piece_disputed.eq(True).to_numpy()
+    return units.assign(is_disputed=is_disputed)
+
+
+def has_value(column: pd.Series) -> pd.Series:
+    return column.fillna("").astype(str).str.strip() != ""
 
 
 def fix_gadm_gids(features: pd.DataFrame) -> pd.DataFrame:

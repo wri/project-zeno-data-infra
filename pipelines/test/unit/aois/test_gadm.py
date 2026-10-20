@@ -4,9 +4,11 @@ import pytest
 from shapely import box
 
 from pipelines.aois.gadm import (
+    cached_download,
     fill_gadm_names,
     fix_gadm_gids,
     gadm_ids,
+    mark_disputed,
     read_gadm_levels,
 )
 
@@ -106,3 +108,55 @@ def test_names_gadm_already_has_are_never_overwritten():
 def test_fills_for_unknown_ids_fail_loudly():
     with pytest.raises(ValueError, match="GBR.9.9"):
         fill_gadm_names(districts("NA"), fills(aoi_id="GBR.9.9"))
+
+
+def units(*gids):
+    return pd.DataFrame(
+        [dict(zip(["GID_0", "GID_1", "GID_2"], unit_gids)) for unit_gids in gids]
+    ).reindex(columns=["GID_0", "GID_1", "GID_2"])
+
+
+def pieces(*rows):
+    return pd.DataFrame(rows, columns=["GID_0", "GID_1", "GID_2", "DISPUTEDBY"])
+
+
+def test_a_unit_is_disputed_only_if_all_its_pieces_are():
+    all_in_one = pieces(
+        ("Z01", "Z01.1_1", "Z01.1.1_1", "China, India"),
+        ("Z01", "Z01.1_1", "Z01.1.2_1", "China, India"),
+        ("IND", "IND.1_1", "IND.1.1_1", "Pakistan"),
+        ("IND", "IND.1_1", "IND.1.2_1", None),
+    )
+
+    marked = mark_disputed(units(("Z01",), ("IND", "IND.1_1")), all_in_one)
+
+    assert marked.is_disputed.tolist() == [True, False]
+
+
+def test_units_without_any_pieces_are_not_disputed():
+    marked = mark_disputed(units(("XXX",)), pieces(("Z01", None, None, "India")))
+
+    assert marked.is_disputed.tolist() == [False]
+
+
+def test_pieces_are_matched_on_the_units_own_gids():
+    all_in_one = pieces(
+        ("IND", "IND.1_1", "IND.1.1_1", "Pakistan"),
+        ("IND", "IND.1_1", "IND.1.2_1", None),
+    )
+
+    marked = mark_disputed(units(("IND", "IND.1_1", "IND.1.1_1")), all_in_one)
+
+    assert marked.is_disputed.tolist() == [True]
+
+
+def test_source_files_come_from_the_cache_once_downloaded(tmp_path):
+    source = tmp_path / "source.zip"
+    source.write_bytes(b"gadm")
+    cache_uri = str(tmp_path / "cache" / "source.zip")
+
+    cached_download(source.as_uri(), cache_uri, tmp_path / "first.zip")
+    source.unlink()
+    cached_download(source.as_uri(), cache_uri, tmp_path / "second.zip")
+
+    assert (tmp_path / "second.zip").read_bytes() == b"gadm"
