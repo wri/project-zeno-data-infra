@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pandas as pd
-
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.gadm import GadmSource
 from pipelines.aois.vector_file_source import VectorFileSource
@@ -29,7 +28,7 @@ def aoi_sources() -> tuple[AoiSource, ...]:
         ),
         VectorFileSource(
             source="kba",
-            version="v20250911",
+            version="v20240904",
             uri="s3://gfw-data-lake/birdlife_key_biodiversity_areas/v20240904/raw/"
             "KBAsGlobal_2024_September_03_POL.zip",
             id_column="sitrecid",

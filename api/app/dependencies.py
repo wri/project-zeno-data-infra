@@ -45,7 +45,7 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
                 f"{vectors}/gadm/v4.1.85/aois.parquet"
             ),
             "key_biodiversity_area": GeoParquetAoiGeometryRepository(
-                f"{vectors}/kba/v20250911/aois.parquet"
+                f"{vectors}/kba/v20240904/aois.parquet"
             ),
             "protected_area": GeoParquetAoiGeometryRepository(
                 f"{vectors}/wdpa/v202512/aois.parquet"
