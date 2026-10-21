@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 ANALYSIS_PATH_SUFFIX = "/analytics"
+DATASET_FACTS_EXTENSION = "x-dataset"
 
 
 class UnknownDatasetError(ValueError):
@@ -10,8 +11,12 @@ class UnknownDatasetError(ValueError):
 
 @dataclass(frozen=True)
 class DatasetSummary:
+    """A dataset with the facts needed to choose between datasets and judge
+    whether their results are comparable, such as time basis and coverage."""
+
     name: str
     title: str
+    facts: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -37,7 +42,13 @@ class ApiCatalog:
     def datasets(self) -> list[DatasetSummary]:
         summaries = []
         for name, (_, operation) in self.creation_operations.items():
-            summaries.append(DatasetSummary(name, operation.get("summary", "")))
+            summaries.append(
+                DatasetSummary(
+                    name=name,
+                    title=operation.get("summary", ""),
+                    facts=operation.get(DATASET_FACTS_EXTENSION, {}),
+                )
+            )
         return summaries
 
     def describe(self, name: str) -> DatasetDetail:
