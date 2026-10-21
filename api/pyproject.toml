@@ -32,6 +32,7 @@ dependencies = [
     "xarray",
     "zarr",
     "async-lru>=2.4.0",
+    "mcp>=2.3.0",
 ]
 
 [tool.isort]
@@ -44,11 +45,12 @@ members = [
 
 [dependency-groups]
 dev = [
+    "anthropic[mcp]>=1.17.0",
     "locust>=2.38.1",
     "moto[server]>=5.1.11",
     "pandera>=0.24.0",
     "pytest>=8.4.1",
-    "pytest-asyncio>=1.0.0"
+    "pytest-asyncio>=1.0.0",
 ]
 
 [tool.pytest.ini_options]

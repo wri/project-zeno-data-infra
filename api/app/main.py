@@ -13,10 +13,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
+from analytics_tools.application import AnalyticsToolsApplication
+
 from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .routers import land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
+
+analytics_tools = AnalyticsToolsApplication(
+    base_url=os.environ.get("ANALYTICS_API_BASE_URL", "http://localhost:8000"),
+    max_wait_seconds=float(os.environ.get("ANALYTICS_TOOLS_MAX_WAIT_SECONDS", 60)),
+)
 
 
 # Configure logging
@@ -99,7 +106,8 @@ async def lifespan(app: FastAPI):
         async with session.resource("dynamodb", region_name="us-east-1") as dynamo:
             app.state.dynamodb_table = await dynamo.Table(ANALYSES_TABLE_NAME)
             app.state.s3_client = s3_client
-            yield
+            async with analytics_tools.running():
+                yield
 
 
 app = FastAPI(lifespan=lifespan)
@@ -141,6 +149,7 @@ async def profile_request(request: Request, call_next):
 
 
 app.include_router(land_change.router)
+app.mount("/mcp", analytics_tools.asgi_app)
 
 
 @app.get("/")
