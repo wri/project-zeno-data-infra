@@ -60,6 +60,21 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Land Cover Change Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": "Area that changed from one land cover class to another (ha)",
+            "time_basis": "two snapshots compared; net change only, no yearly trend",
+            "coverage": "2015 compared with 2024",
+            "baseline": (
+                "Land cover classes; tree cover means trees 5 m or taller, "
+                "including plantations"
+            ),
+            "prefer_for": (
+                "Net conversion between land cover classes, such as tree "
+                "cover to built-up"
+            ),
+        }
+    },
 )
 async def create(
     *,

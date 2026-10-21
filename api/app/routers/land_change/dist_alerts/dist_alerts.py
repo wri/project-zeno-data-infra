@@ -74,6 +74,18 @@ def _datamart_resource_link_response(request, service) -> str:
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Disturbance Alerts Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": (
+                "Area of vegetation disturbance alerts across all ecosystems (ha)"
+            ),
+            "time_basis": "daily",
+            "coverage": (
+                "2023-present; driver intersection covers only the most "
+                "recent 12 months"
+            ),
+        }
+    },
 )
 async def create(
     *,

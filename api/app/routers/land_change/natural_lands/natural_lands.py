@@ -51,6 +51,13 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Natural Lands Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": "Area of natural and non-natural land classes (ha)",
+            "time_basis": "single snapshot",
+            "coverage": "2020",
+        }
+    },
 )
 async def create(
     *,

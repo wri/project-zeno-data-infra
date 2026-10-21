@@ -61,6 +61,23 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Tree Cover Loss Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": "Area of tree cover loss (ha) and resulting carbon emissions",
+            "time_basis": (
+                "annual; driver intersection returns one total for the " "whole period"
+            ),
+            "coverage": "2001-2025",
+            "baseline": (
+                "Tree cover in 2000 at the chosen canopy cover; the natural "
+                "forest filter uses the 2020 natural forest map instead"
+            ),
+            "prefer_for": (
+                "Attributing tree cover loss to a cause, using the driver "
+                "intersection"
+            ),
+        }
+    },
 )
 async def create(
     *,

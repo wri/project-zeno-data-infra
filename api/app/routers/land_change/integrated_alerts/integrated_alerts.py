@@ -89,6 +89,16 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Integrated Alerts Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": (
+                "Area of forest disturbance alerts combining GLAD-L, GLAD-S2 "
+                "and RADD (ha)"
+            ),
+            "time_basis": "daily",
+            "coverage": "2023-present, humid tropical forests",
+        }
+    },
 )
 async def create(
     *,

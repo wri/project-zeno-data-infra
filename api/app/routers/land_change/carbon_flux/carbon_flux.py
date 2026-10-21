@@ -57,6 +57,17 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Carbon Flux Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": (
+                "Forest carbon gross emissions, gross removals and net flux "
+                "(Mg CO2e)"
+            ),
+            "time_basis": "one total for the whole period",
+            "coverage": "2001-2024",
+            "baseline": "Tree cover in 2000 at 30% canopy cover or more",
+        }
+    },
 )
 async def create(
     *,

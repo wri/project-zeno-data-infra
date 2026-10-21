@@ -59,6 +59,13 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Grasslands Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": "Grassland area (ha)",
+            "time_basis": "annual",
+            "coverage": "2000-2024",
+        }
+    },
 )
 async def create(
     *,

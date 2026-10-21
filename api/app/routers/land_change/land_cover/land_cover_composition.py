@@ -60,6 +60,13 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Land Cover Composition Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": "Area of each land cover class (ha)",
+            "time_basis": "single snapshot",
+            "coverage": "2024",
+        }
+    },
 )
 async def create(
     *,

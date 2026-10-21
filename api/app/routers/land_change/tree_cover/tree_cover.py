@@ -81,6 +81,14 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Create Tree Cover Analysis Task",
+    openapi_extra={
+        "x-dataset": {
+            "measures": "Tree cover extent (ha)",
+            "time_basis": "single snapshot",
+            "coverage": "2000",
+            "baseline": "Tree cover in 2000 at the chosen canopy cover",
+        }
+    },
 )
 async def create(
     *,
