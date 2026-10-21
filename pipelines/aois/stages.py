@@ -1,32 +1,8 @@
-import tempfile
-from pathlib import Path
-from typing import Callable, Optional
-
-import boto3
 import geopandas as gpd
 import pandas as pd
 from pyproj import Geod
 
 from pipelines.aois.aoi_source import AoiSource
-from pipelines.utils import parse_s3_uri
-
-
-def vector_file(
-    uri: str, layer: Optional[str] = None
-) -> Callable[[], gpd.GeoDataFrame]:
-    return lambda: load_features(uri, layer)
-
-
-def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
-    """Downloads the file first, since GDAL's random reads over S3 are very slow
-    for GeoPackages and FileGDBs."""
-    bucket, key = parse_s3_uri(uri)
-    with tempfile.TemporaryDirectory() as directory:
-        local_path = Path(directory) / Path(key).name
-        boto3.client("s3").download_file(
-            bucket, key, str(local_path), ExtraArgs={"RequestPayer": "requester"}
-        )
-        return gpd.read_file(local_path, layer=layer)
 
 
 def normalize(features: gpd.GeoDataFrame, source: AoiSource) -> gpd.GeoDataFrame:

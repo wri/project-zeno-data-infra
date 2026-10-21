@@ -1,31 +1,20 @@
-from dataclasses import dataclass
-from typing import Callable
+from abc import ABC, abstractmethod
 
 import geopandas as gpd
 import pandas as pd
 
-AoiIds = Callable[[pd.DataFrame], pd.Series]
 
-
-@dataclass(frozen=True)
-class AoiSource:
-    """An AOI dataset at a pinned version, how to load it, how to derive each
+class AoiSource(ABC):
+    """An AOI dataset at a pinned version: how to load it, how to derive each
     feature's AOI id from its (lowercased) attributes, and which (lowercased)
     attributes to leave out of the output."""
 
     source: str
     version: str
-    load: Callable[[], gpd.GeoDataFrame]
-    aoi_ids: AoiIds
-    dropped_columns: tuple[str, ...] = ()
+    dropped_columns: tuple[str, ...]
 
+    @abstractmethod
+    def load(self) -> gpd.GeoDataFrame: ...
 
-def column_ids(column: str) -> AoiIds:
-    def ids(attributes: pd.DataFrame) -> pd.Series:
-        values = attributes[column]
-        if pd.api.types.is_float_dtype(values):
-            # integer ids are read as floats when some are missing (101 -> 101.0)
-            values = values.astype("Int64")
-        return values.astype("string")
-
-    return ids
+    @abstractmethod
+    def aoi_ids(self, attributes: pd.DataFrame) -> pd.Series: ...

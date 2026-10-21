@@ -1,10 +1,8 @@
 import geopandas as gpd
-import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 from shapely import Polygon, box
 
-from pipelines.aois.aoi_source import AoiSource, column_ids
 from pipelines.aois.geometry_repair import repair_geometries
 from pipelines.aois.stages import (
     changed_aois,
@@ -13,12 +11,13 @@ from pipelines.aois.stages import (
     with_area_ha,
     write_geoparquet,
 )
+from pipelines.aois.vector_file_source import VectorFileSource
 
-SOURCE = AoiSource(
+SOURCE = VectorFileSource(
     source="wdpa",
     version="v202512",
-    load=gpd.GeoDataFrame,
-    aoi_ids=column_ids("site_pid"),
+    uri="s3://bucket/wdpa.gdb.zip",
+    id_column="site_pid",
 )
 
 
@@ -47,22 +46,16 @@ def test_normalize_assigns_string_ids_and_keeps_lowercased_attributes(
 
 
 def test_normalize_drops_the_source_columns_named_in_any_case(raw_features):
-    source = AoiSource(
+    source = VectorFileSource(
         source="kba",
         version="v20250911",
-        load=gpd.GeoDataFrame,
-        aoi_ids=column_ids("site_pid"),
+        uri="s3://bucket/kba.zip",
+        id_column="site_pid",
         dropped_columns=("shape_area",),
     )
     raw = raw_features.assign(Shape_Area=[1.0, 2.0])
 
     assert "shape_area" not in normalize(raw, source).columns
-
-
-def test_missing_ids_stay_missing_instead_of_becoming_strings():
-    attributes = pd.DataFrame({"sitrecid": [101, None]})
-
-    assert column_ids("sitrecid")(attributes).tolist() == ["101", pd.NA]
 
 
 def test_rows_without_an_id_are_dropped():

@@ -3,36 +3,43 @@ import shutil
 import tempfile
 import urllib.request
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 import fsspec
 import geopandas as gpd
 import pandas as pd
 
+from pipelines.aois.aoi_source import AoiSource
 
-def gadm_levels(
-    levels_url: str,
-    all_in_one_url: str,
-    cache_prefix: str,
-    name_fills: pd.DataFrame,
-) -> Callable[[], gpd.GeoDataFrame]:
+
+@dataclass(frozen=True)
+class GadmSource(AoiSource):
     """GADM admin levels 0-2 from the official by-level distribution, with the
     disputed flag, GIDs and missing names set the same way as the Data API's
     GADM 4.1 import. Source files are cached under `cache_prefix`."""
 
-    def load() -> gpd.GeoDataFrame:
+    source: str
+    version: str
+    levels_url: str
+    all_in_one_url: str
+    cache_prefix: str
+    name_fills: pd.DataFrame
+    dropped_columns: tuple[str, ...] = ()
+
+    def load(self) -> gpd.GeoDataFrame:
         with tempfile.TemporaryDirectory() as directory:
             levels = read_gadm_levels(
-                source_geopackage(levels_url, cache_prefix, directory)
+                source_geopackage(self.levels_url, self.cache_prefix, directory)
             )
             pieces = read_gadm_pieces(
-                source_geopackage(all_in_one_url, cache_prefix, directory)
+                source_geopackage(self.all_in_one_url, self.cache_prefix, directory)
             )
             disputed = mark_disputed(levels, pieces)
-            return fill_gadm_names(fix_gadm_gids(disputed), name_fills)
+            return fill_gadm_names(fix_gadm_gids(disputed), self.name_fills)
 
-    return load
+    def aoi_ids(self, attributes: pd.DataFrame) -> pd.Series:
+        return gadm_ids(attributes)
 
 
 def source_geopackage(url: str, cache_prefix: str, directory: str) -> str:
