@@ -1,7 +1,7 @@
 import geopandas as gpd
 import pyarrow.parquet as pq
 import pytest
-from shapely import Polygon, box
+from shapely import Point, Polygon, box
 
 from pipelines.aois.geometry_repair import repair_geometries
 from pipelines.aois.stages import (
@@ -127,7 +127,9 @@ def test_geoparquet_row_groups_hold_non_overlapping_id_ranges(tmp_path):
     uri = str(tmp_path / "aois.parquet")
     ids = [str(i) for i in range(10)]
 
-    write_geoparquet(features(ids[::-1], [box(0, 0, 1, 1)] * 10), uri, row_group_size=3)
+    write_geoparquet(
+        features(ids[::-1], [box(0, 0, 1, 1)] * 10), uri, row_group_bytes=300
+    )
 
     metadata = pq.ParquetFile(uri).metadata
     id_column = metadata.schema.names.index("aoi_id")
@@ -140,6 +142,22 @@ def test_geoparquet_row_groups_hold_non_overlapping_id_ranges(tmp_path):
     ]
     assert len(ranges) == 4
     assert all(left[1] < right[0] for left, right in zip(ranges, ranges[1:]))
+
+
+def test_row_groups_hold_fewer_large_features_than_small_ones(tmp_path):
+    uri = str(tmp_path / "aois.parquet")
+    small = [box(0, 0, 1, 1)] * 6  # 93 bytes each
+    large = [Point(0, 0).buffer(1, quad_segs=32)] * 2  # about 2 KB each
+
+    write_geoparquet(
+        features([str(i) for i in range(8)], small + large), uri, row_group_bytes=300
+    )
+
+    metadata = pq.ParquetFile(uri).metadata
+    rows_per_group = [
+        metadata.row_group(group).num_rows for group in range(metadata.num_row_groups)
+    ]
+    assert rows_per_group == [3, 3, 1, 1]
 
 
 def test_changed_aois_is_empty_with_columns_when_nothing_changed():
