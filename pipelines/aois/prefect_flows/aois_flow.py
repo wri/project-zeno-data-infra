@@ -3,6 +3,7 @@ from prefect import flow, task
 from pipelines.aois import stages
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.geometry_repair import repair_geometries
+from pipelines.aois.sources import aoi_sources, select_aoi_sources
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.utils import s3_uri_exists
 
@@ -28,3 +29,11 @@ def aoi_flow(source: AoiSource, overwrite: bool = False) -> str:
     task(stages.write_csv)(changes, changed_aois_uri)
     task(stages.write_geoparquet)(features, geoparquet_uri)
     return geoparquet_uri
+
+
+def aois_update(aoi_source: str | None = None, overwrite: bool = False) -> list[str]:
+    """Builds every AOI source's GeoParquet, or only the named source's."""
+    return [
+        aoi_flow(source, overwrite=overwrite)
+        for source in select_aoi_sources(aoi_sources(), aoi_source)
+    ]

@@ -46,6 +46,19 @@ def test_normalize_assigns_string_ids_and_keeps_lowercased_attributes(
     assert list(normalized.name) == ["Yosemite", "Iguazu"]
 
 
+def test_normalize_drops_the_source_columns_named_in_any_case(raw_features):
+    source = AoiSource(
+        source="kba",
+        version="v20250911",
+        load=gpd.GeoDataFrame,
+        aoi_ids=column_ids("site_pid"),
+        dropped_columns=("shape_area",),
+    )
+    raw = raw_features.assign(Shape_Area=[1.0, 2.0])
+
+    assert "shape_area" not in normalize(raw, source).columns
+
+
 def test_missing_ids_stay_missing_instead_of_becoming_strings():
     attributes = pd.DataFrame({"sitrecid": [101, None]})
 

@@ -3,13 +3,11 @@ import pytest
 from pipelines.globals import gadm_country_code_count
 from pipelines.prefect_flows.common_stages import numeric_to_alpha3
 from pipelines.run_updates import (
-    AOI_SOURCES,
     VERSION_REQUIRED_FLOWS,
     UpdateFlow,
     _parse_bbox,
     _validate_flow_args,
     needs_cluster,
-    select_aoi_sources,
 )
 
 
@@ -52,18 +50,3 @@ def test_country_expected_groups_covers_every_iso_code():
     # flox silently drops group labels >= the expected_groups bound, so the country
     # axis must exceed the largest numeric ISO code we map.
     assert max(numeric_to_alpha3) < gadm_country_code_count
-
-
-def test_all_aoi_sources_are_built_when_none_is_named():
-    assert select_aoi_sources(AOI_SOURCES, None) == AOI_SOURCES
-
-
-def test_only_the_named_aoi_source_is_built():
-    assert [source.source for source in select_aoi_sources(AOI_SOURCES, "kba")] == [
-        "kba"
-    ]
-
-
-def test_unknown_aoi_source_lists_valid_names():
-    with pytest.raises(ValueError, match="gadm, wdpa, kba, landmark"):
-        select_aoi_sources(AOI_SOURCES, "kbas")

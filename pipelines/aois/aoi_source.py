@@ -9,13 +9,15 @@ AoiIds = Callable[[pd.DataFrame], pd.Series]
 
 @dataclass(frozen=True)
 class AoiSource:
-    """An AOI dataset at a pinned version, how to load it, and how to derive
-    each feature's AOI id from its (lowercased) attributes."""
+    """An AOI dataset at a pinned version, how to load it, how to derive each
+    feature's AOI id from its (lowercased) attributes, and which (lowercased)
+    attributes to leave out of the output."""
 
     source: str
     version: str
     load: Callable[[], gpd.GeoDataFrame]
     aoi_ids: AoiIds
+    dropped_columns: tuple[str, ...] = ()
 
 
 def column_ids(column: str) -> AoiIds:

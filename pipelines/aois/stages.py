@@ -30,7 +30,11 @@ def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
 
 
 def normalize(features: gpd.GeoDataFrame, source: AoiSource) -> gpd.GeoDataFrame:
-    features = features.to_crs("EPSG:4326").rename(columns=str.lower)
+    features = (
+        features.to_crs("EPSG:4326")
+        .rename(columns=str.lower)
+        .drop(columns=list(source.dropped_columns))
+    )
     return features.assign(aoi_id=source.aoi_ids(features)).reset_index(drop=True)
 
 
