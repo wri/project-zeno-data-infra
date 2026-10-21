@@ -34,8 +34,4 @@ class VectorFileSource(AoiSource):
             return gpd.read_file(local_path, layer=self.layer)
 
     def aoi_ids(self, attributes: pd.DataFrame) -> pd.Series:
-        values = attributes[self.id_column]
-        if pd.api.types.is_float_dtype(values):
-            # integer ids are read as floats when some are missing (101 -> 101.0)
-            values = values.astype("Int64")
-        return values.astype("string")
+        return attributes[self.id_column].astype("string")
