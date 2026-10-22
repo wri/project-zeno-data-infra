@@ -11,6 +11,7 @@ from fastapi import Depends, Request
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.natural_lands_analyzer import INPUT_URIS, NaturalLandsAnalyzer
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -45,6 +46,7 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
+            aoi_geometry_repository=get_aoi_geometry_repository(),
             compute_engine=request.app.state.dask_client,
             input_uris=INPUT_URIS[Environment.production],
         ),

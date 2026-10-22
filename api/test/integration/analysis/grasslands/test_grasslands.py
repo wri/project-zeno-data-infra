@@ -7,6 +7,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import Depends, Request
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.grasslands_analyzer import INPUT_URIS, GrasslandsAnalyzer
 from app.domain.models.environment import Environment
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -38,6 +39,7 @@ def create_analysis_service_for_tests(
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=GrasslandsAnalyzer(
+            aoi_geometry_repository=get_aoi_geometry_repository(),
             compute_engine=request.app.state.dask_client,
             duckdb_query_service=DuckDbPrecalcQueryService(
                 table_uri=INPUT_URIS[Environment.production]["admin_results_table_uri"]

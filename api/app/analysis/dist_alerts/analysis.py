@@ -63,9 +63,15 @@ LAND_COVER_MAPPING = {
 
 
 async def zonal_statistics_on_aois(
-    input_uris: Dict[str, str], aois, dask_client, version, intersection=None
+    input_uris: Dict[str, str],
+    aoi,
+    aoi_geometry_repository,
+    dask_client,
+    version,
+    intersection=None,
 ):
-    geojsons = await get_geojson(aois)
+    geojsons = await get_geojson(aoi, aoi_geometry_repository)
+    aois = aoi.model_dump()
 
     if aois["type"] != "feature_collection":
         aois = sorted(

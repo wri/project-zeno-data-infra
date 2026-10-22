@@ -8,6 +8,7 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.dist_alerts import DistAlertsAnalyticsIn
 
@@ -38,9 +39,11 @@ class DistAlertsAnalyzer(Analyzer):
         self,
         compute_engine=None,
         input_uris: Dict[str, str] | None = None,
+        aoi_geometry_repository: AoiGeometryRepository | None = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.input_uris = input_uris
+        self.aoi_geometry_repository = aoi_geometry_repository
 
     async def analyze(self, analysis: Analysis) -> None:
         if self.input_uris is None:
@@ -65,7 +68,12 @@ class DistAlertsAnalyzer(Analyzer):
             )
         else:
             alerts_df = await zonal_statistics_on_aois(
-                self.input_uris, aoi_dict, self.compute_engine, version, intersection
+                self.input_uris,
+                dist_analytics_in.aoi,
+                self.aoi_geometry_repository,
+                self.compute_engine,
+                version,
+                intersection,
             )
 
         if dist_analytics_in.start_date is not None:
