@@ -27,7 +27,7 @@ DATE_REGEX = r"^\d{4}$"
 
 class TreeCoverGainAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
-    _version: str = PrivateAttr(default="v20250912")
+    _version: str = PrivateAttr(default="v20261022")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",

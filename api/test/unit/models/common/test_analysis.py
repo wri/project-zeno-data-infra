@@ -64,6 +64,14 @@ class TestThumbprint:
         b = _make_analytics_in(start_year="2020")
         assert a.thumbprint() != b.thumbprint()
 
+    def test_different_versions_different_thumbprints(self):
+        """Bumping _version after a fix that changes results must change the
+        resource ID, so stale cached results are not served."""
+        a = _make_analytics_in()
+        b = _make_analytics_in()
+        b._version = "v00000000"
+        assert a.thumbprint() != b.thumbprint()
+
 
 class TestGetAnalysisPrivateFieldFiltering:
     @pytest.mark.asyncio
