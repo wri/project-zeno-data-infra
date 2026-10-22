@@ -32,6 +32,7 @@ dependencies = [
     "xarray",
     "zarr",
     "pyiceberg[pyarrow,sql-sqlite]>=0.9",
+    "async-lru>=2.4.0",
 ]
 
 [tool.isort]

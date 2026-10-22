@@ -1,36 +1,20 @@
-import tempfile
-from pathlib import Path
-from typing import Callable, Optional
-
-import boto3
 import geopandas as gpd
+import numpy as np
 import pandas as pd
+import pyarrow.compute as pc
+import pyarrow.parquet as pq
+from geopandas.io.arrow import _geopandas_to_arrow
 from pyproj import Geod
 
 from pipelines.aois.aoi_source import AoiSource
-from pipelines.utils import parse_s3_uri
-
-
-def vector_file(
-    uri: str, layer: Optional[str] = None
-) -> Callable[[], gpd.GeoDataFrame]:
-    return lambda: load_features(uri, layer)
-
-
-def load_features(uri: str, layer: Optional[str]) -> gpd.GeoDataFrame:
-    """Downloads the file first, since GDAL's random reads over S3 are very slow
-    for GeoPackages and FileGDBs."""
-    bucket, key = parse_s3_uri(uri)
-    with tempfile.TemporaryDirectory() as directory:
-        local_path = Path(directory) / Path(key).name
-        boto3.client("s3").download_file(
-            bucket, key, str(local_path), ExtraArgs={"RequestPayer": "requester"}
-        )
-        return gpd.read_file(local_path, layer=layer)
 
 
 def normalize(features: gpd.GeoDataFrame, source: AoiSource) -> gpd.GeoDataFrame:
-    features = features.to_crs("EPSG:4326").rename(columns=str.lower)
+    features = (
+        features.to_crs("EPSG:4326")
+        .rename(columns=str.lower)
+        .drop(columns=list(source.dropped_columns))
+    )
     return features.assign(aoi_id=source.aoi_ids(features)).reset_index(drop=True)
 
 
@@ -85,14 +69,29 @@ def with_area_ha(features: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def write_geoparquet(
-    features: gpd.GeoDataFrame, uri: str, row_group_size: int = 500
+    features: gpd.GeoDataFrame, uri: str, row_group_bytes: int = 8 * 2**20
 ) -> str:
-    """Sorted by id in small row groups, so reading a few ids only downloads the
-    row groups whose id range can contain them."""
-    features.sort_values("aoi_id").to_parquet(
-        uri, index=False, write_covering_bbox=True, row_group_size=row_group_size
+    """Sorted by id in row groups of roughly `row_group_bytes` of geometry, so
+    reading a few ids only downloads the row groups whose id range can contain
+    them, whether the features are small parcels or whole countries."""
+    table = _geopandas_to_arrow(
+        features.sort_values("aoi_id"), index=False, write_covering_bbox=True
     )
+    sizes = pc.binary_length(table["geometry"]).to_numpy()
+    starts = row_group_starts(sizes, row_group_bytes)
+    ends = starts[1:] + [len(table)]
+    with pq.ParquetWriter(uri, table.schema) as writer:
+        for start, end in zip(starts, ends):
+            writer.write_table(table.slice(start, end - start))
     return uri
+
+
+def row_group_starts(sizes: np.ndarray, row_group_bytes: int) -> list[int]:
+    """First row of each group, starting a new group each time the running
+    total of bytes passes another multiple of `row_group_bytes`."""
+    group_numbers = np.cumsum(sizes) // row_group_bytes
+    later_starts = np.flatnonzero(np.diff(group_numbers)) + 1
+    return [0] + later_starts.tolist()
 
 
 def write_csv(dataframe: pd.DataFrame, uri: str) -> str:

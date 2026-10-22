@@ -1,9 +1,6 @@
 import logging
 from functools import lru_cache
 
-from fastapi import Header
-from pyiceberg.catalog import Catalog, load_catalog
-
 from app.domain.models.environment import Environment
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
@@ -16,6 +13,8 @@ from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
 )
+from fastapi import Header
+from pyiceberg.catalog import Catalog, load_catalog
 
 
 async def get_environment(
@@ -52,6 +51,7 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
             ),
             "key_biodiversity_area": GeoParquetAoiGeometryRepository(
                 f"{vectors}/kba/v20250911/aois.parquet"
+                f"{vectors}/kba/v20240904/aois.parquet"
             ),
             "protected_area": GeoParquetAoiGeometryRepository(
                 f"{vectors}/wdpa/v202512/aois.parquet"

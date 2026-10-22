@@ -2,20 +2,16 @@ import logging
 import os
 from contextlib import nullcontext
 from enum import Enum
-from pathlib import Path
 
 import click
 import coiled
-import pandas as pd
 from dask.distributed import performance_report
 from prefect import flow, task
 from prefect.logging import get_run_logger
 from shapely.geometry import box
 
-from pipelines.aois.aoi_source import AoiSource, column_ids
-from pipelines.aois.gadm import gadm_ids, gadm_levels
 from pipelines.aois.prefect_flows import aois_flow
-from pipelines.aois.stages import vector_file
+from pipelines.aois.sources import aoi_sources
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
@@ -123,69 +119,11 @@ def run_land_ghg_inventory_update(
     )
 
 
-AOI_SOURCES = (
-    AoiSource(
-        source="gadm",
-        version="v4.1.85",
-        load=gadm_levels(
-            levels_url="https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-levels.zip",
-            all_in_one_url="https://geodata.ucdavis.edu/gadm/gadm4.1/gadm_410-gpkg.zip",
-            cache_prefix="s3://lcl-analytics/vectors/aois/gadm/v4.1.85/source",
-            name_fills=pd.read_csv(Path(__file__).parent / "aois/gadm_name_fills.csv"),
-        ),
-        aoi_ids=gadm_ids,
-    ),
-    AoiSource(
-        source="wdpa",
-        version="v202512",
-        load=vector_file(
-            "s3://gfw-data-lake/wdpa_protected_areas/v202512/raw/"
-            "WDPA_Dec2025_Public.gdb.zip",
-            layer="WDPA_poly_Dec2025",
-        ),
-        aoi_ids=column_ids("site_pid"),
-    ),
-    AoiSource(
-        source="kba",
-        version="v20250911",
-        load=vector_file(
-            "s3://gfw-data-lake/birdlife_key_biodiversity_areas/v20240904/raw/"
-            "KBAsGlobal_2024_September_03_POL.zip"
-        ),
-        aoi_ids=column_ids("sitrecid"),
-    ),
-    AoiSource(
-        source="landmark",
-        version="v20260617",
-        load=vector_file(
-            "s3://wri-lcl-public-unsafe/20260617_IP_LC_and_Indicative.gdb.zip",
-            layer="IP_LC_Indicative_20260617",
-        ),
-        aoi_ids=column_ids("landmark_id"),
-    ),
-)
-
-
 @flow
 def run_aois_update(
     version=None, overwrite=False, is_latest=False, aoi_source=None
 ) -> list[str]:
-    """Builds every AOI source's GeoParquet, or only the named source's."""
-    return [
-        aois_flow.aoi_flow(source, overwrite=overwrite)
-        for source in select_aoi_sources(AOI_SOURCES, aoi_source)
-    ]
-
-
-def select_aoi_sources(sources, name):
-    if name is None:
-        return sources
-    by_name = {source.source: source for source in sources}
-    if name not in by_name:
-        raise ValueError(
-            f"Unknown AOI source '{name}'. Accepted values: {', '.join(by_name)}"
-        )
-    return (by_name[name],)
+    return aois_flow.aois_update(aoi_source, overwrite=overwrite)
 
 
 def _parse_bbox(bbox):
@@ -358,7 +296,7 @@ def run_updates(
 )
 @click.option(
     "--aoi-source",
-    type=click.Choice([source.source for source in AOI_SOURCES]),
+    type=click.Choice([source.source for source in aoi_sources()]),
     default=None,
     help="Build only this AOI source (aois_update only); builds all if omitted.",
 )
