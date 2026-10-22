@@ -36,14 +36,20 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
     start_year: str = Field(
         ...,
         title="Start Date",
-        description="Must be year in YYYY date format. Minimum year is 2000. Must be a multiple of 5 (e.g., 2000, 2005).",
+        description=(
+            "Must be year in YYYY date format. Minimum year is 2000. Must be a "
+            "multiple of 5 (e.g., 2000, 2005)."
+        ),
         pattern=DATE_REGEX,
         examples=["2000", "2005"],
     )
     end_year: str = Field(
         ...,
         title="End Date",
-        description="Must be year in YYYY date format. Minimum year is 2000. Must be a multiple of 5 (e.g., 2000, 2005).",
+        description=(
+            "Must be year in YYYY date format. Minimum year is 2000. Must be a "
+            "multiple of 5 (e.g., 2000, 2005)."
+        ),
         pattern=DATE_REGEX,
         examples=["2000", "2005"],
     )

@@ -57,7 +57,11 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     )
     canopy_cover: Optional[AllowedCanopyCover] = Field(
         default=None,
-        title="Minimum percent of area covered by tree canopy to count as forest. Carbon model is only valid for carbon threshold 30% or greater, and will return NaN for carbon emissions if set lower.",
+        title=(
+            "Minimum percent of area covered by tree canopy to count as forest. "
+            "Carbon model is only valid for carbon threshold 30% or greater, and "
+            "will return NaN for carbon emissions if set lower."
+        ),
     )
     # natural_forest is a breakdown by SBTN natural forest class (kept for an
     # existing app), while natural_forest_only filters to SBTN Natural Forest.
@@ -75,7 +79,12 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         ...,
         min_length=0,
         max_length=1,
-        description="List of intersection types. Drivers intersections refers to dominant driver across all years of loss, and will return results aggregated across all years. Fire intersection returns fire-driven tree cover loss area AND non-fire loss, by year",
+        description=(
+            "List of intersection types. Drivers intersections refers to dominant "
+            "driver across all years of loss, and will return results aggregated "
+            "across all years. Fire intersection returns fire-driven tree cover "
+            "loss area AND non-fire loss, by year"
+        ),
     )
 
     @field_validator("start_year", "end_year")
@@ -97,7 +106,8 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     def validate_tree_cover_baseline(self):
         if not (self.canopy_cover or self.forest_filter):
             raise ValueError(
-                "Must set a tree cover baseline using either canopy_cover or forest_filter."
+                "Must set a tree cover baseline using either canopy_cover or "
+                "forest_filter."
             )
         if self.forest_filter == "natural_forest_only" and int(self.start_year) < 2021:
             raise ValueError(
@@ -107,11 +117,13 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         if self.forest_filter == "natural_forest":
             if int(self.start_year) < 2021:
                 raise ValueError(
-                    "natural_forest filter is a snapshot of 2020, and is only valid against loss after 2020."
+                    "natural_forest filter is a snapshot of 2020, and is only valid "
+                    "against loss after 2020."
                 )
             elif self.canopy_cover is not None:
                 raise ValueError(
-                    "Cannot specify both canopy cover from 2000 and natural forest from 2020 as filters."
+                    "Cannot specify both canopy cover from 2000 and natural forest "
+                    "from 2020 as filters."
                 )
         return self
 
