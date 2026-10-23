@@ -22,9 +22,6 @@ from app.domain.analyzers.tree_cover_loss_analyzer import (
 from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.models.analysis import Analysis
 from app.domain.models.environment import Environment
-from app.domain.repositories.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import CustomAreaOfInterest
@@ -82,7 +79,6 @@ async def test_otf_tree_cover_loss_matches_precalc(dask_client):
     analyzer = TreeCoverLossAnalyzer(
         dask_client_router=DaskClientRouter(dask_client, dask_client),
         dataset_repository=ZarrDatasetRepository(PROD),
-        aoi_geometry_repository=DataApiAoiGeometryRepository(),
         input_uris=INPUT_URIS[PROD],
     )
     analytics_in = TreeCoverLossAnalyticsIn(
