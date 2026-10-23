@@ -61,7 +61,9 @@ land_ghg_inventory_agriculture_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-ghg-monitoring-system/"
     "cropland_livestock_emissions_v20260914.zarr"
 )
-
+lang_ghg_inventory_rate_zarr_uri = (
+    "s3://lcl-analytics/zarr/lgms/lulucf_rate_v2.zarr"
+)
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
 sbtn_natural_lands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr"
 sbtn_natural_forests_zarr_uri = (
