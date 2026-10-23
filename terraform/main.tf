@@ -872,14 +872,13 @@ data "aws_iam_policy_document" "ecs_task_analysis_access" {
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.analysis_results.arn]
   }
-  # Read and write the custom AOI Iceberg tables; the API creates the table on first write
+  # Read and write the custom AOI Iceberg table
   statement {
     effect = "Allow"
     actions = [
       "s3tables:GetTableBucket",
       "s3tables:GetNamespace",
       "s3tables:ListTables",
-      "s3tables:CreateTable",
       "s3tables:GetTable",
       "s3tables:GetTableMetadataLocation",
       "s3tables:UpdateTableMetadataLocation",
@@ -901,6 +900,57 @@ resource "aws_s3tables_table_bucket" "aois" {
 resource "aws_s3tables_namespace" "custom" {
   namespace        = "custom"
   table_bucket_arn = aws_s3tables_table_bucket.aois.arn
+}
+
+# Schema matches the API's custom AOI repository. S3 Tables' default maintenance
+# compacts files and expires old snapshots, so deleted AOIs don't stay readable.
+resource "aws_s3tables_table" "custom_aois" {
+  name             = "custom_aois"
+  namespace        = aws_s3tables_namespace.custom.namespace
+  table_bucket_arn = aws_s3tables_table_bucket.aois.arn
+  format           = "ICEBERG"
+
+  metadata {
+    iceberg {
+      schema {
+        field {
+          name     = "aoi_id"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "area_ha"
+          type     = "double"
+          required = true
+        }
+        field {
+          name     = "geometry"
+          type     = "binary"
+          required = true
+        }
+        field {
+          name     = "updated_at"
+          type     = "timestamptz"
+          required = true
+        }
+        field {
+          name     = "name"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "user_id"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "monitor_status"
+          type     = "string"
+          required = true
+        }
+      }
+    }
+  }
 }
 
 resource "aws_iam_policy" "ecs_task_analysis" {

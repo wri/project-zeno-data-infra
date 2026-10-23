@@ -4577,7 +4577,7 @@ dependencies = [
     { name = "pandera", extra = ["pandas"] },
     { name = "prefect" },
     { name = "prefect-coiled" },
-    { name = "pyiceberg", extra = ["pyarrow", "sql-sqlite"] },
+    { name = "pyiceberg", extra = ["pyarrow"] },
     { name = "pyinstrument" },
     { name = "python-json-logger" },
     { name = "rasterio" },
@@ -4594,6 +4594,7 @@ dev = [
     { name = "locust" },
     { name = "moto", extra = ["server"] },
     { name = "pandera" },
+    { name = "pyiceberg", extra = ["sql-sqlite"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
 ]
@@ -4619,7 +4620,7 @@ requires-dist = [
     { name = "pandera", extras = ["pandas"] },
     { name = "prefect" },
     { name = "prefect-coiled", specifier = ">=0.0.4" },
-    { name = "pyiceberg", extras = ["pyarrow", "sql-sqlite"], specifier = ">=0.9" },
+    { name = "pyiceberg", extras = ["pyarrow"], specifier = ">=0.9" },
     { name = "pyinstrument" },
     { name = "python-json-logger" },
     { name = "rasterio", specifier = "==1.4.3" },
@@ -4636,6 +4637,7 @@ dev = [
     { name = "locust", specifier = ">=2.38.1" },
     { name = "moto", extras = ["server"], specifier = ">=5.1.11" },
     { name = "pandera", specifier = ">=0.24.0" },
+    { name = "pyiceberg", extras = ["sql-sqlite"], specifier = ">=0.9" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-asyncio", specifier = ">=1.0.0" },
 ]
