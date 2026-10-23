@@ -1,10 +1,17 @@
+import dask
+import time
+import traceback
 import xarray as xr
+from typing import List
+from odc.geo.cog import save_cog_with_dask
+
 
 from pipelines.globals import (
     land_ghg_inventory_vegetation_zarr_uri as VEGETATION_ZARR_URI,
     land_ghg_inventory_soc_zarr_uri as SOC_ZARR_URI,
-    land_ghg_inventory_organic_soil_zarr_uri as ORGANIC_ZARR_URI
-    lang_ghg_inventory_rate_zarr_uri as RATE_ZARR_URI
+    land_ghg_inventory_organic_soil_zarr_uri as ORGANIC_ZARR_URI,
+    land_ghg_inventory_rate_zarr_uri as RATE_ZARR_URI,
+    land_ghg_inventory_rate_cog_tile_prefix as COG_TILE_PREFIX
 )
 
 # xarray variable names
@@ -29,13 +36,13 @@ TILE_BLOCKSIZE = 1024    # power of two: required for web-mercator tiling
 TILE_BATCHING = 256      # odc-geo tiles per S3 multipart part
 LAT_LIMIT = 90           # clip the top band to the zarr's edge
 
-def tile_name(min_lon, max_lat):
+# --- helper functions to create COG tiles ---
+def tile_name(min_lon, max_lat) -> str:
     """Name a tile after its north-west corner, e.g. 20S_100E."""
     return (
         f"{abs(max_lat):02.0f}{'S' if max_lat < 0 else 'N'}"
         f"_{abs(min_lon):03.0f}{'W' if min_lon < 0 else 'E'}"
     )
-
 
 def tile_grid(tile_degrees=TILE_DEGREES, lon_bounds=(-180, 180), lat_bounds=(-60, 100)):
     """Uniform grid as {name: (minx, miny, maxx, maxy)}, clipped to LAT_LIMIT."""
@@ -48,6 +55,21 @@ def tile_grid(tile_degrees=TILE_DEGREES, lon_bounds=(-180, 180), lat_bounds=(-60
             grid[tile_name(min_lon, max_lat)] = (
                 min_lon, min_lat, min_lon + tile_degrees, max_lat,
             )
+    return grid
+
+def clip_tile(layer, bbox):
+    min_x, min_y, max_x, max_y = bbox
+    return layer.sel(x=slice(min_x, max_x), y=slice(max_y, min_y))  # y descends
+
+def tile_task(name, bbox, prefix=COG_TILE_PREFIX, compression="deflate"):
+    """(uri, dask task) for one tile. No .chunk(): odc-geo rechunks to blocksize."""
+    uri = f"{prefix}/{name}.tif"
+    return uri, save_cog_with_dask(
+        net_flux_tile(bbox), uri,
+        compression=compression, predictor=3, stats=False,
+        tile_batching=TILE_BATCHING, overview_resampling="average",
+        blocksize=TILE_BLOCKSIZE,
+    )
 
 def create_rate_zarr(overwrite: bool = False) -> str:
 
@@ -81,3 +103,27 @@ def create_rate_zarr(overwrite: bool = False) -> str:
     rate.to_dataset().to_zarr(RATE_ZARR_URI, mode="w")
 
     return RATE_ZARR_URI
+
+def create_cogs(tile_names: List[str], tiles=None, prefix=COG_TILE_PREFIX):
+    tiles = tile_grid()
+
+    rate_global = xr.open_zarr(RATE_ZARR_URI)[RATE_VAR].rio.write_crs("EPSG:4326")
+
+    written, failed = {}, {}
+    started_all = time.time()
+    for i in enumerate(tile_names, 1):
+        started = time.time()
+        try:
+            uri, task = tile_task(tile_name, tiles[tile_name], prefix=prefix)
+            dask.compute(task)
+        except Exception as err:
+            failed[tile_name] = traceback.format_exc()
+            print(f"[{i:2d}/{len(tile_names)}] {tile_name:9s} FAILED after "
+                  f"{time.time() - started:5.0f}s  {type(err).__name__}: {err}", flush=True)
+            continue
+        written[tile_name] = uri
+        print(f"[{i:2d}/{len(tile_names)}] {tile_name:9s} {time.time() - started:5.0f}s  {uri}",
+              flush=True)
+    print(f"\n{len(written)} written, {len(failed)} failed in "
+          f"{(time.time() - started_all) / 60:.0f} min")
+    return written, failed
