@@ -31,6 +31,7 @@ dependencies = [
     "sparse",
     "xarray",
     "zarr",
+    "pyiceberg[pyarrow]>=0.9",
     "async-lru>=2.4.0",
 ]
 
@@ -48,6 +49,7 @@ dev = [
     "moto[server]>=5.1.11",
     "pandera>=0.24.0",
     "pytest>=8.4.1",
+    "pyiceberg[sql-sqlite]>=0.9",
     "pytest-asyncio>=1.0.0"
 ]
 

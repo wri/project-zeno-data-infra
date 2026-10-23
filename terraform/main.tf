@@ -342,6 +342,30 @@ module "analytics" {
         {
           name  = "LOCAL_CLUSTER_AREA_THRESHOLD_HA"
           value = tostring(var.local_cluster_area_threshold_ha)
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__TYPE"
+          value = "rest"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__URI"
+          value = "https://s3tables.${data.aws_region.current.name}.amazonaws.com/iceberg"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__WAREHOUSE"
+          value = aws_s3tables_table_bucket.tables.arn
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__REST__SIGV4_ENABLED"
+          value = "true"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__REST__SIGNING_NAME"
+          value = "s3tables"
+        },
+        {
+          name  = "PYICEBERG_CATALOG__AOIS__REST__SIGNING_REGION"
+          value = data.aws_region.current.name
         }
       ]
       enable_cloudwatch_logging = true
@@ -847,6 +871,85 @@ data "aws_iam_policy_document" "ecs_task_analysis_access" {
     effect    = "Allow"
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.analysis_results.arn]
+  }
+  # Read and write the custom AOI Iceberg table
+  statement {
+    effect = "Allow"
+    actions = [
+      "s3tables:GetTableBucket",
+      "s3tables:GetNamespace",
+      "s3tables:ListTables",
+      "s3tables:GetTable",
+      "s3tables:GetTableMetadataLocation",
+      "s3tables:UpdateTableMetadataLocation",
+      "s3tables:GetTableData",
+      "s3tables:PutTableData",
+    ]
+    resources = [
+      aws_s3tables_table_bucket.tables.arn,
+      "${aws_s3tables_table_bucket.tables.arn}/table/*",
+    ]
+  }
+}
+
+# Iceberg tables, which S3 Tables compacts and cleans up
+resource "aws_s3tables_table_bucket" "tables" {
+  name = "lcl-tables${local.name_suffix}"
+}
+
+resource "aws_s3tables_namespace" "custom" {
+  namespace        = "custom"
+  table_bucket_arn = aws_s3tables_table_bucket.tables.arn
+}
+
+# Schema matches the API's custom AOI repository. S3 Tables' default maintenance
+# compacts files and expires old snapshots, so deleted AOIs don't stay readable.
+resource "aws_s3tables_table" "custom_aois" {
+  name             = "custom_aois"
+  namespace        = aws_s3tables_namespace.custom.namespace
+  table_bucket_arn = aws_s3tables_table_bucket.tables.arn
+  format           = "ICEBERG"
+
+  metadata {
+    iceberg {
+      schema {
+        field {
+          name     = "aoi_id"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "area_ha"
+          type     = "double"
+          required = true
+        }
+        field {
+          name     = "geometry"
+          type     = "binary"
+          required = true
+        }
+        field {
+          name     = "updated_at"
+          type     = "timestamptz"
+          required = true
+        }
+        field {
+          name     = "name"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "user_id"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "monitor_status"
+          type     = "string"
+          required = true
+        }
+      }
+    }
   }
 }
 

@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
 from .domain.compute_engines.dask_client_router import DaskClientRouter
-from .routers import land_change
+from .routers import custom_aois, land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
 
@@ -141,6 +141,7 @@ async def profile_request(request: Request, call_next):
 
 
 app.include_router(land_change.router)
+app.include_router(custom_aois.router)
 
 
 @app.get("/")
