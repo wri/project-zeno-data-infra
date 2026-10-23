@@ -13,6 +13,10 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
     IntegratedAlertsAnalyzer,
     build_input_uris,
 )
+from app.domain.analyzers.integrated_alerts_points_analyzer import (
+    IntegratedAlertsPointsAnalyzer,
+    build_points_input_uris,
+)
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
@@ -26,11 +30,16 @@ from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.integrated_alerts import (
     ANALYTICS_NAME,
+    POINTS_ANALYTICS_NAME,
     IntegratedAlertsAnalytics,
     IntegratedAlertsAnalyticsIn,
     IntegratedAlertsAnalyticsResponse,
     IntegratedAlertsLatest,
     IntegratedAlertsLatestResponse,
+    IntegratedAlertsPoints,
+    IntegratedAlertsPointsAnalyticsIn,
+    IntegratedAlertsPointsResponse,
+    decode_cursor,
 )
 from app.routers.common_analytics import create_analysis, get_analysis
 from app.use_cases.analysis.analysis_service import AnalysisService
@@ -175,4 +184,110 @@ async def get_latest(
 ):
     return IntegratedAlertsLatestResponse(
         data=IntegratedAlertsLatest(alert_date=latest_alert_date, version=version)
+    )
+
+
+def get_points_analysis_repository(request: Request) -> AnalysisRepository:
+    return AwsDynamoDbS3AnalysisRepository(
+        POINTS_ANALYTICS_NAME,
+        request.app.state.dynamodb_table,
+        request.app.state.s3_client,
+    )
+
+
+async def get_points_request_version(
+    request: Request,
+    latest_version: str = Depends(get_latest_integrated_alerts_version),
+) -> str:
+    """The alerts version a points request is served from: a cursor's own version,
+    so a list keeps paging through the version it started on, else the latest one.
+    The pipeline builds a version's points table before marking it latest."""
+    try:
+        body = await request.json()
+    except ValueError:
+        return latest_version
+    raw_cursor = body.get("cursor") if isinstance(body, dict) else None
+    if not raw_cursor:
+        return latest_version
+    try:
+        return decode_cursor(raw_cursor).version
+    except ValueError:
+        # Request validation reports the malformed cursor as a 422.
+        return latest_version
+
+
+def create_points_analysis_service(
+    analysis_repository: AnalysisRepository = Depends(get_points_analysis_repository),
+    version: str = Depends(get_points_request_version),
+) -> AnalysisService:
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=IntegratedAlertsPointsAnalyzer(
+            input_uris=build_points_input_uris(version)
+        ),
+        event=POINTS_ANALYTICS_NAME,
+    )
+
+
+@router.post(
+    "/points",
+    response_class=ORJSONResponse,
+    response_model=DataMartResourceLinkResponse,
+    status_code=202,
+    summary="Create Integrated Alerts Points Task",
+    description=(
+        "List the newest integrated alerts in one AOI (one id, or one feature), "
+        "one row per alert pixel with its pixel center (lat, lon), date, "
+        "confidence and SBTN natural lands class, newest date first. Only the "
+        "most recent alerts are stored; the result metadata gives the stored and "
+        "served date ranges, whether the list was cut at `limit`, and a "
+        "`next_cursor` to pass as `cursor` for the next page."
+    ),
+)
+async def create_points(
+    *,
+    data: IntegratedAlertsPointsAnalyticsIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    service: AnalysisService = Depends(create_points_analysis_service),
+    version: str = Depends(get_points_request_version),
+):
+    data._version = version
+    return await create_analysis(
+        data=data,
+        service=service,
+        request=request,
+        background_tasks=background_tasks,
+        resource_link_callback=_points_resource_link_response,
+    )
+
+
+def _points_resource_link_response(request, service) -> str:
+    return str(
+        request.url_for(
+            "get_integrated_alerts_points_result",
+            resource_id=service.resource_thumbprint(),
+        )
+    )
+
+
+@router.get(
+    "/points/{resource_id}",
+    response_class=ORJSONResponse,
+    response_model=IntegratedAlertsPointsResponse,
+    status_code=200,
+)
+async def get_integrated_alerts_points_result(
+    resource_id: UUID5,
+    response: FastAPIResponse,
+    analysis_repository: AnalysisRepository = Depends(get_points_analysis_repository),
+):
+    analytics_out: AnalyticsOut = await get_analysis(
+        resource_id=resource_id,
+        analysis_repository=analysis_repository,
+        response=response,
+    )
+
+    return IntegratedAlertsPointsResponse(
+        data=IntegratedAlertsPoints(**analytics_out.model_dump()), status="success"
     )
