@@ -111,7 +111,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             translated_value = dataset_repository.translate(
                 filter.dataset, filter.value
             )
-            da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
+            da = dataset_repository.load(
+                filter.dataset, geometry=aoi_geometry
+            ).reindex_like(by, method="nearest", tolerance=1e-5)
             filter_arr = FloxOTFHandler._get_filter_by_op(
                 da, filter.op, translated_value
             )

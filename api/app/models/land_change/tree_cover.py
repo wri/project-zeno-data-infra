@@ -30,7 +30,7 @@ ValidCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
 
 class TreeCoverAnalyticsIn(AnalyticsIn):
     _analytics_name: str = PrivateAttr(default=ANALYTICS_NAME)
-    _version: str = PrivateAttr(default="v20250909")
+    _version: str = PrivateAttr(default="v20261022")
     aoi: Annotated[AoiUnion, Field(discriminator="type")] = Field(
         ...,
         title="AOI",
