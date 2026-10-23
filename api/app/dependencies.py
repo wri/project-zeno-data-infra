@@ -3,6 +3,13 @@ import logging
 from fastapi import Header
 
 from app.domain.models.environment import Environment
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
+from app.domain.repositories.aoi_type_routing_geometry_repository import (
+    AoiTypeRoutingGeometryRepository,
+)
+from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
+    GeoParquetAoiGeometryRepository,
+)
 
 
 async def get_environment(
@@ -26,3 +33,25 @@ async def get_environment(
     )
 
     return resolved_environment
+
+
+def get_aoi_geometry_repository() -> AoiGeometryRepository:
+    """Geometries for predefined AOIs, from the pipeline's GeoParquet copy of
+    each dataset at a pinned version."""
+    vectors = "s3://lcl-analytics/vectors/aois"
+    return AoiTypeRoutingGeometryRepository(
+        {
+            "admin": GeoParquetAoiGeometryRepository(
+                f"{vectors}/gadm/v4.1.85/aois.parquet"
+            ),
+            "key_biodiversity_area": GeoParquetAoiGeometryRepository(
+                f"{vectors}/kba/v20240904/aois.parquet"
+            ),
+            "protected_area": GeoParquetAoiGeometryRepository(
+                f"{vectors}/wdpa/v202512/aois.parquet"
+            ),
+            "indigenous_land": GeoParquetAoiGeometryRepository(
+                f"{vectors}/landmark/v20260617/aois.parquet"
+            ),
+        }
+    )

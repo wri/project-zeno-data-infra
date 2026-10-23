@@ -1,16 +1,15 @@
 # flake8: noqa: E501
 import json
-import logging
-import os
 from enum import Enum
 from typing import Iterable
 
 import duckdb
-import httpx
 import numpy as np
 import xarray as xr
 from rioxarray.exceptions import NoDataInBounds
-from shapely.geometry import shape
+from shapely.geometry import mapping, shape
+
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 
 JULIAN_DATE_2021 = 2459215
 
@@ -31,49 +30,16 @@ class FeatureTooSmallError(Exception):
     pass
 
 
-async def send_request_to_data_api(url, params):
-    params["x-api-key"] = _get_api_key()
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        response = await client.get(url, params=params)
-    return response.json()
-
-
-async def get_geojsons_from_data_api(aoi, send_request=send_request_to_data_api):
-    url, params = get_geojson_request_for_data_api(aoi)
-    response = await send_request(url, params)
-
-    if "data" not in response:
-        logging.error(
-            f"Unable to get GeoJSON from Data API for AOI {aoi}, Data API returned: \n{response}"
-        )
-        raise ValueError("Unable to get GeoJSON from Data API.")
-
-    geojsons = [json.loads(data["gfw_geojson"]) for data in response["data"]]
-    return geojsons
-
-
-def get_geojson_request_for_data_api(aoi):
-    value_list = get_sql_in_list(aoi["ids"])
-    if aoi["type"] == "key_biodiversity_area":
-        url = "https://data-api.globalforestwatch.org/dataset/birdlife_key_biodiversity_areas/latest/query"
-        sql = f"select gfw_geojson from data where sitrecid in {value_list} order by sitrecid"
-    elif aoi["type"] == "protected_area":
-        url = "https://data-api.globalforestwatch.org/dataset/wdpa_protected_areas/latest/query"
-        sql = f"select gfw_geojson from data where site_pid in {value_list} order by site_pid"
-    elif aoi["type"] == "indigenous_land":
-        url = "https://data-api.globalforestwatch.org/dataset/landmark_ip_lc_and_indicative_poly/latest/query"
-        sql = f"select gfw_geojson from data where landmark_id in {value_list} order by landmark_id"
-    else:
-        raise ValueError(f"Unable to retrieve AOI type {aoi['type']} from Data API.")
-    return url, {"sql": sql}
-
-
-async def get_geojson(aoi, geojsons_from_predefined_aoi=get_geojsons_from_data_api):
-    if aoi["type"] == "feature_collection":
-        geojson = aoi["feature_collection"]["features"]
-    else:
-        geojson = await geojsons_from_predefined_aoi(aoi)
-    return geojson
+async def get_geojson(aoi, aoi_geometry_repository: AoiGeometryRepository | None):
+    """GeoJSON geometries for an AOI. A predefined AOI's geometries come in the
+    order of its ids sorted as strings, which is how callers pair them up."""
+    if aoi.type == "feature_collection":
+        return aoi.feature_collection["features"]
+    if aoi_geometry_repository is None:
+        raise ValueError(f"No geometry source for AOI type {aoi.type}.")
+    sorted_aoi = aoi.model_copy(update={"ids": sorted(aoi.ids)})
+    geometries, _ = await aoi_geometry_repository.load(sorted_aoi)
+    return [mapping(geometry) for geometry in geometries]
 
 
 def clip_zarr_to_geojson(xarr: xr.Dataset, geojson):
@@ -175,10 +141,6 @@ def _open_zarr(uri, group: str | None = None):
         group=group,
         storage_options={"requester_pays": True},
     )
-
-
-def _get_api_key():
-    return os.environ["API_KEY"]
 
 
 def get_sql_in_list(iter: Iterable) -> str:

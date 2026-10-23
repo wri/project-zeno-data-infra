@@ -3,10 +3,11 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_environment
+from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.analyzers.natural_lands_analyzer import INPUT_URIS, NaturalLandsAnalyzer
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
 )
@@ -34,10 +35,14 @@ def create_analysis_service(
     request: Request,
     analysis_repository: AnalysisRepository = Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=NaturalLandsAnalyzer(
+            aoi_geometry_repository=aoi_geometry_repository,
             compute_engine=request.app.state.dask_client,
             input_uris=resolve_uris(INPUT_URIS, environment),
         ),

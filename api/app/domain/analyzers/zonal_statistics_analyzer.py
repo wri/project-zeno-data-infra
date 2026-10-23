@@ -8,6 +8,7 @@ import newrelic.agent as nr_agent
 from app.analysis.common.analysis import get_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 
 
 class ZonalStatisticsAnalyzer(Analyzer):
@@ -27,10 +28,12 @@ class ZonalStatisticsAnalyzer(Analyzer):
         duckdb_query_service=None,
         input_uris: Dict[str, str] | None = None,
         otf_timeout_seconds: float = 600,
+        aoi_geometry_repository: AoiGeometryRepository | None = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.duckdb_query_service = duckdb_query_service
         self.input_uris = input_uris
+        self.aoi_geometry_repository = aoi_geometry_repository
         self.otf_timeout_seconds = otf_timeout_seconds
 
     @nr_agent.function_trace(name="ZonalStatisticsAnalyzer.analyze")
@@ -62,7 +65,7 @@ class ZonalStatisticsAnalyzer(Analyzer):
 
     async def _compute_on_the_fly(self, analytics_in) -> Dict[str, Any]:
         aois = analytics_in.aoi.model_dump()
-        geojsons = await get_geojson(aois)
+        geojsons = await get_geojson(analytics_in.aoi, self.aoi_geometry_repository)
         if aois["type"] != "feature_collection":
             aoi_list = sorted(
                 [{"type": aois["type"], "id": id} for id in aois["ids"]],
