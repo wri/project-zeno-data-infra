@@ -353,7 +353,7 @@ module "analytics" {
         },
         {
           name  = "PYICEBERG_CATALOG__AOIS__WAREHOUSE"
-          value = aws_s3tables_table_bucket.aois.arn
+          value = aws_s3tables_table_bucket.tables.arn
         },
         {
           name  = "PYICEBERG_CATALOG__AOIS__REST__SIGV4_ENABLED"
@@ -886,20 +886,20 @@ data "aws_iam_policy_document" "ecs_task_analysis_access" {
       "s3tables:PutTableData",
     ]
     resources = [
-      aws_s3tables_table_bucket.aois.arn,
-      "${aws_s3tables_table_bucket.aois.arn}/table/*",
+      aws_s3tables_table_bucket.tables.arn,
+      "${aws_s3tables_table_bucket.tables.arn}/table/*",
     ]
   }
 }
 
-# Custom AOI geometries, as Iceberg tables that S3 Tables compacts and cleans up
-resource "aws_s3tables_table_bucket" "aois" {
-  name = "gnw-aois${local.name_suffix}"
+# Iceberg tables, which S3 Tables compacts and cleans up
+resource "aws_s3tables_table_bucket" "tables" {
+  name = "lcl-tables${local.name_suffix}"
 }
 
 resource "aws_s3tables_namespace" "custom" {
   namespace        = "custom"
-  table_bucket_arn = aws_s3tables_table_bucket.aois.arn
+  table_bucket_arn = aws_s3tables_table_bucket.tables.arn
 }
 
 # Schema matches the API's custom AOI repository. S3 Tables' default maintenance
@@ -907,7 +907,7 @@ resource "aws_s3tables_namespace" "custom" {
 resource "aws_s3tables_table" "custom_aois" {
   name             = "custom_aois"
   namespace        = aws_s3tables_namespace.custom.namespace
-  table_bucket_arn = aws_s3tables_table_bucket.aois.arn
+  table_bucket_arn = aws_s3tables_table_bucket.tables.arn
   format           = "ICEBERG"
 
   metadata {
