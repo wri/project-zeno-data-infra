@@ -39,6 +39,22 @@ def test_version_not_required_for_unversioned_flows(flow_name):
     _validate_flow_args(flow_name, version=None)  # must not raise
 
 
+@pytest.mark.parametrize(
+    "content_date", [None, "2026-9-30", "09/30/2026", "2026-02-30"]
+)
+def test_wur_update_requires_valid_content_date(content_date):
+    with pytest.raises(ValueError, match="content_date"):
+        _validate_flow_args(
+            UpdateFlow.WUR_UPDATE, version="v20261018", content_date=content_date
+        )
+
+
+def test_wur_update_accepts_iso_content_date():
+    _validate_flow_args(
+        UpdateFlow.WUR_UPDATE, version="v20261018", content_date="2026-09-30"
+    )
+
+
 def test_country_expected_groups_covers_every_iso_code():
     # flox silently drops group labels >= the expected_groups bound, so the country
     # axis must exceed the largest numeric ISO code we map.
