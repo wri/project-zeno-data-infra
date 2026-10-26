@@ -95,25 +95,19 @@ class IntegratedAlertsAnalyticsResponse(Response):
 
 @dataclass(frozen=True)
 class PointsCursor:
-    """Where a page of points ended: the alerts version whose table served it, the
-    last point's position in that table's file (row group, row within it), and the
-    fingerprint of the list it pages through. Positions only mean something in
-    that version's file and for that list, so a cursor pins both."""
+    """Where a page of points ended: the alerts version that served it, the last
+    point's position (opaque here; it's whatever the points repository uses to
+    resume) and the fingerprint of the list it pages through. A position only
+    means something for that version and that list, so a cursor pins both."""
 
     version: str
-    group: int
-    offset: int
+    position: str
     list_id: str
 
 
 def encode_cursor(cursor: PointsCursor) -> str:
     payload = json.dumps(
-        {
-            "v": cursor.version,
-            "g": cursor.group,
-            "o": cursor.offset,
-            "l": cursor.list_id,
-        },
+        {"v": cursor.version, "p": cursor.position, "l": cursor.list_id},
         separators=(",", ":"),
     )
     return base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
@@ -126,13 +120,12 @@ def decode_cursor(value: str) -> PointsCursor:
         payload = json.loads(base64.urlsafe_b64decode(padded.encode()))
         cursor = PointsCursor(
             version=str(payload["v"]),
-            group=int(payload["g"]),
-            offset=int(payload["o"]),
+            position=str(payload["p"]),
             list_id=str(payload["l"]),
         )
     except (binascii.Error, UnicodeDecodeError, ValueError, KeyError, TypeError):
         raise ValueError("Not a valid points cursor.") from None
-    if cursor.group < 0 or cursor.offset < 0:
+    if not cursor.position:
         raise ValueError("Not a valid points cursor.")
     return cursor
 

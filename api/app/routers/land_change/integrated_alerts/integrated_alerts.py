@@ -15,7 +15,6 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 )
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
-    build_points_input_uris,
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -24,6 +23,10 @@ from app.infrastructure.external_services.duck_db_query_service import (
 )
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
     AwsDynamoDbS3AnalysisRepository,
+)
+from app.infrastructure.persistence.parquet_alert_points_repository import (
+    ParquetAlertPointsRepository,
+    build_points_input_uris,
 )
 from app.models.common.analysis import AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
@@ -215,10 +218,14 @@ def create_points_analysis_service(
     analysis_repository: AnalysisRepository = Depends(get_points_analysis_repository),
     version: str = Depends(get_points_request_version),
 ) -> AnalysisService:
+    input_uris = build_points_input_uris(version)
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=IntegratedAlertsPointsAnalyzer(
-            input_uris=build_points_input_uris(version)
+            points_repository=ParquetAlertPointsRepository(
+                input_uris["alert_points_table_uri"]
+            ),
+            input_uris=input_uris,
         ),
         event=POINTS_ANALYTICS_NAME,
     )

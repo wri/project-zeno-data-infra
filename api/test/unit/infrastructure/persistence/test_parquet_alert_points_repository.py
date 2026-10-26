@@ -16,8 +16,10 @@ import pyarrow.parquet as pq
 import pytest
 import shapely
 
-from app.infrastructure.external_services import alert_points_table
-from app.infrastructure.external_services.alert_points_table import (
+from app.domain.repositories.alert_points_repository import AlertPointsQuery
+from app.infrastructure.persistence import parquet_alert_points_repository
+from app.infrastructure.persistence.parquet_alert_points_repository import (
+    ParquetAlertPointsRepository,
     date_to_day,
     day_to_date,
     load_alert_points_table,
@@ -95,7 +97,7 @@ def test_table_without_metadata_or_version_in_path_is_refused(tmp_path, points):
 
 def test_table_fixture_has_interior_and_boundary_row_groups(table):
     groups = np.arange(table.metadata.num_row_groups)
-    boxes = table.boxes(groups)
+    boxes = table.extents[groups]
     geom = aoi_polygon()
     interior = shapely.contains_properly(geom, boxes)
     boundary = shapely.intersects(geom, boxes) & ~interior
@@ -187,17 +189,14 @@ def test_small_page_reads_only_part_of_the_newest_date(table, points, monkeypatc
         return read_row_groups(self, row_groups, *args, **kwargs)
 
     monkeypatch.setattr(pq.ParquetFile, "read_row_groups", recording_read_row_groups)
-    monkeypatch.setattr(alert_points_table, "READ_BATCH_GROUPS", 2)
+    monkeypatch.setattr(parquet_alert_points_repository, "READ_BATCH_GROUPS", 2)
     start_day = LATEST_DAY - DAYS_STORED + 1
     result, truncated, _ = newest_points(
         table, geom, start_day, LATEST_DAY, ALL_CONFIDENCES, None, limit=5
     )
 
     newest_date_groups = np.flatnonzero(
-        (table.date_max == LATEST_DAY)
-        & shapely.intersects(
-            geom, table.boxes(np.arange(table.metadata.num_row_groups))
-        )
+        (table.date_max == LATEST_DAY) & shapely.intersects(geom, table.extents)
     )
     assert 0 < len(read_groups) < len(newest_date_groups)
     assert read_groups == sorted(read_groups)
@@ -217,7 +216,7 @@ def test_small_page_reads_only_part_of_the_newest_date(table, points, monkeypatc
 def test_pages_after_the_last_position_join_into_the_full_list(
     table, points, monkeypatch, page_size, confidences, classes
 ):
-    monkeypatch.setattr(alert_points_table, "READ_BATCH_GROUPS", 2)
+    monkeypatch.setattr(parquet_alert_points_repository, "READ_BATCH_GROUPS", 2)
     geom = aoi_polygon()
     start_day = LATEST_DAY - DAYS_STORED + 1
     expected = brute_force(points, geom, start_day, LATEST_DAY, confidences, classes)
@@ -255,3 +254,67 @@ def test_date_conversions_round_trip():
     assert day_to_date(LATEST_DAY).isoformat() == "2026-10-16"
     assert date_to_day("2026-10-16") == LATEST_DAY
     assert date_to_day("2026-1-5") == date_to_day("2026-01-05")
+
+
+def _query(geom, limit, after=None, confidences=ALL_CONFIDENCES, classes=None):
+    return AlertPointsQuery(
+        geometry=geom,
+        start_date=day_to_date(LATEST_DAY - DAYS_STORED + 1),
+        end_date=day_to_date(LATEST_DAY),
+        confidences=confidences,
+        natural_lands_classes=classes,
+        limit=limit,
+        after=after,
+    )
+
+
+@pytest.mark.asyncio
+async def test_repository_describes_its_source(table):
+    source = await ParquetAlertPointsRepository(table.path).source()
+    assert source.version == "v20261018"
+    assert source.first_date == day_to_date(LATEST_DAY - DAYS_STORED + 1)
+    assert source.latest_date == day_to_date(LATEST_DAY)
+
+
+@pytest.mark.asyncio
+async def test_repository_pages_are_points_in_domain_terms(table, points):
+    repository = ParquetAlertPointsRepository(table.path)
+    geom = aoi_polygon()
+    expected = brute_force(
+        points,
+        geom,
+        LATEST_DAY - DAYS_STORED + 1,
+        LATEST_DAY,
+        ALL_CONFIDENCES,
+        None,
+    )
+
+    pages, after, more = [], None, True
+    while more:
+        page = await repository.newest_points(_query(geom, limit=40, after=after))
+        assert list(page.points.columns) == [
+            "lat",
+            "lon",
+            "alert_date",
+            "confidence",
+            "natural_lands_class",
+        ]
+        pages.append(page.points)
+        more, after = page.more, page.last_position
+    result = pd.concat(pages, ignore_index=True)
+
+    assert len(pages) > 2
+    np.testing.assert_allclose(result.lat, lat(expected.row))
+    np.testing.assert_allclose(result.lon, lon(expected.col))
+    assert list(result.alert_date) == [day_to_date(d) for d in expected.alert_date]
+    assert list(result.confidence) == list(expected.confidence)
+    assert list(result.natural_lands_class) == list(expected.natural_lands_class)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("position", ["", "3", "3:x", "-1:0", "1:2:3"])
+async def test_repository_rejects_a_position_it_did_not_make(table, position):
+    with pytest.raises(ValueError, match="Not a valid points cursor"):
+        await ParquetAlertPointsRepository(table.path).newest_points(
+            _query(aoi_polygon(), limit=5, after=position)
+        )

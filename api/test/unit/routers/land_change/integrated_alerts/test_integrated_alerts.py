@@ -9,11 +9,12 @@ from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
 from app.domain.models.environment import Environment
-from app.infrastructure.external_services.alert_points_table import (
-    load_alert_points_table,
-)
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
+)
+from app.infrastructure.persistence.parquet_alert_points_repository import (
+    ParquetAlertPointsRepository,
+    load_alert_points_table,
 )
 from app.main import app
 from app.models.land_change.integrated_alerts import (
@@ -124,7 +125,7 @@ def test_points_request_without_a_cursor_uses_the_latest_version():
 
 
 def test_points_request_with_a_cursor_uses_the_cursors_version():
-    cursor = encode_cursor(PointsCursor("v20261018", 3, 4, "list"))
+    cursor = encode_cursor(PointsCursor("v20261018", "3:4", "list"))
     assert _request_version({"cursor": cursor}) == "v20261018"
 
 
@@ -155,7 +156,7 @@ def test_points_request_with_a_malformed_cursor_gets_422():
 def test_points_request_with_another_lists_cursor_gets_422():
     first_page = {"aoi": {"type": "admin", "ids": ["BRA.14.87"]}}
     list_id = IntegratedAlertsPointsAnalyticsIn(**first_page).list_id()
-    cursor = encode_cursor(PointsCursor("v20261018", 3, 4, list_id))
+    cursor = encode_cursor(PointsCursor("v20261018", "3:4", list_id))
     app.dependency_overrides[integrated_alerts.get_points_request_version] = lambda: (
         "v20261018"
     )
@@ -189,6 +190,7 @@ def test_points_post_then_get_returns_points(tmp_path):
         return AnalysisService(
             analysis_repository=repository,
             analyzer=IntegratedAlertsPointsAnalyzer(
+                points_repository=ParquetAlertPointsRepository(table_uri),
                 input_uris={"alert_points_table_uri": table_uri},
                 geometry_repository=FakeGeometryRepository(),
             ),

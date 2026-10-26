@@ -11,17 +11,18 @@ from httpx import ASGITransport, AsyncClient
 
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
-    build_points_input_uris,
 )
 from app.domain.repositories.gadm_aoi_geometry_repository import (
     GadmAoiGeometryRepository,
 )
-from app.infrastructure.external_services.alert_points_table import (
-    day_to_date,
-    load_alert_points_table,
-)
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
+)
+from app.infrastructure.persistence.parquet_alert_points_repository import (
+    ParquetAlertPointsRepository,
+    build_points_input_uris,
+    day_to_date,
+    load_alert_points_table,
 )
 from app.main import app
 from app.models.land_change.integrated_alerts import POINTS_ANALYTICS_NAME
@@ -42,7 +43,8 @@ def create_points_analysis_service_for_tests() -> AnalysisService:
     return AnalysisService(
         analysis_repository=get_file_system_analysis_repository(),
         analyzer=IntegratedAlertsPointsAnalyzer(
-            input_uris=build_points_input_uris(VERSION)
+            points_repository=ParquetAlertPointsRepository(TABLE_URI),
+            input_uris=build_points_input_uris(VERSION),
         ),
         event=POINTS_ANALYTICS_NAME,
     )
@@ -87,11 +89,22 @@ def brute_force_rows(geom, start_date, end_date):
     min_x, min_y, max_x, max_y = geom.bounds
     cols = sorted([(min_x - table.x0) / table.dx, (max_x - table.x0) / table.dx])
     rows = sorted([(min_y - table.y0) / table.dy, (max_y - table.y0) / table.dy])
+    meta = table.metadata
+    names = [meta.schema.column(j).name for j in range(meta.num_columns)]
+
+    def statistics(column):
+        j = names.index(column)
+        stats = [
+            meta.row_group(g).column(j).statistics for g in range(meta.num_row_groups)
+        ]
+        return np.array([s.min for s in stats]), np.array([s.max for s in stats])
+
+    (row_min, row_max), (col_min, col_max) = statistics("row"), statistics("col")
     groups = np.flatnonzero(
-        (table.row_max >= int(np.floor(rows[0])))
-        & (table.row_min <= int(np.ceil(rows[1])))
-        & (table.col_max >= int(np.floor(cols[0])))
-        & (table.col_min <= int(np.ceil(cols[1])))
+        (row_max >= int(np.floor(rows[0])))
+        & (row_min <= int(np.ceil(rows[1])))
+        & (col_max >= int(np.floor(cols[0])))
+        & (col_min <= int(np.ceil(cols[1])))
     )
     with table.filesystem.open_input_file(table.path) as f:
         points = pq.ParquetFile(f).read_row_groups(groups.tolist()).to_pandas()

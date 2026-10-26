@@ -1,8 +1,9 @@
+import asyncio
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import lru_cache
-from typing import Iterable, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,13 @@ import pyarrow.fs as pafs
 import pyarrow.parquet as pq
 import shapely
 from shapely.geometry.base import BaseGeometry
+
+from app.domain.repositories.alert_points_repository import (
+    AlertPointsPage,
+    AlertPointsQuery,
+    AlertPointsRepository,
+    AlertPointsSource,
+)
 
 # alert_date in the table counts days since this date
 ALERT_EPOCH = date(2014, 12, 31)
@@ -20,6 +28,18 @@ POINT_COLUMNS = ["row", "col", "alert_date", "confidence", "natural_lands_class"
 # Row groups read at a time within a date. A busy date can hold millions of points
 # under a large AOI; reading it in batches stops near the page size instead.
 READ_BATCH_GROUPS = 16
+
+
+def build_points_input_uris(version: str) -> Dict[str, str]:
+    # First iteration: every request reads the 30-day v20261018 table from the
+    # benchmark, whatever the version, until the pipeline publishes one per
+    # version at f"integrated-alerts/{version}/alert-points/by-date.parquet".
+    return {
+        "alert_points_table_uri": (
+            "s3://lcl-analytics/zonal-statistics/integrated-alerts/test/"
+            "alert-points-index/v20261018/global-30d/by-date.parquet"
+        ),
+    }
 
 
 def day_to_date(day: int) -> date:
@@ -33,20 +53,20 @@ def date_to_day(value: str) -> int:
 
 @dataclass(frozen=True)
 class AlertPointsTable:
-    """Footer of an alert points table parquet: per row group row counts and
-    row/col/alert_date statistics, plus the alerts grid from the key-value
-    metadata, so a query picks its row groups without reading any data."""
+    """Footer of an alert points table parquet: per row group row counts,
+    alert_date statistics and extent (a lat/lon box from its row/col statistics),
+    with a spatial index over the extents, plus the alerts grid from the
+    key-value metadata. A query picks its row groups from these without reading
+    any data."""
 
     path: str
     filesystem: pafs.FileSystem
     metadata: pq.FileMetaData
     num_rows: np.ndarray
-    row_min: np.ndarray
-    row_max: np.ndarray
-    col_min: np.ndarray
-    col_max: np.ndarray
     date_min: np.ndarray
     date_max: np.ndarray
+    extents: np.ndarray
+    extent_tree: shapely.STRtree
     version: str
     latest_day: int
     days_stored: int
@@ -66,16 +86,6 @@ class AlertPointsTable:
     def lat(self, row):
         """Pixel-center latitude of global row index row."""
         return self.y0 + np.asarray(row) * self.dy
-
-    def boxes(self, groups: np.ndarray) -> np.ndarray:
-        """Extent (pixel edges) of each row group in groups, as shapely boxes."""
-        half_x, half_y = abs(self.dx) / 2, abs(self.dy) / 2
-        return shapely.box(
-            self.lon(self.col_min[groups]) - half_x,
-            self.lat(self.row_max[groups]) - half_y,
-            self.lon(self.col_max[groups]) + half_x,
-            self.lat(self.row_min[groups]) + half_y,
-        )
 
 
 def _filesystem(uri: str) -> Tuple[pafs.FileSystem, str]:
@@ -127,24 +137,33 @@ def load_alert_points_table(uri: str) -> AlertPointsTable:
             "days_stored": str(latest_day - int(date_min.min()) + 1),
             **{f"grid_{k}": repr(v) for k, v in ALERTS_GRID.items()},
         }
+    x0, y0 = float(key_value["grid_x0"]), float(key_value["grid_y0"])
+    dx, dy = float(key_value["grid_dx"]), float(key_value["grid_dy"])
+    # Each row group's extent: the pixel edges around its row/col range. The table
+    # is Hilbert-sorted, so a row group covers a compact patch and its extent is
+    # tight.
+    extents = shapely.box(
+        x0 + col_min * dx - abs(dx) / 2,
+        y0 + row_max * dy - abs(dy) / 2,
+        x0 + col_max * dx + abs(dx) / 2,
+        y0 + row_min * dy + abs(dy) / 2,
+    )
     return AlertPointsTable(
         path=path,
         filesystem=filesystem,
         metadata=metadata,
         num_rows=np.array([rg.num_rows for rg in row_groups], dtype=np.int64),
-        row_min=row_min,
-        row_max=row_max,
-        col_min=col_min,
-        col_max=col_max,
         date_min=date_min,
         date_max=date_max,
+        extents=extents,
+        extent_tree=shapely.STRtree(extents),
         version=key_value["alerts_version"],
         latest_day=date_to_day(key_value["latest_alert_date"]),
         days_stored=int(key_value["days_stored"]),
-        x0=float(key_value["grid_x0"]),
-        y0=float(key_value["grid_y0"]),
-        dx=float(key_value["grid_dx"]),
-        dy=float(key_value["grid_dy"]),
+        x0=x0,
+        y0=y0,
+        dx=dx,
+        dy=dy,
     )
 
 
@@ -169,8 +188,9 @@ def newest_points(
     past that point: the file is in serving order, so everything up to it has
     been served.
 
-    Row groups are picked from the footer statistics: those whose box intersects
-    geom, read a date at a time from the newest and, within a date, in batches of
+    Row groups are those whose extent intersects geom (a query on the extents'
+    spatial index) and whose dates overlap the request, read a date at a time
+    from the newest and, within a date, in batches of
     READ_BATCH_GROUPS in file order, stopping as soon as the page is over full, so
     memory stays near the page size however many points a date holds. Points from
     row groups entirely inside geom skip the point-in-polygon test. Relies on the
@@ -178,25 +198,19 @@ def newest_points(
     date has been read once that date's row groups have.
     """
     shapely.prepare(geom)
-    (row_lo, row_hi), (col_lo, col_hi) = _grid_window(table, geom)
-    candidates = np.flatnonzero(
-        (table.row_max >= row_lo)
-        & (table.row_min <= row_hi)
-        & (table.col_max >= col_lo)
-        & (table.col_min <= col_hi)
-        & (table.date_max >= start_day)
-        & (table.date_min <= end_day)
-    )
+    # Sorted, since the tree returns row groups in its own order and pages are
+    # read in file order.
+    candidates = np.sort(table.extent_tree.query(geom, predicate="intersects"))
+    candidates = candidates[
+        (table.date_max[candidates] >= start_day)
+        & (table.date_min[candidates] <= end_day)
+    ]
     if after is not None:
         candidates = candidates[candidates >= after[0]]
-    boxes = table.boxes(candidates)
-    hit = shapely.intersects(geom, boxes)
-    candidates, boxes = candidates[hit], boxes[hit]
-    interior = shapely.contains_properly(geom, boxes)
+    interior = shapely.contains_properly(geom, table.extents[candidates])
 
     confidences = list(confidences)
     classes = None if classes is None else list(classes)
-    window = (row_lo, row_hi, col_lo, col_hi)
     found, n_found = [], 0
     read = np.zeros(len(candidates), dtype=bool)
     with table.filesystem.open_input_file(table.path) as f:
@@ -231,7 +245,6 @@ def newest_points(
                     geom,
                     points,
                     point_interior,
-                    window,
                     (start_day, end_day),
                     confidences,
                     classes,
@@ -261,34 +274,18 @@ def newest_points(
     return page[POINT_COLUMNS], len(result) > limit, last
 
 
-def _grid_window(table: AlertPointsTable, geom: BaseGeometry):
-    """Global row and col ranges (inclusive) holding every pixel center inside
-    geom's bounds, rounded outward."""
-    min_x, min_y, max_x, max_y = geom.bounds
-    cols = sorted([(min_x - table.x0) / table.dx, (max_x - table.x0) / table.dx])
-    rows = sorted([(min_y - table.y0) / table.dy, (max_y - table.y0) / table.dy])
-    return (
-        (int(np.floor(rows[0])), int(np.ceil(rows[1]))),
-        (int(np.floor(cols[0])), int(np.ceil(cols[1]))),
-    )
-
-
 def _keep_points(
-    table, geom, points, interior, window, days, confidences, classes
+    table, geom, points, interior, days, confidences, classes
 ) -> pd.DataFrame:
-    row_lo, row_hi, col_lo, col_hi = window
     keep = (
-        points["alert_date"].between(*days)
-        & points["confidence"].isin(confidences)
-        & points["row"].between(row_lo, row_hi)
-        & points["col"].between(col_lo, col_hi)
+        points["alert_date"].between(*days) & points["confidence"].isin(confidences)
     ).to_numpy()
     if classes is not None:
         keep &= points["natural_lands_class"].isin(classes).to_numpy()
     points, inside = points[keep], interior[keep].copy()
 
-    # Points from row groups straddling the AOI's boundary get the exact test,
-    # against the AOI prepared in newest_points.
+    # Points from row groups entirely inside the AOI are inside it; the others get
+    # the exact test, against the AOI prepared in newest_points.
     edge = np.flatnonzero(~inside)
     if len(edge) == 0:
         return points
@@ -310,3 +307,62 @@ def _empty_points() -> pd.DataFrame:
             "natural_lands_class": np.empty(0, np.uint8),
         }
     )
+
+
+class ParquetAlertPointsRepository(AlertPointsRepository):
+    """Alert points from an alert points table parquet (see newest_points). A
+    page's position is the (row group, row) of its last point in the file."""
+
+    def __init__(self, uri: str):
+        self.uri = uri
+
+    async def source(self) -> AlertPointsSource:
+        table = await asyncio.to_thread(load_alert_points_table, self.uri)
+        return AlertPointsSource(
+            version=table.version,
+            first_date=day_to_date(table.first_day),
+            latest_date=day_to_date(table.latest_day),
+        )
+
+    async def newest_points(self, query: AlertPointsQuery) -> AlertPointsPage:
+        return await asyncio.to_thread(self._newest_points, query)
+
+    def _newest_points(self, query: AlertPointsQuery) -> AlertPointsPage:
+        table = load_alert_points_table(self.uri)
+        after = None if query.after is None else _decode_position(query.after)
+        points, more, last = newest_points(
+            table,
+            query.geometry,
+            (query.start_date - ALERT_EPOCH).days,
+            (query.end_date - ALERT_EPOCH).days,
+            query.confidences,
+            query.natural_lands_classes,
+            query.limit,
+            after,
+        )
+        days = points["alert_date"].to_numpy()
+        dates = {d: day_to_date(d) for d in np.unique(days)}
+        return AlertPointsPage(
+            points=pd.DataFrame(
+                {
+                    "lat": table.lat(points["row"].to_numpy()),
+                    "lon": table.lon(points["col"].to_numpy()),
+                    "alert_date": [dates[d] for d in days],
+                    "confidence": points["confidence"].to_numpy(),
+                    "natural_lands_class": points["natural_lands_class"].to_numpy(),
+                }
+            ),
+            more=more,
+            last_position=None if last is None else f"{last[0]}:{last[1]}",
+        )
+
+
+def _decode_position(position: str) -> Tuple[int, int]:
+    """The (row group, row) in a position string; ValueError if it isn't one."""
+    try:
+        group, offset = (int(part) for part in position.split(":"))
+    except ValueError:
+        raise ValueError("Not a valid points cursor.") from None
+    if group < 0 or offset < 0:
+        raise ValueError("Not a valid points cursor.")
+    return group, offset

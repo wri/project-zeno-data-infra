@@ -1,3 +1,4 @@
+from datetime import date
 from test.unit.alert_points import (
     DAYS_STORED,
     LATEST_DAY,
@@ -15,10 +16,17 @@ from shapely.geometry import mapping
 
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
-    served_days,
+    served_dates,
 )
 from app.domain.models.analysis import Analysis
-from app.infrastructure.external_services.alert_points_table import (
+from app.domain.repositories.alert_points_repository import (
+    AlertPointsPage,
+    AlertPointsQuery,
+    AlertPointsRepository,
+    AlertPointsSource,
+)
+from app.infrastructure.persistence.parquet_alert_points_repository import (
+    ParquetAlertPointsRepository,
     day_to_date,
     load_alert_points_table,
 )
@@ -59,7 +67,7 @@ def table_uri(tmp_path, points):
 
 def _analyzer(table_uri, geometries):
     return IntegratedAlertsPointsAnalyzer(
-        input_uris={"alert_points_table_uri": table_uri},
+        points_repository=ParquetAlertPointsRepository(table_uri),
         geometry_repository=FakeGeometryRepository(geometries),
     )
 
@@ -163,7 +171,7 @@ async def test_aoi_without_geometry_fails(table_uri):
             return [], []
 
     analyzer = IntegratedAlertsPointsAnalyzer(
-        input_uris={"alert_points_table_uri": table_uri},
+        points_repository=ParquetAlertPointsRepository(table_uri),
         geometry_repository=MissingGeometryRepository(),
     )
     analytics_in = IntegratedAlertsPointsAnalyticsIn(
@@ -182,13 +190,18 @@ async def test_aoi_without_geometry_fails(table_uri):
         ("2026-10-15", "2026-10-15", (LATEST_DAY - 1, LATEST_DAY - 1)),
     ],
 )
-def test_served_days_clip_the_request_to_the_stored_window(
-    table_uri, start_date, end_date, expected
+def test_served_dates_clip_the_request_to_the_stored_window(
+    start_date, end_date, expected
 ):
+    source = AlertPointsSource(
+        version="v20261018",
+        first_date=day_to_date(FIRST_DAY),
+        latest_date=day_to_date(LATEST_DAY),
+    )
     analytics_in = IntegratedAlertsPointsAnalyticsIn(
         aoi=AdminAreaOfInterest(ids=["BRA"]), start_date=start_date, end_date=end_date
     )
-    assert served_days(load_alert_points_table(table_uri), analytics_in) == expected
+    assert served_dates(source, analytics_in) == tuple(day_to_date(d) for d in expected)
 
 
 def test_points_request_validation():
@@ -266,7 +279,7 @@ async def test_cursor_from_another_version_is_refused(table_uri):
     list_id = IntegratedAlertsPointsAnalyticsIn(aoi=aoi).list_id()
     analytics_in = IntegratedAlertsPointsAnalyticsIn(
         aoi=aoi,
-        cursor=encode_cursor(PointsCursor("v20261001", 3, 4, list_id)),
+        cursor=encode_cursor(PointsCursor("v20261001", "3:4", list_id)),
     )
 
     with pytest.raises(ValueError, match="cursor is for alerts version v20261001"):
@@ -276,9 +289,9 @@ async def test_cursor_from_another_version_is_refused(table_uri):
 
 
 def test_cursor_round_trips_and_rejects_garbage():
-    cursor = PointsCursor("v20261018", 12, 7, "0123456789abcdef")
+    cursor = PointsCursor("v20261018", "12:7", "0123456789abcdef")
     assert decode_cursor(encode_cursor(cursor)) == cursor
-    for bad in ["", "not-a-cursor", encode_cursor(PointsCursor("v1", -1, 0, "x"))]:
+    for bad in ["", "not-a-cursor", encode_cursor(PointsCursor("v1", "", "x"))]:
         with pytest.raises(ValueError, match="Not a valid points cursor"):
             decode_cursor(bad)
     with pytest.raises(ValueError, match="Not a valid points cursor"):
@@ -306,7 +319,7 @@ def test_cursor_from_a_different_list_is_rejected(changed):
         land_filter="natural_lands",
     )
     list_id = IntegratedAlertsPointsAnalyticsIn(**first_page).list_id()
-    cursor = encode_cursor(PointsCursor("v20261018", 3, 4, list_id))
+    cursor = encode_cursor(PointsCursor("v20261018", "3:4", list_id))
 
     IntegratedAlertsPointsAnalyticsIn(**first_page, cursor=cursor, limit=50)
     with pytest.raises(ValueError, match="cursor is for a different list"):
@@ -334,3 +347,85 @@ def test_end_date_before_start_date_is_rejected():
         aoi=aoi, start_date="2026-10-15", end_date="2026-10-15"
     )
     IntegratedAlertsPointsAnalyticsIn(aoi=aoi, start_date="2026-10-15")
+
+
+class InMemoryAlertPointsRepository(AlertPointsRepository):
+    """Serves a fixed list of points in pages, with positions as list offsets,
+    to check the analyzer depends only on the AlertPointsRepository interface."""
+
+    def __init__(self, points: pd.DataFrame):
+        self.points = points
+        self.queries: list[AlertPointsQuery] = []
+
+    async def source(self) -> AlertPointsSource:
+        return AlertPointsSource("v20261020", date(2026, 10, 1), date(2026, 10, 18))
+
+    async def newest_points(self, query) -> AlertPointsPage:
+        self.queries.append(query)
+        start = 0 if query.after is None else int(query.after) + 1
+        stop = start + query.limit
+        page = self.points.iloc[start:stop]
+        more = stop < len(self.points)
+        return AlertPointsPage(
+            points=page.reset_index(drop=True),
+            more=more,
+            last_position=str(start + len(page) - 1) if len(page) else None,
+        )
+
+
+@pytest.mark.asyncio
+async def test_analyzer_pages_through_any_points_repository():
+    points = pd.DataFrame(
+        {
+            "lat": [-3.1, -3.2, -3.3],
+            "lon": [-52.1, -52.2, -52.3],
+            "alert_date": [date(2026, 10, 18), date(2026, 10, 17), date(2026, 10, 2)],
+            "confidence": [4, 3, 3],
+            "natural_lands_class": [2, 0, 5],
+        }
+    )
+    repository = InMemoryAlertPointsRepository(points)
+    analyzer = IntegratedAlertsPointsAnalyzer(
+        points_repository=repository,
+        geometry_repository=FakeGeometryRepository({"BRA.1": aoi_polygon()}),
+    )
+
+    pages, cursor = [], None
+    while True:
+        analytics_in = IntegratedAlertsPointsAnalyticsIn(
+            aoi=AdminAreaOfInterest(ids=["BRA.1"]),
+            start_date="2026-09-01",
+            alert_confidence=["high", "highest"],
+            land_filter="natural_forests",
+            limit=2,
+            cursor=cursor,
+        )
+        analysis = _analysis(analytics_in)
+        await analyzer.analyze(analysis)
+        pages.append(analysis.result)
+        cursor = analysis.metadata["next_cursor"]
+        if cursor is None:
+            break
+
+    assert pages == [
+        {
+            "lat": [-3.1, -3.2],
+            "lon": [-52.1, -52.2],
+            "alert_date": ["2026-10-18", "2026-10-17"],
+            "alert_confidence": ["highest", "high"],
+            "natural_lands_class": [2, 0],
+        },
+        {
+            "lat": [-3.3],
+            "lon": [-52.3],
+            "alert_date": ["2026-10-02"],
+            "alert_confidence": ["high"],
+            "natural_lands_class": [5],
+        },
+    ]
+    first, second = repository.queries
+    assert (first.start_date, first.end_date) == (date(2026, 10, 1), date(2026, 10, 18))
+    assert first.confidences == [3, 4]
+    assert first.natural_lands_classes == [2, 5, 8, 9]
+    assert (first.after, second.after) == (None, "1")
+    assert analysis.metadata["alerts"]["version"] == "v20261020"
