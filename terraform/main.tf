@@ -903,8 +903,7 @@ resource "aws_s3tables_namespace" "custom" {
 }
 
 # Schema matches the API's custom AOI repository, which adds the s2_cell partition
-# on first use (this resource can't declare partitions). Schema changes go through
-# PyIceberg, since changing metadata here replaces the table. S3 Tables' default
+# on first use (this resource can't declare partitions). S3 Tables' default
 # maintenance compacts files and expires old snapshots.
 resource "aws_s3tables_table" "custom_aois" {
   name             = "custom_aois"
@@ -983,6 +982,12 @@ resource "aws_s3tables_table" "custom_aois" {
       }
     }
   }
+
+  # schema changes go through PyIceberg; replacing the table would delete its data
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [metadata]
+  }
 }
 
 # Index of each custom AOI's S2 cell, so the API reads and writes by id within one
@@ -1008,6 +1013,12 @@ resource "aws_s3tables_table" "custom_aoi_cells" {
         }
       }
     }
+  }
+
+  # schema changes go through PyIceberg; replacing the table would delete its data
+  lifecycle {
+    prevent_destroy = true
+    ignore_changes  = [metadata]
   }
 }
 

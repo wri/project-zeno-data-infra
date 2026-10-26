@@ -16,6 +16,7 @@ from pyiceberg.expressions import (
     GreaterThanOrEqual,
     In,
     LessThanOrEqual,
+    Or,
 )
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table
@@ -81,18 +82,9 @@ class CachedTables:
 
 
 class IcebergCustomAoiRepository(CustomAoiRepository):
-    """Stores custom AOIs in an Iceberg table with WKB geometries, partitioned by
-    the S2 cell of each geometry's centroid so spatial reads skip most files.
-
-    A second table indexes each AOI's cell, so reads and writes by id only touch
-    that AOI's partition. An id without an index entry is treated as new. The data
-    table is written first, so if an index write fails, the next save of that AOI
-    repairs the entry. Both tables must already exist; the data table's partition
-    is added on first use if it's missing.
-
-    Reads reuse loaded tables for up to max_table_age_seconds, so they may miss
-    another instance's writes for that long; this instance's own writes are
-    visible immediately."""
+    """Stores custom AOIs in an Iceberg table with WKB geometries. Utilizes Iceberg partitions
+    by Google S2 cell ID for fast spatial reads, and a separate aoi_id -> partition table
+    for fast lookup by ID."""
 
     def __init__(
         self,
@@ -125,9 +117,11 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
     def _upsert(self, aois: List[CustomAoi]) -> None:
         rows = to_arrow(aois, self.cell_level)
         ids = [aoi.aoi_id for aoi in aois]
-        cells = [*self.cells(ids).values(), *rows.column("s2_cell").to_pylist()]
+        new_cells = rows.column("s2_cell").to_pylist()
 
         def replace(table: Table) -> None:
+            # read on every attempt, in case another writer just moved an AOI
+            cells = [*self.cells(ids, fresh=True).values(), *new_cells]
             with table.transaction() as transaction:
                 transaction.delete(self.rows_for(ids, cells))
                 transaction.append(rows)
@@ -142,23 +136,17 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
         )
 
     def _delete(self, aoi_id: str) -> None:
-        cells = self.cells([aoi_id])
-        rows = (
-            self.rows_for([aoi_id], cells.values())
-            if cells
-            else EqualTo("aoi_id", aoi_id)
+        self.commit(
+            self.table,
+            lambda table: table.delete(self.rows_with_ids([aoi_id], fresh=True)),
         )
-        self.commit(self.table, lambda table: table.delete(rows))
         self.commit(
             self.index_table, lambda index: index.delete(EqualTo("aoi_id", aoi_id))
         )
 
     def _get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
-        cells = self.cells(aoi_ids)
-        if not cells:
-            return []
         rows = self.table().scan(
-            row_filter=self.rows_for(list(cells), cells.values()),
+            row_filter=self.rows_with_ids(aoi_ids),
             selected_fields=("aoi_id", "geometry"),
         )
         by_id = {aoi.aoi_id: aoi for aoi in geometries_from_arrow(rows.to_arrow())}
@@ -182,10 +170,22 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
             if geometry.intersects(aoi.geometry)
         ]
 
-    def cells(self, aoi_ids: List[str]) -> Dict[str, int]:
+    def rows_with_ids(
+        self, aoi_ids: List[str], fresh: bool = False
+    ) -> BooleanExpression:
+        """The rows of these ids: indexed ids within their partitions, and ids
+        without an index entry across all partitions."""
+        cells = self.cells(aoi_ids, fresh)
+        unindexed = [aoi_id for aoi_id in aoi_ids if aoi_id not in cells]
+        if not cells:
+            return In("aoi_id", unindexed)
+        indexed = self.rows_for(list(cells), cells.values())
+        return Or(indexed, In("aoi_id", unindexed)) if unindexed else indexed
+
+    def cells(self, aoi_ids: List[str], fresh: bool = False) -> Dict[str, int]:
         """The indexed S2 cell of each id that has an index entry."""
         entries = (
-            self.index_table()
+            self.index_table(fresh)
             .scan(
                 row_filter=In("aoi_id", aoi_ids), selected_fields=("aoi_id", "s2_cell")
             )

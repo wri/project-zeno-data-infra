@@ -2,6 +2,7 @@ import pytest
 import s2sphere
 from pyiceberg.catalog.sql import SqlCatalog
 from pyiceberg.exceptions import NoSuchTableError
+from pyiceberg.expressions import EqualTo
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
@@ -130,6 +131,19 @@ async def test_get_returns_only_ids_and_geometries_in_requested_order(repository
         CustomAoiGeometry("b", MultiPolygon([box(100, 40, 102, 42)])),
         CustomAoiGeometry("a", MultiPolygon([box(0, 0, 1, 1)])),
     ]
+
+
+@pytest.mark.asyncio
+async def test_get_finds_aois_whose_index_entry_is_missing(catalog):
+    repository = IcebergCustomAoiRepository(
+        catalog, TABLE, INDEX, max_table_age_seconds=0
+    )
+    await repository.upsert([aoi("a")])
+    catalog.load_table(INDEX).delete(EqualTo("aoi_id", "a"))
+
+    found = await repository.get(["a"])
+
+    assert [stored.aoi_id for stored in found] == ["a"]
 
 
 @pytest.mark.asyncio
