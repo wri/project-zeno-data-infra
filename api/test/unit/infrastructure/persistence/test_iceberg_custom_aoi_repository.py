@@ -3,7 +3,7 @@ import s2sphere
 from pyiceberg.catalog.sql import SqlCatalog
 from pyiceberg.exceptions import NoSuchTableError
 from shapely import from_wkb
-from shapely.geometry import MultiPolygon, box
+from shapely.geometry import MultiPolygon, Polygon, box
 
 from app.domain.models.custom_aoi import CustomAoi, MonitorStatus
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
@@ -116,6 +116,63 @@ async def test_delete_removes_the_aoi_and_its_index_entry_idempotently(
 
     assert sorted(rows_by_id(catalog, TABLE)) == ["b"]
     assert sorted(rows_by_id(catalog, INDEX)) == ["b"]
+
+
+@pytest.mark.asyncio
+async def test_get_returns_the_stored_aois_in_requested_order(repository):
+    await repository.upsert(
+        [aoi("a", monitor_status=MonitorStatus.monitored), aoi("b", origin=(100, 40))]
+    )
+
+    found = await repository.get(["b", "missing", "a"])
+
+    assert [stored.aoi_id for stored in found] == ["b", "a"]
+    assert found[1] == aoi("a", monitor_status=MonitorStatus.monitored)
+
+
+@pytest.mark.asyncio
+async def test_intersecting_returns_only_aois_touching_the_geometry(repository):
+    await repository.upsert(
+        [
+            aoi("touched", origin=(10, 20)),
+            aoi("inside_bounds_only", origin=(12, 22)),
+            aoi("far", origin=(100, 40)),
+        ]
+    )
+    # L shape along the bottom and left of a 10-14, 20-24 square
+    l_shape = Polygon(
+        [(10, 20), (14, 20), (14, 20.5), (10.5, 20.5), (10.5, 24), (10, 24)]
+    )
+
+    found = await repository.intersecting(l_shape)
+
+    assert [stored.aoi_id for stored in found] == ["touched"]
+
+
+@pytest.mark.asyncio
+async def test_cached_tables_see_other_writers_once_they_expire(catalog):
+    reader = IcebergCustomAoiRepository(catalog, TABLE, INDEX, max_table_age_seconds=0)
+    writer = IcebergCustomAoiRepository(catalog, TABLE, INDEX)
+    await writer.upsert([aoi("a")])
+    assert [stored.aoi_id for stored in await reader.get(["a"])] == ["a"]
+
+    await writer.upsert([aoi("b", origin=(100, 40))])
+
+    assert [stored.aoi_id for stored in await reader.get(["b"])] == ["b"]
+
+
+@pytest.mark.asyncio
+async def test_own_writes_are_visible_immediately_despite_the_cache(catalog):
+    repository = IcebergCustomAoiRepository(
+        catalog, TABLE, INDEX, max_table_age_seconds=3600
+    )
+    await repository.upsert([aoi("a")])
+    await repository.get(["a"])
+
+    await repository.upsert([aoi("b", origin=(100, 40))])
+    await repository.delete("a")
+
+    assert [stored.aoi_id for stored in await repository.get(["a", "b"])] == ["b"]
 
 
 @pytest.mark.asyncio

@@ -70,7 +70,10 @@ def get_custom_aoi_catalog() -> Catalog:
     return load_catalog("aois")
 
 
+@lru_cache
 def get_custom_aoi_repository() -> CustomAoiRepository:
+    """One repository per process, so its cached tables are reused across
+    requests."""
     return IcebergCustomAoiRepository(
         get_custom_aoi_catalog(), "custom.custom_aois", "custom.custom_aoi_cells"
     )
