@@ -1,8 +1,11 @@
+import json
 import dask
 import time
 import traceback
 import xarray as xr
 from typing import List, Optional
+from cogeo_mosaic.backends import MosaicBackend
+from cogeo_mosaic.mosaic import MosaicJSON
 from odc.geo.cog import save_cog_with_dask
 from shapely.geometry import Polygon, box
 
@@ -38,6 +41,12 @@ TILE_DEGREES = 40
 TILE_BLOCKSIZE = 1024    # power of two: required for web-mercator tiling
 TILE_BATCHING = 256      # odc-geo tiles per S3 multipart part
 LAT_LIMIT = 90           # clip the top band to the zarr's edge
+
+# mosaic options
+MERCATOR_MAX_LAT = 85.0511287798066  # web-mercator latitude limit
+MOSAIC_MIN_ZOOM = 2
+MOSAIC_MAX_ZOOM = 12
+MOSAIC_QUADKEY_ZOOM = 5   # index granularity: most lookups resolve to a single COG
 
 # --- helper functions to create COG tiles ---
 def tile_name(min_lon, max_lat) -> str:
@@ -161,3 +170,37 @@ def create_cogs(
     print(f"\n{len(written)} written, {len(failed)} failed in "
           f"{(time.time() - started_all) / 60:.0f} min")
     return written, failed
+
+
+def create_mosaic(tile_uris, prefix=COG_TILE_PREFIX, overwrite=False, clamp_global=True):
+    """Build the mosaic.json index over the net-flux COG tiles at {prefix}/mosaic.json.
+    clamp_global forces the global web-mercator extent (tiles carry data past the
+    85.05 N/S limit); otherwise from_urls' own bounds are kept (e.g. a bbox subset)."""
+    mosaic_uri = f"{prefix}/mosaic.json"
+    if not overwrite and s3_uri_exists(mosaic_uri):
+        return mosaic_uri
+
+    mosaic = MosaicJSON.from_urls(
+        sorted(tile_uris),
+        minzoom=MOSAIC_MIN_ZOOM, maxzoom=MOSAIC_MAX_ZOOM, quadkey_zoom=MOSAIC_QUADKEY_ZOOM,
+    )
+    definition = json.loads(mosaic.model_dump_json(exclude_none=True))
+    bounds = [round(v, 6) for v in definition["bounds"]]
+    if clamp_global:
+        bounds[0], bounds[2], bounds[3] = -180.0, 180.0, MERCATOR_MAX_LAT
+    definition["bounds"] = bounds
+    definition["center"] = [
+        round((bounds[0] + bounds[2]) / 2, 6),
+        round((bounds[1] + bounds[3]) / 2, 6),
+        definition["minzoom"],
+    ]
+
+    with MosaicBackend(mosaic_uri, mosaic_def=MosaicJSON(**definition)) as backend:
+        backend.write(overwrite=True)
+
+    per_quadkey = [len(v) for v in definition["tiles"].values()]
+    assets = len(set().union(*definition["tiles"].values())) if per_quadkey else 0
+    print(f"wrote {mosaic_uri}: {len(per_quadkey)} quadkeys, {assets} assets, "
+          f"{min(per_quadkey, default=0)}-{max(per_quadkey, default=0)} assets/quadkey, "
+          f"bounds {definition['bounds']}", flush=True)
+    return mosaic_uri

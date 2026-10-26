@@ -17,6 +17,7 @@ from pipelines.land_ghg_inventory.create_agriculture_assets import (
 )
 from pipelines.land_ghg_inventory.create_lulucf_assets import (
     create_cogs,
+    create_mosaic,
     create_net_flux_zarr,
 )
 
@@ -74,6 +75,19 @@ def prepare_lulucf_cogs(
     if failed:
         raise RuntimeError(f"{len(failed)} COG tiles failed: {sorted(failed)}")
     return written
+
+
+@task
+def prepare_lulucf_mosaic(
+    written: dict,
+    prefix: Optional[str] = None,
+    overwrite: bool = False,
+    clamp_global: bool = True,
+) -> str:
+    kwargs = {} if prefix is None else {"prefix": prefix}
+    return create_mosaic(
+        sorted(written.values()), overwrite=overwrite, clamp_global=clamp_global, **kwargs
+    )
 
 
 @task

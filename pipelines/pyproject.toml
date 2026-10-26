@@ -30,6 +30,7 @@ dependencies = [
     "earthengine-api",
     "xee",
     "distributed==2025.5.1",
+    "cogeo-mosaic>=9.2.0",
 ]
 
 [dependency-groups]

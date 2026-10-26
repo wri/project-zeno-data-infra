@@ -269,8 +269,8 @@ def land_ghg_inventory_net_flux(
     vegetation + mineral SOC + organic peat annual per-hectare zarr, plus
     its 40-deg COG tiles.
 
-    ``bbox`` allows for a test run with a bbox, saving the COGs in a /test
-    subdirectory."""
+    ``bbox`` allows for a test run with a bbox, saving the COGs and mosaic.json
+    in a /test subdirectory."""
     cog_prefix = (
         land_ghg_inventory_net_flux_cog_tile_prefix
         if bbox is None
@@ -279,10 +279,12 @@ def land_ghg_inventory_net_flux(
     net_flux_zarr_uri = land_ghg_inventory_tasks.prepare_net_flux_zarr.with_options(
         name="land_ghg_inventory-net-flux--create-zarr"
     )(overwrite=overwrite)
-    land_ghg_inventory_tasks.prepare_lulucf_cogs.with_options(
+    written = land_ghg_inventory_tasks.prepare_lulucf_cogs.with_options(
         name="land_ghg_inventory-net-flux-write-cogs"
     )(net_flux_zarr_uri, bbox=bbox, prefix=cog_prefix, overwrite=overwrite)
-    return cog_prefix
+    return land_ghg_inventory_tasks.prepare_lulucf_mosaic.with_options(
+        name="land_ghg_inventory-net-flux-write-mosaic"
+    )(written, prefix=cog_prefix, overwrite=overwrite, clamp_global=bbox is None)
 
 
 # component name -> its subflow. Add new components (e.g. soil) here to expose
