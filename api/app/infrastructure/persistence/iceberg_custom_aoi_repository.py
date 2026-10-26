@@ -36,18 +36,18 @@ from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 def custom_aoi_schema() -> Schema:
     return Schema(
         NestedField(1, "aoi_id", StringType(), required=True),
-        NestedField(2, "area_ha", DoubleType(), required=True),
-        NestedField(3, "geometry", BinaryType(), required=True),
-        NestedField(4, "updated_at", TimestamptzType(), required=True),
-        NestedField(5, "name", StringType(), required=True),
-        NestedField(6, "user_id", StringType(), required=True),
-        NestedField(7, "monitor_status", StringType(), required=True),
+        NestedField(2, "name", StringType(), required=True),
+        NestedField(3, "user_id", StringType(), required=True),
+        NestedField(4, "email", StringType(), required=True),
+        NestedField(5, "monitor_status", StringType(), required=True),
+        NestedField(6, "geometry", BinaryType(), required=True),
+        NestedField(7, "area_ha", DoubleType(), required=True),
         NestedField(8, "xmin", DoubleType(), required=True),
         NestedField(9, "ymin", DoubleType(), required=True),
         NestedField(10, "xmax", DoubleType(), required=True),
         NestedField(11, "ymax", DoubleType(), required=True),
         NestedField(12, "s2_cell", LongType(), required=True),
-        NestedField(13, "email", StringType(), required=True),
+        NestedField(13, "updated_at", TimestamptzType(), required=True),
     )
 
 
@@ -75,12 +75,9 @@ class CachedTables:
         if not fresh and cached and self.clock() - cached[1] < self.max_age_seconds:
             return cached[0]
         table = self.catalog.load_table(name)
-        self.keep(name, table)
-        return table
-
-    def keep(self, name: str, table: Table) -> None:
         with self.lock:
             self.loaded[name] = (table, self.clock())
+        return table
 
 
 class IcebergCustomAoiRepository(CustomAoiRepository):
@@ -88,10 +85,10 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
     the S2 cell of each geometry's centroid so spatial reads skip most files.
 
     A second table indexes each AOI's cell, so reads and writes by id only touch
-    that AOI's partitions. An id without an index entry is treated as new. The
-    data table is always written first, so if an index write fails, the next save
-    of that AOI repairs the entry. Both tables are provisioned ahead of time; the
-    partition is added on first use if it's missing.
+    that AOI's partition. An id without an index entry is treated as new. The data
+    table is written first, so if an index write fails, the next save of that AOI
+    repairs the entry. Both tables must already exist; the data table's partition
+    is added on first use if it's missing.
 
     Reads reuse loaded tables for up to max_table_age_seconds, so they may miss
     another instance's writes for that long; this instance's own writes are
@@ -125,6 +122,37 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._intersecting, geometry)
 
+    def _upsert(self, aois: List[CustomAoi]) -> None:
+        rows = to_arrow(aois, self.cell_level)
+        ids = [aoi.aoi_id for aoi in aois]
+        cells = [*self.cells(ids).values(), *rows.column("s2_cell").to_pylist()]
+
+        def replace(table: Table) -> None:
+            with table.transaction() as transaction:
+                transaction.delete(self.rows_for(ids, cells))
+                transaction.append(rows)
+
+        self.commit(self.table, replace)
+        index_rows = rows.select(["aoi_id", "s2_cell"]).cast(
+            custom_aoi_cell_schema().as_arrow()
+        )
+        self.commit(
+            self.index_table,
+            lambda index: index.upsert(index_rows, join_cols=["aoi_id"]),
+        )
+
+    def _delete(self, aoi_id: str) -> None:
+        cells = self.cells([aoi_id])
+        rows = (
+            self.rows_for([aoi_id], cells.values())
+            if cells
+            else EqualTo("aoi_id", aoi_id)
+        )
+        self.commit(self.table, lambda table: table.delete(rows))
+        self.commit(
+            self.index_table, lambda index: index.delete(EqualTo("aoi_id", aoi_id))
+        )
+
     def _get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
         cells = self.cells(aoi_ids)
         if not cells:
@@ -147,45 +175,12 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
         rows = self.table().scan(
             row_filter=overlapping, selected_fields=("aoi_id", "geometry")
         )
-        candidates = geometries_from_arrow(rows.to_arrow())
         shapely.prepare(geometry)
-        return [aoi for aoi in candidates if geometry.intersects(aoi.geometry)]
-
-    def _upsert(self, aois: List[CustomAoi]) -> None:
-        rows = to_arrow(aois, self.cell_level)
-        ids = [aoi.aoi_id for aoi in aois]
-        previous_cells = self.cells(ids)
-        new_cells = rows.column("s2_cell").to_pylist()
-        replaced = self.rows_for(ids, [*previous_cells.values(), *new_cells])
-
-        def replace(table: Table) -> None:
-            with table.transaction() as transaction:
-                transaction.delete(replaced)
-                transaction.append(rows)
-
-        self.commit(self.table, replace)
-        index_rows = rows.select(["aoi_id", "s2_cell"]).cast(
-            custom_aoi_cell_schema().as_arrow()
-        )
-        self.commit(
-            self.index_table,
-            lambda index: index.upsert(index_rows, join_cols=["aoi_id"]),
-        )
-
-    def _delete(self, aoi_id: str) -> None:
-        cells = self.cells([aoi_id])
-        if cells:
-            self.commit(
-                self.table,
-                lambda table: table.delete(self.rows_for([aoi_id], cells.values())),
-            )
-        else:
-            self.commit(
-                self.table, lambda table: table.delete(EqualTo("aoi_id", aoi_id))
-            )
-        self.commit(
-            self.index_table, lambda index: index.delete(EqualTo("aoi_id", aoi_id))
-        )
+        return [
+            aoi
+            for aoi in geometries_from_arrow(rows.to_arrow())
+            if geometry.intersects(aoi.geometry)
+        ]
 
     def cells(self, aoi_ids: List[str]) -> Dict[str, int]:
         """The indexed S2 cell of each id that has an index entry."""
@@ -210,50 +205,46 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
 
     def table(self, fresh: bool = False) -> Table:
         table = self.tables.get(self.table_name, fresh)
-        if self.is_partitioned(table):
-            return table
-        table = self.partition(table)
-        self.tables.keep(self.table_name, table)
+        if not is_partitioned(table):
+            self.partition(table)
+            table = self.tables.get(self.table_name, fresh=True)
         return table
 
     def index_table(self, fresh: bool = False) -> Table:
         return self.tables.get(self.index_table_name, fresh)
 
-    @staticmethod
-    def is_partitioned(table: Table) -> bool:
-        return any(field.name == "s2_cell" for field in table.spec().fields)
-
-    def partition(self, table: Table) -> Table:
+    def partition(self, table: Table) -> None:
         """Adds the S2 cell partition. Another writer may add it first, so a
         failed commit is checked against the latest table before retrying."""
         for attempt in range(1, self.commit_attempts + 1):
             try:
                 with table.update_spec() as update:
                     update.add_identity("s2_cell")
-                return self.catalog.load_table(self.table_name)
+                return
             except CommitFailedException:
                 table = self.catalog.load_table(self.table_name)
-                if self.is_partitioned(table):
-                    return table
+                if is_partitioned(table):
+                    return
                 if attempt == self.commit_attempts:
                     raise
-        return table
 
     def commit(
         self, load: Callable[..., Table], change: Callable[[Table], object]
     ) -> None:
         """Applies the change to the latest table, retrying when another writer
-        committed first. The committed table replaces the cached one, so this
-        instance's reads see its own writes."""
+        committed first. The committed table stays cached, so this instance's
+        reads see its own writes."""
         for attempt in range(1, self.commit_attempts + 1):
             try:
-                table = load(fresh=True)
-                change(table)
-                self.tables.keep(".".join(table.name()), table)
+                change(load(fresh=True))
                 return
             except CommitFailedException:
                 if attempt == self.commit_attempts:
                     raise
+
+
+def is_partitioned(table: Table) -> bool:
+    return any(field.name == "s2_cell" for field in table.spec().fields)
 
 
 def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
@@ -262,18 +253,18 @@ def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
     return pa.table(
         {
             "aoi_id": [aoi.aoi_id for aoi in aois],
-            "area_ha": [aoi.area_ha for aoi in aois],
-            "geometry": [shapely.to_wkb(aoi.geometry) for aoi in aois],
-            "updated_at": [datetime.now(timezone.utc)] * len(aois),
             "name": [aoi.name for aoi in aois],
             "user_id": [aoi.user_id for aoi in aois],
             "email": [aoi.email for aoi in aois],
             "monitor_status": [aoi.monitor_status.value for aoi in aois],
+            "geometry": [shapely.to_wkb(aoi.geometry) for aoi in aois],
+            "area_ha": [aoi.area_ha for aoi in aois],
             "xmin": bounds[:, 0],
             "ymin": bounds[:, 1],
             "xmax": bounds[:, 2],
             "ymax": bounds[:, 3],
             "s2_cell": [s2_cell(aoi.geometry, cell_level) for aoi in aois],
+            "updated_at": [datetime.now(timezone.utc)] * len(aois),
         },
         schema=custom_aoi_schema().as_arrow(),
     )
@@ -286,7 +277,7 @@ def geometries_from_arrow(rows: pa.Table) -> List[CustomAoiGeometry]:
     ]
 
 
-def s2_cell(geometry, level: int) -> int:
+def s2_cell(geometry: BaseGeometry, level: int) -> int:
     """The S2 cell at this level containing the geometry's centroid, as a signed
     64-bit integer to fit Iceberg's long type."""
     centroid = geometry.centroid

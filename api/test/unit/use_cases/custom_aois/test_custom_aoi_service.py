@@ -40,7 +40,7 @@ class FakeCustomAoiRepository:
 
 
 @pytest.mark.asyncio
-async def test_saved_areas_are_2d_multipolygons_with_geodesic_area():
+async def test_saved_aois_are_2d_multipolygons_with_geodesic_area():
     repository = FakeCustomAoiRepository()
     polygon_z = Polygon([(0, 0, 5), (1, 0, 5), (1, 1, 5), (0, 1, 5), (0, 0, 5)])
 

@@ -872,7 +872,7 @@ data "aws_iam_policy_document" "ecs_task_analysis_access" {
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.analysis_results.arn]
   }
-  # Read and write the custom AOI Iceberg table
+  # Read and write the custom AOI Iceberg tables
   statement {
     effect = "Allow"
     actions = [
@@ -921,21 +921,6 @@ resource "aws_s3tables_table" "custom_aois" {
           required = true
         }
         field {
-          name     = "area_ha"
-          type     = "double"
-          required = true
-        }
-        field {
-          name     = "geometry"
-          type     = "binary"
-          required = true
-        }
-        field {
-          name     = "updated_at"
-          type     = "timestamptz"
-          required = true
-        }
-        field {
           name     = "name"
           type     = "string"
           required = true
@@ -946,8 +931,23 @@ resource "aws_s3tables_table" "custom_aois" {
           required = true
         }
         field {
+          name     = "email"
+          type     = "string"
+          required = true
+        }
+        field {
           name     = "monitor_status"
           type     = "string"
+          required = true
+        }
+        field {
+          name     = "geometry"
+          type     = "binary"
+          required = true
+        }
+        field {
+          name     = "area_ha"
+          type     = "double"
           required = true
         }
         field {
@@ -976,8 +976,8 @@ resource "aws_s3tables_table" "custom_aois" {
           required = true
         }
         field {
-          name     = "email"
-          type     = "string"
+          name     = "updated_at"
+          type     = "timestamptz"
           required = true
         }
       }
