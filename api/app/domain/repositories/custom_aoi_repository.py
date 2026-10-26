@@ -3,7 +3,7 @@ from typing import List
 
 from shapely.geometry.base import BaseGeometry
 
-from app.domain.models.custom_aoi import CustomAoi
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
 
 
 class CustomAoiRepository(ABC):
@@ -16,10 +16,10 @@ class CustomAoiRepository(ABC):
         """Remove the AOI, if it exists."""
 
     @abstractmethod
-    async def get(self, aoi_ids: List[str]) -> List[CustomAoi]:
-        """The stored AOIs with these ids, in the order requested. Ids that
-        aren't stored are left out."""
+    async def get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
+        """The geometries of the stored AOIs with these ids, in the order
+        requested. Ids that aren't stored are left out."""
 
     @abstractmethod
-    async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoi]:
-        """The stored AOIs whose geometry intersects this geometry."""
+    async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
+        """The geometries of the stored AOIs that intersect this geometry."""

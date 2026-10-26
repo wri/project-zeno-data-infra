@@ -29,7 +29,7 @@ from pyiceberg.types import (
 )
 from shapely.geometry.base import BaseGeometry
 
-from app.domain.models.custom_aoi import CustomAoi, MonitorStatus
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 
 
@@ -47,6 +47,7 @@ def custom_aoi_schema() -> Schema:
         NestedField(10, "xmax", DoubleType(), required=True),
         NestedField(11, "ymax", DoubleType(), required=True),
         NestedField(12, "s2_cell", LongType(), required=True),
+        NestedField(13, "email", StringType(), required=True),
     )
 
 
@@ -118,21 +119,24 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
     async def delete(self, aoi_id: str) -> None:
         await asyncio.to_thread(self._delete, aoi_id)
 
-    async def get(self, aoi_ids: List[str]) -> List[CustomAoi]:
+    async def get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._get, aoi_ids)
 
-    async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoi]:
+    async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._intersecting, geometry)
 
-    def _get(self, aoi_ids: List[str]) -> List[CustomAoi]:
+    def _get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
         cells = self.cells(aoi_ids)
         if not cells:
             return []
-        rows = self.table().scan(row_filter=self.rows_for(list(cells), cells.values()))
-        by_id = {aoi.aoi_id: aoi for aoi in from_arrow(rows.to_arrow())}
+        rows = self.table().scan(
+            row_filter=self.rows_for(list(cells), cells.values()),
+            selected_fields=("aoi_id", "geometry"),
+        )
+        by_id = {aoi.aoi_id: aoi for aoi in geometries_from_arrow(rows.to_arrow())}
         return [by_id[aoi_id] for aoi_id in aoi_ids if aoi_id in by_id]
 
-    def _intersecting(self, geometry: BaseGeometry) -> List[CustomAoi]:
+    def _intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         """Prunes files and rows by bounding box, then keeps the AOIs that
         actually intersect the geometry."""
         xmin, ymin, xmax, ymax = geometry.bounds
@@ -140,7 +144,10 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
             And(LessThanOrEqual("xmin", xmax), GreaterThanOrEqual("xmax", xmin)),
             And(LessThanOrEqual("ymin", ymax), GreaterThanOrEqual("ymax", ymin)),
         )
-        candidates = from_arrow(self.table().scan(row_filter=overlapping).to_arrow())
+        rows = self.table().scan(
+            row_filter=overlapping, selected_fields=("aoi_id", "geometry")
+        )
+        candidates = geometries_from_arrow(rows.to_arrow())
         shapely.prepare(geometry)
         return [aoi for aoi in candidates if geometry.intersects(aoi.geometry)]
 
@@ -260,6 +267,7 @@ def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
             "updated_at": [datetime.now(timezone.utc)] * len(aois),
             "name": [aoi.name for aoi in aois],
             "user_id": [aoi.user_id for aoi in aois],
+            "email": [aoi.email for aoi in aois],
             "monitor_status": [aoi.monitor_status.value for aoi in aois],
             "xmin": bounds[:, 0],
             "ymin": bounds[:, 1],
@@ -271,16 +279,9 @@ def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
     )
 
 
-def from_arrow(rows: pa.Table) -> List[CustomAoi]:
+def geometries_from_arrow(rows: pa.Table) -> List[CustomAoiGeometry]:
     return [
-        CustomAoi(
-            aoi_id=row["aoi_id"],
-            geometry=shapely.from_wkb(row["geometry"]),
-            area_ha=row["area_ha"],
-            name=row["name"],
-            user_id=row["user_id"],
-            monitor_status=MonitorStatus(row["monitor_status"]),
-        )
+        CustomAoiGeometry(row["aoi_id"], shapely.from_wkb(row["geometry"]))
         for row in rows.to_pylist()
     ]
 

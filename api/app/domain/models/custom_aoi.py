@@ -16,4 +16,13 @@ class CustomAoi:
     area_ha: float
     name: str
     user_id: str
+    email: str
     monitor_status: MonitorStatus
+
+
+@dataclass(frozen=True)
+class CustomAoiGeometry:
+    """A stored custom AOI's geometry, without its owner's details."""
+
+    aoi_id: str
+    geometry: MultiPolygon

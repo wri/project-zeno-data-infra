@@ -19,6 +19,7 @@ def custom_aois(*geometries_by_id):
                 "geometry": mapping(geometry),
                 "name": "My forest",
                 "user_id": "user-1",
+                "email": "owner@example.org",
                 "monitor_status": "monitored",
             }
             for aoi_id, geometry in geometries_by_id
@@ -46,9 +47,10 @@ async def test_saved_areas_are_2d_multipolygons_with_geodesic_area():
     await CustomAoiService(repository).save(custom_aois(("a", polygon_z)))
 
     stored = repository.stored["a"]
-    assert (stored.name, stored.user_id, stored.monitor_status) == (
+    assert (stored.name, stored.user_id, stored.email, stored.monitor_status) == (
         "My forest",
         "user-1",
+        "owner@example.org",
         MonitorStatus.monitored,
     )
     assert isinstance(stored.geometry, MultiPolygon)

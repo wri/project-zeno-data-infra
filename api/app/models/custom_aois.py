@@ -1,7 +1,7 @@
 from typing import Any, ClassVar, Dict, List
 
 import shapely
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from shapely.geometry import shape
 
 from app.domain.models.custom_aoi import MonitorStatus
@@ -11,6 +11,9 @@ class CustomAoiIn(BaseModel):
     id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=1)
     user_id: str = Field(..., min_length=1)
+    email: EmailStr = Field(
+        ..., description="The owner's email, for notifications about this AOI."
+    )
     monitor_status: MonitorStatus = MonitorStatus.not_monitored
     geometry: Dict[str, Any] = Field(
         ..., description="GeoJSON Polygon or MultiPolygon, in WGS84."

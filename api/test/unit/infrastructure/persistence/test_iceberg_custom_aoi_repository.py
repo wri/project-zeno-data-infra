@@ -5,7 +5,7 @@ from pyiceberg.exceptions import NoSuchTableError
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from app.domain.models.custom_aoi import CustomAoi, MonitorStatus
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, MonitorStatus
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
     custom_aoi_cell_schema,
@@ -41,6 +41,7 @@ def aoi(aoi_id, size=1, monitor_status=MonitorStatus.not_monitored, origin=(0, 0
         float(size),
         name=f"Area {aoi_id}",
         user_id="user-1",
+        email="owner@example.org",
         monitor_status=monitor_status,
     )
 
@@ -63,11 +64,12 @@ async def test_upsert_replaces_existing_ids(repository, catalog):
     rows = rows_by_id(catalog, TABLE)
     assert sorted(rows) == ["a", "b"]
     assert rows["b"]["area_ha"] == 2.0
-    assert (rows["b"]["name"], rows["b"]["user_id"], rows["b"]["monitor_status"]) == (
-        "Area b",
-        "user-1",
-        "monitored",
-    )
+    assert (
+        rows["b"]["name"],
+        rows["b"]["user_id"],
+        rows["b"]["email"],
+        rows["b"]["monitor_status"],
+    ) == ("Area b", "user-1", "owner@example.org", "monitored")
     assert from_wkb(rows["b"]["geometry"]).area == 4.0
 
 
@@ -119,15 +121,15 @@ async def test_delete_removes_the_aoi_and_its_index_entry_idempotently(
 
 
 @pytest.mark.asyncio
-async def test_get_returns_the_stored_aois_in_requested_order(repository):
-    await repository.upsert(
-        [aoi("a", monitor_status=MonitorStatus.monitored), aoi("b", origin=(100, 40))]
-    )
+async def test_get_returns_only_ids_and_geometries_in_requested_order(repository):
+    await repository.upsert([aoi("a"), aoi("b", size=2, origin=(100, 40))])
 
     found = await repository.get(["b", "missing", "a"])
 
-    assert [stored.aoi_id for stored in found] == ["b", "a"]
-    assert found[1] == aoi("a", monitor_status=MonitorStatus.monitored)
+    assert found == [
+        CustomAoiGeometry("b", MultiPolygon([box(100, 40, 102, 42)])),
+        CustomAoiGeometry("a", MultiPolygon([box(0, 0, 1, 1)])),
+    ]
 
 
 @pytest.mark.asyncio

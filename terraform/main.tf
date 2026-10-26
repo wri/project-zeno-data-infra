@@ -975,6 +975,11 @@ resource "aws_s3tables_table" "custom_aois" {
           type     = "long"
           required = true
         }
+        field {
+          name     = "email"
+          type     = "string"
+          required = true
+        }
       }
     }
   }

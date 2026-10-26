@@ -51,7 +51,7 @@ def circle(coordinates):
     return Polygon(np.column_stack([np.cos(angles), np.sin(angles)]))
 
 
-OWNER = {"name": "My forest", "user_id": "user-1"}
+OWNER = {"name": "My forest", "user_id": "user-1", "email": "owner@example.org"}
 
 
 def custom_aois(*ids, geometry=None, **fields):
@@ -64,20 +64,25 @@ def custom_aois(*ids, geometry=None, **fields):
     }
 
 
-def test_put_saves_each_aoi_with_its_owner_name_and_monitor_status(service):
+def test_put_saves_each_aoi_with_its_owner_and_monitor_status(service):
     body = custom_aois("a", "b")
-    body["aois"][1].update(name="Watched", user_id="user-2", monitor_status="monitored")
+    body["aois"][1].update(
+        name="Watched",
+        user_id="user-2",
+        email="other@example.org",
+        monitor_status="monitored",
+    )
 
     response = client.put("/v0/custom_aois", json=body, headers=ADMIN)
 
     assert response.status_code == 200
     assert response.json()["data"]["ids"] == ["a", "b"]
     assert [
-        (aoi.id, aoi.name, aoi.user_id, aoi.monitor_status)
+        (aoi.id, aoi.name, aoi.user_id, aoi.email, aoi.monitor_status)
         for aoi in service.saved.aois
     ] == [
-        ("a", "My forest", "user-1", MonitorStatus.not_monitored),
-        ("b", "Watched", "user-2", MonitorStatus.monitored),
+        ("a", "My forest", "user-1", "owner@example.org", MonitorStatus.not_monitored),
+        ("b", "Watched", "user-2", "other@example.org", MonitorStatus.monitored),
     ]
 
 
@@ -110,8 +115,10 @@ def test_writes_require_an_admin(service, headers, status):
         custom_aois("a", geometry={"type": "Point", "coordinates": [0, 0]}),
         {"aois": [{"geometry": mapping(box(0, 0, 1, 1)), **OWNER}]},
         custom_aois("a", geometry=mapping(circle(coordinates=100_002))),
-        custom_aois("a", name="My forest"),
-        custom_aois("a", user_id="user-1"),
+        custom_aois("a", name="My forest", email="owner@example.org"),
+        custom_aois("a", user_id="user-1", email="owner@example.org"),
+        custom_aois("a", name="My forest", user_id="user-1"),
+        custom_aois("a", **{**OWNER, "email": "not-an-email"}),
         custom_aois("a", **OWNER, monitor_status="on"),
     ],
     ids=[
@@ -122,6 +129,8 @@ def test_writes_require_an_admin(service, headers, status):
         "over 100,000 coordinates",
         "missing user id",
         "missing name",
+        "missing email",
+        "invalid email",
         "unknown monitor status",
     ],
 )
