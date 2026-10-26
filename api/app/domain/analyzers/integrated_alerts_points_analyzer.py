@@ -73,7 +73,7 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
             if start_date > end_date:
                 truncated[aoi_id] = False
                 continue
-            page = await self.points_repository.newest_points(
+            page = await self.points_repository.read_most_recent_points(
                 AlertPointsQuery(
                     geometry=geometry,
                     start_date=start_date,

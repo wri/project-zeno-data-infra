@@ -23,7 +23,7 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
     date_to_day,
     day_to_date,
     load_alert_points_table,
-    newest_points,
+    read_most_recent_rows,
 )
 
 ALL_CONFIDENCES = [2, 3, 4]
@@ -120,7 +120,7 @@ def test_all_points_match_brute_force(
     geom = aoi_polygon()
     expected = brute_force(points, geom, start_day, end_day, confidences, classes)
 
-    result, truncated, _ = newest_points(
+    result, truncated, _ = read_most_recent_rows(
         table, geom, start_day, end_day, confidences, classes, limit=len(points)
     )
 
@@ -135,7 +135,7 @@ def test_limit_returns_the_newest_points(table, points, limit):
     start_day = LATEST_DAY - DAYS_STORED + 1
     expected = brute_force(points, geom, start_day, LATEST_DAY, ALL_CONFIDENCES, None)
 
-    result, truncated, _ = newest_points(
+    result, truncated, _ = read_most_recent_rows(
         table, geom, start_day, LATEST_DAY, ALL_CONFIDENCES, None, limit=limit
     )
 
@@ -148,7 +148,7 @@ def test_limit_equal_to_matches_is_not_truncated(table, points):
     start_day = LATEST_DAY - DAYS_STORED + 1
     expected = brute_force(points, geom, start_day, LATEST_DAY, ALL_CONFIDENCES, None)
 
-    result, truncated, _ = newest_points(
+    result, truncated, _ = read_most_recent_rows(
         table, geom, start_day, LATEST_DAY, ALL_CONFIDENCES, None, limit=len(expected)
     )
 
@@ -166,7 +166,7 @@ def test_limit_reads_only_the_newest_dates(table, monkeypatch):
         return read_row_groups(self, row_groups, *args, **kwargs)
 
     monkeypatch.setattr(pq.ParquetFile, "read_row_groups", recording_read_row_groups)
-    newest_points(
+    read_most_recent_rows(
         table,
         geom,
         LATEST_DAY - DAYS_STORED + 1,
@@ -191,7 +191,7 @@ def test_small_page_reads_only_part_of_the_newest_date(table, points, monkeypatc
     monkeypatch.setattr(pq.ParquetFile, "read_row_groups", recording_read_row_groups)
     monkeypatch.setattr(parquet_alert_points_repository, "READ_BATCH_GROUPS", 2)
     start_day = LATEST_DAY - DAYS_STORED + 1
-    result, truncated, _ = newest_points(
+    result, truncated, _ = read_most_recent_rows(
         table, geom, start_day, LATEST_DAY, ALL_CONFIDENCES, None, limit=5
     )
 
@@ -223,7 +223,7 @@ def test_pages_after_the_last_position_join_into_the_full_list(
 
     pages, after, truncated = [], None, True
     while truncated:
-        page, truncated, last = newest_points(
+        page, truncated, last = read_most_recent_rows(
             table,
             geom,
             start_day,
@@ -242,7 +242,7 @@ def test_pages_after_the_last_position_join_into_the_full_list(
 
 def test_aoi_without_alerts_returns_no_points(table):
     far_away = shapely.box(lon(0), lat(100), lon(100), lat(0))
-    result, truncated, _ = newest_points(
+    result, truncated, _ = read_most_recent_rows(
         table, far_away, table.first_day, table.latest_day, ALL_CONFIDENCES, None, 10
     )
     assert result.empty
@@ -291,7 +291,9 @@ async def test_repository_pages_are_points_in_domain_terms(table, points):
 
     pages, after, more = [], None, True
     while more:
-        page = await repository.newest_points(_query(geom, limit=40, after=after))
+        page = await repository.read_most_recent_points(
+            _query(geom, limit=40, after=after)
+        )
         assert list(page.points.columns) == [
             "lat",
             "lon",
@@ -315,6 +317,6 @@ async def test_repository_pages_are_points_in_domain_terms(table, points):
 @pytest.mark.parametrize("position", ["", "3", "3:x", "-1:0", "1:2:3"])
 async def test_repository_rejects_a_position_it_did_not_make(table, position):
     with pytest.raises(ValueError, match="Not a valid points cursor"):
-        await ParquetAlertPointsRepository(table.path).newest_points(
+        await ParquetAlertPointsRepository(table.path).read_most_recent_points(
             _query(aoi_polygon(), limit=5, after=position)
         )

@@ -54,7 +54,7 @@ class AlertPointsRepository(ABC):
         pass
 
     @abstractmethod
-    async def newest_points(self, query: AlertPointsQuery) -> AlertPointsPage:
+    async def read_most_recent_points(self, query: AlertPointsQuery) -> AlertPointsPage:
         """Raises ValueError if query.after isn't a position from this
         repository."""
         pass

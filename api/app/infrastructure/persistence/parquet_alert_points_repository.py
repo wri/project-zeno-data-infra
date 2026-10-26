@@ -167,7 +167,7 @@ def load_alert_points_table(uri: str) -> AlertPointsTable:
     )
 
 
-def newest_points(
+def read_most_recent_rows(
     table: AlertPointsTable,
     geom: BaseGeometry,
     start_day: int,
@@ -285,7 +285,7 @@ def _keep_points(
     points, inside = points[keep], interior[keep].copy()
 
     # Points from row groups entirely inside the AOI are inside it; the others get
-    # the exact test, against the AOI prepared in newest_points.
+    # the exact test, against the AOI prepared in read_most_recent_rows.
     edge = np.flatnonzero(~inside)
     if len(edge) == 0:
         return points
@@ -310,7 +310,7 @@ def _empty_points() -> pd.DataFrame:
 
 
 class ParquetAlertPointsRepository(AlertPointsRepository):
-    """Alert points from an alert points table parquet (see newest_points). A
+    """Alert points from an alert points table parquet (see read_most_recent_rows). A
     page's position is the (row group, row) of its last point in the file."""
 
     def __init__(self, uri: str):
@@ -324,13 +324,13 @@ class ParquetAlertPointsRepository(AlertPointsRepository):
             latest_date=day_to_date(table.latest_day),
         )
 
-    async def newest_points(self, query: AlertPointsQuery) -> AlertPointsPage:
-        return await asyncio.to_thread(self._newest_points, query)
-
-    def _newest_points(self, query: AlertPointsQuery) -> AlertPointsPage:
-        table = load_alert_points_table(self.uri)
+    async def read_most_recent_points(self, query: AlertPointsQuery) -> AlertPointsPage:
+        # Loading the table (cached after the first call) and reading row groups
+        # block, so they run in a thread; the rest is cheap.
+        table = await asyncio.to_thread(load_alert_points_table, self.uri)
         after = None if query.after is None else _decode_position(query.after)
-        points, more, last = newest_points(
+        rows, more, last = await asyncio.to_thread(
+            read_most_recent_rows,
             table,
             query.geometry,
             (query.start_date - ALERT_EPOCH).days,
@@ -340,16 +340,16 @@ class ParquetAlertPointsRepository(AlertPointsRepository):
             query.limit,
             after,
         )
-        days = points["alert_date"].to_numpy()
+        days = rows["alert_date"].to_numpy()
         dates = {d: day_to_date(d) for d in np.unique(days)}
         return AlertPointsPage(
             points=pd.DataFrame(
                 {
-                    "lat": table.lat(points["row"].to_numpy()),
-                    "lon": table.lon(points["col"].to_numpy()),
+                    "lat": table.lat(rows["row"].to_numpy()),
+                    "lon": table.lon(rows["col"].to_numpy()),
                     "alert_date": [dates[d] for d in days],
-                    "confidence": points["confidence"].to_numpy(),
-                    "natural_lands_class": points["natural_lands_class"].to_numpy(),
+                    "confidence": rows["confidence"].to_numpy(),
+                    "natural_lands_class": rows["natural_lands_class"].to_numpy(),
                 }
             ),
             more=more,

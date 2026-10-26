@@ -360,7 +360,7 @@ class InMemoryAlertPointsRepository(AlertPointsRepository):
     async def source(self) -> AlertPointsSource:
         return AlertPointsSource("v20261020", date(2026, 10, 1), date(2026, 10, 18))
 
-    async def newest_points(self, query) -> AlertPointsPage:
+    async def read_most_recent_points(self, query) -> AlertPointsPage:
         self.queries.append(query)
         start = 0 if query.after is None else int(query.after) + 1
         stop = start + query.limit
