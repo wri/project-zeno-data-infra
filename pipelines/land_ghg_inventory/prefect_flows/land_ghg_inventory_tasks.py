@@ -15,6 +15,10 @@ from pipelines.land_ghg_inventory.create_agriculture_assets import (
     create_agriculture_cogs,
     create_agriculture_zarr,
 )
+from pipelines.land_ghg_inventory.create_lulucf_assets import (
+    create_cogs,
+    create_net_flux_zarr,
+)
 
 
 @task
@@ -49,6 +53,27 @@ def prepare_agriculture_zarr(overwrite: bool = False) -> str:
 @task
 def prepare_agriculture_cogs(overwrite: bool = False) -> Tuple[str, str]:
     return create_agriculture_cogs(overwrite=overwrite)
+
+
+@task
+def prepare_net_flux_zarr(overwrite: bool = False) -> str:
+    return create_net_flux_zarr(overwrite=overwrite)
+
+
+@task
+def prepare_lulucf_cogs(
+    net_flux_zarr_uri: str,
+    bbox: Optional[Polygon] = None,
+    prefix: Optional[str] = None,
+    overwrite: bool = False,
+) -> dict:
+    kwargs = {} if prefix is None else {"prefix": prefix}
+    written, failed = create_cogs(
+        bbox=bbox, overwrite=overwrite, net_flux_zarr_uri=net_flux_zarr_uri, **kwargs
+    )
+    if failed:
+        raise RuntimeError(f"{len(failed)} COG tiles failed: {sorted(failed)}")
+    return written
 
 
 @task
