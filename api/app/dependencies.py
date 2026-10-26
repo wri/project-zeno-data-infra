@@ -71,4 +71,6 @@ def get_custom_aoi_catalog() -> Catalog:
 
 
 def get_custom_aoi_repository() -> CustomAoiRepository:
-    return IcebergCustomAoiRepository(get_custom_aoi_catalog(), "custom.custom_aois")
+    return IcebergCustomAoiRepository(
+        get_custom_aoi_catalog(), "custom.custom_aois", "custom.custom_aoi_cells"
+    )

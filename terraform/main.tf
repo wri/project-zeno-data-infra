@@ -902,8 +902,10 @@ resource "aws_s3tables_namespace" "custom" {
   table_bucket_arn = aws_s3tables_table_bucket.tables.arn
 }
 
-# Schema matches the API's custom AOI repository. S3 Tables' default maintenance
-# compacts files and expires old snapshots, so deleted AOIs don't stay readable.
+# Schema matches the API's custom AOI repository, which adds the s2_cell partition
+# on first use (this resource can't declare partitions). Schema changes go through
+# PyIceberg, since changing metadata here replaces the table. S3 Tables' default
+# maintenance compacts files and expires old snapshots.
 resource "aws_s3tables_table" "custom_aois" {
   name             = "custom_aois"
   namespace        = aws_s3tables_namespace.custom.namespace
@@ -946,6 +948,57 @@ resource "aws_s3tables_table" "custom_aois" {
         field {
           name     = "monitor_status"
           type     = "string"
+          required = true
+        }
+        field {
+          name     = "xmin"
+          type     = "double"
+          required = true
+        }
+        field {
+          name     = "ymin"
+          type     = "double"
+          required = true
+        }
+        field {
+          name     = "xmax"
+          type     = "double"
+          required = true
+        }
+        field {
+          name     = "ymax"
+          type     = "double"
+          required = true
+        }
+        field {
+          name     = "s2_cell"
+          type     = "long"
+          required = true
+        }
+      }
+    }
+  }
+}
+
+# Index of each custom AOI's S2 cell, so the API reads and writes by id within one
+# partition of custom_aois. Maintained by the API's custom AOI repository.
+resource "aws_s3tables_table" "custom_aoi_cells" {
+  name             = "custom_aoi_cells"
+  namespace        = aws_s3tables_namespace.custom.namespace
+  table_bucket_arn = aws_s3tables_table_bucket.tables.arn
+  format           = "ICEBERG"
+
+  metadata {
+    iceberg {
+      schema {
+        field {
+          name     = "aoi_id"
+          type     = "string"
+          required = true
+        }
+        field {
+          name     = "s2_cell"
+          type     = "long"
           required = true
         }
       }

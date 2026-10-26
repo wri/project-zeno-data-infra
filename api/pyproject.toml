@@ -33,6 +33,7 @@ dependencies = [
     "zarr",
     "pyiceberg[pyarrow]>=0.9",
     "async-lru>=2.4.0",
+    "s2sphere>=0.2.5",
 ]
 
 [tool.isort]

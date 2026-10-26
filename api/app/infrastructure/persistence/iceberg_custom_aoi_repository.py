@@ -1,17 +1,19 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Callable, List
+from typing import Callable, Dict, List
 
 import pyarrow as pa
+import s2sphere
 import shapely
 from pyiceberg.catalog import Catalog
 from pyiceberg.exceptions import CommitFailedException
-from pyiceberg.expressions import EqualTo
+from pyiceberg.expressions import And, BooleanExpression, EqualTo, In
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table
 from pyiceberg.types import (
     BinaryType,
     DoubleType,
+    LongType,
     NestedField,
     StringType,
     TimestamptzType,
@@ -30,46 +32,153 @@ def custom_aoi_schema() -> Schema:
         NestedField(5, "name", StringType(), required=True),
         NestedField(6, "user_id", StringType(), required=True),
         NestedField(7, "monitor_status", StringType(), required=True),
-        identifier_field_ids=[1],
+        NestedField(8, "xmin", DoubleType(), required=True),
+        NestedField(9, "ymin", DoubleType(), required=True),
+        NestedField(10, "xmax", DoubleType(), required=True),
+        NestedField(11, "ymax", DoubleType(), required=True),
+        NestedField(12, "s2_cell", LongType(), required=True),
+    )
+
+
+def custom_aoi_cell_schema() -> Schema:
+    return Schema(
+        NestedField(1, "aoi_id", StringType(), required=True),
+        NestedField(2, "s2_cell", LongType(), required=True),
     )
 
 
 class IcebergCustomAoiRepository(CustomAoiRepository):
-    """Stores custom AOIs in an Iceberg table with WKB geometries. The table is
-    provisioned ahead of time with this schema."""
+    """Stores custom AOIs in an Iceberg table with WKB geometries, partitioned by
+    the S2 cell of each geometry's centroid so spatial reads skip most files.
 
-    def __init__(self, catalog: Catalog, table_name: str, commit_attempts: int = 3):
+    A second table indexes each AOI's cell, so reads and writes by id only touch
+    that AOI's partitions. An id without an index entry is treated as new. The
+    data table is always written first, so if an index write fails, the next save
+    of that AOI repairs the entry. Both tables are provisioned ahead of time; the
+    partition is added on first use if it's missing."""
+
+    def __init__(
+        self,
+        catalog: Catalog,
+        table_name: str,
+        index_table_name: str,
+        cell_level: int = 5,
+        commit_attempts: int = 3,
+    ):
         self.catalog = catalog
         self.table_name = table_name
+        self.index_table_name = index_table_name
+        self.cell_level = cell_level
         self.commit_attempts = commit_attempts
 
     async def upsert(self, aois: List[CustomAoi]) -> None:
-        rows = to_arrow(aois)
-        await asyncio.to_thread(
-            self.commit, lambda table: table.upsert(rows, join_cols=["aoi_id"])
-        )
+        await asyncio.to_thread(self._upsert, aois)
 
     async def delete(self, aoi_id: str) -> None:
-        await asyncio.to_thread(
-            self.commit, lambda table: table.delete(EqualTo("aoi_id", aoi_id))
+        await asyncio.to_thread(self._delete, aoi_id)
+
+    def _upsert(self, aois: List[CustomAoi]) -> None:
+        rows = to_arrow(aois, self.cell_level)
+        ids = [aoi.aoi_id for aoi in aois]
+        previous_cells = self.cells(ids)
+        new_cells = rows.column("s2_cell").to_pylist()
+        replaced = self.rows_for(ids, [*previous_cells.values(), *new_cells])
+
+        def replace(table: Table) -> None:
+            with table.transaction() as transaction:
+                transaction.delete(replaced)
+                transaction.append(rows)
+
+        self.commit(self.table, replace)
+        index_rows = rows.select(["aoi_id", "s2_cell"]).cast(
+            custom_aoi_cell_schema().as_arrow()
+        )
+        self.commit(
+            self.index_table,
+            lambda index: index.upsert(index_rows, join_cols=["aoi_id"]),
         )
 
-    def table(self) -> Table:
-        return self.catalog.load_table(self.table_name)
+    def _delete(self, aoi_id: str) -> None:
+        cells = self.cells([aoi_id])
+        if cells:
+            self.commit(
+                self.table,
+                lambda table: table.delete(self.rows_for([aoi_id], cells.values())),
+            )
+        else:
+            self.commit(
+                self.table, lambda table: table.delete(EqualTo("aoi_id", aoi_id))
+            )
+        self.commit(
+            self.index_table, lambda index: index.delete(EqualTo("aoi_id", aoi_id))
+        )
 
-    def commit(self, change: Callable[[Table], object]) -> None:
+    def cells(self, aoi_ids: List[str]) -> Dict[str, int]:
+        """The indexed S2 cell of each id that has an index entry."""
+        entries = (
+            self.index_table()
+            .scan(
+                row_filter=In("aoi_id", aoi_ids), selected_fields=("aoi_id", "s2_cell")
+            )
+            .to_arrow()
+        )
+        return dict(
+            zip(
+                entries.column("aoi_id").to_pylist(),
+                entries.column("s2_cell").to_pylist(),
+            )
+        )
+
+    @staticmethod
+    def rows_for(aoi_ids: List[str], cells) -> BooleanExpression:
+        """The rows of these ids, limited to the partitions of these cells."""
+        return And(In("aoi_id", aoi_ids), In("s2_cell", set(cells)))
+
+    def table(self) -> Table:
+        table = self.catalog.load_table(self.table_name)
+        if self.is_partitioned(table):
+            return table
+        return self.partition(table)
+
+    def index_table(self) -> Table:
+        return self.catalog.load_table(self.index_table_name)
+
+    @staticmethod
+    def is_partitioned(table: Table) -> bool:
+        return any(field.name == "s2_cell" for field in table.spec().fields)
+
+    def partition(self, table: Table) -> Table:
+        """Adds the S2 cell partition. Another writer may add it first, so a
+        failed commit is checked against the latest table before retrying."""
+        for attempt in range(1, self.commit_attempts + 1):
+            try:
+                with table.update_spec() as update:
+                    update.add_identity("s2_cell")
+                return self.catalog.load_table(self.table_name)
+            except CommitFailedException:
+                table = self.catalog.load_table(self.table_name)
+                if self.is_partitioned(table):
+                    return table
+                if attempt == self.commit_attempts:
+                    raise
+        return table
+
+    def commit(
+        self, load: Callable[[], Table], change: Callable[[Table], object]
+    ) -> None:
         """Retries when another writer committed first, against the latest table."""
         for attempt in range(1, self.commit_attempts + 1):
             try:
-                change(self.table())
+                change(load())
                 return
             except CommitFailedException:
                 if attempt == self.commit_attempts:
                     raise
 
 
-def to_arrow(aois: List[CustomAoi]) -> pa.Table:
+def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
     """Rows for the AOIs, all stamped with the same save time."""
+    bounds = shapely.bounds([aoi.geometry for aoi in aois])
     return pa.table(
         {
             "aoi_id": [aoi.aoi_id for aoi in aois],
@@ -79,6 +188,21 @@ def to_arrow(aois: List[CustomAoi]) -> pa.Table:
             "name": [aoi.name for aoi in aois],
             "user_id": [aoi.user_id for aoi in aois],
             "monitor_status": [aoi.monitor_status.value for aoi in aois],
+            "xmin": bounds[:, 0],
+            "ymin": bounds[:, 1],
+            "xmax": bounds[:, 2],
+            "ymax": bounds[:, 3],
+            "s2_cell": [s2_cell(aoi.geometry, cell_level) for aoi in aois],
         },
         schema=custom_aoi_schema().as_arrow(),
     )
+
+
+def s2_cell(geometry, level: int) -> int:
+    """The S2 cell at this level containing the geometry's centroid, as a signed
+    64-bit integer to fit Iceberg's long type."""
+    centroid = geometry.centroid
+    cell = s2sphere.CellId.from_lat_lng(
+        s2sphere.LatLng.from_degrees(centroid.y, centroid.x)
+    ).parent(level)
+    return cell.id() - 2**64 if cell.id() >= 2**63 else cell.id()
