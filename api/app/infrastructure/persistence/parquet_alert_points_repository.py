@@ -31,13 +31,12 @@ READ_BATCH_GROUPS = 16
 
 
 def build_points_input_uris(version: str) -> Dict[str, str]:
-    # First iteration: every request reads the 30-day v20261018 table from the
-    # benchmark, whatever the version, until the pipeline publishes one per
-    # version at f"integrated-alerts/{version}/alert-points/by-date.parquet".
+    """The alerts version's points table, written by the integrated alerts
+    pipeline before the version is marked latest."""
     return {
         "alert_points_table_uri": (
-            "s3://lcl-analytics/zonal-statistics/integrated-alerts/test/"
-            "alert-points-index/v20261018/global-30d/by-date.parquet"
+            f"s3://lcl-analytics/zonal-statistics/integrated-alerts/{version}/"
+            "alert-points/by-date.parquet"
         ),
     }
 
