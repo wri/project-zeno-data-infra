@@ -7,6 +7,7 @@ from pipelines.run_updates import (
     UpdateFlow,
     _parse_bbox,
     _validate_flow_args,
+    needs_cluster,
 )
 
 
@@ -39,6 +40,17 @@ def test_version_not_required_for_unversioned_flows(flow_name):
     _validate_flow_args(flow_name, version=None)  # must not raise
 
 
+def test_cluster_is_only_created_for_remote_dask_flows():
+    assert needs_cluster(UpdateFlow.DIST_UPDATE, local=False)
+    assert not needs_cluster(UpdateFlow.DIST_UPDATE, local=True)
+    assert not needs_cluster(UpdateFlow.AOIS_UPDATE, local=False)
+
+
+def test_country_expected_groups_covers_every_iso_code():
+    # flox silently drops group labels >= the expected_groups bound, so the country
+    # axis must exceed the largest numeric ISO code we map.
+    assert max(numeric_to_alpha3) < gadm_country_code_count
+
 @pytest.mark.parametrize(
     "content_date", [None, "2026-9-30", "09/30/2026", "2026-02-30"]
 )
@@ -53,9 +65,3 @@ def test_wur_update_accepts_iso_content_date():
     _validate_flow_args(
         UpdateFlow.WUR_UPDATE, version="v20261018", content_date="2026-09-30"
     )
-
-
-def test_country_expected_groups_covers_every_iso_code():
-    # flox silently drops group labels >= the expected_groups bound, so the country
-    # axis must exceed the largest numeric ISO code we map.
-    assert max(numeric_to_alpha3) < gadm_country_code_count

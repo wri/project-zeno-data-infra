@@ -48,6 +48,7 @@ markers = [
 
 [tool.setuptools]
 packages = [
+  "aois",
   "grasslands",
   "disturbance",
   "carbon_flux",

@@ -3,7 +3,7 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_environment
+from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.analyzers.tree_cover_analyzer import INPUT_URIS, TreeCoverAnalyzer
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
@@ -17,9 +17,7 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_sql_que
 )
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
-from app.domain.repositories.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -50,6 +48,9 @@ def create_analysis_service(
     request: Request,
     analysis_repository=Depends(get_analysis_repository),
     environment: Environment = Depends(get_environment),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
 ) -> AnalysisService:
     compute_engine = ComputeEngine(
         handler=TreeCoverPrecalcHandler(
@@ -59,7 +60,7 @@ def create_analysis_service(
             ),
             next_handler=FloxOTFHandler(
                 environment=environment,
-                aoi_geometry_repository=DataApiAoiGeometryRepository(),
+                aoi_geometry_repository=aoi_geometry_repository,
                 dask_client_router=request.app.state.dask_client_router,
             ),
         )
