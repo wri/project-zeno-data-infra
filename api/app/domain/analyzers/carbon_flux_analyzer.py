@@ -10,6 +10,7 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
 
@@ -42,10 +43,12 @@ class CarbonFluxAnalyzer(Analyzer):
         compute_engine=None,
         query_service=None,
         input_uris: Dict[str, str] | None = None,
+        aoi_geometry_repository: AoiGeometryRepository | None = None,
     ):
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.query_service = query_service
         self.input_uris = input_uris
+        self.aoi_geometry_repository = aoi_geometry_repository
 
     @nr_agent.function_trace(name="CarbonFluxAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
@@ -61,7 +64,9 @@ class CarbonFluxAnalyzer(Analyzer):
             )
         else:
             aois = carbon_flux_analytics_in.aoi.model_dump()
-            geojsons = await get_geojson(aois)
+            geojsons = await get_geojson(
+                carbon_flux_analytics_in.aoi, self.aoi_geometry_repository
+            )
             if aois["type"] != "feature_collection":
                 aoi_list = sorted(
                     [{"type": aois["type"], "id": id} for id in aois["ids"]],

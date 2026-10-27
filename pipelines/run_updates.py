@@ -10,6 +10,8 @@ from prefect import flow, task
 from prefect.logging import get_run_logger
 from shapely.geometry import box
 
+from pipelines.aois.prefect_flows import aois_flow
+from pipelines.aois.sources import aoi_sources
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
 from pipelines.grasslands.prefect_flows import grasslands_flow
@@ -117,6 +119,13 @@ def run_land_ghg_inventory_update(
     )
 
 
+@flow
+def run_aois_update(
+    version=None, overwrite=False, is_latest=False, aoi_source=None
+) -> list[str]:
+    return aois_flow.aois_update(aoi_source, overwrite=overwrite)
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -134,6 +143,7 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    AOIS_UPDATE = "aois_update"
 
 
 update_flows = {
@@ -145,6 +155,7 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
+    UpdateFlow.AOIS_UPDATE: run_aois_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -157,6 +168,9 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
 
+# flows that don't use Dask, so run on the flow's own machine
+CLUSTERLESS_FLOWS = (UpdateFlow.AOIS_UPDATE,)
+
 # flow_name values that route into run_land_ghg_inventory_update
 LAND_GHG_INVENTORY_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_UPDATE,
@@ -165,6 +179,10 @@ LAND_GHG_INVENTORY_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
 )
+
+
+def needs_cluster(flow_name: "UpdateFlow", local: bool) -> bool:
+    return not local and flow_name not in CLUSTERLESS_FLOWS
 
 
 def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
@@ -192,6 +210,7 @@ def run_updates(
     is_latest=False,
     flow_name: UpdateFlow = UpdateFlow.DIST_UPDATE,
     bbox=None,
+    aoi_source=None,
     local=False,
     performance_report_path=None,
 ) -> list[str]:
@@ -210,7 +229,7 @@ def run_updates(
     bbox_geom = _parse_bbox(bbox)
 
     try:
-        if not local:
+        if needs_cluster(flow_name, local):
             dask_client = create_cluster()
 
         flow_fn = update_flows.get(flow_name)
@@ -236,6 +255,8 @@ def run_updates(
         if flow_name in LAND_GHG_INVENTORY_FLOWS:
             kwargs["bbox"] = bbox_geom
             kwargs["flow_name"] = flow_name.value
+        if flow_name == UpdateFlow.AOIS_UPDATE:
+            kwargs["aoi_source"] = aoi_source
         elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
             kwargs["bbox"] = bbox_geom
         with report:
@@ -274,6 +295,12 @@ def run_updates(
     ),
 )
 @click.option(
+    "--aoi-source",
+    type=click.Choice([source.source for source in aoi_sources()]),
+    default=None,
+    help="Build only this AOI source (aois_update only); builds all if omitted.",
+)
+@click.option(
     "--local",
     is_flag=True,
     help="Run compute on this machine instead of a Coiled cluster.",
@@ -285,13 +312,23 @@ def run_updates(
     help="Write a Dask performance report HTML here (Coiled runs only; "
     "ignored with --local).",
 )
-def cli(flow_name, version, overwrite, is_latest, bbox, local, performance_report_path):
+def cli(
+    flow_name,
+    version,
+    overwrite,
+    is_latest,
+    bbox,
+    aoi_source,
+    local,
+    performance_report_path,
+):
     run_updates(
         version=version,
         overwrite=overwrite,
         is_latest=is_latest,
         flow_name=UpdateFlow(flow_name),
         bbox=bbox,
+        aoi_source=aoi_source,
         local=local,
         performance_report_path=performance_report_path,
     )

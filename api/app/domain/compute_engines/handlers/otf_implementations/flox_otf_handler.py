@@ -16,9 +16,7 @@ from app.domain.compute_engines.handlers.analytics_otf_handler import (
 )
 from app.domain.models.dataset import Dataset, DatasetQuery
 from app.domain.models.environment import Environment
-from app.domain.repositories.data_api_aoi_geometry_repository import (
-    DataApiAoiGeometryRepository,
-)
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 
 
@@ -35,7 +33,7 @@ class FloxOTFHandler(AnalyticsOTFHandler):
         self,
         environment: Environment = Environment.production,
         dataset_repository=None,
-        aoi_geometry_repository=DataApiAoiGeometryRepository(),
+        aoi_geometry_repository: Optional[AoiGeometryRepository] = None,
         dask_client=None,
         dask_client_router: Optional[DaskClientRouter] = None,
     ):
@@ -60,9 +58,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
                 aoi.feature_collection["features"]
             )
         else:
-            aoi_geometries, areas_ha = await self.aoi_geometry_repository.load(
-                aoi.type, aoi.ids
-            )
+            if self.aoi_geometry_repository is None:
+                raise ValueError(f"No geometry source for AOI type {aoi.type}.")
+            aoi_geometries, areas_ha = await self.aoi_geometry_repository.load(aoi)
             total_area_ha = sum(areas_ha)
 
         dask_client = self._resolve_dask_client(total_area_ha)
@@ -113,7 +111,9 @@ class FloxOTFHandler(AnalyticsOTFHandler):
             translated_value = dataset_repository.translate(
                 filter.dataset, filter.value
             )
-            da = dataset_repository.load(filter.dataset, geometry=aoi_geometry)
+            da = dataset_repository.load(
+                filter.dataset, geometry=aoi_geometry
+            ).reindex_like(by, method="nearest", tolerance=1e-5)
             filter_arr = FloxOTFHandler._get_filter_by_op(
                 da, filter.op, translated_value
             )
