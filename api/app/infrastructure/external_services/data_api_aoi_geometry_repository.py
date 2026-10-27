@@ -5,7 +5,10 @@ from typing import Iterable
 import httpx
 from shapely import wkb
 
-from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
+from app.domain.repositories.aoi_geometry_repository import (
+    AoiGeometryRepository,
+    AoiNotFoundError,
+)
 
 
 class DataApiAoiGeometryRepository(AoiGeometryRepository):
@@ -38,7 +41,7 @@ class DataApiAoiGeometryRepository(AoiGeometryRepository):
         rows = {str(row[id_column]): row for row in response["data"]}
         missing = [aoi_id for aoi_id in aoi.ids if aoi_id not in rows]
         if missing:
-            raise ValueError(f"AOI ids not found: {missing}")
+            raise AoiNotFoundError(f"AOI ids not found: {missing}")
 
         geometries = [wkb.loads(bytes.fromhex(rows[i]["geom"])) for i in aoi.ids]
         areas_ha = [rows[aoi_id].get("gfw_area__ha", 0) for aoi_id in aoi.ids]

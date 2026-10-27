@@ -15,7 +15,7 @@ from pyinstrument import Profiler
 
 from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .request_size_limit import RequestSizeLimit
-from .routers import custom_aois, land_change
+from .routers import aois, custom_aois, land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
 
@@ -147,6 +147,7 @@ app.include_router(custom_aois.router)
 app.add_middleware(
     RequestSizeLimit, max_bytes=50 * 2**20, path_prefix="/v0/custom_aois"
 )
+app.include_router(aois.router)
 
 
 @app.get("/")
