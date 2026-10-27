@@ -4,7 +4,7 @@ import boto3
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.data_api import DataApiClient
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.integrated_alerts.create_zarr import create_zarr
 from pipelines.integrated_alerts.extra_processing import (
@@ -20,7 +20,7 @@ logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
 @task
 def get_new_integrated_alerts_version() -> str:
-    return get_latest_version("gfw_integrated_dist_alerts")
+    return DataApiClient().get_latest_version("gfw_integrated_dist_alerts")
 
 
 @task

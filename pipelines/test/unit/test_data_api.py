@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from pipelines.wur_alert_drivers.data_api import DataApiClient
+from pipelines.data_api import DataApiClient
 
 
 def _client(handler):
@@ -44,3 +44,32 @@ def test_errors_are_raised():
 
     with pytest.raises(httpx.HTTPStatusError):
         _client(handler).get_assets("my_dataset", "v20261018")
+
+
+def test_get_latest_version_needs_no_token():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx.Response(
+            200, json={"status": "success", "data": {"version": "v20250501"}}
+        )
+
+    client = DataApiClient(
+        http_client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+
+    assert client.get_latest_version("umd_glad_dist_alerts") == "v20250501"
+    (request,) = requests
+    assert str(request.url) == (
+        "https://data-api.globalforestwatch.org/dataset/umd_glad_dist_alerts/latest"
+    )
+    assert "Authorization" not in request.headers
+
+
+def test_get_latest_version_raises_if_no_latest_version():
+    def handler(request):
+        return httpx.Response(200, json={"status": "error", "data": {}})
+
+    with pytest.raises(ValueError):
+        _client(handler).get_latest_version("invalid_dataset")

@@ -1,8 +1,8 @@
 from prefect import flow, task
 
+from pipelines.data_api import DataApiClient
 from pipelines.utils import get_secret
 from pipelines.wur_alert_drivers import stages
-from pipelines.wur_alert_drivers.data_api import DataApiClient
 
 DATASET = "wur_integration_alert_drivers_class"
 # New alert drivers data is put here (by hand, about monthly) before each run.

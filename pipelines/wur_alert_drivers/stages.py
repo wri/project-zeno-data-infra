@@ -1,9 +1,9 @@
 """Steps for creating a new version of the WUR integrated alert drivers dataset in
 the GFW Data API.
 
-Each step works against a Data API client (see data_api.DataApiClient), so it can
-be tested with an in-memory fake. The two steps that create assets skip creation
-if the asset already exists, so a failed run can be resumed with the same
+Each step works against a Data API client (see pipelines.data_api.DataApiClient),
+so it can be tested with an in-memory fake. The two steps that create assets skip
+creation if the asset already exists, so a failed run can be resumed with the same
 version.
 """
 

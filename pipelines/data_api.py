@@ -6,22 +6,35 @@ DATA_API_URL = "https://data-api.globalforestwatch.org"
 
 
 class DataApiClient:
-    """Minimal GFW Data API client for creating and updating dataset versions.
+    """Minimal GFW Data API client for reading, creating and updating datasets.
 
-    Every request is authenticated with the given bearer token, and any non-2xx
-    response raises httpx.HTTPStatusError (except a missing version, see
+    Requests are authenticated with the given bearer token, which is only needed
+    for creating and updating (reads like get_latest_version are public). Any
+    non-2xx response raises httpx.HTTPStatusError (except a missing version, see
     get_version). Responses are unwrapped to their "data" field.
     """
 
     def __init__(
         self,
-        token: str,
+        token: Optional[str] = None,
         base_url: str = DATA_API_URL,
         http_client: Optional[httpx.Client] = None,
     ):
         self.base_url = base_url
-        self.headers = {"Authorization": f"Bearer {token}"}
+        self.headers = {"Authorization": f"Bearer {token}"} if token else {}
         self.http_client = http_client or httpx.Client(timeout=60)
+
+    def get_latest_version(self, dataset: str) -> str:
+        """Return the name of the dataset's latest version.
+
+        Raises ValueError if the dataset has no latest version set.
+        """
+        response = self._request("GET", f"{self.base_url}/dataset/{dataset}/latest")
+        response.raise_for_status()
+        body = response.json()
+        if body["status"] != "success":
+            raise ValueError(f"No latest version set for dataset {dataset}")
+        return body["data"]["version"]
 
     def get_version(self, dataset: str, version: str) -> Optional[dict]:
         """Return the version's metadata, or None if the version doesn't exist."""
