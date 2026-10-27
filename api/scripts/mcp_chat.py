@@ -11,16 +11,7 @@ import asyncio
 import json
 import os
 
-import httpx2
-from anthropic import AsyncAnthropic
-from anthropic.lib.tools.mcp import async_mcp_tool
-from mcp.client.client import Client
-from mcp.client.streamable_http import streamable_http_client
-
-SYSTEM_PROMPT = """You help people analyze land change, such as tree cover loss,
-disturbance alerts and land cover, for areas of interest. Use the analytics
-tools to get real numbers rather than answering from memory, and mention the
-dataset's cautions when they affect how a result should be read."""
+from analytics_agent import connect_agent
 
 
 def show(message) -> None:
@@ -41,42 +32,15 @@ async def read_line(prompt: str) -> str | None:
 
 
 async def chat(server_url: str, model: str, bearer_token: str) -> None:
-    anthropic_client = AsyncAnthropic()
-    http_client = httpx2.AsyncClient(
-        headers={"Authorization": f"Bearer {bearer_token}"},
-        timeout=httpx2.Timeout(30, read=300),
-    )
-    transport = streamable_http_client(server_url, http_client=http_client)
-    async with http_client, Client(transport, read_timeout_seconds=180) as mcp_client:
-        listed = await mcp_client.list_tools()
-        tools = [async_mcp_tool(tool, mcp_client.session) for tool in listed.tools]
-        print(f"Connected to {server_url} with tools: {[t.name for t in listed.tools]}")
+    async with connect_agent(server_url, model, bearer_token) as agent:
+        print(f"Connected to {server_url}")
         print("Type a question, or press Ctrl-D to quit.")
-
-        # The runner keeps its own copy of the conversation, so the full
-        # history is mirrored here to carry it across turns.
         messages: list = []
         while (user_input := await read_line("\nyou> ")) is not None:
             if not user_input.strip():
                 continue
             messages.append({"role": "user", "content": user_input})
-            runner = anthropic_client.beta.messages.tool_runner(
-                model=model,
-                max_tokens=16000,
-                thinking={"type": "adaptive"},
-                system=SYSTEM_PROMPT,
-                tools=tools,
-                messages=messages,
-                # Retries on another model if a safety classifier refuses.
-                betas=["server-side-fallback-2026-07-01"],
-                fallbacks="default",
-            )
-            async for message in runner:
-                show(message)
-                messages.append({"role": "assistant", "content": message.content})
-                tool_response = await runner.generate_tool_call_response()
-                if tool_response is not None:
-                    messages.append(tool_response)
+            await agent.reply(messages, on_message=show)
 
 
 def main() -> None:
