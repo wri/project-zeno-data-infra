@@ -61,35 +61,14 @@ def test_load_alert_points_table_reads_grid_and_window_from_metadata(table):
     assert table.lat(10) == pytest.approx(GRID["y0"] + 10 * GRID["dy"])
 
 
-def test_table_without_metadata_falls_back_to_path_statistics_and_grid(
-    tmp_path, points
-):
+def test_table_without_metadata_is_refused(tmp_path, points):
     path = tmp_path / "v20261018" / "by-date.parquet"
     path.parent.mkdir()
     with_metadata = pq.read_table(write_points_table(path, points))
     pq.write_table(with_metadata.replace_schema_metadata(None), path)
     load_alert_points_table.cache_clear()
     try:
-        table = load_alert_points_table(str(path))
-    finally:
-        load_alert_points_table.cache_clear()
-
-    assert table.version == "v20261018"
-    assert table.latest_day == points.alert_date.max()
-    assert table.first_day == points.alert_date.min()
-    assert table.lon(0) == pytest.approx(-179.99995)
-    assert table.lat(0) == pytest.approx(89.99995)
-    assert table.lon(3_599_999) == pytest.approx(179.99995)
-    assert table.lat(1_499_999) == pytest.approx(-59.99995)
-
-
-def test_table_without_metadata_or_version_in_path_is_refused(tmp_path, points):
-    path = tmp_path / "by-date.parquet"
-    with_metadata = pq.read_table(write_points_table(path, points))
-    pq.write_table(with_metadata.replace_schema_metadata(None), path)
-    load_alert_points_table.cache_clear()
-    try:
-        with pytest.raises(ValueError, match="No alerts version"):
+        with pytest.raises(ValueError, match="missing table metadata: alerts_version"):
             load_alert_points_table(str(path))
     finally:
         load_alert_points_table.cache_clear()

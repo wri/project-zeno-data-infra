@@ -1,5 +1,4 @@
 import asyncio
-import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import lru_cache
@@ -21,9 +20,16 @@ from app.domain.repositories.alert_points_repository import (
 
 # alert_date in the table counts days since this date
 ALERT_EPOCH = date(2014, 12, 31)
-# Pixel centers of the alerts zarr's first column and row (global 10 m grid), for
-# table files written without grid metadata.
-ALERTS_GRID = {"x0": -179.99995, "y0": 89.99995, "dx": 0.0001, "dy": -0.0001}
+# Key-value metadata every table carries, written by the pipeline
+TABLE_METADATA_KEYS = (
+    "alerts_version",
+    "latest_alert_date",
+    "days_stored",
+    "grid_x0",
+    "grid_y0",
+    "grid_dx",
+    "grid_dy",
+)
 POINT_COLUMNS = ["row", "col", "alert_date", "confidence", "natural_lands_class"]
 # Row groups read at a time within a date. A busy date can hold millions of points
 # under a large AOI; reading it in batches stops near the page size instead.
@@ -119,23 +125,12 @@ def load_alert_points_table(uri: str) -> AlertPointsTable:
         )
 
     key_value = {k.decode(): v.decode() for k, v in (metadata.metadata or {}).items()}
+    missing = [key for key in TABLE_METADATA_KEYS if key not in key_value]
+    if missing:
+        raise ValueError(f"{uri} is missing table metadata: {', '.join(missing)}")
     row_min, row_max = statistics("row")
     col_min, col_max = statistics("col")
     date_min, date_max = statistics("alert_date")
-    # Table files written without the key-value metadata (the first ones) get the
-    # version from their path, the stored window from the date statistics and the
-    # grid from ALERTS_GRID.
-    if "alerts_version" not in key_value:
-        version = re.search(r"/(v\d{8})/", uri)
-        if version is None:
-            raise ValueError(f"No alerts version in the metadata or path of {uri}.")
-        latest_day = int(date_max.max())
-        key_value = {
-            "alerts_version": version.group(1),
-            "latest_alert_date": day_to_date(latest_day).isoformat(),
-            "days_stored": str(latest_day - int(date_min.min()) + 1),
-            **{f"grid_{k}": repr(v) for k, v in ALERTS_GRID.items()},
-        }
     x0, y0 = float(key_value["grid_x0"]), float(key_value["grid_y0"])
     dx, dy = float(key_value["grid_dx"]), float(key_value["grid_dy"])
     # Each row group's extent: the pixel edges around its row/col range. The table

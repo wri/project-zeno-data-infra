@@ -30,7 +30,7 @@ from app.routers.land_change.integrated_alerts import integrated_alerts
 from app.use_cases.analysis.analysis_service import AnalysisService
 
 # Pin the integration test to a release with a published points table.
-VERSION = "v20261018"
+VERSION = "v20261025"
 TABLE_URI = build_points_input_uris(VERSION)["alert_points_table_uri"]
 CONFIDENCE = {2: "low", 3: "high", 4: "highest"}
 
