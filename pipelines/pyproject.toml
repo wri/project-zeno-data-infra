@@ -31,6 +31,8 @@ dependencies = [
     "xee",
     "distributed==2025.5.1",
     "cogeo-mosaic>=9.2.0",
+    "tifffile>=2026.10.15",
+    "imagecodecs>=2026.10.10",
 ]
 
 [dependency-groups]

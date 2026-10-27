@@ -264,13 +264,14 @@ def land_ghg_inventory_net_flux(
     version: str,
     overwrite: bool = False,
     bbox: Optional[Polygon] = None,
+    clip_to_bbox: bool = False,
 ) -> str:
     """Land GHG inventory LULUCF net flux visualization: the combined
     vegetation + mineral SOC + organic peat annual per-hectare zarr, plus
     its 40-deg COG tiles.
 
     ``bbox`` allows for a test run with a bbox, saving the COGs and mosaic.json
-    in a /test subdirectory."""
+    in a /test subdirectory. ``clip_to_bbox`` clipa each tile to the bbox"""
     cog_prefix = (
         land_ghg_inventory_net_flux_cog_tile_prefix
         if bbox is None
@@ -281,7 +282,10 @@ def land_ghg_inventory_net_flux(
     )(overwrite=overwrite)
     written = land_ghg_inventory_tasks.prepare_lulucf_cogs.with_options(
         name="land_ghg_inventory-net-flux-write-cogs"
-    )(net_flux_zarr_uri, bbox=bbox, prefix=cog_prefix, overwrite=overwrite)
+    )(
+        net_flux_zarr_uri, bbox=bbox, prefix=cog_prefix, overwrite=overwrite,
+        clip_to_bbox=clip_to_bbox,
+    )
     return land_ghg_inventory_tasks.prepare_lulucf_mosaic.with_options(
         name="land_ghg_inventory-net-flux-write-mosaic"
     )(written, prefix=cog_prefix, overwrite=overwrite, clamp_global=bbox is None)

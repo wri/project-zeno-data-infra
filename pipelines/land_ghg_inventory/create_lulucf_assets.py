@@ -138,9 +138,10 @@ def create_cogs(
     prefix=COG_TILE_PREFIX,
     overwrite: bool = False,
     net_flux_zarr_uri: str = NET_FLUX_ZARR_URI,
+    clip_to_bbox: bool = False,
 ):
     """Write a COG per 40-deg tile, one at a time. bbox option limits COGs to tiles that
-    intersect with the bbox. Existing tiles are skipped unless overwrite is set."""
+    intersect with the bbox. clip_to_bbox option available to clip the COG to the bbox only."""
     tiles = tiles_in_bbox(bbox)
     if names is not None:
         tiles = {name: tiles[name] for name in names}
@@ -156,8 +157,11 @@ def create_cogs(
             written[name] = uri
             print(f"[{i:2d}/{len(tiles)}] {name:9s} exists, skipped  {uri}", flush=True)
             continue
+        clip_geom = tiles[name]
+        if clip_to_bbox and bbox is not None:
+            clip_geom = clip_geom.intersection(bbox)
         try:
-            uri, task = tile_task(name, net_flux_global, tiles[name], prefix=prefix)
+            uri, task = tile_task(name, net_flux_global, clip_geom, prefix=prefix)
             dask.compute(task)
         except Exception as err:
             failed[name] = traceback.format_exc()
