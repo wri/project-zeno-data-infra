@@ -22,8 +22,22 @@ class AnalysisState:
         return self.status in FINISHED_STATUSES
 
 
+@dataclass(frozen=True)
+class AreaMatch:
+    """An area found by name, with the area of interest to request analyses
+    for it."""
+
+    name: str
+    display_name: str
+    aoi: dict[str, Any]
+
+
 class AnalyticsClient(Protocol):
     async def openapi_document(self) -> dict[str, Any]: ...
+
+    async def search_areas(
+        self, name: str, area_types: list[str] | None, limit: int
+    ) -> list[AreaMatch]: ...
 
     async def create_analysis(self, path: str, payload: dict[str, Any]) -> str:
         """Start an analysis and return the link to poll for its state."""

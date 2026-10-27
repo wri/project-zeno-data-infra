@@ -33,6 +33,8 @@ dependencies = [
     "zarr",
     "pyiceberg[pyarrow]>=0.9",
     "async-lru>=2.4.0",
+    "s2sphere>=0.2.5",
+    "pydantic[email]>=2.11.7",
     "mcp>=2.3.0",
 ]
 

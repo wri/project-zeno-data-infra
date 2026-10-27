@@ -2,15 +2,20 @@
 
 Start the API first, then from the api directory run:
     uv run --env-file ../.env python scripts/mcp_chat.py
+
+Requires ANTHROPIC_API_KEY and RW_AUTH_TOKEN, which is forwarded to the API.
 """
 
 import argparse
 import asyncio
 import json
+import os
 
+import httpx2
 from anthropic import AsyncAnthropic
 from anthropic.lib.tools.mcp import async_mcp_tool
 from mcp.client.client import Client
+from mcp.client.streamable_http import streamable_http_client
 
 SYSTEM_PROMPT = """You help people analyze land change, such as tree cover loss,
 disturbance alerts and land cover, for areas of interest. Use the analytics
@@ -35,9 +40,14 @@ async def read_line(prompt: str) -> str | None:
         return None
 
 
-async def chat(server_url: str, model: str) -> None:
+async def chat(server_url: str, model: str, bearer_token: str) -> None:
     anthropic_client = AsyncAnthropic()
-    async with Client(server_url, read_timeout_seconds=180) as mcp_client:
+    http_client = httpx2.AsyncClient(
+        headers={"Authorization": f"Bearer {bearer_token}"},
+        timeout=httpx2.Timeout(30, read=300),
+    )
+    transport = streamable_http_client(server_url, http_client=http_client)
+    async with http_client, Client(transport, read_timeout_seconds=180) as mcp_client:
         listed = await mcp_client.list_tools()
         tools = [async_mcp_tool(tool, mcp_client.session) for tool in listed.tools]
         print(f"Connected to {server_url} with tools: {[t.name for t in listed.tools]}")
@@ -74,7 +84,9 @@ def main() -> None:
     parser.add_argument("--server-url", default="http://localhost:8000/mcp/")
     parser.add_argument("--model", default="claude-opus-5-5")
     arguments = parser.parse_args()
-    asyncio.run(chat(arguments.server_url, arguments.model))
+    asyncio.run(
+        chat(arguments.server_url, arguments.model, os.environ["RW_AUTH_TOKEN"])
+    )
 
 
 if __name__ == "__main__":

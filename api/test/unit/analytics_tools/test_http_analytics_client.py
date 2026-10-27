@@ -7,7 +7,7 @@ from analytics_tools.http_analytics_client import HttpAnalyticsClient
 BASE_URL = "http://analytics-api"
 
 
-def client_returning(response):
+def client_returning(response, authorization=None):
     requests = []
 
     def handler(request):
@@ -17,7 +17,7 @@ def client_returning(response):
     http_client = httpx.AsyncClient(
         base_url=BASE_URL, transport=httpx.MockTransport(handler)
     )
-    return HttpAnalyticsClient(http_client), requests
+    return HttpAnalyticsClient(http_client, authorization), requests
 
 
 @pytest.mark.asyncio
@@ -50,3 +50,37 @@ async def test_reads_pending_state_and_retry_after():
 
     assert analysis.status == "pending"
     assert analysis.retry_after_seconds == 1
+
+
+@pytest.mark.asyncio
+async def test_search_forwards_the_callers_authorization():
+    body = {
+        "data": [
+            {
+                "aoi_type": "admin",
+                "aoi_id": "BRA.1",
+                "name": "Acre",
+                "display_name": "Acre, Brazil",
+            }
+        ]
+    }
+    client, requests = client_returning(
+        httpx.Response(200, json=body), authorization="Bearer caller-token"
+    )
+
+    matches = await client.search_areas("Acre", ["admin"], limit=5)
+
+    assert requests[0].headers["Authorization"] == "Bearer caller-token"
+    assert requests[0].url.params.get_list("type") == ["admin"]
+    assert requests[0].url.params["q"] == "Acre"
+    assert matches[0].aoi == {"type": "admin", "ids": ["BRA.1"]}
+
+
+@pytest.mark.asyncio
+async def test_forbidden_search_carries_the_api_detail():
+    client, _ = client_returning(
+        httpx.Response(403, json={"detail": "Requires a ResourceWatch admin account"})
+    )
+
+    with pytest.raises(AnalyticsRequestError, match="admin account"):
+        await client.search_areas("Acre", None, limit=5)
