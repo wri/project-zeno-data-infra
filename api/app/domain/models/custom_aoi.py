@@ -21,6 +21,12 @@ class CustomAoi:
 
 
 @dataclass(frozen=True)
+class CustomAoiName:
+    aoi_id: str
+    name: str
+
+
+@dataclass(frozen=True)
 class CustomAoiGeometry:
     """A stored custom AOI's geometry, without its owner's details."""
 

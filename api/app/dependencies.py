@@ -10,6 +10,9 @@ from app.domain.repositories.aoi_name_index import AoiNameIndex
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
+from app.domain.repositories.custom_aoi_geometry_repository import (
+    CustomAoiGeometryRepository,
+)
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.infrastructure.persistence.duck_db_aoi_name_index import (
     DuckDbAoiNameIndex,
@@ -60,10 +63,11 @@ def aoi_uris() -> dict[str, str]:
 
 def get_aoi_geometry_repository() -> AoiGeometryRepository:
     """Geometries for predefined AOIs, from the pipeline's GeoParquet copy of
-    each dataset at a pinned version."""
+    each dataset at a pinned version, and for stored custom AOIs."""
     repositories: dict[str, AoiGeometryRepository] = {}
     for aoi_type, uri in aoi_uris().items():
         repositories[aoi_type] = GeoParquetAoiGeometryRepository(uri)
+    repositories["custom_aoi"] = CustomAoiGeometryRepository(get_custom_aoi_repository)
     return AoiTypeRoutingGeometryRepository(repositories)
 
 

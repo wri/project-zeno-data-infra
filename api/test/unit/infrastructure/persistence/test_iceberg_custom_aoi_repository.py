@@ -6,7 +6,12 @@ from pyiceberg.expressions import EqualTo
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, MonitorStatus
+from app.domain.models.custom_aoi import (
+    CustomAoi,
+    CustomAoiGeometry,
+    CustomAoiName,
+    MonitorStatus,
+)
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
     custom_aoi_cell_schema,
@@ -34,14 +39,20 @@ def repository(catalog):
     return IcebergCustomAoiRepository(catalog, TABLE, INDEX)
 
 
-def aoi(aoi_id, size=1, monitor_status=MonitorStatus.not_monitored, origin=(0, 0)):
+def aoi(
+    aoi_id,
+    size=1,
+    monitor_status=MonitorStatus.not_monitored,
+    origin=(0, 0),
+    user_id="user-1",
+):
     x, y = origin
     return CustomAoi(
         aoi_id,
         MultiPolygon([box(x, y, x + size, y + size)]),
         float(size),
         name=f"Area {aoi_id}",
-        user_id="user-1",
+        user_id=user_id,
         email="owner@example.org",
         monitor_status=monitor_status,
     )
@@ -144,6 +155,15 @@ async def test_get_finds_aois_whose_index_entry_is_missing(catalog):
     found = await repository.get(["a"])
 
     assert [stored.aoi_id for stored in found] == ["a"]
+
+
+@pytest.mark.asyncio
+async def test_names_owned_by_returns_only_that_users_aois(repository):
+    await repository.upsert([aoi("mine"), aoi("theirs", user_id="user-2")])
+
+    owned = await repository.names_owned_by("user-1")
+
+    assert owned == [CustomAoiName("mine", "Area mine")]
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
 
+from app.domain.models.custom_aoi import CustomAoiName
 from app.infrastructure.persistence.duck_db_aoi_name_index import (
     DuckDbAoiNameIndex,
     NameSource,
@@ -176,3 +177,33 @@ async def test_every_word_must_match_so_shared_words_alone_do_not(index):
 @pytest.mark.asyncio
 async def test_misspelled_words_are_corrected_to_the_nearest_known_word(index):
     assert (await ids(index, "yosemte"))[0] == "975"
+
+
+@pytest.mark.asyncio
+async def test_a_users_own_aois_rank_above_other_aois_with_similar_names(index):
+    matches = await index.search(
+        "par", aoi_types=None, limit=3, custom_aois=[CustomAoiName("c1", "Parkside")]
+    )
+
+    assert (matches[0].aoi_type, matches[0].aoi_id, matches[0].name) == (
+        "custom_aoi",
+        "c1",
+        "Parkside",
+    )
+
+
+@pytest.mark.asyncio
+async def test_custom_aois_are_only_searched_when_given(index):
+    assert await ids(index, "parkside") == []
+
+
+@pytest.mark.asyncio
+async def test_custom_aois_follow_the_type_filter(index):
+    matches = await index.search(
+        "parkside",
+        aoi_types=["admin"],
+        limit=3,
+        custom_aois=[CustomAoiName("c1", "Parkside")],
+    )
+
+    assert matches == []

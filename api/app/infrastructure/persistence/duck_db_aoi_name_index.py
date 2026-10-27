@@ -1,11 +1,13 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Set
 
 import duckdb
+import pyarrow as pa
 import pyarrow.parquet as parquet
 
 from app.domain.models.aoi_match import AoiMatch
+from app.domain.models.custom_aoi import CustomAoiName
 from app.domain.repositories.aoi_name_index import AoiNameIndex
 
 
@@ -48,9 +50,11 @@ class DuckDbAoiNameIndex(AoiNameIndex):
         alternate_names_uri: Optional[str] = None,
         word_separators: str = r"[\s,.;:()\[\]/'\"-]+",
         corrected_match_weight: float = 0.8,
+        custom_aoi_importance: float = 1.0,
     ):
         self.word_separators = word_separators
         self.corrected_match_weight = corrected_match_weight
+        self.custom_aoi_importance = custom_aoi_importance
         self.connection = duckdb.connect()
         self.connection.execute("CREATE SEQUENCE text_ids")
         self.connection.execute(
@@ -165,22 +169,76 @@ class DuckDbAoiNameIndex(AoiNameIndex):
         )
 
     async def search(
-        self, text: str, aoi_types: Optional[Sequence[str]], limit: int
+        self,
+        text: str,
+        aoi_types: Optional[Sequence[str]],
+        limit: int,
+        custom_aois: Sequence[CustomAoiName] = (),
     ) -> List[AoiMatch]:
-        return await asyncio.to_thread(self._search, text, aoi_types, limit)
+        return await asyncio.to_thread(
+            self._search, text, aoi_types, limit, custom_aois
+        )
 
     def _search(
-        self, text: str, aoi_types: Optional[Sequence[str]], limit: int
+        self,
+        text: str,
+        aoi_types: Optional[Sequence[str]],
+        limit: int,
+        custom_aois: Sequence[CustomAoiName],
     ) -> List[AoiMatch]:
         cursor = self.connection.cursor()
         place, _, containing_place = text.partition(",")
         words = self._words(cursor, place)
         if not words:
             return []
-        known_words = [self._known_or_nearest(cursor, word) for word in words]
+        custom_words = {
+            word for aoi in custom_aois for word in self._words(cursor, aoi.name)
+        }
+        known_words = [
+            self._known_or_nearest(cursor, word, custom_words) for word in words
+        ]
+        cursor.register(
+            "custom_aois",
+            pa.table(
+                {
+                    "aoi_id": [aoi.aoi_id for aoi in custom_aois],
+                    "name": [aoi.name for aoi in custom_aois],
+                },
+                schema=pa.schema([("aoi_id", pa.string()), ("name", pa.string())]),
+            ),
+        )
         rows = cursor.execute(
             """
-            WITH query AS (
+            WITH custom AS (
+                SELECT -row_number() OVER () AS text_id, aoi_id, name,
+                    strip_accents(lower(trim(name))) AS text
+                FROM custom_aois
+            ),
+            all_names AS (
+                SELECT aoi_type, aoi_id, name, display_name, fallback_importance,
+                    area_ha, search_display_name
+                FROM names
+                UNION ALL
+                SELECT 'custom_aoi', aoi_id, name, name, $custom_importance, NULL,
+                    text
+                FROM custom
+            ),
+            all_texts AS (
+                SELECT text_id, aoi_type, aoi_id, is_alternate, text FROM search_texts
+                UNION ALL
+                SELECT text_id, 'custom_aoi', aoi_id, false, text FROM custom
+            ),
+            all_words AS (
+                SELECT text_id, word FROM text_words
+                UNION ALL
+                SELECT text_id, word FROM (
+                    SELECT text_id,
+                        unnest(regexp_split_to_array(text, $separators)) AS word
+                    FROM custom
+                )
+                WHERE word <> ''
+            ),
+            query AS (
                 SELECT strip_accents(lower(trim($place))) AS place,
                     strip_accents(lower(trim($containing_place)))
                         AS containing_place
@@ -190,10 +248,10 @@ class DuckDbAoiNameIndex(AoiNameIndex):
                     generate_subscripts($words, 1) AS position
             ),
             texts_with_every_word AS (
-                SELECT text_words.text_id
-                FROM text_words
-                JOIN query_words ON starts_with(text_words.word, query_words.word)
-                GROUP BY text_words.text_id
+                SELECT all_words.text_id
+                FROM all_words
+                JOIN query_words ON starts_with(all_words.word, query_words.word)
+                GROUP BY all_words.text_id
                 HAVING count(DISTINCT query_words.position) = len($words)
             ),
             text_matches AS (
@@ -206,7 +264,7 @@ class DuckDbAoiNameIndex(AoiNameIndex):
                         ELSE CASE WHEN is_alternate THEN 0.55 ELSE 0.6 END
                             * $word_match_weight
                     END AS match
-                FROM search_texts, query
+                FROM all_texts, query
                 WHERE (
                     text = query.place
                     OR starts_with(text, query.place)
@@ -221,7 +279,7 @@ class DuckDbAoiNameIndex(AoiNameIndex):
             )
             SELECT names.aoi_type, names.aoi_id, names.name, names.display_name
             FROM best_matches
-            JOIN names USING (aoi_type, aoi_id)
+            JOIN all_names AS names USING (aoi_type, aoi_id)
             LEFT JOIN importance USING (aoi_type, aoi_id), query
             ORDER BY
                 0.5 * best_matches.match
@@ -242,8 +300,11 @@ class DuckDbAoiNameIndex(AoiNameIndex):
                 ),
                 "aoi_types": None if aoi_types is None else list(aoi_types),
                 "limit": limit,
+                "custom_importance": self.custom_aoi_importance,
+                "separators": self.word_separators,
             },
         ).fetchall()
+        cursor.unregister("custom_aois")
         return [AoiMatch(*row) for row in rows]
 
     def _words(self, cursor, text: str) -> List[str]:
@@ -254,10 +315,12 @@ class DuckDbAoiNameIndex(AoiNameIndex):
             {"text": text, "separators": self.word_separators},
         ).fetchone()[0]
 
-    def _known_or_nearest(self, cursor, word: str) -> str:
+    def _known_or_nearest(self, cursor, word: str, custom_words: Set[str]) -> str:
         """The word itself if some name has a word starting with it, else the
         nearest word any name has, preferring the most common. A word with no
         near neighbour is kept, so it matches nothing."""
+        if any(custom_word.startswith(word) for custom_word in custom_words):
+            return word
         if cursor.execute(
             "SELECT 1 FROM vocabulary WHERE starts_with(word, $word) LIMIT 1",
             {"word": word},

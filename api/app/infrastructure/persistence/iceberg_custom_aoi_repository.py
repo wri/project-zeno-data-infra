@@ -30,7 +30,7 @@ from pyiceberg.types import (
 )
 from shapely.geometry.base import BaseGeometry
 
-from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, CustomAoiName
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 
 
@@ -82,9 +82,9 @@ class CachedTables:
 
 
 class IcebergCustomAoiRepository(CustomAoiRepository):
-    """Stores custom AOIs in an Iceberg table with WKB geometries. Utilizes Iceberg partitions
-    by Google S2 cell ID for fast spatial reads, and a separate aoi_id -> partition table
-    for fast lookup by ID."""
+    """Stores custom AOIs in an Iceberg table with WKB geometries. Utilizes
+    Iceberg partitions by Google S2 cell ID for fast spatial reads, and a
+    separate aoi_id -> partition table for fast lookup by ID."""
 
     def __init__(
         self,
@@ -113,6 +113,9 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
 
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._intersecting, geometry)
+
+    async def names_owned_by(self, user_id: str) -> List[CustomAoiName]:
+        return await asyncio.to_thread(self._names_owned_by, user_id)
 
     def _upsert(self, aois: List[CustomAoi]) -> None:
         rows = to_arrow(aois, self.cell_level)
@@ -181,6 +184,15 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
             return In("aoi_id", unindexed)
         indexed = self.rows_for(list(cells), cells.values())
         return Or(indexed, In("aoi_id", unindexed)) if unindexed else indexed
+
+    def _names_owned_by(self, user_id: str) -> List[CustomAoiName]:
+        rows = self.table().scan(
+            row_filter=EqualTo("user_id", user_id), selected_fields=("aoi_id", "name")
+        )
+        return [
+            CustomAoiName(row["aoi_id"], row["name"])
+            for row in rows.to_arrow().to_pylist()
+        ]
 
     def cells(self, aoi_ids: List[str], fresh: bool = False) -> Dict[str, int]:
         """The indexed S2 cell of each id that has an index entry."""
