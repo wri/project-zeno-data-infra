@@ -4,6 +4,7 @@ from pipelines.wur_alert_drivers.stages import (
     AssetCreationError,
     create_cog_if_needed,
     create_version_if_needed,
+    driver_date_raster_tile_set_body,
     metadata_body,
     wait_for_assets_saved,
 )
@@ -96,10 +97,29 @@ def test_create_version_skips_creation_if_version_exists():
     )
 
     create_version_if_needed(
-        client, DATASET, VERSION, "gs://bucket/source", 3600, sleep=lambda s: None
+        client, DATASET, VERSION, {"creation_options": {}}, 3600, sleep=lambda s: None
     )
 
     assert client.calls == []
+
+
+def test_create_version_creates_version_with_given_body():
+    client = FakeDataApiClient(asset_states=[[_asset("Raster tile set", "saved")]])
+    body = {"creation_options": {"pixel_meaning": "driver_date"}}
+
+    create_version_if_needed(client, DATASET, VERSION, body, 3600, sleep=lambda s: None)
+
+    assert client.calls == [("create_version", body)]
+
+
+def test_driver_date_body_keeps_raw_uint32_values():
+    # Unlike the integration class dataset, no calc reduces the values to a class.
+    options = driver_date_raster_tile_set_body("gs://bucket/source")["creation_options"]
+
+    assert options["pixel_meaning"] == "driver_date"
+    assert options["data_type"] == "uint32"
+    assert "calc" not in options
+    assert options["source_uri"] == ["gs://bucket/source"]
 
 
 def test_create_cog_uses_the_versions_raster_tile_set_as_source():

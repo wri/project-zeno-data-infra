@@ -133,11 +133,9 @@ def run_wur_update(
     version, content_date, overwrite=False, is_latest=False
 ) -> list[str]:
     # overwrite isn't used: re-running with the same version resumes creating it.
-    return [
-        wur_flow.wur_alert_drivers_flow(
-            content_date=content_date, version=version, is_latest=is_latest
-        )
-    ]
+    return wur_flow.wur_alert_drivers_flow(
+        content_date=content_date, version=version, is_latest=is_latest
+    )
 
 
 def _parse_bbox(bbox):
@@ -192,7 +190,10 @@ VERSION_REQUIRED_FLOWS = (
 )
 
 # flows that don't use Dask, so run on the flow's own machine
-CLUSTERLESS_FLOWS = (UpdateFlow.AOIS_UPDATE, UpdateFlow.WUR_UPDATE,)
+CLUSTERLESS_FLOWS = (
+    UpdateFlow.AOIS_UPDATE,
+    UpdateFlow.WUR_UPDATE,
+)
 
 # flow_name values that route into run_land_ghg_inventory_update
 LAND_GHG_INVENTORY_FLOWS = (

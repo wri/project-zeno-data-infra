@@ -20,13 +20,32 @@ class AssetCreationError(Exception):
     """Raised when a Data API asset fails, or isn't saved in time."""
 
 
-def raster_tile_set_body(source_uri: str) -> dict:
-    """Body for creating the version and its raster tile set from GeoTIFFs."""
+def class_raster_tile_set_body(source_uri: str) -> dict:
+    """Body for creating a wur_integration_alert_drivers_class version and its
+    raster tile set from the GeoTIFFs: the driver class only (A // 100000)."""
     return {
         "creation_options": {
             "pixel_meaning": "class",
             "data_type": "uint8",
             "calc": "A // 100000",
+            "band_count": 1,
+            "no_data": 0,
+            "resampling": "nearest",
+            "grid": "10/100000",
+            "source_type": "raster",
+            "source_driver": "GeoTIFF",
+            "source_uri": [source_uri],
+        }
+    }
+
+
+def driver_date_raster_tile_set_body(source_uri: str) -> dict:
+    """Body for creating a wur_alert_drivers version and its raster tile set from
+    the same GeoTIFFs, keeping the full uint32 driver and date values."""
+    return {
+        "creation_options": {
+            "pixel_meaning": "driver_date",
+            "data_type": "uint32",
             "band_count": 1,
             "no_data": 0,
             "resampling": "nearest",
@@ -107,14 +126,14 @@ def create_version_if_needed(
     client,
     dataset: str,
     version: str,
-    source_uri: str,
+    body: dict,
     timeout_seconds: float,
     **wait_options,
 ) -> list[dict]:
-    """Create the version (and its raster tile set) from source_uri, unless it
-    already exists, then wait until its assets are saved."""
+    """Create the version (and its raster tile set) with the creation body, unless
+    it already exists, then wait until its assets are saved."""
     if client.get_version(dataset, version) is None:
-        client.create_version(dataset, version, raster_tile_set_body(source_uri))
+        client.create_version(dataset, version, body)
     else:
         print(f"{dataset}/{version} already exists, not creating it again")
     return wait_for_assets_saved(

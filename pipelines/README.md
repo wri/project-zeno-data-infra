@@ -92,8 +92,9 @@ Example — run the DIST alerts update:
 python -m pipelines.run_updates --flow dist_update --version v20260301
 ```
 
-Example — create a new Data API version of the WUR alert drivers dataset
-(`wur_integration_alert_drivers_class`), after new GeoTIFFs have been put in
+Example — create new Data API versions of the WUR alert drivers datasets
+(`wur_alert_drivers` and `wur_integration_alert_drivers_class`, both with the
+`--version` name), after new GeoTIFFs have been put in
 `gs://lcl_tiles/wur_alert_drivers` (about once a month). `--content-date` is the
 date up to which the alert drivers have been calculated.
 
