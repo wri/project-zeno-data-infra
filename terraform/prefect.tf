@@ -160,11 +160,23 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         title   = "Flow Name"
         type    = "string"
         default = "dist_update"
-        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update"]
+        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update", "subscription_emails"]
       }
       content_date = {
         title       = "Content date"
         description = "YYYY-MM-DD date up to which the data has been calculated. Required for wur_update."
+        anyOf       = [{ type = "string" }, { type = "null" }]
+        default     = null
+      }
+      dry_run = {
+        title       = "Dry run"
+        description = "For subscription_emails only: if true, log the emails instead of sending them."
+        type        = "boolean"
+        default     = false
+      }
+      test_recipient = {
+        title       = "Test recipient"
+        description = "For subscription_emails only: send every email to this address instead of the subscriber's."
         anyOf       = [{ type = "string" }, { type = "null" }]
         default     = null
       }
@@ -258,6 +270,33 @@ resource "prefect_automation" "run_pipelines_on_intdist_update" {
         version   = "{{ event.payload.version }}"
         is_latest = "{{ event.payload.is_latest }}"
         flow_name = "integrated_alerts_update"
+      })
+      job_variables = jsonencode({})
+    },
+  ]
+}
+
+# The integrated alerts flow emits intdist_latest once it has marked a new
+# version as latest, which then sends the week's subscription emails.
+resource "prefect_automation" "run_subscription_emails_on_intdist_latest" {
+  name    = "run-subscription-emails-on-intdist-latest${local.name_suffix}"
+  enabled = terraform.workspace == "default"
+
+  trigger = {
+    event = {
+      posture   = "Reactive"
+      expect    = ["intdist_latest${local.name_suffix}"]
+      threshold = 1
+      within    = 0
+    }
+  }
+  actions = [
+    {
+      type          = "run-deployment"
+      source        = "selected"
+      deployment_id = prefect_deployment.gnw_zonal_stats_update.id
+      parameters    = jsonencode({
+        flow_name = "subscription_emails"
       })
       job_variables = jsonencode({})
     },

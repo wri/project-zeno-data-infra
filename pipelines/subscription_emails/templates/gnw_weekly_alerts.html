@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Your weekly alerts</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; padding: 0; }
+  a { color: #0b4db3; }
+  @media (max-width: 620px) {
+    .container { width: 100% !important; }
+    .pad { padding-left: 20px !important; padding-right: 20px !important; }
+    .headline { font-size: 26px !important; line-height: 34px !important; }
+    .bar-col { display: none !important; }
+  }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#f3f4f6;">
+<!-- Inbox preview text, hidden in the email itself. -->
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all;">In the last week, your areas had a total of {{total_ha}} ha of alerts. Latest update {{latest_update}}.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f4f6;">
+<tr>
+<td align="center" style="padding:32px 12px;">
+<table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px; max-width:600px; background-color:#ffffff; font-family:'IBM Plex Sans', Helvetica, Arial, sans-serif; color:#111827;">
+
+  <!-- Accent bar -->
+  <tr><td style="height:5px; line-height:5px; font-size:0; background-color:#dcef6a;">&nbsp;</td></tr>
+
+  <!-- Header -->
+  <tr>
+  <td class="pad" style="padding:24px 40px; border-bottom:1px solid #e5e7eb;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td style="font-size:18px; line-height:24px;"><strong style="font-weight:600; color:#111827;">Global Nature Watch</strong> <span style="color:#6b7280;">Horizon</span></td>
+      <td align="right" style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:12px; letter-spacing:1.5px; color:#6b7280;">WEEKLY ALERTS</td>
+    </tr>
+    </table>
+  </td>
+  </tr>
+
+  <!-- Summary -->
+  <tr>
+  <td class="pad" style="padding:36px 40px 0 40px;">
+    <p style="margin:0 0 16px 0; font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:14px; letter-spacing:1px; text-transform:uppercase; color:#b91c1c;">Week of {{week_label}}</p>
+    <h1 class="headline" style="margin:0 0 20px 0; font-size:32px; line-height:40px; font-weight:600; color:#111827;">In the last week, your areas had a total of <span style="color:#b91c1c;">{{total_ha}}&nbsp;ha of alerts</span></h1>
+    <p style="margin:0 0 32px 0; font-size:16px; line-height:26px; color:#374151;">High and highest confidence integrated alerts across {{dashboard_count}} {{if dashboard_count == 1}}dashboard{{else}}dashboards{{end}}. Latest update {{latest_update}}.</p>
+  </td>
+  </tr>
+
+  <!-- Dashboards table -->
+  <tr>
+  <td class="pad" style="padding:0 40px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;">
+    <tr>
+      <td style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:12px; letter-spacing:1px; color:#4b5563;">YOUR DASHBOARDS WITH NEW ALERTS</td>
+      <td align="right" style="font-size:13px; color:#4b5563;">Hectares, high + highest confidence</td>
+    </tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e7eb; border-radius:8px; border-collapse:separate; overflow:hidden;">
+    <tr style="background-color:#f3f4f6;">
+      <td style="padding:12px 14px; font-size:13px; font-weight:600; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap;">Dashboard</td>
+      <td class="bar-col" style="padding:12px 6px; font-size:13px; font-weight:600; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap;">Land type split</td>
+      <td align="right" style="padding:12px 6px; font-size:13px; font-weight:600; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap;">Total</td>
+      <td align="right" style="padding:12px 6px; font-size:13px; font-weight:600; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap;">Natural lands</td>
+      <td align="right" style="padding:12px 14px 12px 6px; font-size:13px; font-weight:600; color:#374151; border-bottom:1px solid #e5e7eb; white-space:nowrap;">Natural forest</td>
+    </tr>
+    {{each dashboards}}
+    <tr>
+      <td style="padding:14px 6px 14px 14px; font-size:14px; line-height:20px; border-top:1px solid #e5e7eb;">{{if loop_var.url}}<a href="{{loop_var.url}}" style="color:#0b4db3; text-decoration:underline;">{{loop_var.name}}</a>{{else}}<span style="color:#111827;">{{loop_var.name}}</span>{{end}}</td>
+      <td class="bar-col" width="120" style="padding:14px 6px; border-top:1px solid #e5e7eb;">
+        <table role="presentation" width="120" cellpadding="0" cellspacing="0" border="0" style="width:120px;">
+        <tr>
+          {{if loop_var.bar_natural_forest_pct > 0}}<td width="{{loop_var.bar_natural_forest_pct}}%" style="height:10px; line-height:10px; font-size:0; background-color:#4a6b2a;">&nbsp;</td>{{end}}
+          {{if loop_var.bar_other_natural_pct > 0}}<td width="{{loop_var.bar_other_natural_pct}}%" style="height:10px; line-height:10px; font-size:0; background-color:#c3d36d;">&nbsp;</td>{{end}}
+          {{if loop_var.bar_outside_pct > 0}}<td width="{{loop_var.bar_outside_pct}}%" style="height:10px; line-height:10px; font-size:0; background-color:#e2e4e9;">&nbsp;</td>{{end}}
+          <td style="height:10px; line-height:10px; font-size:0;">&nbsp;</td>
+        </tr>
+        </table>
+      </td>
+      <td align="right" style="padding:14px 6px; font-size:14px; font-weight:600; color:#111827; border-top:1px solid #e5e7eb; white-space:nowrap;">{{loop_var.total_ha}}</td>
+      <td align="right" style="padding:14px 6px; font-size:14px; color:#374151; border-top:1px solid #e5e7eb; white-space:nowrap;">{{loop_var.natural_lands_ha}}</td>
+      <td align="right" style="padding:14px 14px 14px 6px; font-size:14px; color:#374151; border-top:1px solid #e5e7eb; white-space:nowrap;">{{loop_var.natural_forest_ha}}</td>
+    </tr>
+    {{end}}
+    {{if more_dashboard_count > 0}}
+    <tr>
+      <td colspan="5" style="padding:12px 14px; font-size:14px; color:#4b5563; border-top:1px solid #e5e7eb; background-color:#f9fafb;">And {{more_dashboard_count}} more {{if more_dashboard_count == 1}}dashboard{{else}}dashboards{{end}} with new alerts</td>
+    </tr>
+    {{end}}
+    </table>
+
+    <!-- Legend -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
+    <tr>
+      <td style="width:12px; height:12px; font-size:0; background-color:#4a6b2a; border-radius:2px;">&nbsp;</td>
+      <td style="padding:0 18px 0 8px; font-size:14px; color:#4b5563;">Natural forest</td>
+      <td style="width:12px; height:12px; font-size:0; background-color:#c3d36d; border-radius:2px;">&nbsp;</td>
+      <td style="padding:0 18px 0 8px; font-size:14px; color:#4b5563;">Other natural lands</td>
+      <td style="width:12px; height:12px; font-size:0; background-color:#e2e4e9; border-radius:2px;">&nbsp;</td>
+      <td style="padding:0 0 0 8px; font-size:14px; color:#4b5563;">Outside natural lands</td>
+    </tr>
+    </table>
+
+    <!-- Buttons, only once their links are in the substitution data -->
+    {{if dashboards_url or download_url}}
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+    <tr>
+      {{if dashboards_url}}<td style="padding-right:12px;"><a href="{{dashboards_url}}" style="display:inline-block; padding:12px 22px; background-color:#0b4db3; border-radius:4px; color:#ffffff; font-size:16px; font-weight:600; text-decoration:none;">Go to my dashboards</a></td>{{end}}
+      {{if download_url}}<td><a href="{{download_url}}" style="display:inline-block; padding:11px 20px; border:1px solid #0b4db3; border-radius:4px; color:#0b4db3; font-size:15px; font-weight:600; text-decoration:none;">Download full data (CSV)</a></td>{{end}}
+    </tr>
+    </table>
+    {{end}}
+
+    <p style="margin:18px 0 36px 0; font-size:14px; line-height:20px; color:#4b5563;">Ranked by new alert area. Dashboards with no new alerts this week aren't included.</p>
+  </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+  <td class="pad" style="padding:36px 40px 40px 40px; border-top:1px solid #e5e7eb;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f4f6; border-radius:8px;">
+    <tr>
+      <td style="padding:18px 20px; font-size:15px; line-height:22px; color:#374151;">&#9432;&nbsp; Also following the same area on Global Forest Watch (myGFW)? You may get a separate GFW email about the same alerts.</td>
+    </tr>
+    </table>
+    {{if manage_url or unsubscribe_url}}
+    <p style="margin:24px 0 0 0; font-size:15px; color:#4b5563;">{{if manage_url}}<a href="{{manage_url}}" style="color:#0b4db3; text-decoration:underline;">Manage alert emails</a>{{end}}{{if manage_url and unsubscribe_url}} &nbsp;&middot;&nbsp; {{end}}{{if unsubscribe_url}}<a href="{{unsubscribe_url}}" style="color:#0b4db3; text-decoration:underline;">Turn off all alert emails</a>{{end}}</p>
+    {{end}}
+    <p style="margin:24px 0 0 0; font-size:14px; line-height:21px; color:#4b5563;">You're getting this because you turned on alert emails for one or more of your dashboards. We send it once a week, after the integrated alerts data updates, and only when there are new alerts.</p>
+    <p style="margin:20px 0 0 0; font-size:14px; color:#4b5563;">Global Nature Watch &middot; A partnership convened by the World Resources Institute</p>
+  </td>
+  </tr>
+
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

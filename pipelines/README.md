@@ -103,6 +103,15 @@ python -m pipelines.run_updates --flow wur_update --version v20261018 \
     --content-date 2026-09-30 --is-latest
 ```
 
+Example — email each dashboard subscriber the past week's high and highest
+confidence integrated alerts in their dashboards' areas, right after the weekly
+integrated alerts update. `--dry-run` logs the emails instead of sending them,
+and `--test-recipient` sends them all to one address instead of the subscribers'.
+
+```bash
+python -m pipelines.run_updates --flow subscription_emails --dry-run
+```
+
 ## Running Pipeline from Prefect Cloud UI
 
 ### Architecture Overview
@@ -147,6 +156,8 @@ There are two deployments available:
    - **overwrite** — set to `true` to re-run over existing outputs
    - **is_latest** — set to `true` to mark this version as the latest served by the analytics API
    - **content_date** — for `wur_update` only: the `YYYY-MM-DD` date up to which the WUR alert drivers have been calculated
+   - **dry_run** — for `subscription_emails` only: set to `true` to log the emails instead of sending them
+   - **test_recipient** — for `subscription_emails` only: send every email to this address instead of the subscribers'
 
 ![Configure run parameters](prefect_cloud_2.png)
 
