@@ -149,15 +149,21 @@ def _parse_bbox(bbox):
 
 
 class UpdateFlow(str, Enum):
+    # Not currently used, replaced by INTEGRATED_ALERTS_UPDATE
     DIST_UPDATE = "dist_update"
+    # Run by hand yearly for annual TCL update
     TCL_UPDATE = "tcl_update"
+    # Run automatically once a week around Sunday
     INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
+    # LGMS flows run by hand, probably annually
     LAND_GHG_INVENTORY_UPDATE = "land_ghg_inventory_update"
     LAND_GHG_INVENTORY_VEGETATION_UPDATE = "land_ghg_inventory_vegetation_update"
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    # Run once, until a new AOI dataset version happens
     AOIS_UPDATE = "aois_update"
+    # Currently run by hand about once a month when new WUR drivers data is available
     WUR_UPDATE = "wur_update"
 
 
