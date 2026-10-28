@@ -14,12 +14,12 @@ from pydantic import BaseModel
 from rasterio.features import geometry_mask
 from rasterio.windows import from_bounds
 
-from pipelines.disturbance.check_for_new_alerts import get_latest_version
+from pipelines.data_api import DataApiClient
 
 
 def get_latest_dist_alert_date() -> date:
     """Get the latest alert date from umd_glad_dist_alerts version."""
-    version = get_latest_version("umd_glad_dist_alerts")
+    version = DataApiClient().get_latest_version("umd_glad_dist_alerts")
     # Version format is "vYYYYMMDD", extract date part
     return datetime.strptime(version, "v%Y%m%d").date()
 

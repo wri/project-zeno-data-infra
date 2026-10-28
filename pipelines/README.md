@@ -92,6 +92,17 @@ Example — run the DIST alerts update:
 python -m pipelines.run_updates --flow dist_update --version v20260301
 ```
 
+Example — create new Data API versions of the WUR alert drivers datasets
+(`wur_alert_drivers` and `wur_integration_alert_drivers_class`, both with the
+`--version` name), after new GeoTIFFs have been put in
+`gs://lcl_tiles/wur_alert_drivers` (about once a month). `--content-date` is the
+date up to which the alert drivers have been calculated.
+
+```bash
+python -m pipelines.run_updates --flow wur_update --version v20261018 \
+    --content-date 2026-09-30 --is-latest
+```
+
 ## Running Pipeline from Prefect Cloud UI
 
 ### Architecture Overview
@@ -135,6 +146,7 @@ There are two deployments available:
    - **version** — the dataset version (e.g. `v20260301`; required for `tcl_update`)
    - **overwrite** — set to `true` to re-run over existing outputs
    - **is_latest** — set to `true` to mark this version as the latest served by the analytics API
+   - **content_date** — for `wur_update` only: the `YYYY-MM-DD` date up to which the WUR alert drivers have been calculated
 
 ![Configure run parameters](prefect_cloud_2.png)
 
