@@ -18,6 +18,9 @@ from pipelines.integrated_alerts.prefect_flows.alert_points_table import (
 from pipelines.integrated_alerts.prefect_flows.gadm_integrated_alerts import (
     integrated_alerts_area,
 )
+from pipelines.integrated_alerts.prefect_flows.vector_zonal_stats import (
+    integrated_alerts_vector_zonal_stats,
+)
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -63,10 +66,10 @@ def integrated_alerts_zarr_flow(
     bbox=None,
     days_stored=DAYS_STORED,
 ) -> list[str]:
-    """bbox (a shapely Polygon) only clips the GADM parquet and the alert points
-    table, which are then written to local parquet files. The zarr is still
-    created for the whole world. days_stored is the number of days of alerts the
-    alert points table keeps."""
+    """bbox (a shapely Polygon) only clips the GADM parquet, the alert points
+    table and the vector AOI zonal stats, which are then written to local parquet
+    files. The zarr is still created for the whole world. days_stored is the
+    number of days of alerts the alert points table keeps."""
     logger = get_run_logger()
     result_uris = []
 
@@ -112,6 +115,21 @@ def integrated_alerts_zarr_flow(
     # look for a global parquet for this version that may not exist.
     if is_latest and bbox is None:
         write_int_latest_version(version)
+
+    # Zonal stats for vector AOIs other than GADM. Nothing serves them yet, so
+    # they run after the version is marked latest, and a failure (e.g. the custom
+    # AOI catalog being unreachable) is logged without failing the release.
+    vector_state = integrated_alerts_vector_zonal_stats(
+        integrated_alerts_zarr_uri,
+        version,
+        overwrite=overwrite,
+        bbox=bbox,
+        return_state=True,
+    )
+    if vector_state.is_failed():
+        logger.warning(f"Vector AOI zonal stats failed: {vector_state.message}")
+    else:
+        result_uris.extend(vector_state.result())
 
     if extra_processing_future is not None:
         # Propagates failure, so fails the flow if the extra processing

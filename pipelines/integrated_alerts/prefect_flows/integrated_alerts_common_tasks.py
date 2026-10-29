@@ -5,7 +5,8 @@ from prefect import task
 from shapely.geometry import Polygon
 
 from pipelines.globals import ANALYTICS_BUCKET
-from pipelines.integrated_alerts import alert_points_table, stages
+from pipelines.integrated_alerts import alert_points_table, stages, vector_zonal_stats
+from pipelines.zonal_stats.aoi_sources import AOISource
 
 INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
 
@@ -38,4 +39,17 @@ def build_alert_points_table(
 ) -> dict:
     return alert_points_table.build_alert_points_table(
         zarr_uri, admin_result_uri, version, result_uri, days_stored, bbox
+    )
+
+
+@task(persist_result=False)
+def build_vector_zonal_stats(
+    aoi_source: AOISource,
+    zarr_uri: str,
+    version: str,
+    result_uri: str,
+    bbox: Optional[Polygon] = None,
+) -> dict:
+    return vector_zonal_stats.build_vector_zonal_stats(
+        aoi_source, zarr_uri, version, result_uri, bbox
     )

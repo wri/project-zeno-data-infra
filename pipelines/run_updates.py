@@ -41,6 +41,8 @@ def create_cluster():
         container=os.getenv("PIPELINES_IMAGE"),
         environ={
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
+            # Iceberg catalogs (e.g. custom AOIs), configured like the client's.
+            **{k: v for k, v in os.environ.items() if k.startswith("PYICEBERG_")},
         },
         worker_options={"nthreads": 4},  # to avoid OOMs
     )
