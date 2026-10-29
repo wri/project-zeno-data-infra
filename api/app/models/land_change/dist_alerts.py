@@ -63,7 +63,7 @@ class DistAlertsAnalytics(StrictBaseModel):
     }
     metadata: Optional[dict] = None
     message: Optional[str] = None
-    status: AnalysisStatus
+    status: Optional[AnalysisStatus] = None
 
     model_config = {
         "from_attributes": True,
