@@ -79,6 +79,32 @@ def successful_analyses(messages: list) -> AnalysisCalls:
     return analyses
 
 
+def transcript(messages: list) -> list[dict]:
+    """The conversation as plain data: tool calls with their inputs, tool
+    results (truncated) and the agent's text."""
+    entries = []
+    for message in messages:
+        if isinstance(message["content"], str):
+            entries.append({"role": message["role"], "text": message["content"]})
+            continue
+        for block in message["content"]:
+            if isinstance(block, dict):
+                entries.append(
+                    {
+                        "tool_result": block.get("tool_use_id"),
+                        "is_error": block.get("is_error", False),
+                        "content": json.dumps(block.get("content"), default=str)[:2000],
+                    }
+                )
+            elif block.type == "tool_use":
+                entries.append(
+                    {"tool_call": block.id, "name": block.name, "input": block.input}
+                )
+            elif block.type == "text":
+                entries.append({"role": "assistant", "text": block.text})
+    return entries
+
+
 def final_text(messages: list) -> str:
     for message in reversed(messages):
         if message["role"] == "assistant":
@@ -116,31 +142,75 @@ async def judge(client: AsyncAnthropic, model: str, case: dict, answer: str):
     return response.parsed_output
 
 
+class ResultWriter:
+    """Writes each case's result row and transcript as soon as the case
+    finishes, so an interrupted run keeps everything completed so far."""
+
+    def __init__(self, output: Path, fieldnames: list[str]):
+        self.output = output
+        self.csv_file = output.open("w", newline="")
+        self.rows = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
+        self.rows.writeheader()
+        self.transcripts = output.with_suffix(".jsonl").open("w")
+
+    def write(self, result: dict, conversation: dict) -> None:
+        self.rows.writerow(result)
+        self.csv_file.flush()
+        self.transcripts.write(json.dumps(conversation, default=str) + "\n")
+        self.transcripts.flush()
+
+    def close(self) -> None:
+        self.csv_file.close()
+        self.transcripts.close()
+
+
+RESULT_COLUMNS = [
+    "dataset_ok",
+    "areas_ok",
+    "answer_ok",
+    "agent_value",
+    "judge_reason",
+    "datasets_used",
+    "aoi_ids_used",
+    "tool_calls",
+    "error",
+    "final_answer",
+]
+
+
 async def run_case(
     agent: AnalyticsAgent,
     judge_client: AsyncAnthropic,
     judge_model: str,
     case: dict,
     limit: asyncio.Semaphore,
+    writer: ResultWriter,
 ) -> dict:
     async with limit:
         messages: list = [{"role": "user", "content": case["question"]}]
-        error = ""
+        errors = []
         try:
             await agent.reply(messages)
         except Exception as exception:
-            error = f"{type(exception).__name__}: {exception}"
+            errors.append(f"agent {type(exception).__name__}: {exception}")
         analyses = successful_analyses(messages)
         answer = final_text(messages)
-        verdict = await judge(judge_client, judge_model, case, answer)
-        print(f"  {case['case_id']}: answer {'ok' if verdict.correct else 'wrong'}")
-        return {
+        verdict = None
+        try:
+            verdict = await judge(judge_client, judge_model, case, answer)
+        except Exception as exception:
+            errors.append(f"judge {type(exception).__name__}: {exception}")
+        outcome = (
+            "judge failed" if verdict is None else "ok" if verdict.correct else "wrong"
+        )
+        print(f"  {case['case_id']}: answer {outcome}", flush=True)
+        result = {
             **case,
             "dataset_ok": used_expected_dataset(case, analyses),
             "areas_ok": used_expected_areas(case, analyses),
-            "answer_ok": verdict.correct,
-            "agent_value": verdict.agent_value,
-            "judge_reason": verdict.reason,
+            "answer_ok": verdict.correct if verdict else None,
+            "agent_value": verdict.agent_value if verdict else "",
+            "judge_reason": verdict.reason if verdict else "",
             "datasets_used": ";".join(sorted(analyses.datasets)),
             "aoi_ids_used": ";".join(sorted(analyses.aoi_ids)),
             "tool_calls": sum(
@@ -150,9 +220,13 @@ async def run_case(
                 for b in m["content"]
                 if b.type == "tool_use"
             ),
-            "error": error,
+            "error": "; ".join(errors),
             "final_answer": answer,
         }
+        writer.write(
+            result, {"case_id": case["case_id"], "transcript": transcript(messages)}
+        )
+        return result
 
 
 def pass_rate(results: list[dict], check: str) -> str:
@@ -167,30 +241,32 @@ async def run(arguments: argparse.Namespace) -> None:
         cases = list(csv.DictReader(file))
     if arguments.limit:
         cases = cases[: arguments.limit]
-    print(f"Running {len(cases)} cases")
-
-    judge_client = AsyncAnthropic()
-    limit = asyncio.Semaphore(arguments.concurrency)
-    async with connect_agent(
-        arguments.server_url, arguments.model, os.environ["RW_AUTH_TOKEN"]
-    ) as agent:
-        results = await asyncio.gather(
-            *[
-                run_case(agent, judge_client, arguments.judge_model, case, limit)
-                for case in cases
-            ]
-        )
+    print(f"Running {len(cases)} cases", flush=True)
 
     results_dir = Path(arguments.cases).parent / "results"
     results_dir.mkdir(exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    output = results_dir / f"{stamp}.csv"
-    with output.open("w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=list(results[0]))
-        writer.writeheader()
-        writer.writerows(results)
+    writer = ResultWriter(results_dir / f"{stamp}.csv", list(cases[0]) + RESULT_COLUMNS)
+    print(f"Writing results to {writer.output} as cases finish", flush=True)
 
-    print(f"\nResults written to {output}")
+    judge_client = AsyncAnthropic()
+    limit = asyncio.Semaphore(arguments.concurrency)
+    try:
+        async with connect_agent(
+            arguments.server_url, arguments.model, os.environ["RW_AUTH_TOKEN"]
+        ) as agent:
+            results = await asyncio.gather(
+                *[
+                    run_case(
+                        agent, judge_client, arguments.judge_model, case, limit, writer
+                    )
+                    for case in cases
+                ]
+            )
+    finally:
+        writer.close()
+
+    print()
     print(f"Dataset used:  {pass_rate(results, 'dataset_ok')}")
     print(f"Areas used:    {pass_rate(results, 'areas_ok')}")
     print(f"Answer right:  {pass_rate(results, 'answer_ok')}")
