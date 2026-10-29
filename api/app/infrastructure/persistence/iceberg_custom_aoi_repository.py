@@ -39,16 +39,14 @@ def custom_aoi_schema() -> Schema:
         NestedField(1, "aoi_id", StringType(), required=True),
         NestedField(2, "name", StringType(), required=True),
         NestedField(3, "user_id", StringType(), required=True),
-        NestedField(4, "email", StringType(), required=True),
-        NestedField(5, "monitor_status", StringType(), required=True),
-        NestedField(6, "geometry", BinaryType(), required=True),
-        NestedField(7, "area_ha", DoubleType(), required=True),
-        NestedField(8, "xmin", DoubleType(), required=True),
-        NestedField(9, "ymin", DoubleType(), required=True),
-        NestedField(10, "xmax", DoubleType(), required=True),
-        NestedField(11, "ymax", DoubleType(), required=True),
-        NestedField(12, "s2_cell", LongType(), required=True),
-        NestedField(13, "updated_at", TimestamptzType(), required=True),
+        NestedField(4, "geometry", BinaryType(), required=True),
+        NestedField(5, "area_ha", DoubleType(), required=True),
+        NestedField(6, "xmin", DoubleType(), required=True),
+        NestedField(7, "ymin", DoubleType(), required=True),
+        NestedField(8, "xmax", DoubleType(), required=True),
+        NestedField(9, "ymax", DoubleType(), required=True),
+        NestedField(10, "s2_cell", LongType(), required=True),
+        NestedField(11, "updated_at", TimestamptzType(), required=True),
     )
 
 
@@ -82,9 +80,9 @@ class CachedTables:
 
 
 class IcebergCustomAoiRepository(CustomAoiRepository):
-    """Stores custom AOIs in an Iceberg table with WKB geometries. Utilizes Iceberg partitions
-    by Google S2 cell ID for fast spatial reads, and a separate aoi_id -> partition table
-    for fast lookup by ID."""
+    """Stores custom AOIs in an Iceberg table with WKB geometries. Utilizes
+    Iceberg partitions by Google S2 cell ID for fast spatial reads, and a
+    separate aoi_id -> partition table for fast lookup by ID."""
 
     def __init__(
         self,
@@ -255,8 +253,6 @@ def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
             "aoi_id": [aoi.aoi_id for aoi in aois],
             "name": [aoi.name for aoi in aois],
             "user_id": [aoi.user_id for aoi in aois],
-            "email": [aoi.email for aoi in aois],
-            "monitor_status": [aoi.monitor_status.value for aoi in aois],
             "geometry": [shapely.to_wkb(aoi.geometry) for aoi in aois],
             "area_ha": [aoi.area_ha for aoi in aois],
             "xmin": bounds[:, 0],

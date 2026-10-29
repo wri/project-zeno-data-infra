@@ -6,7 +6,7 @@ from pyiceberg.expressions import EqualTo
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, MonitorStatus
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
     custom_aoi_cell_schema,
@@ -34,7 +34,7 @@ def repository(catalog):
     return IcebergCustomAoiRepository(catalog, TABLE, INDEX)
 
 
-def aoi(aoi_id, size=1, monitor_status=MonitorStatus.not_monitored, origin=(0, 0)):
+def aoi(aoi_id, size=1, origin=(0, 0)):
     x, y = origin
     return CustomAoi(
         aoi_id,
@@ -42,8 +42,6 @@ def aoi(aoi_id, size=1, monitor_status=MonitorStatus.not_monitored, origin=(0, 0
         float(size),
         name=f"Area {aoi_id}",
         user_id="user-1",
-        email="owner@example.org",
-        monitor_status=monitor_status,
     )
 
 
@@ -60,17 +58,12 @@ def cell_contains(cell, lng, lat):
 @pytest.mark.asyncio
 async def test_upsert_replaces_existing_ids(repository, catalog):
     await repository.upsert([aoi("a"), aoi("b")])
-    await repository.upsert([aoi("b", 2, MonitorStatus.monitored)])
+    await repository.upsert([aoi("b", 2)])
 
     rows = rows_by_id(catalog, TABLE)
     assert sorted(rows) == ["a", "b"]
     assert rows["b"]["area_ha"] == 2.0
-    assert (
-        rows["b"]["name"],
-        rows["b"]["user_id"],
-        rows["b"]["email"],
-        rows["b"]["monitor_status"],
-    ) == ("Area b", "user-1", "owner@example.org", "monitored")
+    assert (rows["b"]["name"], rows["b"]["user_id"]) == ("Area b", "user-1")
     assert from_wkb(rows["b"]["geometry"]).area == 4.0
 
 

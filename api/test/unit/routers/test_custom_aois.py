@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 from shapely.geometry import Polygon, box, mapping
 
 from app.authentication import get_authenticator
-from app.domain.models.custom_aoi import MonitorStatus
 from app.main import app
 from app.models.common.authentication import User
 from app.routers.custom_aois import get_custom_aoi_service
@@ -51,7 +50,7 @@ def circle(coordinates):
     return Polygon(np.column_stack([np.cos(angles), np.sin(angles)]))
 
 
-OWNER = {"name": "My forest", "user_id": "user-1", "email": "owner@example.org"}
+OWNER = {"name": "My forest", "user_id": "user-1"}
 
 
 def custom_aois(*ids, geometry=None, **fields):
@@ -64,25 +63,17 @@ def custom_aois(*ids, geometry=None, **fields):
     }
 
 
-def test_put_saves_each_aoi_with_its_owner_and_monitor_status(service):
+def test_put_saves_each_aoi_with_its_name_and_owner(service):
     body = custom_aois("a", "b")
-    body["aois"][1].update(
-        name="Watched",
-        user_id="user-2",
-        email="other@example.org",
-        monitor_status="monitored",
-    )
+    body["aois"][1].update(name="Watched", user_id="user-2")
 
     response = client.put("/v0/custom_aois", json=body, headers=ADMIN)
 
     assert response.status_code == 200
     assert response.json()["data"]["ids"] == ["a", "b"]
-    assert [
-        (aoi.id, aoi.name, aoi.user_id, aoi.email, aoi.monitor_status)
-        for aoi in service.saved.aois
-    ] == [
-        ("a", "My forest", "user-1", "owner@example.org", MonitorStatus.not_monitored),
-        ("b", "Watched", "user-2", "other@example.org", MonitorStatus.monitored),
+    assert [(aoi.id, aoi.name, aoi.user_id) for aoi in service.saved.aois] == [
+        ("a", "My forest", "user-1"),
+        ("b", "Watched", "user-2"),
     ]
 
 
@@ -115,11 +106,8 @@ def test_writes_require_an_admin(service, headers, status):
         custom_aois("a", geometry={"type": "Point", "coordinates": [0, 0]}),
         {"aois": [{"geometry": mapping(box(0, 0, 1, 1)), **OWNER}]},
         custom_aois("a", geometry=mapping(circle(coordinates=100_002))),
-        custom_aois("a", name="My forest", email="owner@example.org"),
-        custom_aois("a", user_id="user-1", email="owner@example.org"),
-        custom_aois("a", name="My forest", user_id="user-1"),
-        custom_aois("a", **{**OWNER, "email": "not-an-email"}),
-        custom_aois("a", **OWNER, monitor_status="on"),
+        custom_aois("a", name="My forest"),
+        custom_aois("a", user_id="user-1"),
     ],
     ids=[
         "duplicate ids",
@@ -129,9 +117,6 @@ def test_writes_require_an_admin(service, headers, status):
         "over 100,000 coordinates",
         "missing user id",
         "missing name",
-        "missing email",
-        "invalid email",
-        "unknown monitor status",
     ],
 )
 def test_invalid_requests_are_rejected(service, body):
