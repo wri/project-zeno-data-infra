@@ -14,10 +14,9 @@ some AOI's bounding box touches get a Dask task. Each task:
    that column per group;
 4. writes these partial sums (aoi_id, groups, sum) to a part file.
 
-An AOI spanning several tiles has partial sums in each. A second round of tasks,
-one per range of aoi_ids, adds up each AOI's partial sums from every part and
-writes a bucket file. The client appends the buckets, already in aoi_id order,
-into the result. No process holds every pixel or every result.
+The results don't fit in client memory, so a second round of Dask tasks sums
+each range of aoi_ids ("bucket") across the parts into a bucket file, which the
+client appends one at a time into the result.
 """
 
 from dataclasses import dataclass
