@@ -84,7 +84,9 @@ def read_tile_alert_pixels(
     )
 
 
-def alert_tiles(alerts_zarr_uri: str, bbox: Optional[Polygon] = None) -> List[Tile]:
+def list_alert_tiles(
+    alerts_zarr_uri: str, bbox: Optional[Polygon] = None
+) -> List[Tile]:
     """List the alerts zarr's chunks that hold data as tiles, narrowed to bbox
     if one is given."""
     # dask-backed, so its chunk grid defines the tiles

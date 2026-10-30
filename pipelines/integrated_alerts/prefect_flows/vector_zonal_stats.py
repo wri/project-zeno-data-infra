@@ -5,7 +5,7 @@ from shapely.geometry import Polygon
 
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_common_tasks
 from pipelines.utils import s3_uri_exists
-from pipelines.zonal_stats.aoi_sources import custom_aois
+from pipelines.zonal_stats.aoi_sources import custom_aoi_source
 
 
 @flow(name="Integrated alerts vector zonal stats", retries=2, retry_delay_seconds=120)
@@ -31,7 +31,7 @@ def integrated_alerts_vector_zonal_stats(
         The URIs of the saved parquets.
     """
     result_uris = []
-    for aoi_source in [custom_aois()]:
+    for aoi_source in [custom_aoi_source()]:
         if bbox is None:
             result_uri = (
                 f"{integrated_alerts_common_tasks.INTEGRATED_ALERTS_PREFIX}"

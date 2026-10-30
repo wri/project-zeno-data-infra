@@ -50,7 +50,7 @@ ROW_GROUP_SIZE = 100_000
 
 @dataclass(frozen=True)
 class TileTask:
-    """Describe the work of one tile's Dask task (tile_sums)."""
+    """Describe the work of one tile's Dask task (compute_tile_sums)."""
 
     ys: slice
     """Row index range of the tile in the grid (positions for isel, not y
@@ -116,7 +116,7 @@ def sum_pixels_in_polygons(
     )
 
 
-def tile_sums(tile: TileTask) -> Optional[str]:
+def compute_tile_sums(tile: TileTask) -> Optional[str]:
     """Write one tile's partial sums per AOI (steps 1-4 above) to a part file,
     as a Dask task. Returns the part's URI, or None if nothing in the tile
     is covered."""
@@ -168,7 +168,7 @@ def combine_tile_sums(bucket: BucketTask) -> Tuple[int, Optional[str]]:
     return bucket.position, bucket.bucket_uri
 
 
-def zonal_stats(
+def compute_zonal_stats(
     aoi_source: AOISource,
     tiles: List[Tile],
     read_pixels: TilePixels,
@@ -181,8 +181,8 @@ def zonal_stats(
 ) -> Dict:
     """Compute zonal statistics of every AOI in aoi_source over the tiles and
     write them to result_uri. Returns a summary of the run."""
-    aoi_bounds = aoi_source.bounds()
-    tiles_with_aois = _tiles_with_aois(tiles, aoi_bounds)
+    aoi_bounds = aoi_source.read_bounds()
+    tiles_with_aois = _select_tiles_with_aois(tiles, aoi_bounds)
     parts_uri = result_uri.removesuffix(".parquet") + "_parts"
     print(
         f"{aoi_source.aoi_type} zonal stats: {len(aoi_bounds):,} AOIs, "
@@ -202,7 +202,9 @@ def zonal_stats(
         )
         for ys, xs, bounds in tiles_with_aois
     ]
-    part_uris = [uri for uri in map_tiles(tile_sums, tile_tasks, "tiles") if uri]
+    part_uris = [
+        uri for uri in map_tiles(compute_tile_sums, tile_tasks, "tiles") if uri
+    ]
 
     aoi_ids = np.sort(aoi_bounds["aoi_id"].unique())
     bucket_tasks = (
@@ -217,7 +219,7 @@ def zonal_stats(
                 finish=finish,
                 bucket_uri=f"{parts_uri}/buckets/{i}.parquet",
             )
-            for i, ids in enumerate(_buckets(aoi_ids))
+            for i, ids in enumerate(_split_into_buckets(aoi_ids))
         ]
         if part_uris
         else []
@@ -225,7 +227,7 @@ def zonal_stats(
     buckets = dict(map_tiles(combine_tile_sums, bucket_tasks, "buckets"))
     bucket_uris = [buckets[i] for i in sorted(buckets) if buckets[i]]
 
-    schema = schema.with_metadata({**metadata, **aoi_source.provenance()})
+    schema = schema.with_metadata({**metadata, **aoi_source.provenance})
     rows = _write_result(bucket_uris, result_uri, schema)
     _remove(parts_uri)
     summary = {
@@ -238,7 +240,7 @@ def zonal_stats(
     return summary
 
 
-def _tiles_with_aois(tiles: List[Tile], aoi_bounds: pd.DataFrame) -> List[Tile]:
+def _select_tiles_with_aois(tiles: List[Tile], aoi_bounds: pd.DataFrame) -> List[Tile]:
     """Select the tiles that at least one AOI's bounding box intersects."""
     if aoi_bounds.empty:
         return []
@@ -250,7 +252,7 @@ def _tiles_with_aois(tiles: List[Tile], aoi_bounds: pd.DataFrame) -> List[Tile]:
     return [tiles[i] for i in hit]
 
 
-def _buckets(aoi_ids: np.ndarray) -> List[np.ndarray]:
+def _split_into_buckets(aoi_ids: np.ndarray) -> List[np.ndarray]:
     """Split sorted aoi_ids into consecutive groups of AOIS_PER_BUCKET."""
     return np.array_split(aoi_ids, max(1, int(np.ceil(len(aoi_ids) / AOIS_PER_BUCKET))))
 

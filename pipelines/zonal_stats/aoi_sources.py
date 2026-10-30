@@ -31,14 +31,15 @@ class AOISource(Protocol):
     def aoi_type(self) -> str:
         """Return the value of the results' aoi_type column."""
 
-    def bounds(self) -> pd.DataFrame:
+    def read_bounds(self) -> pd.DataFrame:
         """Read every AOI's bounding box, without geometries."""
 
     def read(self, bounds: Bounds) -> gpd.GeoDataFrame:
         """Read the polygons of the AOIs whose bounding boxes intersect bounds."""
 
+    @property
     def provenance(self) -> Dict[str, str]:
-        """Describe where the polygons came from, for the results' metadata."""
+        """Where the polygons came from, for the results' metadata."""
 
 
 @dataclass(frozen=True)
@@ -52,7 +53,7 @@ class IcebergSource:
     aoi_type: str
     row_filter: BooleanExpression = AlwaysTrue()
 
-    def bounds(self) -> pd.DataFrame:
+    def read_bounds(self) -> pd.DataFrame:
         columns = ("aoi_id", "xmin", "ymin", "xmax", "ymax")
         return self._scan(self.row_filter, columns).to_pandas()
 
@@ -73,6 +74,7 @@ class IcebergSource:
             crs="EPSG:4326",
         )
 
+    @property
     def provenance(self) -> Dict[str, str]:
         return {"aoi_source": f"iceberg:{self.catalog}/{self.table}"}
 
@@ -84,7 +86,7 @@ class IcebergSource:
         return table.scan(row_filter=row_filter, selected_fields=columns)
 
 
-def custom_aois() -> IcebergSource:
+def custom_aoi_source() -> IcebergSource:
     """Return the source of monitored custom AOIs, read from the table the API's
     custom AOI endpoints write."""
     return IcebergSource(

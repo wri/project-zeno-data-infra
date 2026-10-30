@@ -19,7 +19,7 @@ from shapely.geometry import Polygon
 from pipelines.globals import pixel_area_10m_zarr_uri, sbtn_natural_lands_zarr_uri
 from pipelines.integrated_alerts.alert_pixels import (
     ALERT_EPOCH,
-    alert_tiles,
+    list_alert_tiles,
     open_zarrs,
     read_tile_alert_pixels,
 )
@@ -29,7 +29,7 @@ from pipelines.prefect_flows.tile_stages import (
     worker_cached,
 )
 from pipelines.zonal_stats.aoi_sources import AOISource
-from pipelines.zonal_stats.pixels_in_polygons import zonal_stats
+from pipelines.zonal_stats.pixels_in_polygons import compute_zonal_stats
 
 # Same dates as the GADM results: from 2023-01-01 to the last alert_date code.
 FIRST_DAY = (date(2023, 1, 1) - ALERT_EPOCH).days
@@ -96,9 +96,9 @@ def build_vector_zonal_stats(
     grid = xr.open_zarr(alerts_zarr_uri)["alert_date"].squeeze("band", drop=True)
     tiles = [
         (ys, xs, window_bounds(grid, ys, xs))
-        for ys, xs in alert_tiles(alerts_zarr_uri, bbox)
+        for ys, xs in list_alert_tiles(alerts_zarr_uri, bbox)
     ]
-    return zonal_stats(
+    return compute_zonal_stats(
         aoi_source,
         tiles,
         read_pixels=partial(read_alert_pixels, alerts_zarr_uri=alerts_zarr_uri),

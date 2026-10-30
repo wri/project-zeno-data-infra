@@ -17,7 +17,7 @@ from pipelines.integrated_alerts.vector_zonal_stats import (
     build_vector_zonal_stats,
 )
 from pipelines.test.unit.conftest import custom_aoi_rows
-from pipelines.zonal_stats.aoi_sources import custom_aois
+from pipelines.zonal_stats.aoi_sources import custom_aoi_source
 
 ALERTS_RESOLUTION = 0.0001
 NATURAL_LANDS_RESOLUTION = 0.00025
@@ -103,7 +103,7 @@ def inputs(tmp_path, monkeypatch):
     }
 
 
-def raster_oracle(inputs, aois) -> pd.DataFrame:
+def sum_raster_by_aoi(inputs, aois) -> pd.DataFrame:
     """Compute the expected results from the whole grid with xarray."""
     alerts = xr.open_zarr(inputs["alerts"]).squeeze("band", drop=True)
     natural_lands = xr.open_zarr(inputs["natural_lands"])["band_data"].squeeze(
@@ -165,13 +165,13 @@ def test_custom_aoi_results_match_the_raster(inputs, custom_aoi_table):
     result_uri = str(inputs["tmp_path"] / "custom-integrated-alerts.parquet")
 
     summary = build_vector_zonal_stats(
-        custom_aois(), inputs["alerts"], "v20261028", result_uri
+        custom_aoi_source(), inputs["alerts"], "v20261028", result_uri
     )
 
     result = pq.ParquetFile(result_uri)
     table = result.read().to_pandas()
     monitored = {k: v for k, v in AOIS.items() if k != "unmonitored"}
-    expected = raster_oracle(inputs, monitored)
+    expected = sum_raster_by_aoi(inputs, monitored)
     assert set(expected["aoi_id"]) == {"across", "dup-a", "dup-b"}
     pd.testing.assert_frame_equal(table, expected)
 
@@ -191,9 +191,9 @@ def test_bbox_run_counts_only_pixels_inside_it(inputs, custom_aoi_table):
     result_uri = str(inputs["tmp_path"] / "custom-bbox.parquet")
 
     build_vector_zonal_stats(
-        custom_aois(), inputs["alerts"], "v20261028", result_uri, bbox
+        custom_aoi_source(), inputs["alerts"], "v20261028", result_uri, bbox
     )
 
     table = pq.read_table(result_uri).to_pandas()
-    expected = raster_oracle(inputs, {"across": AOIS["across"] & bbox})
+    expected = sum_raster_by_aoi(inputs, {"across": AOIS["across"] & bbox})
     pd.testing.assert_frame_equal(table, expected)

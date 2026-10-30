@@ -28,7 +28,7 @@ from shapely.geometry import Polygon
 from pipelines.globals import sbtn_natural_lands_zarr_uri
 from pipelines.integrated_alerts.alert_pixels import (
     ALERT_EPOCH,
-    alert_tiles,
+    list_alert_tiles,
     open_zarrs,
     read_tile_alert_pixels,
 )
@@ -173,7 +173,7 @@ def build_alert_points_table(
     latest_day = latest_alert_day(admin_result_uri)
     day_lo = latest_day - days_stored + 1
     parts_uri = result_uri.removesuffix(".parquet") + "_parts"
-    tiles = alert_tiles(alerts_zarr_uri, bbox)
+    tiles = list_alert_tiles(alerts_zarr_uri, bbox)
     print(f"alert points table: {len(tiles):,} tiles, days {day_lo}..{latest_day}")
 
     tile_parts: Dict[int, List[str]] = {}

@@ -13,9 +13,9 @@ from shapely.geometry import Polygon, box
 from pipelines.zonal_stats import pixels_in_polygons
 from pipelines.zonal_stats.pixels_in_polygons import (
     TileTask,
+    compute_tile_sums,
+    compute_zonal_stats,
     sum_pixels_in_polygons,
-    tile_sums,
-    zonal_stats,
 )
 
 # A 12 x 12 grid of unit pixels from (0, 0), in 4 x 4 pixel tiles. Pixel (row,
@@ -25,7 +25,7 @@ SIZE, TILE = 12, 4
 SCHEMA = pa.schema([("aoi_id", pa.string()), ("g", pa.int64()), ("v", pa.float64())])
 
 
-def grid_pixels(ys: slice, xs: slice) -> pd.DataFrame:
+def read_grid_pixels(ys: slice, xs: slice) -> pd.DataFrame:
     rows, cols = np.meshgrid(
         np.arange(ys.start, ys.stop), np.arange(xs.start, xs.stop), indexing="ij"
     )
@@ -59,7 +59,7 @@ class FakeSource:
     aois: Dict[str, Polygon]
     aoi_type: str = "test"
 
-    def bounds(self) -> pd.DataFrame:
+    def read_bounds(self) -> pd.DataFrame:
         bounds = shapely.bounds(list(self.aois.values()))
         return pd.DataFrame(
             {
@@ -76,6 +76,7 @@ class FakeSource:
         )
         return aois[aois.intersects(box(*bounds))].reset_index(drop=True)
 
+    @property
     def provenance(self) -> Dict[str, str]:
         return {"aoi_source": "memory"}
 
@@ -83,12 +84,12 @@ class FakeSource:
 def first_tile_task(aoi_source: FakeSource, part_uri: str) -> TileTask:
     """Build the task of the top-left tile (rows 0-3, cols 0-3)."""
     ys, xs, bounds = grid_tiles()[0]
-    return TileTask(ys, xs, bounds, aoi_source, grid_pixels, ["g"], "v", part_uri)
+    return TileTask(ys, xs, bounds, aoi_source, read_grid_pixels, ["g"], "v", part_uri)
 
 
-def brute_force(aois: Dict[str, Polygon]) -> pd.DataFrame:
+def sum_by_brute_force(aois: Dict[str, Polygon]) -> pd.DataFrame:
     """Sum the grid's pixels in each polygon by testing every pixel center."""
-    pixels = grid_pixels(slice(0, SIZE), slice(0, SIZE))
+    pixels = read_grid_pixels(slice(0, SIZE), slice(0, SIZE))
     covered = [
         pixels[shapely.contains_xy(polygon, pixels["x"], pixels["y"])].assign(
             aoi_id=aoi_id
@@ -137,7 +138,7 @@ def test_sum_pixels_in_polygons_matches_brute_force():
 
 
 def test_sum_pixels_in_polygons_with_no_pixels_covered():
-    pixels = grid_pixels(slice(0, 2), slice(0, 2))
+    pixels = read_grid_pixels(slice(0, 2), slice(0, 2))
 
     sums = sum_pixels_in_polygons(pixels, [box(20, 20, 21, 21)], ["g"], "v")
 
@@ -145,7 +146,7 @@ def test_sum_pixels_in_polygons_with_no_pixels_covered():
     assert list(sums.columns) == ["polygon", "g", "v"]
 
 
-def test_tile_sums_reports_identical_polygons_for_each_aoi(tmp_path):
+def test_compute_tile_sums_reports_identical_polygons_for_each_aoi(tmp_path):
     aoi_source = FakeSource(
         {
             "a": box(0, 8, 3, 12),
@@ -155,10 +156,10 @@ def test_tile_sums_reports_identical_polygons_for_each_aoi(tmp_path):
     )
     tile = first_tile_task(aoi_source, str(tmp_path / "part.parquet"))
 
-    assert tile_sums(tile) == tile.part_uri
+    assert compute_tile_sums(tile) == tile.part_uri
 
     part = pd.read_parquet(tile.part_uri)
-    expected = brute_force(
+    expected = sum_by_brute_force(
         {
             aoi_id: polygon & box(*tile.bounds)
             for aoi_id, polygon in aoi_source.aois.items()
@@ -168,18 +169,20 @@ def test_tile_sums_reports_identical_polygons_for_each_aoi(tmp_path):
     assert part["aoi_id"].is_monotonic_increasing
 
 
-def test_tile_sums_without_aois_or_pixels_writes_nothing(tmp_path):
+def test_compute_tile_sums_without_aois_or_pixels_writes_nothing(tmp_path):
     part_uri = str(tmp_path / "part.parquet")
     elsewhere = FakeSource({"a": box(8, 0, 12, 4)})
     touching = FakeSource({"a": box(4, 8, 6, 12)})  # shares only the tile's edge
 
-    assert tile_sums(first_tile_task(elsewhere, part_uri)) is None
-    assert tile_sums(first_tile_task(touching, part_uri)) is None
+    assert compute_tile_sums(first_tile_task(elsewhere, part_uri)) is None
+    assert compute_tile_sums(first_tile_task(touching, part_uri)) is None
     assert not (tmp_path / "part.parquet").exists()
 
 
 @pytest.mark.parametrize("aois_per_bucket", [1, 2, 20_000])
-def test_zonal_stats_adds_up_aois_across_tiles(tmp_path, monkeypatch, aois_per_bucket):
+def test_compute_zonal_stats_adds_up_aois_across_tiles(
+    tmp_path, monkeypatch, aois_per_bucket
+):
     monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_BUCKET", aois_per_bucket)
     monkeypatch.setattr(pixels_in_polygons, "ROW_GROUP_SIZE", 5)
     aois = {
@@ -192,10 +195,10 @@ def test_zonal_stats_adds_up_aois_across_tiles(tmp_path, monkeypatch, aois_per_b
     }
     result_uri = str(tmp_path / "result.parquet")
 
-    summary = zonal_stats(
+    summary = compute_zonal_stats(
         FakeSource(aois),
         grid_tiles(),
-        read_pixels=grid_pixels,
+        read_pixels=read_grid_pixels,
         by=["g"],
         sum_column="v",
         finish=lambda sums: sums.sort_values(["aoi_id", "g"]),
@@ -206,7 +209,7 @@ def test_zonal_stats_adds_up_aois_across_tiles(tmp_path, monkeypatch, aois_per_b
 
     result = pq.ParquetFile(result_uri)
     pd.testing.assert_frame_equal(
-        result.read().to_pandas(), brute_force(aois), check_dtype=False
+        result.read().to_pandas(), sum_by_brute_force(aois), check_dtype=False
     )
     assert result.schema_arrow.remove_metadata().equals(SCHEMA)
     assert result.schema_arrow.metadata == {
@@ -215,17 +218,17 @@ def test_zonal_stats_adds_up_aois_across_tiles(tmp_path, monkeypatch, aois_per_b
     }
     assert summary["aois"] == len(aois)
     assert summary["tiles"] == 9  # "outside" touches no tile
-    assert summary["rows"] == len(brute_force(aois))
+    assert summary["rows"] == len(sum_by_brute_force(aois))
     assert not (tmp_path / "result_parts").exists()
 
 
-def test_zonal_stats_without_aois_writes_an_empty_result(tmp_path):
+def test_compute_zonal_stats_without_aois_writes_an_empty_result(tmp_path):
     result_uri = str(tmp_path / "result.parquet")
 
-    summary = zonal_stats(
+    summary = compute_zonal_stats(
         FakeSource({"outside": box(30, 30, 31, 31)}),
         grid_tiles(),
-        read_pixels=grid_pixels,
+        read_pixels=read_grid_pixels,
         by=["g"],
         sum_column="v",
         finish=lambda sums: sums,
