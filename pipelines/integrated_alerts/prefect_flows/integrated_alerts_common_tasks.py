@@ -6,7 +6,7 @@ from shapely.geometry import Polygon
 
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.integrated_alerts import alert_points_table, stages, vector_zonal_stats
-from pipelines.zonal_stats.aoi_sources import AOISource
+from pipelines.zonal_stats.aoi_sources import AOISource, GeoParquetSource
 
 INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
 
@@ -51,5 +51,18 @@ def compute_vector_zonal_stats(
     bbox: Optional[Polygon] = None,
 ) -> dict:
     return vector_zonal_stats.compute_vector_zonal_stats(
+        aoi_source, zarr_uri, version, result_uri, bbox
+    )
+
+
+@task(persist_result=False)
+def compute_admin_zonal_stats(
+    aoi_source: GeoParquetSource,
+    zarr_uri: str,
+    version: str,
+    result_uri: str,
+    bbox: Optional[Polygon] = None,
+) -> dict:
+    return vector_zonal_stats.compute_admin_zonal_stats(
         aoi_source, zarr_uri, version, result_uri, bbox
     )

@@ -20,7 +20,7 @@ client appends one at a time into the result.
 """
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Collection, Dict, List, Optional, Sequence, Tuple
 
 import fsspec
 import geopandas as gpd
@@ -62,6 +62,8 @@ class TileTask:
     clipping AOI polygons."""
     aoi_source: AOISource
     """Where the AOI polygons come from."""
+    aoi_ids: List[str]
+    """The AOIs whose bounding boxes intersect the tile, the only ones read."""
     read_pixels: TilePixels
     """The dataset's reader of the tile's candidate pixels."""
     by: List[str]
@@ -119,7 +121,7 @@ def compute_tile_sums(tile: TileTask) -> Optional[str]:
     """Write one tile's partial sums per AOI (steps 1-4 above) to a part file,
     as a Dask task. Returns the part's URI, or None if nothing in the tile
     is covered."""
-    aois = tile.aoi_source.read(tile.bounds)
+    aois = tile.aoi_source.read(tile.bounds, tile.aoi_ids)
     aois["geometry"] = aois.geometry.clip_by_rect(*tile.bounds)
     aois = aois[~aois.geometry.is_empty]
     if aois.empty:
@@ -177,10 +179,16 @@ def compute_zonal_stats(
     schema: pa.Schema,
     result_uri: str,
     metadata: Dict[str, str],
+    exclude_ids: Collection[str] = (),
+    bucket_key: Optional[Callable[[pd.Series], pd.Series]] = None,
 ) -> Dict:
     """Compute zonal statistics of every AOI in aoi_source over the tiles and
-    write them to result_uri. Returns a summary of the run."""
+    write them to result_uri. Returns a summary of the run. exclude_ids are
+    AOIs not computed from pixels (e.g. admin units finish sums from their
+    children); bucket_key maps sorted aoi_ids to keys a bucket never splits
+    (e.g. admin units' country), which must be contiguous in aoi_id order."""
     aoi_bounds = aoi_source.read_bounds()
+    aoi_bounds = aoi_bounds[~aoi_bounds["aoi_id"].isin(exclude_ids)]
     tiles_with_aois = _select_tiles_with_aois(tiles, aoi_bounds)
     parts_uri = result_uri.removesuffix(".parquet") + "_parts"
     print(
@@ -194,18 +202,20 @@ def compute_zonal_stats(
             xs=xs,
             bounds=bounds,
             aoi_source=aoi_source,
+            aoi_ids=aoi_ids,
             read_pixels=read_pixels,
             by=by,
             sum_column=sum_column,
             part_uri=f"{parts_uri}/tiles/{ys.start}_{xs.start}.parquet",
         )
-        for ys, xs, bounds in tiles_with_aois
+        for (ys, xs, bounds), aoi_ids in tiles_with_aois
     ]
     part_uris = [
         uri for uri in map_tiles(compute_tile_sums, tile_tasks, "tiles") if uri
     ]
 
-    aoi_ids = np.sort(aoi_bounds["aoi_id"].unique())
+    sorted_ids = pd.Series(np.sort(aoi_bounds["aoi_id"].unique()))
+    keys = sorted_ids if bucket_key is None else bucket_key(sorted_ids)
     bucket_tasks = (
         [
             BucketTask(
@@ -218,7 +228,9 @@ def compute_zonal_stats(
                 finish=finish,
                 bucket_uri=f"{parts_uri}/buckets/{i}.parquet",
             )
-            for i, ids in enumerate(_split_into_buckets(aoi_ids))
+            for i, ids in enumerate(
+                _split_into_buckets(sorted_ids.to_numpy(), keys.to_numpy())
+            )
         ]
         if part_uris
         else []
@@ -239,21 +251,39 @@ def compute_zonal_stats(
     return summary
 
 
-def _select_tiles_with_aois(tiles: List[Tile], aoi_bounds: pd.DataFrame) -> List[Tile]:
-    """Select the tiles that at least one AOI's bounding box intersects."""
-    if aoi_bounds.empty:
+def _select_tiles_with_aois(
+    tiles: List[Tile], aoi_bounds: pd.DataFrame
+) -> List[Tuple[Tile, List[str]]]:
+    """Select the tiles that at least one AOI's bounding box intersects, each
+    with the ids of those AOIs."""
+    if aoi_bounds.empty or not tiles:
         return []
     tree = shapely.STRtree(
         shapely.box(*aoi_bounds[["xmin", "ymin", "xmax", "ymax"]].to_numpy().T)
     )
     tile_boxes = shapely.box(*np.array([bounds for _, _, bounds in tiles]).T)
-    hit = np.unique(tree.query(tile_boxes, predicate="intersects")[0])
-    return [tiles[i] for i in hit]
+    pairs = pd.DataFrame(
+        dict(zip(["tile", "aoi"], tree.query(tile_boxes, predicate="intersects")))
+    )
+    pairs["aoi_id"] = aoi_bounds["aoi_id"].to_numpy()[pairs["aoi"]]
+    return [
+        (tiles[tile], sorted(aoi_ids.unique()))
+        for tile, aoi_ids in pairs.groupby("tile")["aoi_id"]
+    ]
 
 
-def _split_into_buckets(aoi_ids: np.ndarray) -> List[np.ndarray]:
-    """Split sorted aoi_ids into consecutive groups of AOIS_PER_BUCKET."""
-    return np.array_split(aoi_ids, max(1, int(np.ceil(len(aoi_ids) / AOIS_PER_BUCKET))))
+def _split_into_buckets(aoi_ids: np.ndarray, keys: np.ndarray) -> List[np.ndarray]:
+    """Split sorted aoi_ids into consecutive groups of about AOIS_PER_BUCKET,
+    never splitting the ids of one key: a group ends only where a key does."""
+    if len(aoi_ids) == 0:
+        return []
+    key_starts = np.flatnonzero(np.r_[True, keys[1:] != keys[:-1]])
+    # Each id's bucket is the bucket of the first id of its key.
+    first_of_key = key_starts[
+        np.searchsorted(key_starts, np.arange(len(keys)), "right") - 1
+    ]
+    bucket = first_of_key // AOIS_PER_BUCKET
+    return np.split(aoi_ids, np.flatnonzero(np.diff(bucket)) + 1)
 
 
 def _write_result(bucket_uris: List[str], result_uri: str, schema: pa.Schema) -> int:
