@@ -42,10 +42,8 @@ AOIS = {
 
 @pytest.fixture
 def inputs(tmp_path, monkeypatch):
-    """Synthetic alerts (one chunk empty, some alerts before FIRST_DAY), 30 m
-    natural lands covering most of them and a 10 m pixel area grid offset by
-    floating point noise, on disk; the adapter reads these instead of the data
-    lake's natural lands and pixel area."""
+    """Write synthetic alerts, natural lands and pixel area zarrs, and make the
+    adapter read them."""
     rng = np.random.default_rng(1)
     y = 1 - (np.arange(SIZE) + 0.5) * ALERTS_RESOLUTION
     x = 10 + (np.arange(SIZE) + 0.5) * ALERTS_RESOLUTION
@@ -114,9 +112,7 @@ def inputs(tmp_path, monkeypatch):
 
 
 def raster_oracle(inputs, aois) -> pd.DataFrame:
-    """The expected results from the whole grid with xarray: alerts from
-    FIRST_DAY with confidence 2-4, natural lands resampled to the alerts grid,
-    each pixel's area, and every pixel center tested against every polygon."""
+    """Compute the expected results from the whole grid with xarray."""
     alerts = xr.open_zarr(inputs["alerts"]).squeeze("band", drop=True)
     natural_lands = xr.open_zarr(inputs["natural_lands"])["band_data"].squeeze(
         "band", drop=True

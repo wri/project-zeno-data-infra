@@ -51,8 +51,8 @@ RESULT_SCHEMA = pa.schema(
 def open_tile_zarrs(
     alerts_zarr_uri: str, pixel_area_zarr_uri: str = pixel_area_10m_zarr_uri
 ) -> Dict:
-    """The alerts and natural lands zarrs (as open_zarrs gives them) and the 10 m
-    pixel area (m²), all opened without dask for reading inside a Dask task."""
+    """Open the zarrs an alert tile is read from (alerts, natural lands, pixel
+    area) for use inside a Dask task."""
     zarrs = open_zarrs(alerts_zarr_uri)
     pixel_area = xr.open_dataset(
         pixel_area_zarr_uri,
@@ -70,11 +70,8 @@ def open_tile_zarrs(
 
 
 def alert_pixels_with_area(ys: slice, xs: slice, alerts_zarr_uri: str) -> pd.DataFrame:
-    """The tile's alert pixels from FIRST_DAY on: pixel-center x and y,
-    natural_lands_class, alert_date, confidence and area_ha. The pixel area grid
-    is the alerts grid offset by floating point noise, so each alert pixel takes
-    the area of the pixel whose center is within 1e-5 degrees, as the GADM
-    results' reindex_like does."""
+    """Read a tile's alert pixels from FIRST_DAY on, with their location and
+    area."""
     zarrs = worker_cached(
         ("vector_zonal_stats_zarrs", alerts_zarr_uri),
         partial(open_tile_zarrs, alerts_zarr_uri),
@@ -91,8 +88,7 @@ def alert_pixels_with_area(ys: slice, xs: slice, alerts_zarr_uri: str) -> pd.Dat
 
 
 def label_results(sums: pd.DataFrame, aoi_type: str) -> pd.DataFrame:
-    """Summed alert area per AOI and group, in the GADM results' columns,
-    labels and order."""
+    """Format summed alert areas like the GADM results."""
     return pd.DataFrame(
         {
             "aoi_id": sums["aoi_id"],
@@ -118,9 +114,9 @@ def build_vector_zonal_stats(
     result_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> Dict:
-    """Integrated alerts zonal statistics for every AOI in aoi_source,
-    written to result_uri. With a bbox, only the alert pixels whose centers are
-    inside it count, for small test runs."""
+    """Compute integrated alerts zonal statistics for every AOI in aoi_source
+    and write them to result_uri. With a bbox, only alert pixels inside it
+    count."""
     grid = xr.open_zarr(alerts_zarr_uri)["alert_date"].squeeze("band", drop=True)
     tiles = [
         (ys, xs, window_bounds(grid, ys, xs))

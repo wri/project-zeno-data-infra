@@ -26,8 +26,7 @@ def chunk_edges(chunks: Iterable[int], target: int) -> List[int]:
 
 
 def window_bounds(grid: xr.DataArray, ys: slice, xs: slice) -> Bounds:
-    """(west, south, east, north) of the pixels at rows ys and columns xs of
-    grid, at the pixel edges, from the pixel-center coordinates."""
+    """Compute the bounds of a window of grid at its pixel edges."""
     x, y = grid.x.values, grid.y.values
     dx, dy = abs(float(x[1] - x[0])), abs(float(y[1] - y[0]))
     top, bottom = y[ys.start], y[ys.stop - 1]

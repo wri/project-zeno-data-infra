@@ -54,7 +54,7 @@ def grid_tiles() -> list:
 
 @dataclass(frozen=True)
 class FakeSource:
-    """An AOI source over AOI polygons held in memory."""
+    """Serve AOI polygons held in memory as an AOI source."""
 
     aois: Dict[str, Polygon]
     aoi_type: str = "test"
@@ -81,13 +81,13 @@ class FakeSource:
 
 
 def first_tile_task(aoi_source: FakeSource, part_uri: str) -> TileTask:
-    """The task of the top-left tile: rows 0-3, cols 0-3, x 0-4, y 8-12."""
+    """Build the task of the top-left tile (rows 0-3, cols 0-3)."""
     ys, xs, bounds = grid_tiles()[0]
     return TileTask(ys, xs, bounds, aoi_source, grid_pixels, ["g"], "v", part_uri)
 
 
 def brute_force(aois: Dict[str, Polygon]) -> pd.DataFrame:
-    """Every pixel center of the whole grid tested against every polygon."""
+    """Sum the grid's pixels in each polygon by testing every pixel center."""
     pixels = grid_pixels(slice(0, SIZE), slice(0, SIZE))
     covered = [
         pixels[shapely.contains_xy(polygon, pixels["x"], pixels["y"])].assign(

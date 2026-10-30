@@ -39,8 +39,8 @@ CUSTOM_AOI_SCHEMA = Schema(
 
 @pytest.fixture
 def custom_aoi_table(tmp_path, monkeypatch) -> Table:
-    """An empty custom AOI table, custom.custom_aois, in a local SQL catalog
-    named "aois", configured through environment variables as on the cluster."""
+    """Create an empty custom AOI table in a local SQL catalog, configured
+    through environment variables as on the cluster."""
     monkeypatch.setenv("PYICEBERG_CATALOG__AOIS__TYPE", "sql")
     monkeypatch.setenv(
         "PYICEBERG_CATALOG__AOIS__URI", f"sqlite:///{tmp_path}/catalog.db"
@@ -58,7 +58,8 @@ def custom_aoi_table(tmp_path, monkeypatch) -> Table:
 def custom_aoi_rows(
     aois: Dict[str, BaseGeometry], not_monitored: Iterable[str] = ()
 ) -> pa.Table:
-    """Rows for the custom AOI table, monitored unless listed in not_monitored."""
+    """Build rows for the custom AOI table, monitored unless listed in
+    not_monitored."""
     ids, geometries = list(aois), list(aois.values())
     bounds = shapely.bounds(geometries)
     return pa.table(

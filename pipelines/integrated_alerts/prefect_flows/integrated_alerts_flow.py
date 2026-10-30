@@ -66,10 +66,10 @@ def integrated_alerts_zarr_flow(
     bbox=None,
     days_stored=DAYS_STORED,
 ) -> list[str]:
-    """bbox (a shapely Polygon) only clips the GADM parquet, the alert points
-    table and the vector AOI zonal stats, which are then written to local parquet
-    files. The zarr is still created for the whole world. days_stored is the
-    number of days of alerts the alert points table keeps."""
+    """Build the integrated alerts zarr for a release and the results computed
+    from it. bbox (a shapely Polygon) limits the results to a small area,
+    written locally, for test runs; days_stored is the number of days of alerts
+    the alert points table keeps."""
     logger = get_run_logger()
     result_uris = []
 

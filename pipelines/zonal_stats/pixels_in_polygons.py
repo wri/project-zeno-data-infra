@@ -50,7 +50,7 @@ ROW_GROUP_SIZE = 100_000
 
 @dataclass(frozen=True)
 class TileTask:
-    """Input to the Dask task (tile_sums) run on one tile."""
+    """Describe the work of one tile's Dask task (tile_sums)."""
 
     ys: slice
     """Row index range of the tile in the grid (positions for isel, not y
@@ -64,7 +64,7 @@ class TileTask:
     aoi_source: AOISource
     """Where the AOI polygons come from."""
     read_pixels: TilePixels
-    """The dataset's reader of the tile's candidate pixels as pixels."""
+    """The dataset's reader of the tile's candidate pixels."""
     by: List[str]
     """Names of the pixel columns the sums are grouped by."""
     sum_column: str
@@ -75,7 +75,7 @@ class TileTask:
 
 @dataclass(frozen=True)
 class BucketTask:
-    """Input to the Dask task (combine_tile_sums) run on one bucket of AOIs."""
+    """Describe the work of one bucket's Dask task (combine_tile_sums)."""
 
     position: int
     """Order of the bucket in the result."""
@@ -101,9 +101,8 @@ def sum_pixels_in_polygons(
     by: List[str],
     sum_column: str,
 ) -> pd.DataFrame:
-    """The sum of sum_column per group of `by` columns over the pixels whose
-    centers (x, y) are inside each polygon, keyed by the polygon's position in
-    polygons."""
+    """Sum a column over the pixels inside each polygon, by group, keyed by the
+    polygon's position."""
     # Every (polygon, pixel) pair where the polygon contains the pixel center,
     # from a spatial index of the pixels: bounding boxes first, then the exact
     # test, in one vectorized call.
@@ -118,9 +117,9 @@ def sum_pixels_in_polygons(
 
 
 def tile_sums(tile: TileTask) -> Optional[str]:
-    """Dask task: one tile's partial sums per AOI (steps 1-4 above), written to
-    tile.part_uri sorted by aoi_id. Returns part_uri, or None if nothing in the
-    tile is covered."""
+    """Write one tile's partial sums per AOI (steps 1-4 above) to a part file,
+    as a Dask task. Returns the part's URI, or None if nothing in the tile
+    is covered."""
     aois = tile.aoi_source.read(tile.bounds)
     aois["geometry"] = aois.geometry.clip_by_rect(*tile.bounds)
     aois = aois[~aois.geometry.is_empty]
@@ -148,10 +147,9 @@ def tile_sums(tile: TileTask) -> Optional[str]:
 
 
 def combine_tile_sums(bucket: BucketTask) -> Tuple[int, Optional[str]]:
-    """Dask task: the bucket's AOIs, their partial sums from every part added up
-    and passed through finish (the dataset's labels and order), written to
-    bucket.bucket_uri. Returns the bucket's position and its file, or None if none
-    of its AOIs is covered."""
+    """Add up a bucket of AOIs' partial sums from every part, finish them and
+    write them to a bucket file, as a Dask task. Returns the bucket's
+    position and URI, or None if none of its AOIs is covered."""
     filesystem, _ = fsspec.core.url_to_fs(bucket.bucket_uri)
     paths = [fsspec.core.url_to_fs(uri)[1] for uri in bucket.part_uris]
     in_bucket = (pc.field("aoi_id") >= bucket.first_id) & (
@@ -181,9 +179,8 @@ def zonal_stats(
     result_uri: str,
     metadata: Dict[str, str],
 ) -> Dict:
-    """Zonal statistics of every AOI in aoi_source over the tiles, written
-    to result_uri with schema (plus metadata and the AOI source's
-    provenance). Returns a summary of the run."""
+    """Compute zonal statistics of every AOI in aoi_source over the tiles and
+    write them to result_uri. Returns a summary of the run."""
     aoi_bounds = aoi_source.bounds()
     tiles_with_aois = _tiles_with_aois(tiles, aoi_bounds)
     parts_uri = result_uri.removesuffix(".parquet") + "_parts"
@@ -242,7 +239,7 @@ def zonal_stats(
 
 
 def _tiles_with_aois(tiles: List[Tile], aoi_bounds: pd.DataFrame) -> List[Tile]:
-    """The tiles that at least one AOI's bounding box intersects."""
+    """Select the tiles that at least one AOI's bounding box intersects."""
     if aoi_bounds.empty:
         return []
     tree = shapely.STRtree(
@@ -254,7 +251,7 @@ def _tiles_with_aois(tiles: List[Tile], aoi_bounds: pd.DataFrame) -> List[Tile]:
 
 
 def _buckets(aoi_ids: np.ndarray) -> List[np.ndarray]:
-    """Sorted aoi_ids in consecutive groups of AOIS_PER_BUCKET."""
+    """Split sorted aoi_ids into consecutive groups of AOIS_PER_BUCKET."""
     return np.array_split(aoi_ids, max(1, int(np.ceil(len(aoi_ids) / AOIS_PER_BUCKET))))
 
 

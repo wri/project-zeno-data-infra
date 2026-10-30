@@ -24,28 +24,28 @@ from pipelines.prefect_flows.tile_stages import Bounds
 
 
 class AOISource(Protocol):
+    """Provide the AOIs of a zonal statistics run: their bounding boxes for
+    planning, and their polygons tile by tile."""
+
     @property
     def aoi_type(self) -> str:
-        """Value of the results' aoi_type column."""
+        """Return the value of the results' aoi_type column."""
 
     def bounds(self) -> pd.DataFrame:
-        """aoi_id, xmin, ymin, xmax, ymax of every AOI, without geometries."""
+        """Read every AOI's bounding box, without geometries."""
 
     def read(self, bounds: Bounds) -> gpd.GeoDataFrame:
-        """aoi_id and geometry (EPSG:4326) of the AOIs whose bounding boxes
-        intersect bounds (west, south, east, north)."""
+        """Read the polygons of the AOIs whose bounding boxes intersect bounds."""
 
     def provenance(self) -> Dict[str, str]:
-        """Where the polygons came from, for the results' metadata."""
+        """Describe where the polygons came from, for the results' metadata."""
 
 
 @dataclass(frozen=True)
 class IcebergSource:
-    """AOIs in an Iceberg table with aoi_id, WKB geometry and xmin, ymin, xmax,
-    ymax columns, such as the custom AOI table the API writes (partitioned by S2
-    cell, so a bounding box filter prunes to the files near it). The catalog is
-    configured through PYICEBERG_CATALOG__{CATALOG}__* environment variables, on
-    the client and on every worker."""
+    """Read AOIs from an Iceberg table, such as the API's custom AOI table. The
+    catalog is configured through PYICEBERG_CATALOG__{CATALOG}__*
+    environment variables on the client and every worker."""
 
     catalog: str
     table: str
@@ -85,8 +85,8 @@ class IcebergSource:
 
 
 def custom_aois() -> IcebergSource:
-    """Monitored custom AOIs, from the table the API's custom AOI endpoints
-    write."""
+    """Return the source of monitored custom AOIs, read from the table the API's
+    custom AOI endpoints write."""
     return IcebergSource(
         catalog="aois",
         table="custom.custom_aois",

@@ -82,9 +82,8 @@ def tile_alert_pixels(
 
 
 def alert_tiles(alerts_zarr_uri: str, bbox: Optional[Polygon] = None) -> List[Tile]:
-    """The alerts zarr's chunks that hold data, as (rows, cols) tiles in row
-    then column order. With a bbox, tiles are narrowed to the pixels
-    clip_ds_to_bbox would keep, and tiles outside it are dropped."""
+    """List the alerts zarr's chunks that hold data as tiles, narrowed to bbox
+    if one is given."""
     # dask-backed, so its chunk grid defines the tiles
     grid = xr.open_zarr(alerts_zarr_uri)["alert_date"].squeeze("band", drop=True)
     chunk_rows, chunk_cols = grid.data.chunksize
