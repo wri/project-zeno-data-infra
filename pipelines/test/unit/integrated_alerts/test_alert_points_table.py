@@ -9,12 +9,12 @@ import xarray as xr
 from shapely.geometry import box
 
 from pipelines.integrated_alerts import alert_points_table
+from pipelines.integrated_alerts.alert_pixels import alert_tiles
 from pipelines.integrated_alerts.alert_points_table import (
     HILBERT_ORDER,
     TABLE_SCHEMA,
     build_alert_points_table,
     latest_alert_day,
-    table_tiles,
 )
 from pipelines.integrated_alerts.stages import resample_to_alerts_grid
 from pipelines.prefect_flows.common_stages import clip_ds_to_bbox
@@ -159,15 +159,15 @@ def test_latest_alert_day_accepts_timestamps(tmp_path):
     assert latest_alert_day(path) == LATEST_DAY
 
 
-def test_table_tiles_are_the_chunks_with_data(inputs):
-    tiles = table_tiles(inputs["alerts"])
+def test_alert_tiles_are_the_chunks_with_data(inputs):
+    tiles = alert_tiles(inputs["alerts"])
     assert len(tiles) == 8
     assert (slice(0, CHUNK), slice(CHUNK, 2 * CHUNK)) not in tiles
 
 
-def test_table_tiles_narrow_to_a_bbox(inputs):
+def test_alert_tiles_narrow_to_a_bbox(inputs):
     bbox = box(10.0015, 0.9955, 10.0045, 0.9985)  # pixel centers 15..44 of each axis
-    tiles = table_tiles(inputs["alerts"], bbox)
+    tiles = alert_tiles(inputs["alerts"], bbox)
     rows = sorted({(ys.start, ys.stop) for ys, _ in tiles})
     cols = sorted({(xs.start, xs.stop) for _, xs in tiles})
     assert rows == [(15, 20), (20, 40), (40, 45)]

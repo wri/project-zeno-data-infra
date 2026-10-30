@@ -17,8 +17,12 @@ import xarray as xr
 from shapely.geometry import Polygon
 
 from pipelines.globals import pixel_area_10m_zarr_uri
-from pipelines.integrated_alerts.alert_pixels import open_zarrs, tile_alert_pixels
-from pipelines.integrated_alerts.alert_points_table import ALERT_EPOCH, table_tiles
+from pipelines.integrated_alerts.alert_pixels import (
+    ALERT_EPOCH,
+    alert_tiles,
+    open_zarrs,
+    tile_alert_pixels,
+)
 from pipelines.integrated_alerts.stages import alerts_confidence
 from pipelines.prefect_flows.tile_stages import (
     sample_nearest,
@@ -120,7 +124,7 @@ def build_vector_zonal_stats(
     grid = xr.open_zarr(alerts_zarr_uri)["alert_date"].squeeze("band", drop=True)
     tiles = [
         (ys, xs, window_bounds(grid, ys, xs))
-        for ys, xs in table_tiles(alerts_zarr_uri, bbox)
+        for ys, xs in alert_tiles(alerts_zarr_uri, bbox)
     ]
     return zonal_stats(
         aoi_source,

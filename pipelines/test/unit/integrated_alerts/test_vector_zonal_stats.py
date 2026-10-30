@@ -9,8 +9,7 @@ import xarray as xr
 from shapely.geometry import Polygon, box
 
 from pipelines.integrated_alerts import vector_zonal_stats
-from pipelines.integrated_alerts.alert_pixels import open_zarrs
-from pipelines.integrated_alerts.alert_points_table import ALERT_EPOCH
+from pipelines.integrated_alerts.alert_pixels import ALERT_EPOCH, open_zarrs
 from pipelines.integrated_alerts.stages import resample_to_alerts_grid
 from pipelines.integrated_alerts.vector_zonal_stats import (
     FIRST_DAY,
