@@ -16,8 +16,8 @@ def integrated_alerts_vector_zonal_stats(
     bbox: Optional[Polygon] = None,
 ) -> List[str]:
     """Compute integrated alerts area by AOI, date, confidence and SBTN natural
-    lands class for vector AOIs other than GADM, one parquet per AOI type, in the
-    same schema as the GADM results. Covers the monitored custom AOIs.
+    lands class for the monitored custom AOIs, in the same schema as the GADM
+    results.
 
     Args:
         integrated_alerts_zarr_uri: URI of the integrated alerts date_conf zarr.

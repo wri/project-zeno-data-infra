@@ -117,9 +117,9 @@ def compute_integrated_alerts_zonal_stats(
     if is_latest and bbox is None:
         write_int_latest_version(version)
 
-    # Zonal stats for vector AOIs other than GADM. Nothing serves them yet, so
-    # they run after the version is marked latest, and a failure (e.g. the custom
-    # AOI catalog being unreachable) is logged without failing the release.
+    # Zonal stats for vector AOIs run after the version is marked latest, and a
+    # failure (e.g. the custom AOI catalog being unreachable) is logged without
+    # failing the release.
     vector_state = integrated_alerts_vector_zonal_stats(
         integrated_alerts_zarr_uri,
         version,
