@@ -16,16 +16,15 @@ import pyarrow as pa
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.globals import pixel_area_10m_zarr_uri
+from pipelines.globals import pixel_area_10m_zarr_uri, sbtn_natural_lands_zarr_uri
 from pipelines.integrated_alerts.alert_pixels import (
     ALERT_EPOCH,
     alert_tiles,
     open_zarrs,
-    tile_alert_pixels,
+    read_tile_alert_pixels,
 )
 from pipelines.integrated_alerts.stages import alerts_confidence
 from pipelines.prefect_flows.tile_stages import (
-    sample_nearest,
     window_bounds,
     worker_cached,
 )
@@ -36,6 +35,11 @@ from pipelines.zonal_stats.pixels_in_polygons import zonal_stats
 FIRST_DAY = (date(2023, 1, 1) - ALERT_EPOCH).days
 LAST_DAY = 4999
 BY = ["natural_lands_class", "alert_date", "confidence"]
+# layers sampled at each alert pixel, by column name
+LAYER_URIS = {
+    "natural_lands_class": sbtn_natural_lands_zarr_uri,
+    "area_m2": pixel_area_10m_zarr_uri,
+}
 RESULT_SCHEMA = pa.schema(
     [
         ("aoi_id", pa.string()),
@@ -48,43 +52,15 @@ RESULT_SCHEMA = pa.schema(
 )
 
 
-def open_tile_zarrs(
-    alerts_zarr_uri: str, pixel_area_zarr_uri: str = pixel_area_10m_zarr_uri
-) -> Dict:
-    """Open the zarrs an alert tile is read from (alerts, natural lands, pixel
-    area) for use inside a Dask task."""
-    zarrs = open_zarrs(alerts_zarr_uri)
-    pixel_area = xr.open_dataset(
-        pixel_area_zarr_uri,
-        engine="zarr",
-        chunks=None,
-        cache=False,
-        storage_options={"requester_pays": True},  # GFW data lake account
-    )["band_data"]
-    zarrs["pixel_area"] = (
-        pixel_area.squeeze("band", drop=True)
-        if "band" in pixel_area.dims
-        else pixel_area
-    )
-    return zarrs
-
-
-def alert_pixels_with_area(ys: slice, xs: slice, alerts_zarr_uri: str) -> pd.DataFrame:
-    """Read a tile's alert pixels from FIRST_DAY on, with their location and
-    area."""
+def read_alert_pixels(ys: slice, xs: slice, alerts_zarr_uri: str) -> pd.DataFrame:
+    """Read a tile's alert pixels from FIRST_DAY on, with their location,
+    natural lands class and area."""
     zarrs = worker_cached(
         ("vector_zonal_stats_zarrs", alerts_zarr_uri),
-        partial(open_tile_zarrs, alerts_zarr_uri),
+        partial(open_zarrs, alerts_zarr_uri, LAYER_URIS),
     )
-    pixels = tile_alert_pixels(zarrs, ys, xs, FIRST_DAY, LAST_DAY)
-    x = zarrs["alerts"].x.values[pixels["col"]]
-    y = zarrs["alerts"].y.values[pixels["row"]]
-    area_m2 = sample_nearest(
-        zarrs["pixel_area"], x, y, tolerance=1e-5, fill_value=np.nan
-    )
-    return pixels.assign(
-        x=x, y=y, area_ha=np.nan_to_num(area_m2.astype(np.float64)) / 10_000
-    )
+    pixels = read_tile_alert_pixels(zarrs, ys, xs, FIRST_DAY, LAST_DAY)
+    return pixels.assign(area_ha=pixels.pop("area_m2").astype(np.float64) / 10_000)
 
 
 def label_results(sums: pd.DataFrame, aoi_type: str) -> pd.DataFrame:
@@ -125,7 +101,7 @@ def build_vector_zonal_stats(
     return zonal_stats(
         aoi_source,
         tiles,
-        read_pixels=partial(alert_pixels_with_area, alerts_zarr_uri=alerts_zarr_uri),
+        read_pixels=partial(read_alert_pixels, alerts_zarr_uri=alerts_zarr_uri),
         by=BY,
         sum_column="area_ha",
         finish=partial(label_results, aoi_type=aoi_source.aoi_type),

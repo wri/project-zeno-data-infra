@@ -25,11 +25,12 @@ import pyarrow.parquet as pq
 import xarray as xr
 from shapely.geometry import Polygon
 
+from pipelines.globals import sbtn_natural_lands_zarr_uri
 from pipelines.integrated_alerts.alert_pixels import (
     ALERT_EPOCH,
     alert_tiles,
     open_zarrs,
-    tile_alert_pixels,
+    read_tile_alert_pixels,
 )
 from pipelines.prefect_flows.tile_stages import (
     hilbert_index,
@@ -38,6 +39,8 @@ from pipelines.prefect_flows.tile_stages import (
 )
 
 DAYS_STORED = 30  # days of alerts kept, ending at the newest alert date
+# layers sampled at each alert pixel, by column name
+LAYER_URIS = {"natural_lands_class": sbtn_natural_lands_zarr_uri}
 ROW_GROUP_SIZE = 10_000
 HILBERT_ORDER = 22  # 2**22 cells covers the 3.6M-column global 10 m grid
 TABLE_SCHEMA = pa.schema(
@@ -74,9 +77,10 @@ def write_tile_part(task) -> Tuple[Optional[str], Dict[int, int]]:
     part's path and its point count per date (no file if the tile is empty)."""
     ys, xs, day_lo, day_hi, alerts_zarr_uri, parts_uri = task
     zarrs = worker_cached(
-        ("alert_points_zarrs", alerts_zarr_uri), partial(open_zarrs, alerts_zarr_uri)
+        ("alert_points_zarrs", alerts_zarr_uri),
+        partial(open_zarrs, alerts_zarr_uri, LAYER_URIS),
     )
-    pixels = tile_alert_pixels(zarrs, ys, xs, day_lo, day_hi)
+    pixels = read_tile_alert_pixels(zarrs, ys, xs, day_lo, day_hi)
     if pixels.empty:
         return None, {}
     pixels["hilbert"] = hilbert_index(pixels["col"], pixels["row"], HILBERT_ORDER)

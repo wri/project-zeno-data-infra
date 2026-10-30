@@ -97,12 +97,11 @@ def small_row_groups(monkeypatch):
 
 @pytest.fixture
 def natural_lands_uri(inputs, monkeypatch):
-    open_zarrs = alert_points_table.open_zarrs
-
-    def open_test_zarrs(alerts_zarr_uri):
-        return open_zarrs(alerts_zarr_uri, inputs["natural_lands"])
-
-    monkeypatch.setattr(alert_points_table, "open_zarrs", open_test_zarrs)
+    monkeypatch.setattr(
+        alert_points_table,
+        "LAYER_URIS",
+        {"natural_lands_class": inputs["natural_lands"]},
+    )
     return inputs["natural_lands"]
 
 

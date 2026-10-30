@@ -9,7 +9,7 @@ import xarray as xr
 from shapely.geometry import Polygon, box
 
 from pipelines.integrated_alerts import vector_zonal_stats
-from pipelines.integrated_alerts.alert_pixels import ALERT_EPOCH, open_zarrs
+from pipelines.integrated_alerts.alert_pixels import ALERT_EPOCH
 from pipelines.integrated_alerts.stages import resample_to_alerts_grid
 from pipelines.integrated_alerts.vector_zonal_stats import (
     FIRST_DAY,
@@ -89,19 +89,11 @@ def inputs(tmp_path, monkeypatch):
     )
     pixel_area_path = str(tmp_path / "pixel_area.zarr")
     pixel_area.chunk({"band": 1, "y": CHUNK, "x": CHUNK}).to_zarr(pixel_area_path)
-    # A URL, as the adapter opens it with storage options
-    pixel_area_uri = f"file://{pixel_area_path}"
 
-    open_tile_zarrs = vector_zonal_stats.open_tile_zarrs
     monkeypatch.setattr(
         vector_zonal_stats,
-        "open_zarrs",
-        lambda alerts_zarr_uri: open_zarrs(alerts_zarr_uri, natural_lands_uri),
-    )
-    monkeypatch.setattr(
-        vector_zonal_stats,
-        "open_tile_zarrs",
-        lambda alerts_zarr_uri: open_tile_zarrs(alerts_zarr_uri, pixel_area_uri),
+        "LAYER_URIS",
+        {"natural_lands_class": natural_lands_uri, "area_m2": pixel_area_path},
     )
     return {
         "alerts": alerts_uri,
