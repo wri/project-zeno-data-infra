@@ -1,14 +1,20 @@
 import logging
+from functools import lru_cache
 
 from fastapi import Header
+from pyiceberg.catalog import Catalog, load_catalog
 
 from app.domain.models.environment import Environment
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
+from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
+)
+from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
+    IcebergCustomAoiRepository,
 )
 
 
@@ -54,4 +60,20 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
                 f"{vectors}/landmark/v20260617/aois.parquet"
             ),
         }
+    )
+
+
+@lru_cache
+def get_custom_aoi_catalog() -> Catalog:
+    """The Iceberg catalog holding custom AOIs, configured through
+    PYICEBERG_CATALOG__AOIS__* environment variables."""
+    return load_catalog("aois")
+
+
+@lru_cache
+def get_custom_aoi_repository() -> CustomAoiRepository:
+    """One repository per process, so its cached tables are reused across
+    requests."""
+    return IcebergCustomAoiRepository(
+        get_custom_aoi_catalog(), "custom.custom_aois", "custom.custom_aoi_cells"
     )

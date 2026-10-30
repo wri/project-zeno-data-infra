@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.testclient import TestClient
@@ -55,7 +57,8 @@ class TestGetEnvironmentDependency:
                     assert parameter.get("name") != "x-environment", (
                         f"x-environment header should be hidden from docs "
                         f"(found in {method.upper()} {path}). "
-                        "Add include_in_schema=False to the Header() in get_environment."
+                        "Add include_in_schema=False to the Header() in "
+                        "get_environment."
                     )
 
 
@@ -68,7 +71,8 @@ def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
         "protected_area",
         "indigenous_land",
     }
-    assert all(
-        isinstance(source, GeoParquetAoiGeometryRepository)
-        for source in repository.repositories.values()
-    )
+    for source in repository.repositories.values():
+        assert isinstance(source, GeoParquetAoiGeometryRepository)
+        assert re.fullmatch(
+            r"s3://lcl-analytics/vectors/aois/\w+/v[\w.]+/aois\.parquet", source.uri
+        )
