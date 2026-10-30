@@ -14,7 +14,7 @@ from pipelines.integrated_alerts.stages import resample_to_alerts_grid
 from pipelines.integrated_alerts.vector_zonal_stats import (
     FIRST_DAY,
     RESULT_SCHEMA,
-    build_vector_zonal_stats,
+    compute_vector_zonal_stats,
 )
 from pipelines.test.unit.conftest import custom_aoi_rows
 from pipelines.zonal_stats.aoi_sources import custom_aoi_source
@@ -164,7 +164,7 @@ def test_custom_aoi_results_match_the_raster(inputs, custom_aoi_table):
     custom_aoi_table.append(custom_aoi_rows(AOIS, not_monitored=["unmonitored"]))
     result_uri = str(inputs["tmp_path"] / "custom-integrated-alerts.parquet")
 
-    summary = build_vector_zonal_stats(
+    summary = compute_vector_zonal_stats(
         custom_aoi_source(), inputs["alerts"], "v20261028", result_uri
     )
 
@@ -190,7 +190,7 @@ def test_bbox_run_counts_only_pixels_inside_it(inputs, custom_aoi_table):
     bbox = box(10.0015, 0.9955, 10.0045, 0.9985)  # pixel centers 15..44
     result_uri = str(inputs["tmp_path"] / "custom-bbox.parquet")
 
-    build_vector_zonal_stats(
+    compute_vector_zonal_stats(
         custom_aoi_source(), inputs["alerts"], "v20261028", result_uri, bbox
     )
 

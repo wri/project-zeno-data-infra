@@ -52,24 +52,25 @@ def write_int_latest_version(version) -> None:
 
 
 @flow(
-    name="Create int-Dist zarr",
+    name="Compute int-Dist zonal stats",
     log_prints=True,
     description=(
-        "Create zarr from tiles of one version of the integrated disturbance "
-        "alerts dataset"
+        "Compute zonal statistics by AOI for one version of the integrated "
+        "disturbance alerts"
     ),
 )
-def integrated_alerts_zarr_flow(
+def compute_integrated_alerts_zonal_stats(
     version=None,
     overwrite=False,
     is_latest=False,
     bbox=None,
     days_stored=DAYS_STORED,
 ) -> list[str]:
-    """Build the integrated alerts zarr for a release and the results computed
-    from it. bbox (a shapely Polygon) limits the results to a small area,
-    written locally, for test runs; days_stored is the number of days of alerts
-    the alert points table keeps."""
+    """Compute integrated alerts zonal statistics by AOI for one alerts version,
+    from the version's zarr, which is created first. Also writes the alert
+    points table (the newest days_stored days of alerts, as points) that the API
+    lists alerts from. bbox (a shapely Polygon) limits the results to a small
+    area, written locally, for test runs."""
     logger = get_run_logger()
     result_uris = []
 

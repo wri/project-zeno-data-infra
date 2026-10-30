@@ -83,7 +83,7 @@ def label_results(sums: pd.DataFrame, aoi_type: str) -> pd.DataFrame:
     )
 
 
-def build_vector_zonal_stats(
+def compute_vector_zonal_stats(
     aoi_source: AOISource,
     alerts_zarr_uri: str,
     version: str,

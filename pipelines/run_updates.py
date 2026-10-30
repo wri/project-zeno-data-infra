@@ -87,7 +87,7 @@ def run_integrated_alerts_update(
 ) -> list[str]:
     result_uris = []
 
-    result = integrated_alerts_flow.integrated_alerts_zarr_flow(
+    result = integrated_alerts_flow.compute_integrated_alerts_zonal_stats(
         version, overwrite=overwrite, is_latest=is_latest, bbox=bbox
     )
     result_uris.append(result)

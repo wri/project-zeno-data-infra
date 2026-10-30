@@ -44,8 +44,8 @@ def integrated_alerts_vector_zonal_stats(
             # local bbox test run
             result_uri = f"{aoi_source.aoi_type}-integrated-alerts-{version}.parquet"
 
-        integrated_alerts_common_tasks.build_vector_zonal_stats.with_options(
-            name=f"build-{aoi_source.aoi_type}-zonal-stats"
+        integrated_alerts_common_tasks.compute_vector_zonal_stats.with_options(
+            name=f"integrated-alerts-{aoi_source.aoi_type}-compute-zonal-stats"
         )(aoi_source, integrated_alerts_zarr_uri, version, result_uri, bbox)
         result_uris.append(result_uri)
     return result_uris

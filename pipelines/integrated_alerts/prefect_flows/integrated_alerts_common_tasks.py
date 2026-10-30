@@ -43,13 +43,13 @@ def build_alert_points_table(
 
 
 @task(persist_result=False)
-def build_vector_zonal_stats(
+def compute_vector_zonal_stats(
     aoi_source: AOISource,
     zarr_uri: str,
     version: str,
     result_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> dict:
-    return vector_zonal_stats.build_vector_zonal_stats(
+    return vector_zonal_stats.compute_vector_zonal_stats(
         aoi_source, zarr_uri, version, result_uri, bbox
     )
