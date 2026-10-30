@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
@@ -8,16 +9,23 @@ import shapely
 import xarray as xr
 from shapely.geometry import Polygon, box
 
+from pipelines.aois.stages import with_area_ha, write_geoparquet
 from pipelines.integrated_alerts import vector_zonal_stats
 from pipelines.integrated_alerts.alert_pixels import ALERT_EPOCH
 from pipelines.integrated_alerts.stages import resample_to_alerts_grid
 from pipelines.integrated_alerts.vector_zonal_stats import (
     FIRST_DAY,
     RESULT_SCHEMA,
+    compute_admin_zonal_stats,
     compute_vector_zonal_stats,
+    country,
+    parent_ids,
+    split_admin_levels,
 )
+from pipelines.prefect_flows.common_stages import rollup_by_gadm_and_convert_to_aoi
 from pipelines.test.unit.conftest import custom_aoi_rows
-from pipelines.zonal_stats.aoi_sources import custom_aoi_source
+from pipelines.zonal_stats import pixels_in_polygons
+from pipelines.zonal_stats.aoi_sources import GeoParquetSource, custom_aoi_source
 
 ALERTS_RESOLUTION = 0.0001
 NATURAL_LANDS_RESOLUTION = 0.00025
@@ -103,7 +111,7 @@ def inputs(tmp_path, monkeypatch):
     }
 
 
-def sum_raster_by_aoi(inputs, aois) -> pd.DataFrame:
+def sum_raster_by_aoi(inputs, aois, aoi_type="custom") -> pd.DataFrame:
     """Compute the expected results from the whole grid with xarray."""
     alerts = xr.open_zarr(inputs["alerts"]).squeeze("band", drop=True)
     natural_lands = xr.open_zarr(inputs["natural_lands"])["band_data"].squeeze(
@@ -144,7 +152,7 @@ def sum_raster_by_aoi(inputs, aois) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "aoi_id": sums["aoi_id"],
-            "aoi_type": "custom",
+            "aoi_type": aoi_type,
             "natural_lands_class": sums["natural_lands_class"].astype(np.uint8),
             "alert_date": [
                 ALERT_EPOCH + timedelta(days=int(day)) for day in sums["alert_date"]
@@ -197,3 +205,102 @@ def test_bbox_run_counts_only_pixels_inside_it(inputs, custom_aoi_table):
     table = pq.read_table(result_uri).to_pandas()
     expected = sum_raster_by_aoi(inputs, {"across": AOIS["across"] & bbox})
     pd.testing.assert_frame_equal(table, expected)
+
+
+def write_geoparquet_source(tmp_path, aois, aoi_type, **columns) -> GeoParquetSource:
+    """Write the AOIs as the AOI pipeline's GeoParquet and return a source for it."""
+    uri = str(tmp_path / f"{aoi_type}.parquet")
+    features = gpd.GeoDataFrame(
+        {"aoi_id": list(aois), **columns}, geometry=list(aois.values()), crs="EPSG:4326"
+    )
+    write_geoparquet(with_area_ha(features), uri, row_group_bytes=200)
+    return GeoParquetSource(uri, aoi_type)
+
+
+def test_geoparquet_aoi_results_match_the_raster(inputs):
+    aois = {k: v for k, v in AOIS.items() if k != "unmonitored"}
+    source = write_geoparquet_source(inputs["tmp_path"], aois, "protected_area")
+    result_uri = str(inputs["tmp_path"] / "protected_area-integrated-alerts.parquet")
+
+    compute_vector_zonal_stats(source, inputs["alerts"], "v20261028", result_uri)
+
+    result = pq.ParquetFile(result_uri)
+    expected = sum_raster_by_aoi(inputs, aois, "protected_area")
+    pd.testing.assert_frame_equal(result.read().to_pandas(), expected)
+    metadata = {k.decode(): v.decode() for k, v in result.metadata.metadata.items()}
+    assert metadata["aoi_source"] == source.uri
+
+
+# Admin units whose children partition them at pixel edges, except BBB, whose
+# only child covers a third of it. Only units without children are computed;
+# parents are summed from their children, so BBB gets BBB.1's totals.
+ADMIN_UNITS = {
+    "AAA": (0, box(10.0, 0.994, 10.003, 1.0)),
+    "AAA.1": (1, box(10.0, 0.994, 10.003, 0.997)),
+    "AAA.1.1": (2, box(10.0, 0.994, 10.0015, 0.997)),
+    "AAA.1.2": (2, box(10.0015, 0.994, 10.003, 0.997)),
+    "AAA.2": (1, box(10.0, 0.997, 10.003, 1.0)),
+    "BBB": (0, box(10.003, 0.994, 10.006, 1.0)),
+    "BBB.1": (1, box(10.003, 0.994, 10.006, 0.996)),
+}
+
+
+def test_admin_results_roll_up_to_the_raster_totals(inputs, monkeypatch):
+    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_BUCKET", 2)
+    aois = {aoi_id: geometry for aoi_id, (_, geometry) in ADMIN_UNITS.items()}
+    source = write_geoparquet_source(
+        inputs["tmp_path"],
+        aois,
+        "admin",
+        adm_level=[level for level, _ in ADMIN_UNITS.values()],
+    )
+    result_uri = str(inputs["tmp_path"] / "admin-integrated-alerts.parquet")
+
+    summary = compute_admin_zonal_stats(
+        source, inputs["alerts"], "v20261028", result_uri
+    )
+
+    table = pq.read_table(result_uri).to_pandas()
+    expected = sum_raster_by_aoi(inputs, {**aois, "BBB": aois["BBB.1"]}, "admin")
+    pd.testing.assert_frame_equal(table, expected, check_exact=False, rtol=1e-12)
+    assert summary["aois"] == 4  # AAA.1.1, AAA.1.2, AAA.2 and BBB.1
+
+
+def test_parent_ids_are_the_units_with_children():
+    ids = pd.Series(["A", "A.1", "A.1.1", "A.1.2", "A.2", "B", "C", "C.1"])
+
+    assert sorted(parent_ids(ids)) == ["A", "A.1", "C"]
+
+
+def test_split_admin_levels_roll_up_into_every_parent():
+    sums = pd.DataFrame(
+        [
+            ("A.1.1", 0, 1.0),
+            ("A.1.1", 1, 2.0),
+            ("A.1.2", 0, 3.0),
+            ("A.2", 1, 4.0),  # region without subregions
+            ("B", 0, 5.0),  # country without regions
+        ],
+        columns=["aoi_id", "g", "v"],
+    )
+
+    rolled_up = rollup_by_gadm_and_convert_to_aoi(split_admin_levels(sums), ["g"])
+
+    totals = rolled_up.set_index(["aoi_id", "g"])["v"].sort_index().to_dict()
+    assert totals == {
+        ("A", 0): 4.0,
+        ("A", 1): 6.0,
+        ("A.1", 0): 4.0,
+        ("A.1", 1): 2.0,
+        ("A.1.1", 0): 1.0,
+        ("A.1.1", 1): 2.0,
+        ("A.1.2", 0): 3.0,
+        ("A.2", 1): 4.0,
+        ("B", 0): 5.0,
+    }
+
+
+def test_country_is_the_level_0_id():
+    ids = pd.Series(["BRA", "BRA.1", "BRA.1.12"])
+
+    assert country(ids).tolist() == ["BRA", "BRA", "BRA"]

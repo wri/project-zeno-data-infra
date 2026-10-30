@@ -1,15 +1,18 @@
 """Where the polygons of areas of interest (AOIs) come from for zonal
 statistics. A source is read in two ways: on the client, every AOI's bounding
 box, to decide which tiles have work; and on each tile's Dask task, the
-polygons whose bounding boxes intersect that tile. Sources keep their polygons
-spatially grouped, so a tile's read touches only the files or row groups near
-it."""
+polygons of the AOIs that tile was assigned. Sources filter their files or row
+groups by bounding box and aoi_id statistics, so a tile's read skips the ones
+that can't hold its AOIs."""
 
 from dataclasses import dataclass
-from typing import Dict, Protocol
+from typing import Dict, List, Protocol
 
+import fsspec
 import geopandas as gpd
 import pandas as pd
+import pyarrow.compute as pc
+import pyarrow.parquet as pq
 from pyiceberg.catalog import load_catalog
 from pyiceberg.expressions import (
     AlwaysTrue,
@@ -17,10 +20,21 @@ from pyiceberg.expressions import (
     BooleanExpression,
     EqualTo,
     GreaterThanOrEqual,
+    In,
     LessThanOrEqual,
 )
 
+from pipelines.aois.sources import aoi_sources
+from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.prefect_flows.tile_stages import Bounds
+
+# The API's AOI type of each AOI dataset the pipeline builds
+AOI_TYPES = {
+    "gadm": "admin",
+    "wdpa": "protected_area",
+    "kba": "key_biodiversity_area",
+    "landmark": "indigenous_land",
+}
 
 
 class AOISource(Protocol):
@@ -32,14 +46,47 @@ class AOISource(Protocol):
         """Return the value of the results' aoi_type column."""
 
     def read_bounds(self) -> pd.DataFrame:
-        """Read every AOI's bounding box, without geometries."""
+        """Read the bounding box of every AOI that counts, without geometries;
+        these define the run's AOIs."""
 
-    def read(self, bounds: Bounds) -> gpd.GeoDataFrame:
-        """Read the polygons of the AOIs whose bounding boxes intersect bounds."""
+    def read(self, bounds: Bounds, aoi_ids: List[str]) -> gpd.GeoDataFrame:
+        """Read the polygons of the AOIs among aoi_ids whose bounding boxes
+        intersect bounds."""
 
     @property
     def provenance(self) -> Dict[str, str]:
         """Where the polygons came from, for the results' metadata."""
+
+
+@dataclass(frozen=True)
+class GeoParquetSource:
+    """Read AOIs from a GeoParquet with aoi_id, geometry and a covering bbox,
+    such as the AOI pipeline's aois.parquet."""
+
+    uri: str
+    aoi_type: str
+
+    def read_bounds(self) -> pd.DataFrame:
+        filesystem, path = fsspec.core.url_to_fs(self.uri)
+        table = pq.read_table(path, filesystem=filesystem, columns=["aoi_id", "bbox"])
+        bounds = table.flatten().to_pandas()
+        return bounds.rename(columns=lambda name: name.removeprefix("bbox."))
+
+    def read(self, bounds: Bounds, aoi_ids: List[str]) -> gpd.GeoDataFrame:
+        return gpd.read_parquet(
+            self.uri,
+            columns=["aoi_id", "geometry"],
+            bbox=bounds,
+            filters=pc.field("aoi_id").isin(aoi_ids),
+        )
+
+    def read_attributes(self, columns: List[str]) -> pd.DataFrame:
+        """Read columns of every AOI, without geometries."""
+        return pd.read_parquet(self.uri, columns=columns)
+
+    @property
+    def provenance(self) -> Dict[str, str]:
+        return {"aoi_source": self.uri}
 
 
 @dataclass(frozen=True)
@@ -57,7 +104,7 @@ class IcebergSource:
         columns = ("aoi_id", "xmin", "ymin", "xmax", "ymax")
         return self._scan(self.row_filter, columns).to_pandas()
 
-    def read(self, bounds: Bounds) -> gpd.GeoDataFrame:
+    def read(self, bounds: Bounds, aoi_ids: List[str]) -> gpd.GeoDataFrame:
         west, south, east, north = bounds
         overlaps = And(
             LessThanOrEqual("xmin", east),
@@ -66,7 +113,7 @@ class IcebergSource:
             GreaterThanOrEqual("ymax", south),
         )
         rows = self._scan(
-            And(self.row_filter, overlaps), ("aoi_id", "geometry")
+            And(overlaps, In("aoi_id", aoi_ids)), ("aoi_id", "geometry")
         ).to_pandas()
         return gpd.GeoDataFrame(
             {"aoi_id": rows["aoi_id"]},
@@ -95,3 +142,16 @@ def custom_aoi_source() -> IcebergSource:
         aoi_type="custom",
         row_filter=EqualTo("monitor_status", "monitored"),
     )
+
+
+def predefined_aoi_sources() -> List[GeoParquetSource]:
+    """Return a source for every AOI dataset the AOI pipeline builds, read from
+    its GeoParquet."""
+    return [
+        GeoParquetSource(
+            f"s3://{ANALYTICS_BUCKET}/vectors/aois/{source.source}/{source.version}"
+            "/aois.parquet",
+            AOI_TYPES[source.source],
+        )
+        for source in aoi_sources()
+    ]
