@@ -9,6 +9,7 @@ from pipelines.globals import (
     gadm_region_code_count,
     gadm_subregion_code_count,
     land_ghg_inventory_organic_soil_zarr_uri,
+    land_ghg_inventory_net_flux_cog_tile_prefix,
     land_ghg_inventory_soc_zarr_uri,
     land_ghg_inventory_vegetation_zarr_uri,
     pixel_area_zarr_uri,
@@ -258,6 +259,38 @@ def land_ghg_inventory_organic_soil(
     )(result_df, result_uri)
 
 
+@flow(name="Land GHG inventory flux COGs", retries=2, retry_delay_seconds=120)
+def land_ghg_inventory_net_flux(
+    version: str,
+    overwrite: bool = False,
+    bbox: Optional[Polygon] = None,
+    clip_to_bbox: bool = False,
+) -> str:
+    """Land GHG inventory LULUCF net flux visualization: the combined
+    vegetation + mineral SOC + organic peat annual per-hectare zarr, plus
+    its 40-deg COG tiles.
+
+    ``bbox`` allows for a test run with a bbox, saving the COGs and mosaic.json
+    in a /test subdirectory. ``clip_to_bbox`` clipa each tile to the bbox"""
+    cog_prefix = (
+        land_ghg_inventory_net_flux_cog_tile_prefix
+        if bbox is None
+        else f"{land_ghg_inventory_net_flux_cog_tile_prefix}/test"
+    )
+    net_flux_zarr_uri = land_ghg_inventory_tasks.prepare_net_flux_zarr.with_options(
+        name="land_ghg_inventory-net-flux--create-zarr"
+    )(overwrite=overwrite)
+    written = land_ghg_inventory_tasks.prepare_lulucf_cogs.with_options(
+        name="land_ghg_inventory-net-flux-write-cogs"
+    )(
+        net_flux_zarr_uri, bbox=bbox, prefix=cog_prefix, overwrite=overwrite,
+        clip_to_bbox=clip_to_bbox,
+    )
+    return land_ghg_inventory_tasks.prepare_lulucf_mosaic.with_options(
+        name="land_ghg_inventory-net-flux-write-mosaic"
+    )(written, prefix=cog_prefix, overwrite=overwrite, clamp_global=bbox is None)
+
+
 # component name -> its subflow. Add new components (e.g. soil) here to expose
 # them through `component`, without touching run_updates.py.
 COMPONENT_FLOWS = {
@@ -265,6 +298,7 @@ COMPONENT_FLOWS = {
     "agriculture": land_ghg_inventory_agriculture,
     "mineral_soil": land_ghg_inventory_mineral_soil,
     "organic_soil": land_ghg_inventory_organic_soil,
+    "net_flux": land_ghg_inventory_net_flux,
 }
 ALL_COMPONENTS = tuple(COMPONENT_FLOWS)
 
