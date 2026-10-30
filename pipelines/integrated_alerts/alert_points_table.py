@@ -13,13 +13,11 @@ Built in three steps so no process holds every point:
 3. the client streams the date files, newest first, into the table.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from functools import partial
-from math import ceil
 from typing import Dict, List, Optional, Tuple
 
 import fsspec
-import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
@@ -27,17 +25,22 @@ import pyarrow.parquet as pq
 import xarray as xr
 from shapely.geometry import Polygon
 
-from pipelines.integrated_alerts.alert_pixels import open_zarrs, tile_alert_pixels
+from pipelines.globals import sbtn_natural_lands_zarr_uri
+from pipelines.integrated_alerts.alert_pixels import (
+    ALERT_EPOCH,
+    list_alert_tiles,
+    open_zarrs,
+    read_tile_alert_pixels,
+)
 from pipelines.prefect_flows.tile_stages import (
     hilbert_index,
     map_tiles,
-    tile_windows,
     worker_cached,
-    written_chunks,
 )
 
-ALERT_EPOCH = date(2014, 12, 31)  # alert_date counts days since this date
 DAYS_STORED = 30  # days of alerts kept, ending at the newest alert date
+# layers sampled at each alert pixel, by column name
+LAYER_URIS = {"natural_lands_class": sbtn_natural_lands_zarr_uri}
 ROW_GROUP_SIZE = 10_000
 HILBERT_ORDER = 22  # 2**22 cells covers the 3.6M-column global 10 m grid
 TABLE_SCHEMA = pa.schema(
@@ -50,9 +53,6 @@ TABLE_SCHEMA = pa.schema(
     ]
 )
 PART_SCHEMA = TABLE_SCHEMA.append(pa.field("hilbert", pa.int64()))
-
-# (rows, cols) of one alerts tile on the global grid
-Tile = Tuple[slice, slice]
 
 
 def latest_alert_day(admin_result_uri: str) -> int:
@@ -71,66 +71,16 @@ def latest_alert_day(admin_result_uri: str) -> int:
     return (latest - ALERT_EPOCH).days
 
 
-def table_tiles(alerts_zarr_uri: str, bbox: Optional[Polygon] = None) -> List[Tile]:
-    """The alerts zarr's chunks that hold data, as (rows, cols) tiles. With a
-    bbox, tiles are narrowed to the pixels whose centers are inside it, as
-    clip_ds_to_bbox does, and tiles outside it are dropped."""
-    # dask-backed, so its chunk grid defines the tiles
-    grid = xr.open_zarr(alerts_zarr_uri)["alert_date"].squeeze("band", drop=True)
-    chunk_rows, chunk_cols = grid.data.chunksize
-    written = written_chunks(alerts_zarr_uri, "alert_date")
-    window = None if bbox is None else _bbox_window(grid, bbox)
-
-    tiles = []
-    for ys, xs, _ in tile_windows(grid, tile_px=max(chunk_rows, chunk_cols)):
-        chunks = {
-            (i, j)
-            for i in range(ys.start // chunk_rows, ceil(ys.stop / chunk_rows))
-            for j in range(xs.start // chunk_cols, ceil(xs.stop / chunk_cols))
-        }
-        if not chunks & written:
-            continue
-        if window is not None:
-            (row_lo, row_hi), (col_lo, col_hi) = window
-            ys = slice(max(ys.start, row_lo), min(ys.stop, row_hi))
-            xs = slice(max(xs.start, col_lo), min(xs.stop, col_hi))
-            if ys.start >= ys.stop or xs.start >= xs.stop:
-                continue
-        tiles.append((ys, xs))
-    return tiles
-
-
-def _bbox_window(grid: xr.DataArray, bbox: Polygon):
-    """Global (row, col) index ranges, half-open, of the pixels whose centers
-    are inside bbox (edges included)."""
-    min_x, min_y, max_x, max_y = bbox.bounds
-    x, y = grid.x.values, grid.y.values
-    cols = (
-        int(np.searchsorted(x, min_x, "left")),
-        int(np.searchsorted(x, max_x, "right")),
-    )
-    if y[0] > y[-1]:
-        rows = (
-            int(np.searchsorted(-y, -max_y, "left")),
-            int(np.searchsorted(-y, -min_y, "right")),
-        )
-    else:
-        rows = (
-            int(np.searchsorted(y, min_y, "left")),
-            int(np.searchsorted(y, max_y, "right")),
-        )
-    return rows, cols
-
-
 def write_tile_part(task) -> Tuple[Optional[str], Dict[int, int]]:
     """Dask task: one tile's alert pixels in the window, sorted newest date then
     Hilbert, written to a part file with one row group per date. Returns the
     part's path and its point count per date (no file if the tile is empty)."""
     ys, xs, day_lo, day_hi, alerts_zarr_uri, parts_uri = task
     zarrs = worker_cached(
-        ("alert_points_zarrs", alerts_zarr_uri), partial(open_zarrs, alerts_zarr_uri)
+        ("alert_points_zarrs", alerts_zarr_uri),
+        partial(open_zarrs, alerts_zarr_uri, LAYER_URIS),
     )
-    pixels = tile_alert_pixels(zarrs, ys, xs, day_lo, day_hi)
+    pixels = read_tile_alert_pixels(zarrs, ys, xs, day_lo, day_hi)
     if pixels.empty:
         return None, {}
     pixels["hilbert"] = hilbert_index(pixels["col"], pixels["row"], HILBERT_ORDER)
@@ -223,7 +173,7 @@ def build_alert_points_table(
     latest_day = latest_alert_day(admin_result_uri)
     day_lo = latest_day - days_stored + 1
     parts_uri = result_uri.removesuffix(".parquet") + "_parts"
-    tiles = table_tiles(alerts_zarr_uri, bbox)
+    tiles = list_alert_tiles(alerts_zarr_uri, bbox)
     print(f"alert points table: {len(tiles):,} tiles, days {day_lo}..{latest_day}")
 
     tile_parts: Dict[int, List[str]] = {}

@@ -25,25 +25,30 @@ def chunk_edges(chunks: Iterable[int], target: int) -> List[int]:
     return edges
 
 
+def window_bounds(grid: xr.DataArray, ys: slice, xs: slice) -> Bounds:
+    """Compute the bounds of a window of grid at its pixel edges."""
+    x, y = grid.x.values, grid.y.values
+    dx, dy = abs(float(x[1] - x[0])), abs(float(y[1] - y[0]))
+    top, bottom = y[ys.start], y[ys.stop - 1]
+    return (
+        float(x[xs.start]) - dx / 2,
+        float(min(top, bottom)) - dy / 2,
+        float(x[xs.stop - 1]) + dx / 2,
+        float(max(top, bottom)) + dy / 2,
+    )
+
+
 def tile_windows(
     grid: xr.DataArray, tile_px: int
 ) -> Iterator[Tuple[slice, slice, Bounds]]:
     """(y slice, x slice, bounds) of each tile of grid, snapped to its dask chunk
-    boundaries. Bounds are (west, south, east, north) at the pixel edges, from
-    the pixel-center coordinates."""
-    x, y = grid.x.values, grid.y.values
-    dx, dy = abs(float(x[1] - x[0])), abs(float(y[1] - y[0]))
+    boundaries. Bounds are as window_bounds gives them."""
     y_edges = chunk_edges(grid.chunks[grid.get_axis_num("y")], tile_px)
     x_edges = chunk_edges(grid.chunks[grid.get_axis_num("x")], tile_px)
     for y0, y1 in zip(y_edges[:-1], y_edges[1:]):
         for x0, x1 in zip(x_edges[:-1], x_edges[1:]):
-            bounds = (
-                x[x0] - dx / 2,
-                min(y[y0], y[y1 - 1]) - dy / 2,
-                x[x1 - 1] + dx / 2,
-                max(y[y0], y[y1 - 1]) + dy / 2,
-            )
-            yield slice(y0, y1), slice(x0, x1), bounds
+            ys, xs = slice(y0, y1), slice(x0, x1)
+            yield ys, xs, window_bounds(grid, ys, xs)
 
 
 def written_chunks(zarr_uri: str, variable: str) -> Set[Tuple[int, int]]:
