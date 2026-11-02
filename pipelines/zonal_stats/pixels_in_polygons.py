@@ -14,27 +14,27 @@ some AOI's bounding box touches get a Dask task. Each task:
    that column per group;
 4. writes these partial sums (aoi_id, groups, sum) to a part file.
 
-The results don't fit in client memory, so a second round of Dask tasks sums
-each range of consecutive aoi_ids (a "bucket", not an S3 bucket) across the
-parts into a bucket file, which the client appends one at a time into the
+The results don't fit in client memory, so a Dask dataframe groupby adds up each
+AOI's partial sums across the parts on the cluster, partitioned so finish sees
+whole groups; the client appends the partitions, in aoi_id order, into the
 result.
 """
 
 from dataclasses import dataclass
+from functools import partial
 from typing import Callable, Collection, Dict, List, Optional, Sequence, Tuple
 
+import dask.dataframe as dd
 import fsspec
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyarrow as pa
-import pyarrow.compute as pc
-import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import shapely
 from shapely.geometry.base import BaseGeometry
 
-from pipelines.prefect_flows.tile_stages import Bounds, map_tiles
+from pipelines.prefect_flows.tile_stages import Bounds, _dask_client, map_tiles
 from pipelines.zonal_stats.aoi_sources import AOISource
 
 # (row index range, column index range, bounds) of one tile of the grid
@@ -44,7 +44,7 @@ Tile = Tuple[slice, slice, Bounds]
 # that is summed
 TilePixels = Callable[[slice, slice], pd.DataFrame]
 
-AOIS_PER_BUCKET = 20_000
+AOIS_PER_PARTITION = 20_000
 ROW_GROUP_SIZE = 100_000
 
 
@@ -73,29 +73,6 @@ class TileTask:
     """Name of the pixel column that is summed."""
     part_uri: str
     """File the tile's partial sums are written to."""
-
-
-@dataclass(frozen=True)
-class BucketTask:
-    """Describe the work of one bucket's Dask task (combine_tile_sums). A bucket
-    is a range of consecutive aoi_ids, not an S3 bucket."""
-
-    position: int
-    """Order of the bucket in the result."""
-    first_id: str
-    """Smallest aoi_id in the bucket."""
-    last_id: str
-    """Largest aoi_id in the bucket."""
-    part_uris: List[str]
-    """Every tile's part file, read filtered to the bucket's aoi_ids."""
-    by: List[str]
-    """Names of the columns the sums are grouped by."""
-    sum_column: str
-    """Name of the column that is summed."""
-    finish: Callable[[pd.DataFrame], pd.DataFrame]
-    """The dataset's last step on an AOI's summed rows: labels, columns, order."""
-    bucket_uri: str
-    """File the bucket's results are written to."""
 
 
 def sum_pixels_in_polygons(
@@ -149,28 +126,6 @@ def compute_tile_sums(tile: TileTask) -> Optional[str]:
     return tile.part_uri
 
 
-def combine_tile_sums(bucket: BucketTask) -> Tuple[int, Optional[str]]:
-    """Add up a bucket of AOIs' partial sums from every part, finish them and
-    write them to a bucket file, as a Dask task. Returns the bucket's
-    position and URI, or None if none of its AOIs is covered."""
-    filesystem, _ = fsspec.core.url_to_fs(bucket.bucket_uri)
-    paths = [fsspec.core.url_to_fs(uri)[1] for uri in bucket.part_uris]
-    in_bucket = (pc.field("aoi_id") >= bucket.first_id) & (
-        pc.field("aoi_id") <= bucket.last_id
-    )
-    sums = (
-        ds.dataset(paths, filesystem=filesystem, format="parquet")
-        .to_table(filter=in_bucket)
-        .to_pandas()
-    )
-    if sums.empty:
-        return bucket.position, None
-    sums = sums.groupby(["aoi_id", *bucket.by], as_index=False)[bucket.sum_column].sum()
-    with fsspec.open(bucket.bucket_uri, "wb", auto_mkdir=True) as f:
-        bucket.finish(sums).to_parquet(f, index=False)
-    return bucket.position, bucket.bucket_uri
-
-
 def compute_zonal_stats(
     aoi_source: AOISource,
     tiles: List[Tile],
@@ -182,13 +137,13 @@ def compute_zonal_stats(
     result_uri: str,
     metadata: Dict[str, str],
     exclude_ids: Collection[str] = (),
-    bucket_key: Optional[Callable[[pd.Series], pd.Series]] = None,
+    group_key: Optional[Callable[[pd.Series], pd.Series]] = None,
 ) -> Dict:
     """Compute zonal statistics of every AOI in aoi_source over the tiles and
     write them to result_uri. Returns a summary of the run. exclude_ids are
     AOIs not computed from pixels (e.g. admin units finish sums from their
-    children); bucket_key maps sorted aoi_ids to keys a bucket never splits
-    (e.g. admin units' country), which must be contiguous in aoi_id order."""
+    children); group_key maps aoi_ids to keys whose AOIs finish always sees
+    together (e.g. admin units' country), which must sort like the aoi_ids."""
     aoi_bounds = aoi_source.read_bounds()
     aoi_bounds = aoi_bounds[~aoi_bounds["aoi_id"].isin(exclude_ids)]
     tiles_with_aois = _select_tiles_with_aois(tiles, aoi_bounds)
@@ -216,32 +171,23 @@ def compute_zonal_stats(
         uri for uri in map_tiles(compute_tile_sums, tile_tasks, "tiles") if uri
     ]
 
-    sorted_ids = pd.Series(np.sort(aoi_bounds["aoi_id"].unique()))
-    keys = sorted_ids if bucket_key is None else bucket_key(sorted_ids)
-    bucket_tasks = (
-        [
-            BucketTask(
-                position=i,
-                first_id=ids[0],
-                last_id=ids[-1],
-                part_uris=part_uris,
-                by=by,
-                sum_column=sum_column,
-                finish=finish,
-                bucket_uri=f"{parts_uri}/buckets/{i}.parquet",
-            )
-            for i, ids in enumerate(
-                _split_into_buckets(sorted_ids.to_numpy(), keys.to_numpy())
-            )
-        ]
+    combined_uris = (
+        _combine_tile_sums(
+            part_uris,
+            len(aoi_bounds),
+            by,
+            sum_column,
+            finish,
+            group_key,
+            schema,
+            f"{parts_uri}/combined",
+        )
         if part_uris
         else []
     )
-    buckets = dict(map_tiles(combine_tile_sums, bucket_tasks, "buckets"))
-    bucket_uris = [buckets[i] for i in sorted(buckets) if buckets[i]]
 
     schema = schema.with_metadata({**metadata, **aoi_source.provenance})
-    rows = _write_result(bucket_uris, result_uri, schema)
+    rows = _write_result(combined_uris, result_uri, schema)
     _remove(parts_uri)
     summary = {
         "aois": len(aoi_bounds),
@@ -274,31 +220,67 @@ def _select_tiles_with_aois(
     ]
 
 
-def _split_into_buckets(aoi_ids: np.ndarray, keys: np.ndarray) -> List[np.ndarray]:
-    """Split sorted aoi_ids into consecutive groups of about AOIS_PER_BUCKET,
-    never splitting the ids of one key: a group ends only where a key does."""
-    if len(aoi_ids) == 0:
-        return []
-    key_starts = np.flatnonzero(np.r_[True, keys[1:] != keys[:-1]])
-    # Each id's bucket is the bucket of the first id of its key.
-    first_of_key = key_starts[
-        np.searchsorted(key_starts, np.arange(len(keys)), "right") - 1
-    ]
-    bucket = first_of_key // AOIS_PER_BUCKET
-    return np.split(aoi_ids, np.flatnonzero(np.diff(bucket)) + 1)
+def _combine_tile_sums(
+    part_uris: List[str],
+    n_aois: int,
+    by: List[str],
+    sum_column: str,
+    finish: Callable[[pd.DataFrame], pd.DataFrame],
+    group_key: Optional[Callable[[pd.Series], pd.Series]],
+    schema: pa.Schema,
+    combined_uri: str,
+) -> List[str]:
+    """Add up each AOI's partial sums across the parts with a Dask dataframe
+    groupby, finish them a partition at a time, and write each partition to a
+    file under combined_uri. Returns the files, in aoi_id order."""
+    with _dask_client():
+        sums = (
+            dd.read_parquet(part_uris)
+            .groupby(["aoi_id", *by])[sum_column]
+            .sum(split_out=True)
+            .reset_index()
+        )
+        # Indexing on the group key keeps each group in one partition, and
+        # orders the partitions by key, hence by aoi_id.
+        key = sums["aoi_id"]
+        if group_key is not None:
+            key = key.map_partitions(group_key, meta=("aoi_id", "object"))
+        sums = sums.assign(_key=key).set_index(
+            "_key", npartitions=max(1, -(-n_aois // AOIS_PER_PARTITION))
+        )
+        finish_partition = partial(_finish_partition, finish=finish)
+        finished = sums.map_partitions(
+            finish_partition, meta=finish_partition(sums._meta)
+        )
+        finished.to_parquet(
+            combined_uri,
+            schema=schema,
+            write_index=False,
+            name_function=_partition_file_name,
+        )
+    filesystem, path = fsspec.core.url_to_fs(combined_uri)
+    return [filesystem.unstrip_protocol(f) for f in sorted(filesystem.ls(path))]
 
 
-def _write_result(bucket_uris: List[str], result_uri: str, schema: pa.Schema) -> int:
-    """Append the bucket files, in order, into the result. Returns its rows."""
+def _finish_partition(sums: pd.DataFrame, finish) -> pd.DataFrame:
+    return finish(sums.reset_index(drop=True))
+
+
+def _partition_file_name(i: int) -> str:
+    return f"{i:06d}.parquet"
+
+
+def _write_result(combined_uris: List[str], result_uri: str, schema: pa.Schema) -> int:
+    """Append the combined files, in order, into the result. Returns its rows."""
     rows = 0
     with fsspec.open(result_uri, "wb", auto_mkdir=True) as f, pq.ParquetWriter(
         f, schema, write_statistics=True
     ) as writer:
-        if not bucket_uris:
+        if not combined_uris:
             writer.write_table(schema.empty_table())
-        for uri in bucket_uris:
-            with fsspec.open(uri, "rb") as bucket:
-                table = pq.read_table(bucket).cast(schema)
+        for uri in combined_uris:
+            with fsspec.open(uri, "rb") as f:
+                table = pq.read_table(f).cast(schema)
             writer.write_table(table, row_group_size=ROW_GROUP_SIZE)
             rows += table.num_rows
     return rows

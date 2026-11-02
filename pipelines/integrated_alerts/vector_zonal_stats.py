@@ -131,7 +131,7 @@ def compute_admin_zonal_stats(
         result_uri=result_uri,
         metadata={"alerts_version": version},
         exclude_ids=parents,
-        bucket_key=country,
+        group_key=country,
     )
 
 

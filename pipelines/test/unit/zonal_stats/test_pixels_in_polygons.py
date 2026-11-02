@@ -14,7 +14,6 @@ from pipelines.zonal_stats import pixels_in_polygons
 from pipelines.zonal_stats.pixels_in_polygons import (
     TileTask,
     _select_tiles_with_aois,
-    _split_into_buckets,
     compute_tile_sums,
     compute_zonal_stats,
     sum_pixels_in_polygons,
@@ -185,11 +184,11 @@ def test_compute_tile_sums_without_aois_or_pixels_writes_nothing(tmp_path):
     assert not (tmp_path / "part.parquet").exists()
 
 
-@pytest.mark.parametrize("aois_per_bucket", [1, 2, 20_000])
+@pytest.mark.parametrize("aois_per_partition", [1, 2, 20_000])
 def test_compute_zonal_stats_adds_up_aois_across_tiles(
-    tmp_path, monkeypatch, aois_per_bucket
+    tmp_path, monkeypatch, aois_per_partition
 ):
-    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_BUCKET", aois_per_bucket)
+    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_PARTITION", aois_per_partition)
     monkeypatch.setattr(pixels_in_polygons, "ROW_GROUP_SIZE", 5)
     aois = {
         "across": Polygon([(1, 1.2), (11, 2.3), (10.1, 11), (3, 9.2)]),  # 9 tiles
@@ -258,28 +257,6 @@ def test_tiles_carry_the_ids_of_the_aois_they_intersect():
 
     by_tile = {(tile[0].start, tile[1].start): ids for tile, ids in tiles}
     assert by_tile == {(8, 0): ["a", "b"], (4, 0): ["b"], (8, 4): ["b"], (4, 4): ["b"]}
-
-
-def test_split_into_buckets_never_splits_a_key(monkeypatch):
-    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_BUCKET", 3)
-    ids = np.array(["A", "A.1", "A.2", "A.3", "B", "C", "C.1", "D", "D.1", "D.2"])
-    keys = np.array([i.split(".")[0] for i in ids])
-
-    buckets = _split_into_buckets(ids, keys)
-
-    # a key goes in the bucket of its first id's position: A at 0, B at 4 and
-    # C at 5 in the second bucket, D at 7 in the third
-    assert [b.tolist() for b in buckets] == [
-        ["A", "A.1", "A.2", "A.3"],
-        ["B", "C", "C.1"],
-        ["D", "D.1", "D.2"],
-    ]
-    assert [b.tolist() for b in _split_into_buckets(ids, ids)] == [
-        ids[:3].tolist(),
-        ids[3:6].tolist(),
-        ids[6:9].tolist(),
-        ids[9:].tolist(),
-    ]
 
 
 def test_compute_zonal_stats_leaves_out_excluded_aois(tmp_path):

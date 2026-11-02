@@ -287,7 +287,7 @@ ADMIN_UNITS = {
 
 
 def test_admin_results_roll_up_to_the_raster_totals(inputs, monkeypatch):
-    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_BUCKET", 2)
+    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_PARTITION", 2)
     aois = {aoi_id: geometry for aoi_id, (_, geometry) in ADMIN_UNITS.items()}
     source = write_geoparquet_source(
         inputs["tmp_path"],
