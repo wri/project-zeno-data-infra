@@ -1,5 +1,6 @@
 DATA_LAKE_BUCKET = "gfw-data-lake"
 ANALYTICS_BUCKET = "lcl-analytics"
+COGS_BUCKET = "lcl-cogs"
 GADM_VERSION = "v4.1.85"
 
 country_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm0.zarr"
@@ -61,7 +62,8 @@ land_ghg_inventory_agriculture_zarr_uri = (
     f"s3://{ANALYTICS_BUCKET}/zarr/land-ghg-monitoring-system/"
     "cropland_livestock_emissions_v20260914.zarr"
 )
-
+land_ghg_inventory_net_flux_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/lgms/lulucf_rate_v2.zarr"
+land_ghg_inventory_net_flux_cog_tile_prefix = f"s3://{COGS_BUCKET}/lgms/tiles40"
 grasslands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/grasslands/v1/grasslands.zarr"
 sbtn_natural_lands_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr"
 sbtn_natural_forests_zarr_uri = (
