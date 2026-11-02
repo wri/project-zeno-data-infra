@@ -14,8 +14,8 @@ from app.use_cases.custom_aois.custom_aoi_service import (
 
 router = APIRouter(
     prefix="/v0/custom_aois",
+    tags=["Custom AOIs (admin only)"],
     dependencies=[Depends(require_resource_watch_admin)],
-    include_in_schema=False,
 )
 
 

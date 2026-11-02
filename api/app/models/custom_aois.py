@@ -1,6 +1,5 @@
-from typing import Any, ClassVar, Dict, List
+from typing import Any, Dict, List
 
-import shapely
 from pydantic import BaseModel, Field, field_validator, model_validator
 from shapely.geometry import shape
 
@@ -12,20 +11,13 @@ class CustomAoiIn(BaseModel):
     geometry: Dict[str, Any] = Field(
         ..., description="GeoJSON Polygon or MultiPolygon, in WGS84."
     )
-    # keeps repair and area calculation within one request's time budget
-    max_coordinates: ClassVar[int] = 100_000
 
     @field_validator("geometry")
     @classmethod
     def must_be_polygonal_geojson(cls, geometry):
         if geometry.get("type") not in ("Polygon", "MultiPolygon"):
             raise ValueError("geometry must be a GeoJSON Polygon or MultiPolygon")
-        coordinates = shapely.get_num_coordinates(shape(geometry))
-        if coordinates > cls.max_coordinates:
-            raise ValueError(
-                f"geometry has {coordinates} coordinates; "
-                f"the limit is {cls.max_coordinates}"
-            )
+        shape(geometry)
         return geometry
 
 
