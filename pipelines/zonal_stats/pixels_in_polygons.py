@@ -44,7 +44,9 @@ Tile = Tuple[slice, slice, Bounds]
 # that is summed
 TilePixels = Callable[[slice, slice], pd.DataFrame]
 
-AOIS_PER_PARTITION = 20_000
+# AOIs per partition of the combine's shuffle: small enough that partitions
+# spread across workers and fit in their memory.
+AOIS_PER_PARTITION = 500
 ROW_GROUP_SIZE = 100_000
 
 
