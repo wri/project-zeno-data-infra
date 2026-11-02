@@ -130,15 +130,19 @@ def _dask_client() -> Iterator[Client]:
             yield local_client
 
 
-def map_tiles(fn: Callable, tasks: list, label: str = "tiles") -> Iterator:
+def map_tiles(
+    fn: Callable, tasks: list, label: str = "tiles", retries: int = 2
+) -> Iterator:
     """fn(task) for every task, one Dask task each, yielding results as they
     finish, in batches. Tasks should carry only small descriptions (windows,
-    paths), not data. Raises once all tasks are done if any failed, so callers
-    never complete a partial result."""
+    paths), not data, and be safe to rerun: a failed task is retried up to
+    retries times, so a dropped S3 connection doesn't fail a whole run. Raises
+    once all tasks are done if any still failed, so callers never complete a
+    partial result."""
     if not tasks:
         return
     with _dask_client() as client:
-        futures = client.map(fn, tasks, pure=False)
+        futures = client.map(fn, tasks, pure=False, retries=retries)
         failed, done = [], 0
         for batch in as_completed(
             futures, with_results=True, raise_errors=False
