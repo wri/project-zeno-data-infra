@@ -10,6 +10,7 @@ from pipelines.test.unit.conftest import custom_aoi_rows
 from pipelines.zonal_stats.aoi_sources import (
     GeoParquetSource,
     IcebergSource,
+    aoi_source_for,
     custom_aoi_source,
     predefined_aoi_sources,
 )
@@ -160,3 +161,10 @@ def test_predefined_aoi_sources_read_the_aoi_pipelines_geoparquets():
         "key_biodiversity_area": f"{vectors}/kba/v20240904/aois.parquet",
         "indigenous_land": f"{vectors}/landmark/v20260617/aois.parquet",
     }
+
+
+def test_aoi_source_for_builds_only_the_requested_type(custom_aoi_table, monkeypatch):
+    # The admin source is read without touching the custom AOI catalog.
+    monkeypatch.delenv("PYICEBERG_CATALOG__AOIS__URI")
+    admin = aoi_source_for("admin")
+    assert isinstance(admin, GeoParquetSource) and admin.aoi_type == "admin"
