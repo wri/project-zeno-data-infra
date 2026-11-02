@@ -1,5 +1,6 @@
 import pickle
 
+import pytest
 from pyiceberg.expressions import EqualTo
 from shapely.geometry import box
 
@@ -28,24 +29,40 @@ def test_custom_aoi_source_reads_bounds_and_nearby_polygons(custom_aoi_table):
     assert read.geometry.loc["near"].equals(box(0, 0, 1, 1))
     assert read.crs == "EPSG:4326"
     assert source.read((10, 10, 11, 11)).empty
-    assert source.provenance == {"aoi_source": "iceberg:aois/custom.custom_aois"}
+    assert source.provenance == {
+        "aoi_source": "iceberg:aois/custom.custom_aois",
+        "aoi_snapshot_id": str(custom_aoi_table.current_snapshot().snapshot_id),
+    }
 
 
-def test_source_reads_the_current_table(custom_aoi_table):
-    source = custom_aoi_source()
+def test_pinned_source_keeps_reading_its_snapshot(custom_aoi_table):
     custom_aoi_table.append(custom_aoi_rows({"a": box(0, 0, 1, 1)}))
-    assert source.read((0, 0, 1, 1))["aoi_id"].tolist() == ["a"]
+    pinned = custom_aoi_source()
 
     custom_aoi_table.append(custom_aoi_rows({"b": box(0, 0, 1, 1)}))
     custom_aoi_table.delete(EqualTo("aoi_id", "a"))
 
-    assert source.read_bounds()["aoi_id"].tolist() == ["b"]
-    assert source.read((0, 0, 1, 1))["aoi_id"].tolist() == ["b"]
+    assert pinned.read_bounds()["aoi_id"].tolist() == ["a"]
+    assert pinned.read((0, 0, 1, 1))["aoi_id"].tolist() == ["a"]
+    assert pinned.pin() == pinned  # already pinned: not moved to the new snapshot
+    assert custom_aoi_source().read_bounds()["aoi_id"].tolist() == ["b"]
+
+
+def test_unpinned_source_refuses_to_read(custom_aoi_table):
+    custom_aoi_table.append(custom_aoi_rows({"a": box(0, 0, 1, 1)}))
+    source = IcebergSource(
+        catalog="aois", table="custom.custom_aois", aoi_type="custom"
+    )
+
+    with pytest.raises(RuntimeError, match="before reading"):
+        source.read_bounds()
+    assert source.pin().read_bounds()["aoi_id"].tolist() == ["a"]
 
 
 def test_source_without_saved_aois_is_empty(custom_aoi_table):
     source = custom_aoi_source()
 
+    assert source.snapshot_id is None
     assert source.read_bounds().empty
     assert list(source.read_bounds().columns) == [
         "aoi_id",

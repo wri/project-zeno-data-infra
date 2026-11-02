@@ -5,8 +5,8 @@ polygons whose bounding boxes intersect that tile. Sources keep their polygons
 spatially grouped, so a tile's read touches only the files or row groups near
 it."""
 
-from dataclasses import dataclass
-from typing import Dict, Protocol
+from dataclasses import dataclass, replace
+from typing import Dict, Optional, Protocol
 
 import geopandas as gpd
 import pandas as pd
@@ -43,13 +43,24 @@ class AOISource(Protocol):
 
 @dataclass(frozen=True)
 class IcebergSource:
-    """Read AOIs from an Iceberg table, such as the API's custom AOI table. The
-    catalog is configured through PYICEBERG_CATALOG__{CATALOG}__*
-    environment variables on the client and every worker."""
+    """Read AOIs from an Iceberg table, such as the API's custom AOI table. Reads
+    use one pinned snapshot, so every read of a run sees the same AOIs even if
+    the table changes meanwhile; pin() before reading. The catalog is configured
+    through PYICEBERG_CATALOG__{CATALOG}__* environment variables on the client
+    and every worker."""
 
     catalog: str
     table: str
     aoi_type: str
+    pinned: bool = False
+    snapshot_id: Optional[int] = None  # None when pinned to an empty table
+
+    def pin(self) -> "IcebergSource":
+        """Return this source fixed at the table's current snapshot."""
+        if self.pinned:
+            return self
+        snapshot = load_catalog(self.catalog).load_table(self.table).current_snapshot()
+        return replace(self, pinned=True, snapshot_id=snapshot and snapshot.snapshot_id)
 
     def read_bounds(self) -> pd.DataFrame:
         columns = ("aoi_id", "xmin", "ymin", "xmax", "ymax")
@@ -72,17 +83,28 @@ class IcebergSource:
 
     @property
     def provenance(self) -> Dict[str, str]:
-        return {"aoi_source": f"iceberg:{self.catalog}/{self.table}"}
+        return {
+            "aoi_source": f"iceberg:{self.catalog}/{self.table}",
+            "aoi_snapshot_id": str(self.snapshot_id),
+        }
 
     def _scan(self, row_filter: BooleanExpression, columns):
-        # The table's current snapshot, loaded for each read: AOIs are assumed
-        # not to change during a run. A table without snapshots (nothing saved
-        # yet) scans as empty.
+        if not self.pinned:
+            raise RuntimeError(
+                f"Pin {self.table} (pin()) before reading it, so every read of a "
+                "run sees the same snapshot"
+            )
+        # A table without snapshots (nothing saved yet) scans as empty.
         table = load_catalog(self.catalog).load_table(self.table)
-        return table.scan(row_filter=row_filter, selected_fields=columns)
+        return table.scan(
+            row_filter=row_filter, selected_fields=columns, snapshot_id=self.snapshot_id
+        )
 
 
 def custom_aoi_source() -> IcebergSource:
-    """Return the source of custom AOIs, read from the table the API's custom
-    AOI endpoints write."""
-    return IcebergSource(catalog="aois", table="custom.custom_aois", aoi_type="custom")
+    """Return the source of custom AOIs, pinned to the current snapshot of the
+    table the API's custom AOI endpoints write."""
+    source = IcebergSource(
+        catalog="aois", table="custom.custom_aois", aoi_type="custom"
+    )
+    return source.pin()

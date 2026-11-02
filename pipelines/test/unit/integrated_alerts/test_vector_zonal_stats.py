@@ -6,6 +6,7 @@ import pyarrow.parquet as pq
 import pytest
 import shapely
 import xarray as xr
+from pyiceberg.expressions import In
 from shapely.geometry import Polygon, box
 
 from pipelines.integrated_alerts import vector_zonal_stats
@@ -17,7 +18,7 @@ from pipelines.integrated_alerts.vector_zonal_stats import (
     compute_vector_zonal_stats,
 )
 from pipelines.test.unit.conftest import custom_aoi_rows
-from pipelines.zonal_stats.aoi_sources import custom_aoi_source
+from pipelines.zonal_stats.aoi_sources import IcebergSource, custom_aoi_source
 
 ALERTS_RESOLUTION = 0.0001
 NATURAL_LANDS_RESOLUTION = 0.00025
@@ -176,12 +177,49 @@ def test_custom_aoi_results_match_the_raster(inputs, custom_aoi_table):
 
     assert result.schema_arrow.remove_metadata().equals(RESULT_SCHEMA)
     metadata = {k.decode(): v.decode() for k, v in result.metadata.metadata.items()}
-    assert {k: metadata[k] for k in ("alerts_version", "aoi_source")} == {
+    assert metadata == {
+        **metadata,
         "alerts_version": "v20261028",
         "aoi_source": "iceberg:aois/custom.custom_aois",
+        "aoi_snapshot_id": str(custom_aoi_table.current_snapshot().snapshot_id),
     }
     assert summary["aois"] == len(AOIS)
     assert summary["rows"] == len(expected)
+
+
+def test_aois_changed_during_a_run_keep_the_run_on_its_snapshot(
+    inputs, custom_aoi_table, monkeypatch
+):
+    custom_aoi_table.append(custom_aoi_rows(AOIS))
+    snapshot_id = custom_aoi_table.current_snapshot().snapshot_id
+    read_bounds = IcebergSource.read_bounds
+
+    def read_bounds_then_change_aois(source):
+        # Right after the run is planned, and before any tile reads AOIs, a
+        # user adds, deletes and edits AOIs.
+        bounds = read_bounds(source)
+        custom_aoi_table.delete(In("aoi_id", ["dup-a", "large"]))
+        custom_aoi_table.append(
+            custom_aoi_rows(
+                {"new": AOIS["across"], "large": box(10.0, 0.994, 10.006, 1.0)}
+            )
+        )
+        return bounds
+
+    monkeypatch.setattr(IcebergSource, "read_bounds", read_bounds_then_change_aois)
+    result_uri = str(inputs["tmp_path"] / "custom-integrated-alerts.parquet")
+
+    compute_vector_zonal_stats(
+        custom_aoi_source(), inputs["alerts"], "v20261028", result_uri
+    )
+
+    assert custom_aoi_table.refresh().current_snapshot().snapshot_id != snapshot_id
+    result = pq.ParquetFile(result_uri)
+    pd.testing.assert_frame_equal(
+        result.read().to_pandas(), sum_raster_by_aoi(inputs, AOIS)
+    )
+    metadata = {k.decode(): v.decode() for k, v in result.metadata.metadata.items()}
+    assert metadata["aoi_snapshot_id"] == str(snapshot_id)
 
 
 def test_bbox_run_counts_only_pixels_inside_it(inputs, custom_aoi_table):
