@@ -36,7 +36,7 @@ AOIS = {
     "dup-b": box(10.00213, 0.99512, 10.00337, 0.99671),
     "empty-chunk": box(10.00223, 0.99822, 10.00377, 0.99978),  # chunk with no alerts
     "outside": box(20, 20, 21, 21),
-    "unmonitored": box(10.0001, 0.9941, 10.0059, 0.9999),
+    "large": box(10.0001, 0.9941, 10.0059, 0.9999),  # most of the grid
 }
 
 
@@ -161,7 +161,7 @@ def sum_raster_by_aoi(inputs, aois) -> pd.DataFrame:
 
 
 def test_custom_aoi_results_match_the_raster(inputs, custom_aoi_table):
-    custom_aoi_table.append(custom_aoi_rows(AOIS, not_monitored=["unmonitored"]))
+    custom_aoi_table.append(custom_aoi_rows(AOIS))
     result_uri = str(inputs["tmp_path"] / "custom-integrated-alerts.parquet")
 
     summary = compute_vector_zonal_stats(
@@ -170,9 +170,8 @@ def test_custom_aoi_results_match_the_raster(inputs, custom_aoi_table):
 
     result = pq.ParquetFile(result_uri)
     table = result.read().to_pandas()
-    monitored = {k: v for k, v in AOIS.items() if k != "unmonitored"}
-    expected = sum_raster_by_aoi(inputs, monitored)
-    assert set(expected["aoi_id"]) == {"across", "dup-a", "dup-b"}
+    expected = sum_raster_by_aoi(inputs, AOIS)
+    assert set(expected["aoi_id"]) == {"across", "dup-a", "dup-b", "large"}
     pd.testing.assert_frame_equal(table, expected)
 
     assert result.schema_arrow.remove_metadata().equals(RESULT_SCHEMA)
@@ -181,7 +180,7 @@ def test_custom_aoi_results_match_the_raster(inputs, custom_aoi_table):
         "alerts_version": "v20261028",
         "aoi_source": "iceberg:aois/custom.custom_aois",
     }
-    assert summary["aois"] == len(monitored)
+    assert summary["aois"] == len(AOIS)
     assert summary["rows"] == len(expected)
 
 

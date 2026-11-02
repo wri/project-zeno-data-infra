@@ -7,26 +7,25 @@ from pipelines.test.unit.conftest import custom_aoi_rows
 from pipelines.zonal_stats.aoi_sources import IcebergSource, custom_aoi_source
 
 
-def test_custom_aois_bounds_and_read_return_monitored_aois(custom_aoi_table):
+def test_custom_aoi_source_reads_bounds_and_nearby_polygons(custom_aoi_table):
     custom_aoi_table.append(
         custom_aoi_rows(
             {
                 "near": box(0, 0, 1, 1),
                 "far": box(5, 5, 6, 6),
-                "unmonitored": box(0.5, 0.5, 2, 2),
-            },
-            not_monitored=["unmonitored"],
+                "also-near": box(0.5, 0.5, 2, 2),
+            }
         )
     )
     source = custom_aoi_source()
 
     bounds = source.read_bounds().set_index("aoi_id")
-    assert sorted(bounds.index) == ["far", "near"]
+    assert sorted(bounds.index) == ["also-near", "far", "near"]
     assert bounds.loc["far"].tolist() == [5, 5, 6, 6]
 
-    read = source.read((0.5, 0.5, 0.6, 0.6))
-    assert read["aoi_id"].tolist() == ["near"]
-    assert read.geometry.iloc[0].equals(box(0, 0, 1, 1))
+    read = source.read((0.5, 0.5, 0.6, 0.6)).set_index("aoi_id")
+    assert sorted(read.index) == ["also-near", "near"]
+    assert read.geometry.loc["near"].equals(box(0, 0, 1, 1))
     assert read.crs == "EPSG:4326"
     assert source.read((10, 10, 11, 11)).empty
     assert source.provenance == {"aoi_source": "iceberg:aois/custom.custom_aois"}

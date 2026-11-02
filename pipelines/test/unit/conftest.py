@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Dict, Iterable
+from typing import Dict
 
 import pyarrow as pa
 import pyiceberg.catalog
@@ -24,16 +24,14 @@ CUSTOM_AOI_SCHEMA = Schema(
     NestedField(1, "aoi_id", StringType(), required=True),
     NestedField(2, "name", StringType(), required=True),
     NestedField(3, "user_id", StringType(), required=True),
-    NestedField(4, "email", StringType(), required=True),
-    NestedField(5, "monitor_status", StringType(), required=True),
-    NestedField(6, "geometry", BinaryType(), required=True),
-    NestedField(7, "area_ha", DoubleType(), required=True),
-    NestedField(8, "xmin", DoubleType(), required=True),
-    NestedField(9, "ymin", DoubleType(), required=True),
-    NestedField(10, "xmax", DoubleType(), required=True),
-    NestedField(11, "ymax", DoubleType(), required=True),
-    NestedField(12, "s2_cell", LongType(), required=True),
-    NestedField(13, "updated_at", TimestamptzType(), required=True),
+    NestedField(4, "geometry", BinaryType(), required=True),
+    NestedField(5, "area_ha", DoubleType(), required=True),
+    NestedField(6, "xmin", DoubleType(), required=True),
+    NestedField(7, "ymin", DoubleType(), required=True),
+    NestedField(8, "xmax", DoubleType(), required=True),
+    NestedField(9, "ymax", DoubleType(), required=True),
+    NestedField(10, "s2_cell", LongType(), required=True),
+    NestedField(11, "updated_at", TimestamptzType(), required=True),
 )
 
 
@@ -55,11 +53,8 @@ def custom_aoi_table(tmp_path, monkeypatch) -> Table:
     return catalog.create_table("custom.custom_aois", CUSTOM_AOI_SCHEMA)
 
 
-def custom_aoi_rows(
-    aois: Dict[str, BaseGeometry], not_monitored: Iterable[str] = ()
-) -> pa.Table:
-    """Build rows for the custom AOI table, monitored unless listed in
-    not_monitored."""
+def custom_aoi_rows(aois: Dict[str, BaseGeometry]) -> pa.Table:
+    """Build rows for the custom AOI table."""
     ids, geometries = list(aois), list(aois.values())
     bounds = shapely.bounds(geometries)
     return pa.table(
@@ -67,11 +62,6 @@ def custom_aoi_rows(
             "aoi_id": ids,
             "name": ids,
             "user_id": ["user-1"] * len(ids),
-            "email": ["user@example.org"] * len(ids),
-            "monitor_status": [
-                "not_monitored" if aoi_id in not_monitored else "monitored"
-                for aoi_id in ids
-            ],
             "geometry": shapely.to_wkb(geometries).tolist(),
             "area_ha": [0.0] * len(ids),
             "xmin": bounds[:, 0],

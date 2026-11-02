@@ -15,7 +15,6 @@ from pyiceberg.expressions import (
     AlwaysTrue,
     And,
     BooleanExpression,
-    EqualTo,
     GreaterThanOrEqual,
     LessThanOrEqual,
 )
@@ -51,11 +50,10 @@ class IcebergSource:
     catalog: str
     table: str
     aoi_type: str
-    row_filter: BooleanExpression = AlwaysTrue()
 
     def read_bounds(self) -> pd.DataFrame:
         columns = ("aoi_id", "xmin", "ymin", "xmax", "ymax")
-        return self._scan(self.row_filter, columns).to_pandas()
+        return self._scan(AlwaysTrue(), columns).to_pandas()
 
     def read(self, bounds: Bounds) -> gpd.GeoDataFrame:
         west, south, east, north = bounds
@@ -65,9 +63,7 @@ class IcebergSource:
             LessThanOrEqual("ymin", north),
             GreaterThanOrEqual("ymax", south),
         )
-        rows = self._scan(
-            And(self.row_filter, overlaps), ("aoi_id", "geometry")
-        ).to_pandas()
+        rows = self._scan(overlaps, ("aoi_id", "geometry")).to_pandas()
         return gpd.GeoDataFrame(
             {"aoi_id": rows["aoi_id"]},
             geometry=gpd.GeoSeries.from_wkb(rows["geometry"]),
@@ -87,11 +83,6 @@ class IcebergSource:
 
 
 def custom_aoi_source() -> IcebergSource:
-    """Return the source of monitored custom AOIs, read from the table the API's
-    custom AOI endpoints write."""
-    return IcebergSource(
-        catalog="aois",
-        table="custom.custom_aois",
-        aoi_type="custom",
-        row_filter=EqualTo("monitor_status", "monitored"),
-    )
+    """Return the source of custom AOIs, read from the table the API's custom
+    AOI endpoints write."""
+    return IcebergSource(catalog="aois", table="custom.custom_aois", aoi_type="custom")

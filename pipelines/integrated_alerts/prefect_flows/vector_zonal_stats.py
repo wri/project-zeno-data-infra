@@ -16,7 +16,7 @@ def integrated_alerts_vector_zonal_stats(
     bbox: Optional[Polygon] = None,
 ) -> List[str]:
     """Compute integrated alerts area by AOI, date, confidence and SBTN natural
-    lands class for the monitored custom AOIs, in the same schema as the GADM
+    lands class for the custom AOIs, in the same schema as the GADM
     results.
 
     Args:
