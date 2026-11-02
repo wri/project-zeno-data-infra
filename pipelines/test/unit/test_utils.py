@@ -1,8 +1,15 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
-from pipelines.utils import InvalidS3UriError, copy_s3_directory, get_secret, parse_s3_uri
+from pipelines.utils import (
+    InvalidS3UriError,
+    copy_s3_directory,
+    get_secret,
+    parse_s3_uri,
+    s3_uri_exists,
+)
 
 
 @patch("pipelines.utils.boto3.client")
@@ -42,9 +49,7 @@ def test_copy_s3_directory_copies_every_object_with_relative_key(mock_boto3_clie
         }
     ]
 
-    copy_s3_directory(
-        "s3://src-bucket/src-prefix", "s3://dst-bucket/dst-prefix"
-    )
+    copy_s3_directory("s3://src-bucket/src-prefix", "s3://dst-bucket/dst-prefix")
 
     mock_s3_client.get_paginator.return_value.paginate.assert_called_once_with(
         Bucket="src-bucket", Prefix="src-prefix/", RequestPayer="requester"
@@ -62,3 +67,38 @@ def test_copy_s3_directory_copies_every_object_with_relative_key(mock_boto3_clie
         RequestPayer="requester",
     )
     assert mock_s3_client.copy_object.call_count == 2
+
+
+@patch("pipelines.utils.boto3.client")
+def test_s3_uri_exists_true(mock_boto_client):
+    mock_s3 = MagicMock()
+    mock_boto_client.return_value = mock_s3
+    mock_s3.head_object.return_value = {}
+
+    assert s3_uri_exists("s3://my-bucket/my/key.zarr") is True
+    mock_s3.head_object.assert_called_once_with(
+        Bucket="my-bucket", Key="my/key.zarr", RequestPayer="requester"
+    )
+
+
+@patch("pipelines.utils.boto3.client")
+def test_s3_uri_exists_false(mock_boto_client):
+    mock_s3 = MagicMock()
+    mock_boto_client.return_value = mock_s3
+    mock_s3.head_object.side_effect = ClientError(
+        {"Error": {"Code": "404"}}, "HeadObject"
+    )
+
+    assert s3_uri_exists("s3://my-bucket/missing/key.zarr") is False
+
+
+@patch("pipelines.utils.boto3.client")
+def test_s3_uri_exists_other_error(mock_boto_client):
+    mock_s3 = MagicMock()
+    mock_boto_client.return_value = mock_s3
+    mock_s3.head_object.side_effect = ClientError(
+        {"Error": {"Code": "403"}}, "HeadObject"
+    )
+
+    with pytest.raises(ClientError):
+        s3_uri_exists("s3://my-bucket/forbidden/key.zarr")

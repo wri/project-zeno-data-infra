@@ -14,7 +14,8 @@ from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
 from .domain.compute_engines.dask_client_router import DaskClientRouter
-from .routers import land_change
+from .request_size_limit import RequestSizeLimit
+from .routers import custom_aois, land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
 
@@ -141,6 +142,11 @@ async def profile_request(request: Request, call_next):
 
 
 app.include_router(land_change.router)
+app.include_router(custom_aois.router)
+# custom AOI writes are batches of large geometries, held in memory while parsed
+app.add_middleware(
+    RequestSizeLimit, max_bytes=50 * 2**20, path_prefix="/v0/custom_aois"
+)
 
 
 @app.get("/")

@@ -1,6 +1,8 @@
 import logging
 import os
+import re
 from contextlib import nullcontext
+from datetime import date
 from enum import Enum
 
 import click
@@ -19,6 +21,7 @@ from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
+from pipelines.wur_alert_drivers.prefect_flows import wur_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -126,6 +129,15 @@ def run_aois_update(
     return aois_flow.aois_update(aoi_source, overwrite=overwrite)
 
 
+def run_wur_update(
+    version, content_date, overwrite=False, is_latest=False
+) -> list[str]:
+    # overwrite isn't used: re-running with the same version resumes creating it.
+    return wur_flow.wur_alert_drivers_flow(
+        content_date=content_date, version=version, is_latest=is_latest
+    )
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -135,15 +147,22 @@ def _parse_bbox(bbox):
 
 
 class UpdateFlow(str, Enum):
+    # Not currently used, replaced by INTEGRATED_ALERTS_UPDATE
     DIST_UPDATE = "dist_update"
+    # Run by hand yearly for annual TCL update
     TCL_UPDATE = "tcl_update"
+    # Run automatically once a week around Sunday
     INTEGRATED_ALERTS_UPDATE = "integrated_alerts_update"
+    # LGMS flows run by hand, probably annually
     LAND_GHG_INVENTORY_UPDATE = "land_ghg_inventory_update"
     LAND_GHG_INVENTORY_VEGETATION_UPDATE = "land_ghg_inventory_vegetation_update"
     LAND_GHG_INVENTORY_AGRICULTURE_UPDATE = "land_ghg_inventory_agriculture_update"
     LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE = "land_ghg_inventory_mineral_soil_update"
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
+    # Run once, until a new AOI dataset version happens
     AOIS_UPDATE = "aois_update"
+    # Currently run by hand about once a month when new WUR drivers data is available
+    WUR_UPDATE = "wur_update"
 
 
 update_flows = {
@@ -156,6 +175,7 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.AOIS_UPDATE: run_aois_update,
+    UpdateFlow.WUR_UPDATE: run_wur_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -166,10 +186,14 @@ VERSION_REQUIRED_FLOWS = (
     UpdateFlow.LAND_GHG_INVENTORY_AGRICULTURE_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE,
+    UpdateFlow.WUR_UPDATE,
 )
 
 # flows that don't use Dask, so run on the flow's own machine
-CLUSTERLESS_FLOWS = (UpdateFlow.AOIS_UPDATE,)
+CLUSTERLESS_FLOWS = (
+    UpdateFlow.AOIS_UPDATE,
+    UpdateFlow.WUR_UPDATE,
+)
 
 # flow_name values that route into run_land_ghg_inventory_update
 LAND_GHG_INVENTORY_FLOWS = (
@@ -185,10 +209,27 @@ def needs_cluster(flow_name: "UpdateFlow", local: bool) -> bool:
     return not local and flow_name not in CLUSTERLESS_FLOWS
 
 
-def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
-    """Raise if the selected flow needs a version and none was given."""
+def _validate_flow_args(flow_name: "UpdateFlow", version, content_date=None) -> None:
+    """Raise if the selected flow needs a version and none was given, or needs a
+    content_date (YYYY-MM-DD) and none or an invalid one was given."""
     if flow_name in VERSION_REQUIRED_FLOWS and version is None:
         raise ValueError(f"version is required when flow is {flow_name}")
+    if flow_name == UpdateFlow.WUR_UPDATE and not _is_iso_date(content_date):
+        raise ValueError(
+            f"content_date must be a YYYY-MM-DD date when flow is {flow_name}, "
+            f"got {content_date!r}"
+        )
+
+
+def _is_iso_date(value) -> bool:
+    """True if value is a real date written exactly as YYYY-MM-DD."""
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(value)):
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:  # e.g. 2026-02-30
+        return False
+    return True
 
 
 @flow(
@@ -202,6 +243,8 @@ def _validate_flow_args(flow_name: "UpdateFlow", version) -> None:
         "default for backward compatibility"
         "-'tcl_update' will run tree_cover_loss and carbon_flux flows to provide "
         "all necessary updates for TCL."
+        "-'wur_update' will create a new Data API version of the WUR alert drivers "
+        "dataset (needs version and content_date)."
     ),
 )
 def run_updates(
@@ -213,6 +256,7 @@ def run_updates(
     aoi_source=None,
     local=False,
     performance_report_path=None,
+    content_date=None,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -240,7 +284,7 @@ def run_updates(
                 f"Accepted values: {accepted}"
             )
 
-        _validate_flow_args(flow_name, version)
+        _validate_flow_args(flow_name, version, content_date)
 
         # a Dask performance report needs the distributed scheduler, so it only
         # applies to Coiled runs (there is no client under local=True)
@@ -259,6 +303,8 @@ def run_updates(
             kwargs["aoi_source"] = aoi_source
         elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
             kwargs["bbox"] = bbox_geom
+        elif flow_name == UpdateFlow.WUR_UPDATE:
+            kwargs["content_date"] = content_date
         with report:
             result_uris = flow_fn(**kwargs)
 
@@ -281,7 +327,9 @@ def run_updates(
     help="Which update flow to run.",
 )
 @click.option(
-    "--version", default=None, help="Dataset version (required for tcl_update)."
+    "--version",
+    default=None,
+    help="Dataset version (required for tcl_update and wur_update).",
 )
 @click.option("--overwrite", is_flag=True, help="Overwrite existing outputs.")
 @click.option("--is-latest", is_flag=True, help="Mark this version as latest.")
@@ -299,6 +347,14 @@ def run_updates(
     type=click.Choice([source.source for source in aoi_sources()]),
     default=None,
     help="Build only this AOI source (aois_update only); builds all if omitted.",
+)
+@click.option(
+    "--content-date",
+    default=None,
+    help=(
+        "YYYY-MM-DD date up to which the data has been calculated (required for "
+        "wur_update)."
+    ),
 )
 @click.option(
     "--local",
@@ -319,6 +375,7 @@ def cli(
     is_latest,
     bbox,
     aoi_source,
+    content_date,
     local,
     performance_report_path,
 ):
@@ -331,6 +388,7 @@ def cli(
         aoi_source=aoi_source,
         local=local,
         performance_report_path=performance_report_path,
+        content_date=content_date,
     )
 
 

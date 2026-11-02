@@ -79,6 +79,8 @@ class AnalysisService:
 
             await self.analyzer.analyze(analysis)
 
+            # Analyzers may add to the metadata, e.g. the data window they served.
+            self.analytics_resource.metadata = analysis.metadata
             self.analytics_resource.status = AnalysisStatus.saved
             self.analytics_resource.result = analysis.result
             await self.analysis_repository.store_analysis(
