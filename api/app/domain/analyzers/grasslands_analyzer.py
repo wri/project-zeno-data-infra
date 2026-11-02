@@ -11,6 +11,7 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
@@ -39,7 +40,9 @@ class GrasslandsAnalyzer(Analyzer):
         duckdb_query_service=None,
         input_uris: Dict[str, str] | None = None,
         aoi_geometry_repository: AoiGeometryRepository | None = None,
+        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
     ):
+        self.precomputed_admin_levels = precomputed_admin_levels
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.duckdb_query_service = duckdb_query_service
         self.input_uris = input_uris
@@ -52,7 +55,7 @@ class GrasslandsAnalyzer(Analyzer):
 
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
 
-        if grasslands_analytics_in.aoi.type == "admin":
+        if self.precomputed_admin_levels.covers(grasslands_analytics_in.aoi):
             gadm_ids: List = grasslands_analytics_in.aoi.ids
             results: Dict = await self.analyze_admin_areas(
                 gadm_ids,

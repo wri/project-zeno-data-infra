@@ -9,7 +9,15 @@ from .base import StrictBaseModel
 
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 MAX_OTF_FEATURES = 50
+MAX_ADMIN_LEVEL = 5
+# Deeper admin areas have no precomputed results, so they're computed on the fly
+DEEPEST_PRECOMPUTED_ADMIN_LEVEL = 2
 AdminStr = Annotated[str, StringConstraints(pattern=ADMIN_REGEX)]
+
+
+def admin_level(admin_id: str) -> int:
+    """BRA is level 0, BRA.1 level 1, BRA.1.12 level 2, and so on."""
+    return admin_id.count(".")
 
 
 class AreaOfInterest(StrictBaseModel):
@@ -45,10 +53,18 @@ class AdminAreaOfInterest(AreaOfInterest):
         return ids
 
     @field_validator("ids", mode="after")
-    def check_max_admin_level_2(cls, v):
-        for i in v:
-            if len(i.split(".")) > 3:
-                raise ValueError("Maximum admin level allowed is 2")
+    def check_admin_levels(cls, v):
+        levels = [admin_level(admin_id) for admin_id in v]
+        if max(levels) > MAX_ADMIN_LEVEL:
+            raise ValueError(f"Maximum admin level allowed is {MAX_ADMIN_LEVEL}")
+        on_the_fly_count = sum(
+            level > DEEPEST_PRECOMPUTED_ADMIN_LEVEL for level in levels
+        )
+        if on_the_fly_count > MAX_OTF_FEATURES:
+            raise ValueError(
+                f"At most {MAX_OTF_FEATURES} ids below admin level "
+                f"{DEEPEST_PRECOMPUTED_ADMIN_LEVEL} are allowed per request"
+            )
         return v
 
     @field_validator("provider", mode="before")
@@ -58,6 +74,19 @@ class AdminAreaOfInterest(AreaOfInterest):
     @field_validator("version", mode="before")
     def set_version_default(cls, v):
         return v or "4.1"
+
+
+class PrecomputedAdminAreaOfInterest(AdminAreaOfInterest):
+    """Admin areas for analyses that only have precomputed results."""
+
+    @field_validator("ids", mode="after")
+    def check_precomputed_levels(cls, v):
+        if any(admin_level(i) > DEEPEST_PRECOMPUTED_ADMIN_LEVEL for i in v):
+            raise ValueError(
+                "Maximum admin level allowed is "
+                f"{DEEPEST_PRECOMPUTED_ADMIN_LEVEL} for this analysis"
+            )
+        return v
 
 
 class GlobalAreaOfInterest(AreaOfInterest):

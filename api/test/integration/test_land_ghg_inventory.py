@@ -23,8 +23,8 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
 )
 from app.main import app
 from app.models.common.areas_of_interest import (
-    AdminAreaOfInterest,
     GlobalAreaOfInterest,
+    PrecomputedAdminAreaOfInterest,
 )
 from app.models.common.authentication import User
 from app.models.land_change.land_ghg_inventory import (
@@ -124,7 +124,7 @@ class TestLandGHGInventoryPostWithNoPreviousRequest:
     @pytest_asyncio.fixture
     async def setup(self):
         analytics_in = LandGHGInventoryAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["BRA.1"])
+            aoi=PrecomputedAdminAreaOfInterest(type="admin", ids=["BRA.1"])
         )
         analyzer = LandGHGInventoryAnalyzer(
             input_uris=INPUT_URIS[Environment.production]
@@ -405,7 +405,8 @@ async def test_global_and_admin_requests_get_separate_resources():
     # need bumping for the global AOI.
     analyzer = LandGHGInventoryAnalyzer(input_uris=INPUT_URIS[Environment.production])
     admin_tp = resource_thumbprint(
-        LandGHGInventoryAnalyticsIn(aoi=AdminAreaOfInterest(ids=["BRA"])), analyzer
+        LandGHGInventoryAnalyticsIn(aoi=PrecomputedAdminAreaOfInterest(ids=["BRA"])),
+        analyzer,
     )
     global_tp = resource_thumbprint(
         LandGHGInventoryAnalyticsIn(aoi=GlobalAreaOfInterest()), analyzer

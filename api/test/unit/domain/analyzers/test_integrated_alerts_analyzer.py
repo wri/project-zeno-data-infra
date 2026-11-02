@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import dask
 import numpy as np
@@ -16,6 +16,7 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -348,3 +349,23 @@ class TestOtfAnalysis:
             check_dtype=False,
             rtol=1e-4,
         )
+
+
+@pytest.mark.asyncio
+async def test_admin_areas_below_precomputed_levels_are_computed_on_the_fly():
+    analyzer = IntegratedAlertsAnalyzer(
+        input_uris={"x": "y"},
+        precomputed_admin_levels=PrecomputedAdminLevels(deepest_level=2),
+    )
+    analysis = make_analysis({"type": "admin", "ids": ["BRA.1.2.3"]})
+
+    with (
+        patch.object(
+            analyzer, "_run_on_the_fly", AsyncMock(return_value={"aoi_id": []})
+        ) as on_the_fly,
+        patch.object(analyzer, "_run_precomputed", AsyncMock()) as precomputed,
+    ):
+        await analyzer.analyze(analysis)
+
+    on_the_fly.assert_awaited_once()
+    precomputed.assert_not_awaited()

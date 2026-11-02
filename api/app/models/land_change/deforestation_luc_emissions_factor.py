@@ -5,13 +5,13 @@ from pydantic import Field, PrivateAttr, model_validator
 
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
-    AdminAreaOfInterest,
+    PrecomputedAdminAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "deforestation_luc_emissions_factor"
 
-AoiUnion = Union[AdminAreaOfInterest,]
+AoiUnion = Union[PrecomputedAdminAreaOfInterest,]
 DATE_REGEX = r"^\d{4}$"
 
 

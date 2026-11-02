@@ -3,12 +3,15 @@ from typing import Annotated, Optional, Union
 from pydantic import Field, PrivateAttr
 
 from ..common.analysis import AnalysisStatus, AnalyticsIn
-from ..common.areas_of_interest import AdminAreaOfInterest, GlobalAreaOfInterest
+from ..common.areas_of_interest import (
+    GlobalAreaOfInterest,
+    PrecomputedAdminAreaOfInterest,
+)
 from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "land_ghg_inventory"
 
-AoiUnion = Union[AdminAreaOfInterest, GlobalAreaOfInterest]
+AoiUnion = Union[PrecomputedAdminAreaOfInterest, GlobalAreaOfInterest]
 
 
 class LandGHGInventoryAnalyticsIn(AnalyticsIn):

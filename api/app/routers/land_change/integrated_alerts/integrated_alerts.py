@@ -8,7 +8,12 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_aoi_geometry_repository, get_environment
+from app.dependencies import (
+    get_aoi_geometry_repository,
+    get_environment,
+    get_precomputed_admin_levels,
+)
+from app.domain.analyzers.admin_level_split_analyzer import AdminLevelSplitAnalyzer
 from app.domain.analyzers.integrated_alerts_analyzer import (
     IntegratedAlertsAnalyzer,
     build_input_uris,
@@ -17,6 +22,7 @@ from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
 from app.domain.models.environment import Environment
+from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -83,18 +89,25 @@ def create_analysis_service(
         get_aoi_geometry_repository
     ),
     version: str = Depends(get_latest_integrated_alerts_version),
+    precomputed_admin_levels: PrecomputedAdminLevels = Depends(
+        get_precomputed_admin_levels
+    ),
 ) -> AnalysisService:
     input_uris = build_input_uris(version, environment)
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=IntegratedAlertsAnalyzer(
-            aoi_geometry_repository=aoi_geometry_repository,
-            compute_engine=request.app.state.dask_client,
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=input_uris["admin_results_table_uri"]
+        analyzer=AdminLevelSplitAnalyzer(
+            IntegratedAlertsAnalyzer(
+                aoi_geometry_repository=aoi_geometry_repository,
+                compute_engine=request.app.state.dask_client,
+                duckdb_query_service=DuckDbPrecalcQueryService(
+                    table_uri=input_uris["admin_results_table_uri"]
+                ),
+                input_uris=input_uris,
+                otf_timeout_seconds=float(os.environ.get("OTF_TIMEOUT_SECONDS", 600)),
+                precomputed_admin_levels=precomputed_admin_levels,
             ),
-            input_uris=input_uris,
-            otf_timeout_seconds=float(os.environ.get("OTF_TIMEOUT_SECONDS", 600)),
+            precomputed_admin_levels,
         ),
         event=ANALYTICS_NAME,
     )

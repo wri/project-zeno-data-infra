@@ -1,5 +1,5 @@
 from typing import Dict
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import duckdb
 import numpy as np
@@ -17,6 +17,7 @@ from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
@@ -529,3 +530,31 @@ async def test_flox_handler_tree_cover_loss_from_fires():
         atol=1e-8,  # Absolute tolerance
         rtol=1e-4,  # Relative tolerance
     )
+
+
+@pytest.mark.asyncio
+async def test_admin_areas_below_precomputed_levels_are_computed_on_the_fly():
+    analytics_in = TreeCoverLossAnalyticsIn(
+        aoi=AdminAreaOfInterest(ids=["BRA.1.2.3"]),
+        canopy_cover=30,
+        start_year="2020",
+        end_year="2024",
+        intersections=[],
+    ).model_dump()
+    analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
+    analyzer = TreeCoverLossAnalyzer(
+        input_uris=INPUT_URIS[Environment.production],
+        precomputed_admin_levels=PrecomputedAdminLevels(deepest_level=2),
+    )
+    on_the_fly_result = {"aoi_id": ["BRA.1.2.3"], "area_ha": [1.0]}
+
+    with (
+        patch.object(
+            analyzer, "analyze_otf", AsyncMock(return_value=on_the_fly_result)
+        ) as on_the_fly,
+        patch.object(analyzer, "analyze_admin_areas", AsyncMock()) as precomputed,
+    ):
+        await analyzer.analyze(analysis)
+
+    on_the_fly.assert_awaited_once()
+    precomputed.assert_not_awaited()

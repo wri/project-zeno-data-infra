@@ -12,7 +12,7 @@ from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.models.common.analysis import AnalysisStatus
-from app.models.common.areas_of_interest import AdminAreaOfInterest
+from app.models.common.areas_of_interest import PrecomputedAdminAreaOfInterest
 from app.models.land_change.deforestation_luc_emissions_factor import (
     DeforestationLUCEmissionsFactorAnalyticsIn,
 )
@@ -543,7 +543,7 @@ class TestLandCoverChangeAdminAois:
         analyzer_with_test_data,
     ):
         analytics_in = DeforestationLUCEmissionsFactorAnalyticsIn(
-            aoi=AdminAreaOfInterest(
+            aoi=PrecomputedAdminAreaOfInterest(
                 **{"type": "admin", "ids": ["BRA.12.1", "IDN.24.9"]}
             ),
             gas_types=["CO2e", "CH4"],

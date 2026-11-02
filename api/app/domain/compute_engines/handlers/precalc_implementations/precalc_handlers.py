@@ -4,10 +4,18 @@ from app.domain.compute_engines.handlers.analytics_precalc_handler import (
     AnalyticsPrecalcHandler,
 )
 from app.domain.models.dataset import Dataset, DatasetQuery
+from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 
 
 class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
-    def __init__(self, precalc_query_builder, precalc_query_service, next_handler):
+    def __init__(
+        self,
+        precalc_query_builder,
+        precalc_query_service,
+        next_handler,
+        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
+    ):
+        self.precomputed_admin_levels = precomputed_admin_levels
         self.precalc_query_builder = precalc_query_builder
         self.precalc_query_service = precalc_query_service
         self.next_handler = next_handler
@@ -25,18 +33,24 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
 
 class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
-        return aoi.type == "admin" and Dataset.area_hectares in query.aggregate.datasets
+        return (
+            self.precomputed_admin_levels.covers(aoi)
+            and Dataset.area_hectares in query.aggregate.datasets
+        )
 
 
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
-        return aoi.type == "admin" and Dataset.area_hectares in query.aggregate.datasets
+        return (
+            self.precomputed_admin_levels.covers(aoi)
+            and Dataset.area_hectares in query.aggregate.datasets
+        )
 
 
 class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            aoi.type == "admin"
+            self.precomputed_admin_levels.covers(aoi)
             and (
                 Dataset.area_hectares in query.aggregate.datasets
                 or Dataset.carbon_emissions in query.aggregate.datasets

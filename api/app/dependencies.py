@@ -5,6 +5,7 @@ from fastapi import Header
 from pyiceberg.catalog import Catalog, load_catalog
 
 from app.domain.models.environment import Environment
+from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
@@ -61,6 +62,12 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
             ),
         }
     )
+
+
+def get_precomputed_admin_levels() -> PrecomputedAdminLevels:
+    """Admin levels served from precomputed results; deeper admin areas are
+    computed on the fly."""
+    return PrecomputedAdminLevels(deepest_level=2)
 
 
 @lru_cache
