@@ -15,8 +15,9 @@ some AOI's bounding box touches get a Dask task. Each task:
 4. writes these partial sums (aoi_id, groups, sum) to a part file.
 
 The results don't fit in client memory, so a second round of Dask tasks sums
-each range of aoi_ids ("bucket") across the parts into a bucket file, which the
-client appends one at a time into the result.
+each range of consecutive aoi_ids (a "bucket", not an S3 bucket) across the
+parts into a bucket file, which the client appends one at a time into the
+result.
 """
 
 from dataclasses import dataclass
@@ -74,7 +75,8 @@ class TileTask:
 
 @dataclass(frozen=True)
 class BucketTask:
-    """Describe the work of one bucket's Dask task (combine_tile_sums)."""
+    """Describe the work of one bucket's Dask task (combine_tile_sums). A bucket
+    is a range of consecutive aoi_ids, not an S3 bucket."""
 
     position: int
     """Order of the bucket in the result."""
