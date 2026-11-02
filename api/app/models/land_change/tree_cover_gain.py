@@ -1,4 +1,4 @@
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
@@ -11,7 +11,6 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from app.models.land_change.tree_cover_loss import AllowedForestFilter
 
 ANALYTICS_NAME = "tree_cover_gain"
 
@@ -54,7 +53,7 @@ class TreeCoverGainAnalyticsIn(AnalyticsIn):
         pattern=DATE_REGEX,
         examples=["2000", "2005"],
     )
-    forest_filter: AllowedForestFilter | None = Field(
+    forest_filter: Literal["primary_forest"] | None = Field(
         default=None,
         title="Forest Filter",
     )

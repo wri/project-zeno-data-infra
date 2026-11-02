@@ -29,8 +29,6 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-# Tree cover and tree cover gain precomputed tables only carry primary forest.
-AllowedForestFilter = Literal["primary_forest"]
 AllowedIntersections = List[Literal["driver", "fire"]]
 
 

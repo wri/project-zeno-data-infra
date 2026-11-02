@@ -11,9 +11,6 @@ from app.models.common.areas_of_interest import (
     ProtectedAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
-from app.models.land_change.tree_cover_loss import (
-    AllowedForestFilter,
-)
 
 ANALYTICS_NAME = "tree_cover"
 
@@ -43,7 +40,7 @@ class TreeCoverAnalyticsIn(AnalyticsIn):
         description="Minimum canopy density to consider tree cover, in percent.",
         examples=[10, 35],
     )
-    forest_filter: AllowedForestFilter | None = Field(
+    forest_filter: Literal["primary_forest"] | None = Field(
         default=None,
         title="Forest Filter",
     )
