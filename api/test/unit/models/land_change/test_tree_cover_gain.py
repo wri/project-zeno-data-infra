@@ -1,6 +1,10 @@
 import pytest
+from shapely.geometry import box, mapping
 
-from app.models.common.areas_of_interest import AdminAreaOfInterest
+from app.models.common.areas_of_interest import (
+    AdminAreaOfInterest,
+    CustomAreaOfInterest,
+)
 from app.models.land_change.tree_cover_gain import TreeCoverGainAnalyticsIn
 
 
@@ -13,6 +17,22 @@ def base_config():
         end_year="2020",
     )
     return analytics_in
+
+
+@pytest.fixture()
+def feature_collection_aoi():
+    return CustomAreaOfInterest(
+        feature_collection={
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "id": "my_feature",
+                    "geometry": mapping(box(-55.1, -7.1, -55.0, -7.0)),
+                }
+            ],
+        }
+    )
 
 
 class TestTreeCoverGainAnalyticsIn:
@@ -89,4 +109,23 @@ class TestTreeCoverGainAnalyticsInValidations:
                 start_year="2015",
                 end_year="2020",
                 forest_filter="natural_forest_only",
+            )
+
+    def test_custom_area_is_accepted(self, feature_collection_aoi):
+        model = TreeCoverGainAnalyticsIn(
+            aoi=feature_collection_aoi, start_year="2000", end_year="2020"
+        )
+
+        assert model.aoi.type == "feature_collection"
+
+    @pytest.mark.parametrize("forest_filter", ["intact_forest", "natural_forest"])
+    def test_forest_filters_without_precomputed_data_are_rejected(self, forest_filter):
+        # The precomputed tables only carry primary forest, so other filters
+        # would return unfiltered numbers.
+        with pytest.raises(ValueError):
+            TreeCoverGainAnalyticsIn(
+                aoi=AdminAreaOfInterest(type="admin", ids=["BRA.12.1"]),
+                start_year="2000",
+                end_year="2020",
+                forest_filter=forest_filter,
             )
