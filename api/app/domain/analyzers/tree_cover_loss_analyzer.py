@@ -4,6 +4,7 @@ import newrelic.agent as nr_agent
 import numpy as np
 
 from app.domain.analyzers.analyzer import Analyzer
+from app.domain.analyzers.precomputed_level_split import analyze_by_precomputed_levels
 from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -164,10 +165,12 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        if self.precomputed_admin_levels.covers(analytics_in.aoi):
-            results = await self.analyze_admin_areas(analytics_in)
-        else:
-            results = await self.analyze_otf(analytics_in)
+        results = await analyze_by_precomputed_levels(
+            analytics_in,
+            self.precomputed_admin_levels,
+            precomputed=self.analyze_admin_areas,
+            on_the_fly=self.analyze_otf,
+        )
 
         # postprocess, set NaN for carbon if canopy cover requested is <30
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:

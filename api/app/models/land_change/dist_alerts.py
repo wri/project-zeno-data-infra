@@ -4,10 +4,10 @@ from pydantic import Field, PrivateAttr
 
 from ..common.analysis import DATE_REGEX, AnalysisStatus, AnalyticsIn
 from ..common.areas_of_interest import (
-    AdminAreaOfInterest,
     CustomAreaOfInterest,
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
+    PrecomputedAdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
 from ..common.base import Response, StrictBaseModel
@@ -15,7 +15,7 @@ from ..common.base import Response, StrictBaseModel
 ANALYTICS_NAME = "dist_alerts"
 
 AoiUnion = Union[
-    AdminAreaOfInterest,
+    PrecomputedAdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,

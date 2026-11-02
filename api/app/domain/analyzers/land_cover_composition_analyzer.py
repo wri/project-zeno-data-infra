@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Dict
+from typing import Any, Dict
 
 import dask.dataframe as dd
 import newrelic.agent as nr_agent
@@ -8,6 +8,7 @@ from flox.xarray import xarray_reduce
 
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
+from app.domain.analyzers.precomputed_level_split import analyze_by_precomputed_levels
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
@@ -72,38 +73,44 @@ class LandCoverCompositionAnalyzer(Analyzer):
             **analysis.metadata
         )
 
-        if self.precomputed_admin_levels.covers(land_cover_change_analytics_in.aoi):
-            gadm_ids = land_cover_change_analytics_in.aoi.ids
-            results = await self.analyze_admin_areas(gadm_ids)
+        analysis.result = await analyze_by_precomputed_levels(
+            land_cover_change_analytics_in,
+            self.precomputed_admin_levels,
+            precomputed=lambda request: self.analyze_admin_areas(request.aoi.ids),
+            on_the_fly=self.analyze_on_the_fly,
+        )
 
+    async def analyze_on_the_fly(
+        self, land_cover_change_analytics_in
+    ) -> Dict[str, Any]:
+        if self.input_uris is None:
+            raise RuntimeError("Input URIs must be provided for actual analysis")
+        aois = land_cover_change_analytics_in.aoi.model_dump()
+        geojsons = await get_geojson(
+            land_cover_change_analytics_in.aoi, self.aoi_geometry_repository
+        )
+        if aois["type"] != "feature_collection":
+            aoi_list = sorted(
+                [{"type": aois["type"], "id": id} for id in aois["ids"]],
+                key=lambda aoi: aoi["id"],
+            )
         else:
-            aois = land_cover_change_analytics_in.aoi.model_dump()
-            geojsons = await get_geojson(
-                land_cover_change_analytics_in.aoi, self.aoi_geometry_repository
-            )
-            if aois["type"] != "feature_collection":
-                aoi_list = sorted(
-                    [{"type": aois["type"], "id": id} for id in aois["ids"]],
-                    key=lambda aoi: aoi["id"],
-                )
-            else:
-                aoi_list = aois["feature_collection"]["features"]
-                geojsons = [geojson["geometry"] for geojson in geojsons]
+            aoi_list = aois["feature_collection"]["features"]
+            geojsons = [geojson["geometry"] for geojson in geojsons]
 
-            analysis_partial = partial(
-                self.analyze_area,
-                land_cover_zarr_uri=self.input_uris["land_cover_zarr_uri"],
-                pixel_area_zarr_uri=self.input_uris[str(Dataset.area_hectares)],
-            )
-            dd_df_futures = await self.compute_engine.gather(
-                self.compute_engine.map(analysis_partial, aoi_list, geojsons)
-            )
-            dfs = await self.compute_engine.gather(dd_df_futures)
-            combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
-            combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
-            results = combined_results_df.to_dict(orient="list")
-
-        analysis.result = results
+        analysis_partial = partial(
+            self.analyze_area,
+            land_cover_zarr_uri=self.input_uris["land_cover_zarr_uri"],
+            pixel_area_zarr_uri=self.input_uris[str(Dataset.area_hectares)],
+        )
+        dd_df_futures = await self.compute_engine.gather(
+            self.compute_engine.map(analysis_partial, aoi_list, geojsons)
+        )
+        dfs = await self.compute_engine.gather(dd_df_futures)
+        combined_results_df = await self.compute_engine.compute(dd.concat(dfs))
+        combined_results_df = combined_results_df[combined_results_df.area_ha > 0]
+        results = combined_results_df.to_dict(orient="list")
+        return results
 
     async def analyze_admin_areas(self, gadm_ids):
         id_str = (", ").join([f"'{aoi_id}'" for aoi_id in gadm_ids])

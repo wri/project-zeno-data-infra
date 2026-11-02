@@ -3,15 +3,9 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import (
-    get_aoi_geometry_repository,
-    get_environment,
-    get_precomputed_admin_levels,
-)
-from app.domain.analyzers.admin_level_split_analyzer import AdminLevelSplitAnalyzer
+from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.analyzers.dist_alerts_analyzer import INPUT_URIS, DistAlertsAnalyzer
 from app.domain.models.environment import Environment, resolve_uris
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
@@ -46,20 +40,13 @@ def create_analysis_service(
     aoi_geometry_repository: AoiGeometryRepository = Depends(
         get_aoi_geometry_repository
     ),
-    precomputed_admin_levels: PrecomputedAdminLevels = Depends(
-        get_precomputed_admin_levels
-    ),
 ) -> AnalysisService:
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=AdminLevelSplitAnalyzer(
-            DistAlertsAnalyzer(
-                aoi_geometry_repository=aoi_geometry_repository,
-                compute_engine=getattr(request.app.state, "dask_client", None),
-                input_uris=resolve_uris(INPUT_URIS, environment),
-                precomputed_admin_levels=precomputed_admin_levels,
-            ),
-            precomputed_admin_levels,
+        analyzer=DistAlertsAnalyzer(
+            aoi_geometry_repository=aoi_geometry_repository,
+            compute_engine=getattr(request.app.state, "dask_client", None),
+            input_uris=resolve_uris(INPUT_URIS, environment),
         ),
         event=ANALYTICS_NAME,
     )
