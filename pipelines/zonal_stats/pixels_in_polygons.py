@@ -235,11 +235,15 @@ def _combine_tile_sums(
     """Add up each AOI's partial sums across the parts with a Dask dataframe
     groupby, finish them a partition at a time, and write each partition to a
     file under combined_uri. Returns the files, in aoi_id order."""
+    # Both shuffles (the groupby and the sort) spread rows over this many
+    # partitions; left to Dask, the groupby's output can be one or two
+    # partitions that funnel every row into one worker.
+    n_partitions = max(1, -(-n_aois // AOIS_PER_PARTITION))
     with _dask_client():
         sums = (
             dd.read_parquet(part_uris)
             .groupby(["aoi_id", *by])[sum_column]
-            .sum(split_out=True)
+            .sum(split_out=n_partitions)
             .reset_index()
         )
         # Indexing on the group key keeps each group in one partition, and
@@ -247,9 +251,7 @@ def _combine_tile_sums(
         key = sums["aoi_id"]
         if group_key is not None:
             key = key.map_partitions(group_key, meta=("aoi_id", "object"))
-        sums = sums.assign(_key=key).set_index(
-            "_key", npartitions=max(1, -(-n_aois // AOIS_PER_PARTITION))
-        )
+        sums = sums.assign(_key=key).set_index("_key", npartitions=n_partitions)
         finish_partition = partial(_finish_partition, finish=finish)
         finished = sums.map_partitions(
             finish_partition, meta=finish_partition(sums._meta)
