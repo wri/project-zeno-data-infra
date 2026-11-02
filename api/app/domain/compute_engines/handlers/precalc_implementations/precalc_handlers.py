@@ -4,7 +4,6 @@ from app.domain.compute_engines.handlers.analytics_precalc_handler import (
     AnalyticsPrecalcHandler,
 )
 from app.domain.models.dataset import Dataset, DatasetQuery
-from app.domain.models.precomputed_admin_levels import has_precomputed_results
 
 
 class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
@@ -27,7 +26,7 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
 class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            has_precomputed_results(aoi)
+            aoi.has_precomputed_results()
             and Dataset.area_hectares in query.aggregate.datasets
         )
 
@@ -35,7 +34,7 @@ class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            has_precomputed_results(aoi)
+            aoi.has_precomputed_results()
             and Dataset.area_hectares in query.aggregate.datasets
         )
 
@@ -43,7 +42,7 @@ class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
 class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            has_precomputed_results(aoi)
+            aoi.has_precomputed_results()
             and (
                 Dataset.area_hectares in query.aggregate.datasets
                 or Dataset.carbon_emissions in query.aggregate.datasets

@@ -5,24 +5,33 @@ from uuid import UUID
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
-from app.domain.models.precomputed_admin_levels import (
-    DEEPEST_PRECOMPUTED_ADMIN_LEVEL,
-    admin_level,
-    has_precomputed_level,
-)
-
 from .base import StrictBaseModel
 
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 MAX_OTF_FEATURES = 50
 MAX_ADMIN_LEVEL = 5
+# Deeper admin areas have no precomputed results, so they're computed on the fly
+DEEPEST_PRECOMPUTED_ADMIN_LEVEL = 2
 AdminStr = Annotated[str, StringConstraints(pattern=ADMIN_REGEX)]
+
+
+def admin_level(admin_id: str) -> int:
+    """BRA is level 0, BRA.1 level 1, BRA.1.12 level 2, and so on."""
+    return admin_id.count(".")
+
+
+def has_precomputed_level(admin_id: str) -> bool:
+    return admin_level(admin_id) <= DEEPEST_PRECOMPUTED_ADMIN_LEVEL
 
 
 class AreaOfInterest(StrictBaseModel):
     async def get_geostore_id(self) -> Optional[UUID]:
         """Return the unique identifier for the area of interest."""
         raise NotImplementedError("This method is not implemented.")
+
+    def has_precomputed_results(self) -> bool:
+        """Whether every area of the request has precomputed results."""
+        return False
 
 
 class AdminAreaOfInterest(AreaOfInterest):
@@ -37,6 +46,9 @@ class AdminAreaOfInterest(AreaOfInterest):
         # admin_level = self.get_admin_level()
         geostore_id = None
         return geostore_id
+
+    def has_precomputed_results(self) -> bool:
+        return all(has_precomputed_level(admin_id) for admin_id in self.ids)
 
     def get_ids_at_admin_level(self, admin_level):
         ids = []

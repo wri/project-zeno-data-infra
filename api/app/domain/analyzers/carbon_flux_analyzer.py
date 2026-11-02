@@ -10,7 +10,6 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.carbon_flux import CarbonFluxAnalyticsIn
@@ -58,7 +57,7 @@ class CarbonFluxAnalyzer(Analyzer):
 
         carbon_flux_analytics_in = CarbonFluxAnalyticsIn(**analysis.metadata)
 
-        if has_precomputed_results(carbon_flux_analytics_in.aoi):
+        if carbon_flux_analytics_in.aoi.has_precomputed_results():
             gadm_ids = carbon_flux_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(
                 gadm_ids, carbon_flux_analytics_in.canopy_cover

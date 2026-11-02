@@ -4,6 +4,7 @@ from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
     PrecomputedAdminAreaOfInterest,
+    ProtectedAreaOfInterest,
 )
 
 SAMPLE_FEATURE_COLLECTION = {
@@ -76,6 +77,21 @@ class TestAdminAreaOfInterest:
             _ = AdminAreaOfInterest(
                 type="admin", ids=[f"BRA.14.{i}" for i in range(1200)]
             )
+
+
+class TestHasPrecomputedResults:
+    def test_admin_areas_down_to_level_2_have_precomputed_results(self):
+        aoi = AdminAreaOfInterest(ids=["BRA", "BRA.1", "BRA.1.12"])
+
+        assert aoi.has_precomputed_results()
+
+    def test_admin_areas_below_level_2_have_no_precomputed_results(self):
+        assert not AdminAreaOfInterest(ids=["BRA.1.12.3"]).has_precomputed_results()
+
+    def test_other_area_types_have_no_precomputed_results(self):
+        aoi = ProtectedAreaOfInterest(ids=["555625448"])
+
+        assert not aoi.has_precomputed_results()
 
 
 class TestPrecomputedAdminAreaOfInterest:

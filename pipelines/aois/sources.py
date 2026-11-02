@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pandas as pd
-
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.gadm import GadmSource
 from pipelines.aois.vector_file_source import VectorFileSource
@@ -18,9 +17,6 @@ def aoi_sources() -> tuple[AoiSource, ...]:
             all_in_one_url=f"{gadm_downloads}/gadm_410-gpkg.zip",
             cache_prefix="s3://lcl-analytics/vectors/aois/gadm/v4.1.85/source",
             name_fills=pd.read_csv(Path(__file__).parent / "gadm_name_fills.csv"),
-            levels=(0, 1, 2, 3, 4, 5),
-            # Most of Russia's level-3 units have no name or type in GADM
-            unnamed_units_dropped_in=("RUS",),
         ),
         VectorFileSource(
             source="wdpa",

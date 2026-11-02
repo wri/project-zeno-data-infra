@@ -11,7 +11,6 @@ from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -77,7 +76,7 @@ class NaturalLandsAnalyzer(Analyzer):
 
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
 
-        if has_precomputed_results(natural_lands_analytics_in.aoi):
+        if natural_lands_analytics_in.aoi.has_precomputed_results():
             gadm_ids = natural_lands_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)
         else:

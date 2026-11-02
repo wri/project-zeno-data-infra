@@ -1,17 +1,16 @@
 import geopandas as gpd
 import pandas as pd
 import pytest
-from shapely import box
-
 from pipelines.aois.gadm import (
     cached_download,
-    drop_unnamed_units,
+    drop_unnamed_russian_units,
     fill_gadm_names,
     fix_gadm_gids,
     gadm_ids,
     mark_disputed,
     read_gadm_levels,
 )
+from shapely import box
 
 GID_COLUMNS = [f"GID_{level}" for level in range(6)]
 
@@ -108,7 +107,7 @@ def test_levels_are_read_from_their_own_layers(tmp_path):
             crs="EPSG:4326",
         ).to_file(path, layer=f"ADM_{level}")
 
-    levels = read_gadm_levels(path, tuple(range(6)))
+    levels = read_gadm_levels(path)
 
     assert list(levels.ADM_LEVEL) == [0, 1, 2, 3, 4, 5]
     assert list(levels.NAME_0) == ["Brazil"] * 6
@@ -197,14 +196,14 @@ def named_units(*rows):
     return pd.DataFrame(rows, columns=["ADM_LEVEL", "GID_0", "NAME_0", "NAME_3"])
 
 
-def test_unnamed_units_are_dropped_only_in_the_listed_countries():
+def test_unnamed_units_are_dropped_only_in_russia():
     features = named_units(
         (3, "RUS", "Russia", "NA"),
         (3, "RUS", "Russia", "Kazan"),
         (3, "THA", "Thailand", "NA"),
     )
 
-    kept = drop_unnamed_units(features, countries=("RUS",))
+    kept = drop_unnamed_russian_units(features)
 
     assert kept.NAME_3.tolist() == ["Kazan", "NA"]
 

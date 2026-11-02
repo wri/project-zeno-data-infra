@@ -19,7 +19,6 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -162,7 +161,7 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        if has_precomputed_results(analytics_in.aoi):
+        if analytics_in.aoi.has_precomputed_results():
             results = await self.analyze_admin_areas(analytics_in)
         else:
             results = await self.analyze_otf(analytics_in)

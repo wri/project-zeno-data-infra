@@ -10,16 +10,14 @@ from pathlib import Path
 import fsspec
 import geopandas as gpd
 import pandas as pd
-
 from pipelines.aois.aoi_source import AoiSource
 
 
 @dataclass(frozen=True)
 class GadmSource(AoiSource):
-    """GADM admin `levels` from the official by-level distribution, with the
+    """GADM admin levels 0-5 from the official by-level distribution, with the
     disputed flag, GIDs and missing names set the same way as the Data API's
-    GADM 4.1 import. Units still unnamed in `unnamed_units_dropped_in`
-    countries are dropped. Source files are cached under `cache_prefix`."""
+    GADM 4.1 import. Source files are cached under `cache_prefix`."""
 
     source: str
     version: str
@@ -27,23 +25,19 @@ class GadmSource(AoiSource):
     all_in_one_url: str
     cache_prefix: str
     name_fills: pd.DataFrame
-    levels: tuple[int, ...]
-    unnamed_units_dropped_in: tuple[str, ...] = ()
     dropped_columns: tuple[str, ...] = ()
 
     def load(self) -> gpd.GeoDataFrame:
         with tempfile.TemporaryDirectory() as directory:
             levels = read_gadm_levels(
-                source_geopackage(self.levels_url, self.cache_prefix, directory),
-                self.levels,
+                source_geopackage(self.levels_url, self.cache_prefix, directory)
             )
             pieces = read_gadm_pieces(
-                source_geopackage(self.all_in_one_url, self.cache_prefix, directory),
-                self.levels,
+                source_geopackage(self.all_in_one_url, self.cache_prefix, directory)
             )
             disputed = mark_disputed(levels, pieces)
             named = fill_gadm_names(fix_gadm_gids(disputed), self.name_fills)
-            return drop_unnamed_units(named, self.unnamed_units_dropped_in)
+            return drop_unnamed_russian_units(named)
 
     def aoi_ids(self, attributes: pd.DataFrame) -> pd.Series:
         return gadm_ids(attributes)
@@ -76,10 +70,10 @@ def download(url: str, destination: Path, timeout_seconds: int = 600) -> None:
             shutil.copyfileobj(response, file)
 
 
-def read_gadm_levels(path: str, levels: tuple[int, ...]) -> gpd.GeoDataFrame:
+def read_gadm_levels(path: str) -> gpd.GeoDataFrame:
     layers = [
         gpd.read_file(path, layer=f"ADM_{level}").assign(ADM_LEVEL=level)
-        for level in levels
+        for level in range(6)
     ]
     combined = pd.concat(layers, ignore_index=True)
     return gpd.GeoDataFrame(
@@ -89,12 +83,12 @@ def read_gadm_levels(path: str, levels: tuple[int, ...]) -> gpd.GeoDataFrame:
     )
 
 
-def read_gadm_pieces(path: str, levels: tuple[int, ...]) -> pd.DataFrame:
+def read_gadm_pieces(path: str) -> pd.DataFrame:
     """The all-in-one distribution's smallest units, with only the fields the
     disputed flag needs."""
     return gpd.read_file(
         path,
-        columns=[*(f"GID_{level}" for level in levels), "DISPUTEDBY"],
+        columns=[*(f"GID_{level}" for level in range(6)), "DISPUTEDBY"],
         ignore_geometry=True,
     )
 
@@ -190,15 +184,13 @@ def gadm_ids(attributes: pd.DataFrame) -> pd.Series:
     return ids.where(ids != "NA")
 
 
-def drop_unnamed_units(
-    features: pd.DataFrame, countries: tuple[str, ...]
-) -> pd.DataFrame:
-    """Drops units in `countries` whose name at their own level is "NA", where
-    GADM has subdivisions without names or types to tell them apart."""
+def drop_unnamed_russian_units(features: pd.DataFrame) -> pd.DataFrame:
+    """Drops Russian units whose name at their own level is "NA": most of
+    Russia's level-3 units have no name or type in GADM to tell them apart."""
     own_name = own_level_values(features, features.ADM_LEVEL, "NAME")
-    unnamed = features.GID_0.isin(countries) & (own_name == "NA")
+    unnamed = (features.GID_0 == "RUS") & (own_name == "NA")
     logging.getLogger(__name__).info(
-        "Dropped %d unnamed GADM units in %s", unnamed.sum(), ", ".join(countries)
+        "Dropped %d unnamed Russian GADM units", unnamed.sum()
     )
     return features[~unnamed]
 

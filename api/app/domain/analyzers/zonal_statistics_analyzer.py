@@ -8,7 +8,6 @@ import newrelic.agent as nr_agent
 from app.analysis.common.analysis import get_geojson
 from app.domain.analyzers.analyzer import Analyzer
 from app.domain.models.analysis import Analysis
-from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 
 
@@ -44,7 +43,7 @@ class ZonalStatisticsAnalyzer(Analyzer):
 
         analytics_in = self.model(**analysis.metadata)
 
-        if has_precomputed_results(analytics_in.aoi):
+        if analytics_in.aoi.has_precomputed_results():
             analysis.result = await self._run_precomputed(analytics_in)
         else:
             analysis.result = await self._run_on_the_fly(analytics_in)
