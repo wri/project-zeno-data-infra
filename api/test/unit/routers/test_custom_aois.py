@@ -104,6 +104,8 @@ def test_writes_require_an_admin(service, headers, status):
         custom_aois("a", "a"),
         custom_aois(*[str(i) for i in range(501)]),
         custom_aois("a", geometry={"type": "Point", "coordinates": [0, 0]}),
+        custom_aois("a", geometry={"type": "Polygon"}),
+        custom_aois("a", geometry={"type": "MultiPolygon", "coordinates": [[], []]}),
         {"aois": [{"geometry": mapping(box(0, 0, 1, 1)), **OWNER}]},
         custom_aois("a", name="My forest"),
         custom_aois("a", user_id="user-1"),
@@ -112,6 +114,8 @@ def test_writes_require_an_admin(service, headers, status):
         "duplicate ids",
         "over 500 AOIs",
         "not a polygon",
+        "malformed geometry",
+        "only empty polygons",
         "missing id",
         "missing user id",
         "missing name",
@@ -130,3 +134,15 @@ def test_detailed_geometries_are_accepted(service):
     response = client.put("/v0/custom_aois", json=detailed, headers=ADMIN)
 
     assert response.status_code == 200
+
+
+def test_empty_polygons_in_a_multipolygon_are_dropped(service):
+    square = mapping(box(0, 0, 1, 1))["coordinates"]
+    body = custom_aois(
+        "a", geometry={"type": "MultiPolygon", "coordinates": [square, [], square]}
+    )
+
+    response = client.put("/v0/custom_aois", json=body, headers=ADMIN)
+
+    assert response.status_code == 200
+    assert len(service.saved.aois[0].geometry["coordinates"]) == 2

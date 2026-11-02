@@ -15,9 +15,19 @@ class CustomAoiIn(BaseModel):
     @field_validator("geometry")
     @classmethod
     def must_be_polygonal_geojson(cls, geometry):
+        """A GeoJSON Polygon or MultiPolygon with at least one polygon. Empty
+        polygons in a MultiPolygon hold no area, so they are dropped."""
         if geometry.get("type") not in ("Polygon", "MultiPolygon"):
             raise ValueError("geometry must be a GeoJSON Polygon or MultiPolygon")
-        shape(geometry)
+        if geometry["type"] == "MultiPolygon":
+            polygons = geometry.get("coordinates") or []
+            geometry = {**geometry, "coordinates": [p for p in polygons if p]}
+        try:
+            parsed = shape(geometry)
+        except Exception as error:
+            raise ValueError(f"geometry is not valid GeoJSON: {error!r}") from error
+        if parsed.is_empty:
+            raise ValueError("geometry has no polygons")
         return geometry
 
 
