@@ -16,7 +16,6 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -355,7 +354,6 @@ class TestOtfAnalysis:
 async def test_admin_areas_below_precomputed_levels_are_computed_on_the_fly():
     analyzer = IntegratedAlertsAnalyzer(
         input_uris={"x": "y"},
-        precomputed_admin_levels=PrecomputedAdminLevels(deepest_level=2),
     )
     analysis = make_analysis({"type": "admin", "ids": ["BRA.1.2.3"]})
 

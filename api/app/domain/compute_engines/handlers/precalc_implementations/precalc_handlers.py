@@ -4,18 +4,11 @@ from app.domain.compute_engines.handlers.analytics_precalc_handler import (
     AnalyticsPrecalcHandler,
 )
 from app.domain.models.dataset import Dataset, DatasetQuery
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
+from app.domain.models.precomputed_admin_levels import has_precomputed_results
 
 
 class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
-    def __init__(
-        self,
-        precalc_query_builder,
-        precalc_query_service,
-        next_handler,
-        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
-    ):
-        self.precomputed_admin_levels = precomputed_admin_levels
+    def __init__(self, precalc_query_builder, precalc_query_service, next_handler):
         self.precalc_query_builder = precalc_query_builder
         self.precalc_query_service = precalc_query_service
         self.next_handler = next_handler
@@ -34,7 +27,7 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
 class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            self.precomputed_admin_levels.covers(aoi)
+            has_precomputed_results(aoi)
             and Dataset.area_hectares in query.aggregate.datasets
         )
 
@@ -42,7 +35,7 @@ class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            self.precomputed_admin_levels.covers(aoi)
+            has_precomputed_results(aoi)
             and Dataset.area_hectares in query.aggregate.datasets
         )
 
@@ -50,7 +43,7 @@ class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
 class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            self.precomputed_admin_levels.covers(aoi)
+            has_precomputed_results(aoi)
             and (
                 Dataset.area_hectares in query.aggregate.datasets
                 or Dataset.carbon_emissions in query.aggregate.datasets

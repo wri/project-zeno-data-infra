@@ -7,9 +7,8 @@ import newrelic.agent as nr_agent
 
 from app.analysis.common.analysis import get_geojson
 from app.domain.analyzers.analyzer import Analyzer
-from app.domain.analyzers.precomputed_level_split import analyze_by_precomputed_levels
 from app.domain.models.analysis import Analysis
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
+from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 
 
@@ -31,9 +30,7 @@ class ZonalStatisticsAnalyzer(Analyzer):
         input_uris: Dict[str, str] | None = None,
         otf_timeout_seconds: float = 600,
         aoi_geometry_repository: AoiGeometryRepository | None = None,
-        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
     ):
-        self.precomputed_admin_levels = precomputed_admin_levels
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.duckdb_query_service = duckdb_query_service
         self.input_uris = input_uris
@@ -47,12 +44,10 @@ class ZonalStatisticsAnalyzer(Analyzer):
 
         analytics_in = self.model(**analysis.metadata)
 
-        analysis.result = await analyze_by_precomputed_levels(
-            analytics_in,
-            self.precomputed_admin_levels,
-            precomputed=self._run_precomputed,
-            on_the_fly=self._run_on_the_fly,
-        )
+        if has_precomputed_results(analytics_in.aoi):
+            analysis.result = await self._run_precomputed(analytics_in)
+        else:
+            analysis.result = await self._run_on_the_fly(analytics_in)
 
     async def _run_precomputed(self, analytics_in) -> Dict[str, Any]:
         data: Dict = await self.duckdb_query_service.execute(

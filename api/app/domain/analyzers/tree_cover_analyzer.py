@@ -3,7 +3,6 @@ from typing import Dict, List
 import newrelic.agent as nr_agent
 
 from app.domain.analyzers.analyzer import Analyzer
-from app.domain.analyzers.precomputed_level_split import analyze_by_precomputed_levels
 from app.domain.compute_engines.compute_engine import ComputeEngine
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import (
@@ -13,7 +12,6 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.tree_cover import TreeCoverAnalyticsIn
 
@@ -35,13 +33,9 @@ INPUT_URIS = {
 
 class TreeCoverAnalyzer(Analyzer):
     def __init__(
-        self,
-        compute_engine: ComputeEngine,
-        input_uris: Dict[str, str],
-        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
-    ):
+        self, compute_engine: ComputeEngine, input_uris: Dict[str, str]
+    ) -> None:
         self.compute_engine = compute_engine
-        self.precomputed_admin_levels = precomputed_admin_levels
         self.input_uris = input_uris
 
     @nr_agent.function_trace(name="TreeCoverAnalyzer.analyze")
@@ -76,11 +70,4 @@ class TreeCoverAnalyzer(Analyzer):
             group_bys=groupbys,
             filters=filters,
         )
-        # One compute engine serves both: its handlers pick precomputed or
-        # on-the-fly results for each part of the request
-        analysis.result = await analyze_by_precomputed_levels(
-            analytics_in,
-            self.precomputed_admin_levels,
-            precomputed=lambda request: self.compute_engine.compute(request.aoi, query),
-            on_the_fly=lambda request: self.compute_engine.compute(request.aoi, query),
-        )
+        analysis.result = await self.compute_engine.compute(analytics_in.aoi, query)

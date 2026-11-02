@@ -2,7 +2,6 @@ from app.domain.compute_engines.handlers.precalc_implementations.precalc_handler
     TreeCoverPrecalcHandler,
 )
 from app.domain.models.dataset import Dataset, DatasetAggregate, DatasetQuery
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
 from app.models.common.areas_of_interest import AdminAreaOfInterest
 
 
@@ -11,7 +10,6 @@ def handler() -> TreeCoverPrecalcHandler:
         precalc_query_builder=None,
         precalc_query_service=None,
         next_handler=None,
-        precomputed_admin_levels=PrecomputedAdminLevels(deepest_level=2),
     )
 
 

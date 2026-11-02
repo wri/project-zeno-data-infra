@@ -4,7 +4,6 @@ import newrelic.agent as nr_agent
 import numpy as np
 
 from app.domain.analyzers.analyzer import Analyzer
-from app.domain.analyzers.precomputed_level_split import analyze_by_precomputed_levels
 from app.domain.compute_engines.dask_client_router import DaskClientRouter
 from app.domain.compute_engines.handlers.otf_implementations.flox_otf_handler import (
     FloxOTFHandler,
@@ -20,7 +19,7 @@ from app.domain.models.dataset import (
     DatasetQuery,
 )
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
+from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -150,9 +149,7 @@ class TreeCoverLossAnalyzer(Analyzer):
         dataset_repository: ZarrDatasetRepository | None = None,
         aoi_geometry_repository: AoiGeometryRepository | None = None,
         input_uris: Dict[str, str] | None = None,
-        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
     ):
-        self.precomputed_admin_levels = precomputed_admin_levels
         self.dask_client_router = dask_client_router
         self.dataset_repository = dataset_repository
         self.aoi_geometry_repository = aoi_geometry_repository
@@ -165,12 +162,10 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        results = await analyze_by_precomputed_levels(
-            analytics_in,
-            self.precomputed_admin_levels,
-            precomputed=self.analyze_admin_areas,
-            on_the_fly=self.analyze_otf,
-        )
+        if has_precomputed_results(analytics_in.aoi):
+            results = await self.analyze_admin_areas(analytics_in)
+        else:
+            results = await self.analyze_otf(analytics_in)
 
         # postprocess, set NaN for carbon if canopy cover requested is <30
         if analytics_in.canopy_cover is not None and analytics_in.canopy_cover < 30:

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Any, Dict
+from typing import Dict, List
 
 import newrelic.agent as nr_agent
 import numpy as np
@@ -8,11 +8,10 @@ from xarray import DataArray
 
 from app.analysis.common.analysis import get_geojson, read_zarr_clipped_to_geojson
 from app.domain.analyzers.analyzer import Analyzer
-from app.domain.analyzers.precomputed_level_split import analyze_by_precomputed_levels
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
-from app.domain.models.precomputed_admin_levels import PrecomputedAdminLevels
+from app.domain.models.precomputed_admin_levels import has_precomputed_results
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.grasslands import GrasslandsAnalyticsIn
@@ -41,9 +40,7 @@ class GrasslandsAnalyzer(Analyzer):
         duckdb_query_service=None,
         input_uris: Dict[str, str] | None = None,
         aoi_geometry_repository: AoiGeometryRepository | None = None,
-        precomputed_admin_levels: PrecomputedAdminLevels = PrecomputedAdminLevels(),
     ):
-        self.precomputed_admin_levels = precomputed_admin_levels
         self.compute_engine = compute_engine  # Dask Client, or not?
         self.duckdb_query_service = duckdb_query_service
         self.input_uris = input_uris
@@ -56,45 +53,42 @@ class GrasslandsAnalyzer(Analyzer):
 
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
 
-        analysis.result = await analyze_by_precomputed_levels(
-            grasslands_analytics_in,
-            self.precomputed_admin_levels,
-            precomputed=lambda request: self.analyze_admin_areas(
-                request.aoi.ids, request.start_year, request.end_year
-            ),
-            on_the_fly=self.analyze_on_the_fly,
-        )
-
-    async def analyze_on_the_fly(self, grasslands_analytics_in) -> Dict[str, Any]:
-        if self.input_uris is None:
-            raise Exception("Input URIs must be provided for actual analysis")
-        aois = grasslands_analytics_in.aoi.model_dump()
-        geojsons = await get_geojson(
-            grasslands_analytics_in.aoi, self.aoi_geometry_repository
-        )
-        if aois["type"] != "feature_collection":
-            aoi_list = sorted(
-                [{"type": aois["type"], "id": id} for id in aois["ids"]],
-                key=lambda aoi: aoi["id"],
+        if has_precomputed_results(grasslands_analytics_in.aoi):
+            gadm_ids: List = grasslands_analytics_in.aoi.ids
+            results: Dict = await self.analyze_admin_areas(
+                gadm_ids,
+                grasslands_analytics_in.start_year,
+                grasslands_analytics_in.end_year,
             )
         else:
-            aoi_list = aois["feature_collection"]["features"]
-            geojsons = [geojson["geometry"] for geojson in geojsons]
+            aois = grasslands_analytics_in.aoi.model_dump()
+            geojsons = await get_geojson(
+                grasslands_analytics_in.aoi, self.aoi_geometry_repository
+            )
+            if aois["type"] != "feature_collection":
+                aoi_list = sorted(
+                    [{"type": aois["type"], "id": id} for id in aois["ids"]],
+                    key=lambda aoi: aoi["id"],
+                )
+            else:
+                aoi_list = aois["feature_collection"]["features"]
+                geojsons = [geojson["geometry"] for geojson in geojsons]
 
-        analysis_partial = partial(
-            self.analyze_area,
-            start_year=grasslands_analytics_in.start_year,
-            end_year=grasslands_analytics_in.end_year,
-            grasslands_obj_name=self.input_uris["grasslands_zarr_uri"],
-            pixel_area_obj_name=self.input_uris[str(Dataset.area_hectares)],
-        )
-        dd_df_futures = await self.compute_engine.gather(
-            self.compute_engine.map(analysis_partial, aoi_list, geojsons)
-        )
-        dfs = await self.compute_engine.gather(dd_df_futures)
-        combined_results_df = await self.compute_engine.compute(concat(dfs))
-        results = combined_results_df.to_dict(orient="list")
-        return results
+            analysis_partial = partial(
+                self.analyze_area,
+                start_year=grasslands_analytics_in.start_year,
+                end_year=grasslands_analytics_in.end_year,
+                grasslands_obj_name=self.input_uris["grasslands_zarr_uri"],
+                pixel_area_obj_name=self.input_uris[str(Dataset.area_hectares)],
+            )
+            dd_df_futures = await self.compute_engine.gather(
+                self.compute_engine.map(analysis_partial, aoi_list, geojsons)
+            )
+            dfs = await self.compute_engine.gather(dd_df_futures)
+            combined_results_df = await self.compute_engine.compute(concat(dfs))
+            results = combined_results_df.to_dict(orient="list")
+
+        analysis.result = results
 
     async def analyze_admin_areas(self, gadm_ids, start_year, end_year) -> Dict:
         id_str = ", ".join([f"'{aoi_id}'" for aoi_id in gadm_ids])

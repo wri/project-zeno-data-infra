@@ -45,10 +45,13 @@ class TestAdminAreaOfInterest:
             _ = AdminAreaOfInterest(type="admin", ids=["ETH.1.2.3.4.5.6"])
 
     def test_aaoi_allows_up_to_50_ids_below_level_2(self):
-        shallow_ids = [f"BRA.14.{i}" for i in range(950)]
-        deep_ids = [f"BRA.14.1.{i}" for i in range(50)]
+        assert AdminAreaOfInterest(
+            type="admin", ids=[f"BRA.14.1.{i}" for i in range(50)]
+        )
 
-        assert AdminAreaOfInterest(type="admin", ids=shallow_ids + deep_ids)
+    def test_aaoi_rejects_mixing_levels_with_and_without_precomputed_results(self):
+        with pytest.raises(ValueError, match="separate requests"):
+            _ = AdminAreaOfInterest(type="admin", ids=["BRA.14", "BRA.14.1.2"])
 
     def test_aaoi_rejects_more_than_50_ids_below_level_2(self):
         with pytest.raises(ValueError):
