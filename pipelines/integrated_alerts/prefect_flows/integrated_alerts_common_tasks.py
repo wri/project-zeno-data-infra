@@ -6,7 +6,7 @@ from shapely.geometry import Polygon
 
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.integrated_alerts import alert_points_table, stages, vector_zonal_stats
-from pipelines.zonal_stats.aoi_sources import AOISource, GeoParquetSource
+from pipelines.zonal_stats.aoi_sources import aoi_source_for
 
 INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
 
@@ -44,25 +44,25 @@ def build_alert_points_table(
 
 @task(persist_result=False)
 def compute_vector_zonal_stats(
-    aoi_source: AOISource,
+    aoi_type: str,
     zarr_uri: str,
     version: str,
     result_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> dict:
+    # Built here, so a source that can't be read fails only this AOI type.
     return vector_zonal_stats.compute_vector_zonal_stats(
-        aoi_source, zarr_uri, version, result_uri, bbox
+        aoi_source_for(aoi_type), zarr_uri, version, result_uri, bbox
     )
 
 
 @task(persist_result=False)
 def compute_admin_zonal_stats(
-    aoi_source: GeoParquetSource,
     zarr_uri: str,
     version: str,
     result_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> dict:
     return vector_zonal_stats.compute_admin_zonal_stats(
-        aoi_source, zarr_uri, version, result_uri, bbox
+        aoi_source_for("admin"), zarr_uri, version, result_uri, bbox
     )

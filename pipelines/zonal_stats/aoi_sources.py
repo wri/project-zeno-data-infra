@@ -170,3 +170,15 @@ def predefined_aoi_sources() -> List[GeoParquetSource]:
         )
         for source in aoi_sources()
     ]
+
+
+# Every AOI type with a source: the AOI pipeline's datasets and custom AOIs
+AOI_SOURCE_TYPES = [*AOI_TYPES.values(), "custom"]
+
+
+def aoi_source_for(aoi_type: str) -> AOISource:
+    """Return the source of one AOI type in AOI_SOURCE_TYPES; custom AOIs are
+    pinned to the table's current snapshot when this is called."""
+    if aoi_type == "custom":
+        return custom_aoi_source()
+    return next(s for s in predefined_aoi_sources() if s.aoi_type == aoi_type)
