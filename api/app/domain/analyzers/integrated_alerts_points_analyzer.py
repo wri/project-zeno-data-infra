@@ -2,6 +2,7 @@ from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
 import newrelic.agent as nr_agent
+import pandas as pd
 from shapely.geometry.base import BaseGeometry
 
 from app.analysis.common.analysis import LAND_FILTER_CLASSES
@@ -18,12 +19,21 @@ from app.domain.repositories.gadm_aoi_geometry_repository import (
 )
 from app.models.land_change.integrated_alerts import (
     IntegratedAlertsPointsAnalyticsIn,
+    IntegratedAlertsPointsFilterIn,
     PointsCursor,
     decode_cursor,
     encode_cursor,
 )
 
 CONFIDENCE_CODES = {label: code for code, label in ALERTS_CONFIDENCE.items()}
+# Columns of a points result, as served by /points and written to downloads
+POINTS_RESULT_COLUMNS = [
+    "lat",
+    "lon",
+    "alert_date",
+    "alert_confidence",
+    "natural_lands_class",
+]
 
 
 class IntegratedAlertsPointsAnalyzer(Analyzer):
@@ -44,7 +54,9 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
     @nr_agent.function_trace(name="IntegratedAlertsPointsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
         analytics_in = IntegratedAlertsPointsAnalyticsIn(**analysis.metadata)
-        aoi_ids, geometries = await self._load_geometries(analytics_in)
+        aoi_ids, geometries = await read_admin_geometries(
+            self.geometry_repository, analytics_in
+        )
         source = await self.points_repository.source()
         start_date, end_date = served_dates(source, analytics_in)
         after = None
@@ -59,13 +71,7 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                 )
             after = cursor.position
 
-        result: Dict[str, list] = {
-            "lat": [],
-            "lon": [],
-            "alert_date": [],
-            "alert_confidence": [],
-            "natural_lands_class": [],
-        }
+        result: Dict[str, list] = {column: [] for column in POINTS_RESULT_COLUMNS}
         truncated: Dict[str, bool] = {}
         next_cursor = None
         # One AOI per request (validated), so one list and at most one cursor.
@@ -74,16 +80,11 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                 truncated[aoi_id] = False
                 continue
             page = await self.points_repository.read_most_recent_points(
-                AlertPointsQuery(
-                    geometry=geometry,
-                    start_date=start_date,
-                    end_date=end_date,
-                    confidences=_confidence_codes(analytics_in),
-                    natural_lands_classes=(
-                        None
-                        if analytics_in.land_filter is None
-                        else LAND_FILTER_CLASSES[analytics_in.land_filter]
-                    ),
+                alert_points_query(
+                    analytics_in,
+                    geometry,
+                    start_date,
+                    end_date,
                     limit=analytics_in.limit,
                     after=after,
                 )
@@ -95,44 +96,86 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                         source.version, page.last_position, analytics_in.list_id()
                     )
                 )
-            points = page.points
-            result["lat"] += points["lat"].tolist()
-            result["lon"] += points["lon"].tolist()
-            result["alert_date"] += [d.isoformat() for d in points["alert_date"]]
-            result["alert_confidence"] += [
-                ALERTS_CONFIDENCE[c] for c in points["confidence"].tolist()
-            ]
-            result["natural_lands_class"] += points["natural_lands_class"].tolist()
+            for column, values in format_points(page.points).items():
+                result[column] += values
 
         analysis.result = result
         analysis.metadata = {
             **analysis.metadata,
-            "alerts": {
-                "version": source.version,
-                "latest_alert_date": source.latest_date.isoformat(),
-                "stored_start_date": source.first_date.isoformat(),
-                "stored_end_date": source.latest_date.isoformat(),
-                "start_date": (
-                    start_date.isoformat() if start_date <= end_date else None
-                ),
-                "end_date": end_date.isoformat() if start_date <= end_date else None,
-            },
+            "alerts": served_alerts_metadata(source, start_date, end_date),
             "truncated": truncated,
             # Pass back as `cursor` for the next page; None when the list is done.
             "next_cursor": next_cursor,
         }
 
-    async def _load_geometries(
-        self, analytics_in
-    ) -> Tuple[List[str], List[BaseGeometry]]:
-        aoi_ids = sorted(set(analytics_in.aoi.ids))
-        geometries, _ = await self.geometry_repository.load("admin", aoi_ids)
-        if len(geometries) != len(aoi_ids):
-            raise ValueError(
-                f"Expected {len(aoi_ids)} geometries for admin AOIs, "
-                f"got {len(geometries)}."
-            )
-        return aoi_ids, list(geometries)
+
+async def read_admin_geometries(
+    geometry_repository, analytics_in: IntegratedAlertsPointsFilterIn
+) -> Tuple[List[str], List[BaseGeometry]]:
+    """Read the request's GADM geometries, sorted by aoi_id."""
+    aoi_ids = sorted(set(analytics_in.aoi.ids))
+    geometries, _ = await geometry_repository.load("admin", aoi_ids)
+    if len(geometries) != len(aoi_ids):
+        raise ValueError(
+            f"Expected {len(aoi_ids)} geometries for admin AOIs, "
+            f"got {len(geometries)}."
+        )
+    return aoi_ids, list(geometries)
+
+
+def served_alerts_metadata(
+    source: AlertPointsSource, start_date: date, end_date: date
+) -> Dict[str, Optional[str]]:
+    """Describe the alerts version and the stored and served date ranges, for a
+    result's metadata. The served dates are None when nothing overlaps."""
+    served = start_date <= end_date
+    return {
+        "version": source.version,
+        "latest_alert_date": source.latest_date.isoformat(),
+        "stored_start_date": source.first_date.isoformat(),
+        "stored_end_date": source.latest_date.isoformat(),
+        "start_date": start_date.isoformat() if served else None,
+        "end_date": end_date.isoformat() if served else None,
+    }
+
+
+def alert_points_query(
+    analytics_in: IntegratedAlertsPointsFilterIn,
+    geometry: BaseGeometry,
+    start_date: date,
+    end_date: date,
+    limit: int,
+    after: Optional[str],
+) -> AlertPointsQuery:
+    """Select the request's confidence levels and land filter classes for the
+    points in geometry between the served dates."""
+    return AlertPointsQuery(
+        geometry=geometry,
+        start_date=start_date,
+        end_date=end_date,
+        confidences=_confidence_codes(analytics_in),
+        natural_lands_classes=(
+            None
+            if analytics_in.land_filter is None
+            else LAND_FILTER_CLASSES[analytics_in.land_filter]
+        ),
+        limit=limit,
+        after=after,
+    )
+
+
+def format_points(points: pd.DataFrame) -> Dict[str, list]:
+    """Convert repository points to result columns (POINTS_RESULT_COLUMNS), with
+    ISO dates and confidence labels."""
+    return {
+        "lat": points["lat"].tolist(),
+        "lon": points["lon"].tolist(),
+        "alert_date": [d.isoformat() for d in points["alert_date"]],
+        "alert_confidence": [
+            ALERTS_CONFIDENCE[c] for c in points["confidence"].tolist()
+        ],
+        "natural_lands_class": points["natural_lands_class"].tolist(),
+    }
 
 
 def _confidence_codes(analytics_in) -> List[int]:
