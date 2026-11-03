@@ -184,11 +184,15 @@ def compute_zonal_stats(
     exclude_ids: Collection[str] = (),
     bucket_key: Optional[Callable[[pd.Series], pd.Series]] = None,
 ) -> Dict:
-    """Compute zonal statistics of every AOI in aoi_source over the tiles and
-    write them to result_uri. Returns a summary of the run. exclude_ids are
-    AOIs not computed from pixels (e.g. admin units finish sums from their
-    children); bucket_key maps sorted aoi_ids to keys a bucket never splits
-    (e.g. admin units' country), which must be contiguous in aoi_id order."""
+    """Compute zonal statistics of every AOI in aoi_source over the tiles,
+    write them to result_uri and return a summary of the run.
+
+    exclude_ids: AOIs not computed from pixels, such as admin units that
+        finish sums from their children.
+    bucket_key: maps sorted aoi_ids to keys that a bucket never splits, such
+        as admin units' country. Each key's ids must be contiguous in aoi_id
+        order.
+    """
     aoi_bounds = aoi_source.read_bounds()
     aoi_bounds = aoi_bounds[~aoi_bounds["aoi_id"].isin(exclude_ids)]
     tiles_with_aois = _select_tiles_with_aois(tiles, aoi_bounds)
