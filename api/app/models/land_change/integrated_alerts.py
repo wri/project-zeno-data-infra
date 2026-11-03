@@ -20,6 +20,9 @@ from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "integrated_alerts"
 POINTS_ANALYTICS_NAME = "integrated_alerts_points"
+POINTS_DOWNLOAD_ANALYTICS_NAME = "integrated_alerts_points_download"
+# Keeps shapefiles far below the 2 GB DBF limit and a download's memory bounded.
+POINTS_DOWNLOAD_MAX_POINTS = 1_000_000
 POINTS_DEFAULT_LIMIT = 1000
 POINTS_MAX_LIMIT = 10_000
 # Raising this also needs one next_cursor per AOI in the result metadata.
@@ -285,6 +288,42 @@ class IntegratedAlertsPoints(StrictBaseModel):
 
 class IntegratedAlertsPointsResponse(Response):
     data: IntegratedAlertsPoints
+
+
+class IntegratedAlertsPointsDownloadIn(IntegratedAlertsPointsFilterIn):
+    _analytics_name: str = PrivateAttr(default=POINTS_DOWNLOAD_ANALYTICS_NAME)
+    _version: str = PrivateAttr(default="v20261018")
+    format: Literal["csv", "shp"] = Field(
+        ...,
+        title="Format",
+        description=(
+            "csv: one row per alert with the /points columns. shp: a zipped point "
+            "shapefile (EPSG:4326) with the same attributes, renamed to fit "
+            "shapefile limits: alert_confidence as confidence and "
+            "natural_lands_class as nl_class."
+        ),
+    )
+
+
+class IntegratedAlertsPointsDownload(StrictBaseModel):
+    result: Optional[dict] = {
+        "download_url": "https://gnw-analytics-api-analysis-results.s3.amazonaws.com/",
+        "filename": "integrated_alerts_BRA.1.12_2026-10-01_2026-10-16.csv",
+        "format": "csv",
+        "point_count": 1532,
+    }
+    metadata: Optional[dict] = None
+    message: Optional[str] = None
+    status: AnalysisStatus
+
+    model_config = {
+        "from_attributes": True,
+        "validate_by_name": True,
+    }
+
+
+class IntegratedAlertsPointsDownloadResponse(Response):
+    data: IntegratedAlertsPointsDownload
 
 
 class IntegratedAlertsLatest(StrictBaseModel):
