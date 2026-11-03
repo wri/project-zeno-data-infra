@@ -41,6 +41,8 @@ def create_cluster():
         container=os.getenv("PIPELINES_IMAGE"),
         environ={
             "AWS_REQUEST_PAYER": "requester",  # for reading COGS from gfw account
+            # Iceberg catalogs (e.g. custom AOIs), configured like the client's.
+            **{k: v for k, v in os.environ.items() if k.startswith("PYICEBERG_")},
         },
         worker_options={"nthreads": 4},  # to avoid OOMs
     )
@@ -85,7 +87,7 @@ def run_integrated_alerts_update(
 ) -> list[str]:
     result_uris = []
 
-    result = integrated_alerts_flow.integrated_alerts_zarr_flow(
+    result = integrated_alerts_flow.compute_integrated_alerts_zonal_stats(
         version, overwrite=overwrite, is_latest=is_latest, bbox=bbox
     )
     result_uris.append(result)
