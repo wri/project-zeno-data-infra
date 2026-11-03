@@ -36,6 +36,9 @@ from pipelines.zonal_stats.pixels_in_polygons import Tile, compute_zonal_stats
 FIRST_DAY = (date(2023, 1, 1) - ALERT_EPOCH).days
 LAST_DAY = 4999
 BY = ["natural_lands_class", "alert_date", "confidence"]
+# The API serves admin units down to level 2, and the roll-up
+# (rollup_by_gadm_and_convert_to_aoi) handles only levels 0-2.
+MAX_ADMIN_LEVEL = 2
 # layers sampled at each alert pixel, by column name
 LAYER_URIS = {
     "natural_lands_class": sbtn_natural_lands_zarr_uri,
@@ -114,12 +117,16 @@ def compute_admin_zonal_stats(
     result_uri: str,
     bbox: Optional[Polygon] = None,
 ) -> Dict:
-    """Compute integrated alerts zonal statistics for admin units (GADM) and
-    write them to result_uri. Only units without children are computed from
-    pixels; every parent is summed from its children, one country at a time, as
-    in the rasterized GADM results. A parent whose children don't cover it all
-    gets only its children's totals."""
-    parents = parent_ids(aoi_source.read_attributes(["aoi_id"])["aoi_id"])
+    """Compute integrated alerts zonal statistics for GADM admin units down to
+    MAX_ADMIN_LEVEL and write them to result_uri.
+
+    Only units without children are computed from pixels. Parents are summed
+    from their children, as in the rasterized GADM results, so a parent that
+    its children don't fully cover gets only their totals."""
+    admin_aois = aoi_source.read_attributes(["aoi_id", "adm_level"])
+    up_to_max_level = admin_aois["adm_level"] <= MAX_ADMIN_LEVEL
+    parents = parent_ids(admin_aois.loc[up_to_max_level, "aoi_id"])
+    aois_beyond_max_level = admin_aois.loc[~up_to_max_level, "aoi_id"]
     return compute_zonal_stats(
         aoi_source,
         list_alert_tiles_with_bounds(alerts_zarr_uri, bbox),
@@ -130,7 +137,7 @@ def compute_admin_zonal_stats(
         schema=RESULT_SCHEMA,
         result_uri=result_uri,
         metadata={"alerts_version": version},
-        exclude_ids=parents,
+        exclude_ids=parents.union(aois_beyond_max_level),
         bucket_key=country,
     )
 

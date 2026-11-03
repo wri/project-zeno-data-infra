@@ -307,6 +307,30 @@ def test_admin_results_roll_up_to_the_raster_totals(inputs, monkeypatch):
     assert summary["aois"] == 4  # AAA.1.1, AAA.1.2, AAA.2 and BBB.1
 
 
+def test_admin_aois_below_max_admin_level_are_not_computed(inputs):
+    # Level 3 AOIs under AAA.1.1, which is still computed from pixels.
+    aois_beyond_max_level = {
+        "AAA.1.1.1": (3, box(10.0, 0.994, 10.0015, 0.9955)),
+        "AAA.1.1.2": (3, box(10.0, 0.9955, 10.0015, 0.997)),
+    }
+    admin_aois = {**ADMIN_UNITS, **aois_beyond_max_level}
+    source = write_geoparquet_source(
+        inputs["tmp_path"],
+        {aoi_id: geometry for aoi_id, (_, geometry) in admin_aois.items()},
+        "admin",
+        adm_level=[level for level, _ in admin_aois.values()],
+    )
+    result_uri = str(inputs["tmp_path"] / "admin-integrated-alerts.parquet")
+
+    summary = compute_admin_zonal_stats(
+        source, inputs["alerts"], "v20261028", result_uri
+    )
+
+    aoi_ids = set(pq.read_table(result_uri, columns=["aoi_id"])["aoi_id"].to_pylist())
+    assert aoi_ids.isdisjoint(aois_beyond_max_level) and "AAA.1.1" in aoi_ids
+    assert summary["aois"] == 4  # AAA.1.1, AAA.1.2, AAA.2 and BBB.1
+
+
 def test_parent_ids_are_the_units_with_children():
     ids = pd.Series(["A", "A.1", "A.1.1", "A.1.2", "A.2", "B", "C", "C.1"])
 
