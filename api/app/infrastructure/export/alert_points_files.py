@@ -13,11 +13,6 @@ SHAPEFILE_COLUMN_NAMES = {
 }
 
 
-def write_alert_points_csv(points: Dict[str, list], path: Path) -> None:
-    """Write points result columns to a CSV, one row per alert."""
-    pd.DataFrame(points).to_csv(path, index=False)
-
-
 def write_alert_points_shapefile_zip(
     points: Dict[str, list], path: Path, layer: str
 ) -> None:

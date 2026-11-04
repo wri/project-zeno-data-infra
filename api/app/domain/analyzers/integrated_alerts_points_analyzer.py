@@ -80,11 +80,16 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                 truncated[aoi_id] = False
                 continue
             page = await self.points_repository.read_most_recent_points(
-                alert_points_query(
-                    analytics_in,
-                    geometry,
-                    start_date,
-                    end_date,
+                AlertPointsQuery(
+                    geometry=geometry,
+                    start_date=start_date,
+                    end_date=end_date,
+                    confidences=confidence_codes(analytics_in),
+                    natural_lands_classes=(
+                        None
+                        if analytics_in.land_filter is None
+                        else LAND_FILTER_CLASSES[analytics_in.land_filter]
+                    ),
                     limit=analytics_in.limit,
                     after=after,
                 )
@@ -139,31 +144,6 @@ def served_alerts_metadata(
     }
 
 
-def alert_points_query(
-    analytics_in: IntegratedAlertsPointsFilterIn,
-    geometry: BaseGeometry,
-    start_date: date,
-    end_date: date,
-    limit: int,
-    after: Optional[str],
-) -> AlertPointsQuery:
-    """Select the request's confidence levels and land filter classes for the
-    points in geometry between the served dates."""
-    return AlertPointsQuery(
-        geometry=geometry,
-        start_date=start_date,
-        end_date=end_date,
-        confidences=_confidence_codes(analytics_in),
-        natural_lands_classes=(
-            None
-            if analytics_in.land_filter is None
-            else LAND_FILTER_CLASSES[analytics_in.land_filter]
-        ),
-        limit=limit,
-        after=after,
-    )
-
-
 def format_points(points: pd.DataFrame) -> Dict[str, list]:
     """Convert repository points to result columns (POINTS_RESULT_COLUMNS), with
     ISO dates and confidence labels."""
@@ -178,7 +158,8 @@ def format_points(points: pd.DataFrame) -> Dict[str, list]:
     }
 
 
-def _confidence_codes(analytics_in) -> List[int]:
+def confidence_codes(analytics_in) -> List[int]:
+    """List the requested confidence codes, all of them when none are given."""
     if analytics_in.alert_confidence is None:
         return list(ALERTS_CONFIDENCE)
     return [CONFIDENCE_CODES[c] for c in analytics_in.alert_confidence]
