@@ -68,6 +68,8 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
         next_cursor = None
         # One AOI per request (validated), so one list and at most one cursor.
         for aoi_id, geometry in zip(aoi_ids, geometries):
+            # The requested dates lie outside the stored window, so nothing is
+            # served.
             if start_date > end_date:
                 truncated[aoi_id] = False
                 continue

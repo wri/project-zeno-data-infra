@@ -67,6 +67,7 @@ class IntegratedAlertsPointsDownloadAnalyzer(Analyzer):
         source = await self.points_repository.source()
         start_date, end_date = served_dates(source, analytics_in)
 
+        # The requested dates lie outside the stored window, so nothing is served.
         if start_date > end_date:
             points: Dict[str, list] = {column: [] for column in POINTS_RESULT_COLUMNS}
             more = False
