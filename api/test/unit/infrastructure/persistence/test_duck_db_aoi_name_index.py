@@ -1,157 +1,154 @@
 import json
 
+import duckdb
 import pandas as pd
 import pytest
 
 from app.domain.models.custom_aoi import CustomAoiName
-from app.infrastructure.persistence.duck_db_aoi_name_index import (
-    DuckDbAoiNameIndex,
-    NameSource,
-    PrebuiltDuckDbAoiNameIndex,
-)
+from app.infrastructure.persistence.duck_db_aoi_name_index import DuckDbAoiNameIndex
+
+WORD_SEPARATORS = r"[\s,.;:()\[\]/'\"-]+"
 
 
-def admin_source(tmp_path):
-    uri = str(tmp_path / "gadm.parquet")
-    pd.DataFrame(
-        {
-            "aoi_id": [
-                "PRY",
-                "BRA.14",
-                "BRA.18",
-                "SUR.6",
-                "USA.5.22",
-                "XXX.1",
-                "USA.48",
-                "USA.9.1",
-            ],
-            "adm_level": [0, 1, 1, 1, 2, 1, 1, 2],
-            "name_0": [
-                "Paraguay",
-                "Brazil",
-                "Brazil",
-                "Suriname",
-                "United States",
-                "Ex",
-                "United States",
-                "United States",
-            ],
-            "name_1": [
-                None,
-                "Pará",
-                "Paraná",
-                "Para",
-                "California",
-                "Para",
-                "Washington",
-                "District of Columbia",
-            ],
-            "name_2": [
-                None,
-                None,
-                None,
-                None,
-                "Yosemite West",
-                None,
-                None,
-                "District of Columbia",
-            ],
-            "varname_1": [None, "Grão-Pará", None, None, None, None, None, None],
-            "is_disputed": [False, False, False, False, False, True, False, False],
-            "area_ha": [4.0e7, 1.2e8, 2.0e7, 1.5e5, 1.0e4, 1.0, 1.8e7, 1.8e4],
-        }
-    ).to_parquet(uri)
-    return NameSource(
-        uri=uri,
-        columns=("adm_level", "name_0", "name_1", "name_2", "varname_1", "is_disputed"),
-        name="CASE adm_level WHEN 0 THEN name_0 WHEN 1 THEN name_1 ELSE name_2 END",
-        display_name=(
-            "CASE adm_level WHEN 0 THEN name_0"
-            " WHEN 1 THEN concat_ws(', ', name_1, name_0)"
-            " ELSE concat_ws(', ', name_2, name_1, name_0) END"
-        ),
-        alternate_names="CASE adm_level WHEN 1 THEN [varname_1] ELSE [] END",
-        fallback_importance=(
-            "CASE adm_level WHEN 0 THEN 0.5 WHEN 1 THEN 0.45 ELSE 0.35 END"
-        ),
-        excluded="is_disputed",
-    )
+def aoi(aoi_type, aoi_id, name, display_name, fallback_importance, area_ha):
+    return {
+        "aoi_type": aoi_type,
+        "aoi_id": aoi_id,
+        "name": name,
+        "display_name": display_name,
+        "fallback_importance": fallback_importance,
+        "area_ha": area_ha,
+    }
 
 
-def protected_area_source(tmp_path):
-    uri = str(tmp_path / "wdpa.parquet")
-    pd.DataFrame(
-        {
-            "aoi_id": ["1", "975", "4", "902780"],
-            "name": [
-                "Pari",
-                "Yosemite National Park",
-                "Parque Nacional da Amazônia",
-                "Oulanka National Park",
-            ],
-            "name_eng": [None, None, "Amazonia National Park", None],
-            "iso3": ["BRA", "USA", "BRA", "FIN"],
-            "area_ha": [10.0, 300000.0, 1000000.0, 27000.0],
-        }
-    ).to_parquet(uri)
-    return NameSource(
-        uri=uri,
-        columns=("name", "name_eng", "iso3"),
-        name="name",
-        display_name="concat_ws(', ', name, iso3)",
-        alternate_names="[name_eng]",
-        fallback_importance="0.15",
-    )
-
-
-def prebuilt(index, directory):
-    """The same index loaded from the files the AOI pipeline writes."""
+def write_index(directory, aois, alternate_names, importance):
+    """Writes the files the AOI pipeline produces, from AOIs, their alternate
+    names and their importance."""
     directory.mkdir()
+    connection = duckdb.connect()
+    connection.register("aois", pd.DataFrame(aois))
+    connection.register(
+        "alternates",
+        pd.DataFrame(alternate_names, columns=["aoi_type", "aoi_id", "name"]),
+    )
+    connection.register(
+        "raw_importance",
+        pd.DataFrame(importance, columns=["aoi_type", "aoi_id", "importance"]),
+    )
+    connection.execute(
+        "CREATE TABLE names AS SELECT *,"
+        " strip_accents(lower(display_name)) AS search_display_name FROM aois"
+    )
+    connection.execute("CREATE TABLE importance AS SELECT * FROM raw_importance")
+    connection.execute(
+        """
+        CREATE TABLE search_texts AS
+        SELECT row_number() OVER () AS text_id, aoi_type, aoi_id, is_alternate,
+            strip_accents(lower(trim(name))) AS text
+        FROM (
+            SELECT aoi_type, aoi_id, name, false AS is_alternate FROM aois
+            UNION ALL
+            SELECT aoi_type, aoi_id, name, true FROM alternates
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE text_words AS
+        SELECT DISTINCT text_id, word
+        FROM (
+            SELECT text_id, unnest(regexp_split_to_array(text, $separators)) AS word
+            FROM search_texts
+        )
+        WHERE word <> ''
+        """,
+        {"separators": WORD_SEPARATORS},
+    )
     for table in ("names", "importance", "search_texts", "text_words"):
-        index.connection.execute(f"COPY {table} TO '{directory / table}.parquet'")
+        connection.execute(f"COPY {table} TO '{directory / table}.parquet'")
     (directory / "metadata.json").write_text(
-        json.dumps({"word_separators": index.word_separators})
+        json.dumps({"word_separators": WORD_SEPARATORS})
     )
-    return PrebuiltDuckDbAoiNameIndex(str(directory))
 
 
-@pytest.fixture(params=["built at startup", "prebuilt"])
-def index(request, tmp_path):
-    built = built_index(tmp_path)
-    if request.param == "prebuilt":
-        return prebuilt(built, tmp_path / "prebuilt")
-    return built
-
-
-def built_index(tmp_path):
-    importance_uri = str(tmp_path / "importance.parquet")
-    pd.DataFrame(
-        {
-            "aoi_type": ["admin"] * 6 + ["protected_area"],
-            "aoi_id": ["PRY", "BRA.14", "BRA.18", "SUR.6", "USA.48", "USA.9.1", "975"],
-            "importance": [0.77, 0.65, 0.68, 0.44, 0.76, 0.81, 0.59],
-        }
-    ).to_parquet(importance_uri)
-    alternate_names_uri = str(tmp_path / "alternate_names.parquet")
-    pd.DataFrame(
-        {
-            "aoi_type": ["protected_area", "admin", "admin"],
-            "aoi_id": ["975", "USA.9.1", "USA.9.1"],
-            "alternate_name": [
-                "Parc national de Yosemite",
+@pytest.fixture
+def index(tmp_path):
+    directory = tmp_path / "index"
+    write_index(
+        directory,
+        [
+            aoi("admin", "PRY", "Paraguay", "Paraguay", 0.5, 4.0e7),
+            aoi("admin", "BRA.14", "Pará", "Pará, Brazil", 0.45, 1.2e8),
+            aoi("admin", "BRA.18", "Paraná", "Paraná, Brazil", 0.45, 2.0e7),
+            aoi("admin", "SUR.6", "Para", "Para, Suriname", 0.45, 1.5e5),
+            aoi(
+                "admin",
+                "USA.5.22",
+                "Yosemite West",
+                "Yosemite West, California, United States",
+                0.35,
+                1.0e4,
+            ),
+            aoi(
+                "admin",
+                "USA.48",
                 "Washington",
-                "Washington, DC",
-            ],
-        }
-    ).to_parquet(alternate_names_uri)
-    return DuckDbAoiNameIndex(
-        {
-            "admin": admin_source(tmp_path),
-            "protected_area": protected_area_source(tmp_path),
-        },
-        importance_uri=importance_uri,
-        alternate_names_uri=alternate_names_uri,
+                "Washington, United States",
+                0.45,
+                1.8e7,
+            ),
+            aoi(
+                "admin",
+                "USA.9.1",
+                "District of Columbia",
+                "District of Columbia, District of Columbia, United States",
+                0.35,
+                1.8e4,
+            ),
+            aoi("protected_area", "1", "Pari", "Pari, BRA", 0.15, 10.0),
+            aoi(
+                "protected_area",
+                "975",
+                "Yosemite National Park",
+                "Yosemite National Park, USA",
+                0.15,
+                3.0e5,
+            ),
+            aoi(
+                "protected_area",
+                "4",
+                "Parque Nacional da Amazônia",
+                "Parque Nacional da Amazônia, BRA",
+                0.15,
+                1.0e6,
+            ),
+            aoi(
+                "protected_area",
+                "902780",
+                "Oulanka National Park",
+                "Oulanka National Park, FIN",
+                0.15,
+                2.7e4,
+            ),
+        ],
+        [
+            ("admin", "BRA.14", "Grão-Pará"),
+            ("admin", "USA.9.1", "Washington"),
+            ("admin", "USA.9.1", "Washington, DC"),
+            ("protected_area", "4", "Amazonia National Park"),
+            ("protected_area", "975", "Parc national de Yosemite"),
+        ],
+        [
+            ("admin", "PRY", 0.77),
+            ("admin", "BRA.14", 0.65),
+            ("admin", "BRA.18", 0.68),
+            ("admin", "SUR.6", 0.44),
+            ("admin", "USA.48", 0.76),
+            ("admin", "USA.9.1", 0.81),
+            ("protected_area", "975", 0.59),
+        ],
     )
+    return DuckDbAoiNameIndex(str(directory))
 
 
 async def ids(index, text, aoi_types=None):
@@ -201,15 +198,10 @@ async def test_accents_and_case_are_ignored(index):
 
 
 @pytest.mark.asyncio
-async def test_alternate_names_from_the_source_find_the_aoi(index):
+async def test_alternate_names_find_the_aoi_by_its_name(index):
     matches = await index.search("grao-para", aoi_types=None, limit=1)
 
     assert [(match.aoi_id, match.name) for match in matches] == [("BRA.14", "Pará")]
-
-
-@pytest.mark.asyncio
-async def test_alternate_names_from_the_alternate_names_file_find_the_aoi(index):
-    assert (await ids(index, "parc national de yosemite"))[0] == "975"
 
 
 @pytest.mark.asyncio
@@ -225,12 +217,6 @@ async def test_only_the_requested_aoi_types_are_searched(index):
         "1",
         "902780",
     ]
-
-
-@pytest.mark.asyncio
-async def test_excluded_areas_are_never_matched(index):
-    # the disputed area is named exactly "Para"
-    assert "XXX.1" not in await ids(index, "para")
 
 
 @pytest.mark.asyncio
