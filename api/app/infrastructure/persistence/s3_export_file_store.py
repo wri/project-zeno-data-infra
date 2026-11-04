@@ -1,8 +1,8 @@
 from pathlib import Path
 
 
-class S3DownloadFileStore:
-    """Download files in an S3 bucket, handed to users as presigned URLs."""
+class S3ExportFileStore:
+    """Export files in an S3 bucket, handed to users as presigned download URLs."""
 
     def __init__(self, s3_client, bucket: str):
         self._s3 = s3_client

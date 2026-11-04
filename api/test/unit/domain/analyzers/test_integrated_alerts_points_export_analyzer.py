@@ -15,9 +15,9 @@ import geopandas as gpd
 import pandas as pd
 import pytest
 
-from app.domain.analyzers import integrated_alerts_points_download_analyzer
-from app.domain.analyzers.integrated_alerts_points_download_analyzer import (
-    IntegratedAlertsPointsDownloadAnalyzer,
+from app.domain.analyzers import integrated_alerts_points_export_analyzer
+from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
+    IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.analysis import Analysis
 from app.infrastructure.persistence.parquet_alert_points_repository import (
@@ -26,7 +26,7 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
     load_alert_points_table,
 )
 from app.models.common.areas_of_interest import AdminAreaOfInterest
-from app.models.land_change.integrated_alerts import IntegratedAlertsPointsDownloadIn
+from app.models.land_change.integrated_alerts import IntegratedAlertsPointsExportIn
 
 FIRST_DAY = LATEST_DAY - DAYS_STORED + 1
 
@@ -56,14 +56,14 @@ def table_uri(tmp_path, points):
     load_alert_points_table.cache_clear()
 
 
-async def _download(table_uri, **request):
+async def _export(table_uri, **request):
     file_store = InMemoryFileStore()
-    analyzer = IntegratedAlertsPointsDownloadAnalyzer(
+    analyzer = IntegratedAlertsPointsExportAnalyzer(
         points_repository=ParquetAlertPointsRepository(table_uri),
         file_store=file_store,
         geometry_repository=FakeGeometryRepository(),
     )
-    analytics_in = IntegratedAlertsPointsDownloadIn(
+    analytics_in = IntegratedAlertsPointsExportIn(
         aoi=AdminAreaOfInterest(ids=["BRA.14.87"]), **request
     )
     analysis = Analysis(metadata=analytics_in.model_dump(), result=None, status=None)
@@ -90,10 +90,8 @@ def _expected_rows(points, start_day, end_day, confidences, classes):
 
 
 @pytest.mark.asyncio
-async def test_download_csv_has_one_row_per_alert_with_points_columns(
-    table_uri, points
-):
-    analysis, content, content_type = await _download(
+async def test_export_csv_has_one_row_per_alert_with_points_columns(table_uri, points):
+    analysis, content, content_type = await _export(
         table_uri,
         format="csv",
         alert_confidence=["high", "highest"],
@@ -111,16 +109,16 @@ async def test_download_csv_has_one_row_per_alert_with_points_columns(
         f"integrated_alerts_BRA.14.87_{day_to_date(FIRST_DAY)}_2026-10-16.csv"
     )
     assert analysis.result["file_key"].startswith(
-        "integrated_alerts_points_download/v20261018/"
+        "integrated_alerts_points_export/v20261018/"
     )
     assert analysis.metadata["truncated"] == {"BRA.14.87": False}
 
 
 @pytest.mark.asyncio
-async def test_download_shapefile_zip_holds_point_layer_with_short_column_names(
+async def test_export_shapefile_zip_holds_point_layer_with_short_column_names(
     table_uri, points
 ):
-    analysis, content, content_type = await _download(table_uri, format="shp")
+    analysis, content, content_type = await _export(table_uri, format="shp")
 
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         names = archive.namelist()
@@ -144,12 +142,12 @@ async def test_download_shapefile_zip_holds_point_layer_with_short_column_names(
 
 
 @pytest.mark.asyncio
-async def test_download_is_truncated_past_max_points(table_uri, points, monkeypatch):
+async def test_export_is_truncated_past_max_points(table_uri, points, monkeypatch):
     monkeypatch.setattr(
-        integrated_alerts_points_download_analyzer, "POINTS_DOWNLOAD_MAX_POINTS", 25
+        integrated_alerts_points_export_analyzer, "POINTS_EXPORT_MAX_POINTS", 25
     )
 
-    analysis, content, _ = await _download(table_uri, format="csv")
+    analysis, content, _ = await _export(table_uri, format="csv")
 
     csv = pd.read_csv(io.BytesIO(content))
     expected = _expected_rows(points, FIRST_DAY, LATEST_DAY, [2, 3, 4], None)
@@ -158,8 +156,8 @@ async def test_download_is_truncated_past_max_points(table_uri, points, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_download_dates_are_clipped_to_stored_window(table_uri, points):
-    analysis, content, _ = await _download(
+async def test_export_dates_are_clipped_to_stored_window(table_uri, points):
+    analysis, content, _ = await _export(
         table_uri,
         format="csv",
         start_date=day_to_date(LATEST_DAY - 1).isoformat(),
@@ -174,13 +172,13 @@ async def test_download_dates_are_clipped_to_stored_window(table_uri, points):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("download_format", ["csv", "shp"])
-async def test_download_outside_stored_window_writes_an_empty_file(
-    table_uri, download_format
+@pytest.mark.parametrize("export_format", ["csv", "shp"])
+async def test_export_outside_stored_window_writes_an_empty_file(
+    table_uri, export_format
 ):
-    analysis, content, _ = await _download(
+    analysis, content, _ = await _export(
         table_uri,
-        format=download_format,
+        format=export_format,
         start_date="2024-01-01",
         end_date="2024-12-31",
     )

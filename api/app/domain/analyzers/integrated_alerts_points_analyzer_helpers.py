@@ -1,4 +1,4 @@
-"""Helpers shared by the integrated alerts points and points download
+"""Helpers shared by the integrated alerts points and points export
 analyzers."""
 
 from datetime import date, datetime
@@ -12,7 +12,7 @@ from app.domain.repositories.alert_points_repository import AlertPointsSource
 from app.models.land_change.integrated_alerts import IntegratedAlertsPointsFilterIn
 
 CONFIDENCE_CODES = {label: code for code, label in ALERTS_CONFIDENCE.items()}
-# Columns of a points result, as served by /points and written to downloads
+# Columns of a points result, as served by /points and written to exports
 POINTS_RESULT_COLUMNS = [
     "lat",
     "lon",

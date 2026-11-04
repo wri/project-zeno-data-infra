@@ -28,21 +28,21 @@ from app.infrastructure.export.alert_points_files import (
     write_alert_points_shapefile_zip,
 )
 from app.models.land_change.integrated_alerts import (
-    POINTS_DOWNLOAD_ANALYTICS_NAME,
-    POINTS_DOWNLOAD_MAX_POINTS,
-    IntegratedAlertsPointsDownloadIn,
+    POINTS_EXPORT_ANALYTICS_NAME,
+    POINTS_EXPORT_MAX_POINTS,
+    IntegratedAlertsPointsExportIn,
 )
 
-# File extension and content type of each download format
-DOWNLOAD_FILE_TYPES = {
+# File extension and content type of each export format
+EXPORT_FILE_TYPES = {
     "csv": ("csv", "text/csv"),
     "shp": ("zip", "application/zip"),
 }
 
 
-class IntegratedAlertsPointsDownloadAnalyzer(Analyzer):
+class IntegratedAlertsPointsExportAnalyzer(Analyzer):
     """Write the newest integrated alert points in a GADM area (one per request),
-    up to POINTS_DOWNLOAD_MAX_POINTS, to a CSV or zipped shapefile in a download
+    up to POINTS_EXPORT_MAX_POINTS, to a CSV or zipped shapefile in an export
     file store."""
 
     def __init__(
@@ -57,9 +57,9 @@ class IntegratedAlertsPointsDownloadAnalyzer(Analyzer):
         self.input_uris = input_uris
         self.geometry_repository = geometry_repository or GadmAoiGeometryRepository()
 
-    @nr_agent.function_trace(name="IntegratedAlertsPointsDownloadAnalyzer.analyze")
+    @nr_agent.function_trace(name="IntegratedAlertsPointsExportAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
-        analytics_in = IntegratedAlertsPointsDownloadIn(**analysis.metadata)
+        analytics_in = IntegratedAlertsPointsExportIn(**analysis.metadata)
         # One AOI per request (validated).
         (aoi_id,), (geometry,) = await read_admin_geometries(
             self.geometry_repository, analytics_in
@@ -85,13 +85,13 @@ class IntegratedAlertsPointsDownloadAnalyzer(Analyzer):
                         if analytics_in.land_filter is None
                         else LAND_FILTER_CLASSES[analytics_in.land_filter]
                     ),
-                    limit=POINTS_DOWNLOAD_MAX_POINTS,
+                    limit=POINTS_EXPORT_MAX_POINTS,
                     after=None,
                 )
             )
             points, more = format_points(page.points), page.more
 
-        extension, content_type = DOWNLOAD_FILE_TYPES[analytics_in.format]
+        extension, content_type = EXPORT_FILE_TYPES[analytics_in.format]
         alerts = served_alerts_metadata(source, start_date, end_date)
         name = (
             f"integrated_alerts_{aoi_id}_"
@@ -100,11 +100,11 @@ class IntegratedAlertsPointsDownloadAnalyzer(Analyzer):
         # The request thumbprint leaves out the alerts version (it isn't kept in
         # the metadata), so the version keeps each version's file apart.
         file_key = (
-            f"{POINTS_DOWNLOAD_ANALYTICS_NAME}/{source.version}/"
+            f"{POINTS_EXPORT_ANALYTICS_NAME}/{source.version}/"
             f"{analytics_in.thumbprint()}.{extension}"
         )
-        with tempfile.TemporaryDirectory() as download_dir:
-            path = Path(download_dir) / f"{name}.{extension}"
+        with tempfile.TemporaryDirectory() as export_dir:
+            path = Path(export_dir) / f"{name}.{extension}"
             # Writing up to a million rows blocks, so it runs in a thread.
             if analytics_in.format == "csv":
                 await asyncio.to_thread(pd.DataFrame(points).to_csv, path, index=False)

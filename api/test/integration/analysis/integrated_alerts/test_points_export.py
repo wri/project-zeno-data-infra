@@ -11,8 +11,8 @@ import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
-from app.domain.analyzers.integrated_alerts_points_download_analyzer import (
-    IntegratedAlertsPointsDownloadAnalyzer,
+from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
+    IntegratedAlertsPointsExportAnalyzer,
 )
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -22,12 +22,12 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
     build_points_input_uris,
 )
 from app.main import app
-from app.models.land_change.integrated_alerts import POINTS_DOWNLOAD_ANALYTICS_NAME
+from app.models.land_change.integrated_alerts import POINTS_EXPORT_ANALYTICS_NAME
 from app.routers.land_change.integrated_alerts import integrated_alerts
 from app.use_cases.analysis.analysis_service import AnalysisService
 
 
-class InMemoryDownloadFileStore:
+class InMemoryExportFileStore:
     def __init__(self):
         self.files = {}
 
@@ -39,28 +39,28 @@ class InMemoryDownloadFileStore:
 
 
 def get_file_system_analysis_repository():
-    return FileSystemAnalysisRepository(POINTS_DOWNLOAD_ANALYTICS_NAME)
+    return FileSystemAnalysisRepository(POINTS_EXPORT_ANALYTICS_NAME)
 
 
-async def download_points(request_body, file_store):
-    def download_service() -> AnalysisService:
+async def export_points(request_body, file_store):
+    def export_service() -> AnalysisService:
         return AnalysisService(
             analysis_repository=get_file_system_analysis_repository(),
-            analyzer=IntegratedAlertsPointsDownloadAnalyzer(
+            analyzer=IntegratedAlertsPointsExportAnalyzer(
                 points_repository=ParquetAlertPointsRepository(TABLE_URI),
                 file_store=file_store,
                 input_uris=build_points_input_uris(VERSION),
             ),
-            event=POINTS_DOWNLOAD_ANALYTICS_NAME,
+            event=POINTS_EXPORT_ANALYTICS_NAME,
         )
 
     app.dependency_overrides[
-        integrated_alerts.create_points_download_analysis_service
-    ] = download_service
+        integrated_alerts.create_points_export_analysis_service
+    ] = export_service
     app.dependency_overrides[
-        integrated_alerts.get_points_download_analysis_repository
+        integrated_alerts.get_points_export_analysis_repository
     ] = get_file_system_analysis_repository
-    app.dependency_overrides[integrated_alerts.get_download_file_store] = (
+    app.dependency_overrides[integrated_alerts.get_export_file_store] = (
         lambda: file_store
     )
     app.dependency_overrides[integrated_alerts.get_latest_integrated_alerts_version] = (
@@ -72,7 +72,7 @@ async def download_points(request_body, file_store):
                 transport=ASGITransport(app), base_url="http://testserver"
             ) as client:
                 created = await client.post(
-                    "/v0/land_change/integrated_alerts/points/download",
+                    "/v0/land_change/integrated_alerts/points/exports",
                     json=request_body,
                 )
                 assert created.status_code == 202
@@ -88,16 +88,18 @@ async def download_points(request_body, file_store):
 
 
 @pytest.mark.asyncio
-async def test_downloaded_csv_holds_the_same_rows_as_points():
+async def test_exported_csv_holds_the_same_rows_as_points():
     aoi = {"type": "admin", "ids": ["BRA.14.87"]}
-    file_store = InMemoryDownloadFileStore()
+    file_store = InMemoryExportFileStore()
 
-    download = await download_points({"aoi": aoi, "format": "csv"}, file_store)
+    points_export = await export_points({"aoi": aoi, "format": "csv"}, file_store)
     points = await get_points({"aoi": aoi, "limit": 10_000})
 
-    assert download["status"] == "saved"
-    assert download["metadata"]["alerts"] == points["metadata"]["alerts"]
-    csv = pd.read_csv(io.BytesIO(file_store.files[download["result"]["download_url"]]))
+    assert points_export["status"] == "saved"
+    assert points_export["metadata"]["alerts"] == points["metadata"]["alerts"]
+    csv = pd.read_csv(
+        io.BytesIO(file_store.files[points_export["result"]["download_url"]])
+    )
     expected = pd.DataFrame(points["result"])
-    assert len(csv) == download["result"]["point_count"] > 0
+    assert len(csv) == points_export["result"]["point_count"] > 0
     pd.testing.assert_frame_equal(csv.head(len(expected)), expected, check_dtype=False)

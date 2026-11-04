@@ -16,8 +16,8 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
-from app.domain.analyzers.integrated_alerts_points_download_analyzer import (
-    IntegratedAlertsPointsDownloadAnalyzer,
+from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
+    IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
@@ -33,15 +33,15 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
     ParquetAlertPointsRepository,
     build_points_input_uris,
 )
-from app.infrastructure.persistence.s3_download_file_store import (
-    S3DownloadFileStore,
+from app.infrastructure.persistence.s3_export_file_store import (
+    S3ExportFileStore,
 )
 from app.models.common.analysis import AnalysisStatus, AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.integrated_alerts import (
     ANALYTICS_NAME,
     POINTS_ANALYTICS_NAME,
-    POINTS_DOWNLOAD_ANALYTICS_NAME,
+    POINTS_EXPORT_ANALYTICS_NAME,
     IntegratedAlertsAnalytics,
     IntegratedAlertsAnalyticsIn,
     IntegratedAlertsAnalyticsResponse,
@@ -49,9 +49,9 @@ from app.models.land_change.integrated_alerts import (
     IntegratedAlertsLatestResponse,
     IntegratedAlertsPoints,
     IntegratedAlertsPointsAnalyticsIn,
-    IntegratedAlertsPointsDownload,
-    IntegratedAlertsPointsDownloadIn,
-    IntegratedAlertsPointsDownloadResponse,
+    IntegratedAlertsPointsExport,
+    IntegratedAlertsPointsExportIn,
+    IntegratedAlertsPointsExportResponse,
     IntegratedAlertsPointsResponse,
     decode_cursor,
 )
@@ -315,47 +315,47 @@ async def get_integrated_alerts_points_result(
 DOWNLOAD_URL_EXPIRES_SECONDS = 3600
 
 
-def get_points_download_analysis_repository(request: Request) -> AnalysisRepository:
+def get_points_export_analysis_repository(request: Request) -> AnalysisRepository:
     return AwsDynamoDbS3AnalysisRepository(
-        POINTS_DOWNLOAD_ANALYTICS_NAME,
+        POINTS_EXPORT_ANALYTICS_NAME,
         request.app.state.dynamodb_table,
         request.app.state.s3_client,
     )
 
 
-def get_download_file_store(request: Request) -> S3DownloadFileStore:
+def get_export_file_store(request: Request) -> S3ExportFileStore:
     if RESULTS_BUCKET_NAME is None:
         raise RuntimeError("ANALYSIS_RESULTS_BUCKET_NAME is not set.")
-    return S3DownloadFileStore(request.app.state.s3_client, RESULTS_BUCKET_NAME)
+    return S3ExportFileStore(request.app.state.s3_client, RESULTS_BUCKET_NAME)
 
 
-def create_points_download_analysis_service(
+def create_points_export_analysis_service(
     analysis_repository: AnalysisRepository = Depends(
-        get_points_download_analysis_repository
+        get_points_export_analysis_repository
     ),
-    file_store: S3DownloadFileStore = Depends(get_download_file_store),
+    file_store: S3ExportFileStore = Depends(get_export_file_store),
     version: str = Depends(get_latest_integrated_alerts_version),
 ) -> AnalysisService:
     input_uris = build_points_input_uris(version)
     return AnalysisService(
         analysis_repository=analysis_repository,
-        analyzer=IntegratedAlertsPointsDownloadAnalyzer(
+        analyzer=IntegratedAlertsPointsExportAnalyzer(
             points_repository=ParquetAlertPointsRepository(
                 input_uris["alert_points_table_uri"]
             ),
             file_store=file_store,
             input_uris=input_uris,
         ),
-        event=POINTS_DOWNLOAD_ANALYTICS_NAME,
+        event=POINTS_EXPORT_ANALYTICS_NAME,
     )
 
 
 @router.post(
-    "/points/download",
+    "/points/exports",
     response_class=ORJSONResponse,
     response_model=DataMartResourceLinkResponse,
     status_code=202,
-    summary="Create Integrated Alerts Points Download Task",
+    summary="Create Integrated Alerts Points Export Task",
     description=(
         "Write the integrated alerts in one GADM area to a CSV or zipped "
         "shapefile, one row per alert pixel with the same columns as `/points`, "
@@ -366,12 +366,12 @@ def create_points_download_analysis_service(
         "fresh one."
     ),
 )
-async def create_points_download(
+async def create_points_export(
     *,
-    data: IntegratedAlertsPointsDownloadIn,
+    data: IntegratedAlertsPointsExportIn,
     request: Request,
     background_tasks: BackgroundTasks,
-    service: AnalysisService = Depends(create_points_download_analysis_service),
+    service: AnalysisService = Depends(create_points_export_analysis_service),
     version: str = Depends(get_latest_integrated_alerts_version),
 ):
     data._version = version
@@ -380,44 +380,47 @@ async def create_points_download(
         service=service,
         request=request,
         background_tasks=background_tasks,
-        resource_link_callback=_points_download_resource_link_response,
+        resource_link_callback=_points_export_resource_link_response,
     )
 
 
-def _points_download_resource_link_response(request, service) -> str:
+def _points_export_resource_link_response(request, service) -> str:
     return str(
         request.url_for(
-            "get_integrated_alerts_points_download_result",
+            "get_integrated_alerts_points_export_result",
             resource_id=service.resource_thumbprint(),
         )
     )
 
 
 @router.get(
-    "/points/download/{resource_id}",
+    "/points/exports/{resource_id}",
     response_class=ORJSONResponse,
-    response_model=IntegratedAlertsPointsDownloadResponse,
+    response_model=IntegratedAlertsPointsExportResponse,
     status_code=200,
 )
-async def get_integrated_alerts_points_download_result(
+async def get_integrated_alerts_points_export_result(
     resource_id: UUID5,
     response: FastAPIResponse,
     analysis_repository: AnalysisRepository = Depends(
-        get_points_download_analysis_repository
+        get_points_export_analysis_repository
     ),
-    file_store: S3DownloadFileStore = Depends(get_download_file_store),
+    file_store: S3ExportFileStore = Depends(get_export_file_store),
 ):
     analytics_out: AnalyticsOut = await get_analysis(
         resource_id=resource_id,
         analysis_repository=analysis_repository,
         response=response,
     )
-    download = IntegratedAlertsPointsDownload(**analytics_out.model_dump())
-    if download.status == AnalysisStatus.saved and download.result is not None:
+    points_export = IntegratedAlertsPointsExport(**analytics_out.model_dump())
+    if (
+        points_export.status == AnalysisStatus.saved
+        and points_export.result is not None
+    ):
         # The stored result keeps the file's key; links are made per request so
         # a cached result never hands out an expired one.
-        stored = download.result
-        download.result = {
+        stored = points_export.result
+        points_export.result = {
             "download_url": await file_store.presign_download_url(
                 stored["file_key"],
                 stored["filename"],
@@ -427,4 +430,4 @@ async def get_integrated_alerts_points_download_result(
             "format": stored["format"],
             "point_count": stored["point_count"],
         }
-    return IntegratedAlertsPointsDownloadResponse(data=download, status="success")
+    return IntegratedAlertsPointsExportResponse(data=points_export, status="success")

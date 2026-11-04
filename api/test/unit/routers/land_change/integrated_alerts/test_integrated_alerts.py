@@ -8,8 +8,8 @@ from fastapi.testclient import TestClient
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
-from app.domain.analyzers.integrated_alerts_points_download_analyzer import (
-    IntegratedAlertsPointsDownloadAnalyzer,
+from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
+    IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.environment import Environment
 from app.infrastructure.persistence.file_system_analysis_repository import (
@@ -22,7 +22,7 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
 from app.main import app
 from app.models.land_change.integrated_alerts import (
     POINTS_ANALYTICS_NAME,
-    POINTS_DOWNLOAD_ANALYTICS_NAME,
+    POINTS_EXPORT_ANALYTICS_NAME,
     IntegratedAlertsPointsAnalyticsIn,
     PointsCursor,
     encode_cursor,
@@ -239,7 +239,7 @@ def test_points_post_then_get_returns_points(tmp_path):
     assert data["metadata"]["next_cursor"] is not None
 
 
-class FakeDownloadFileStore:
+class FakeExportFileStore:
     def __init__(self):
         self.files = {}
 
@@ -262,18 +262,18 @@ class FakeDownloadFileStore:
     ],
     ids=["no_format", "two_aois", "unknown_format"],
 )
-def test_download_request_without_one_aoi_and_a_known_format_gets_422(
+def test_export_request_without_one_aoi_and_a_known_format_gets_422(
     request_body,
 ):
     app.dependency_overrides[integrated_alerts.get_latest_integrated_alerts_version] = (
         lambda: "v20261018"
     )
     app.dependency_overrides[
-        integrated_alerts.create_points_download_analysis_service
+        integrated_alerts.create_points_export_analysis_service
     ] = lambda: None
     try:
         response = client.post(
-            "/v0/land_change/integrated_alerts/points/download", json=request_body
+            "/v0/land_change/integrated_alerts/points/exports", json=request_body
         )
     finally:
         app.dependency_overrides.clear()
@@ -281,26 +281,26 @@ def test_download_request_without_one_aoi_and_a_known_format_gets_422(
     assert response.status_code == 422
 
 
-def test_download_post_then_get_returns_a_fresh_download_url(tmp_path):
+def test_export_post_then_get_returns_a_fresh_download_url(tmp_path):
     load_alert_points_table.cache_clear()
     table_uri = write_points_table(tmp_path / "by-date.parquet", make_points())
-    repository = FileSystemAnalysisRepository(POINTS_DOWNLOAD_ANALYTICS_NAME)
-    file_store = FakeDownloadFileStore()
+    repository = FileSystemAnalysisRepository(POINTS_EXPORT_ANALYTICS_NAME)
+    file_store = FakeExportFileStore()
 
     class FakeGeometryRepository:
         async def load(self, aoi_type, aoi_ids):
             return [aoi_polygon()] * len(aoi_ids), [0] * len(aoi_ids)
 
-    def download_service():
+    def export_service():
         return AnalysisService(
             analysis_repository=repository,
-            analyzer=IntegratedAlertsPointsDownloadAnalyzer(
+            analyzer=IntegratedAlertsPointsExportAnalyzer(
                 points_repository=ParquetAlertPointsRepository(table_uri),
                 file_store=file_store,
                 input_uris={"alert_points_table_uri": table_uri},
                 geometry_repository=FakeGeometryRepository(),
             ),
-            event=POINTS_DOWNLOAD_ANALYTICS_NAME,
+            event=POINTS_EXPORT_ANALYTICS_NAME,
         )
 
     request = {"aoi": {"type": "admin", "ids": ["BRA.14.87"]}, "format": "csv"}
@@ -308,31 +308,31 @@ def test_download_post_then_get_returns_a_fresh_download_url(tmp_path):
         lambda: "v20261018"
     )
     app.dependency_overrides[
-        integrated_alerts.create_points_download_analysis_service
-    ] = download_service
+        integrated_alerts.create_points_export_analysis_service
+    ] = export_service
     app.dependency_overrides[
-        integrated_alerts.get_points_download_analysis_repository
+        integrated_alerts.get_points_export_analysis_repository
     ] = lambda: repository
-    app.dependency_overrides[integrated_alerts.get_download_file_store] = (
+    app.dependency_overrides[integrated_alerts.get_export_file_store] = (
         lambda: file_store
     )
     try:
         created = client.post(
-            "/v0/land_change/integrated_alerts/points/download", json=request
+            "/v0/land_change/integrated_alerts/points/exports", json=request
         )
         link = created.json()["data"]["link"]
         resource_id = link.rsplit("/", 1)[1]
         result = client.get(
-            f"/v0/land_change/integrated_alerts/points/download/{resource_id}"
+            f"/v0/land_change/integrated_alerts/points/exports/{resource_id}"
         )
     finally:
         app.dependency_overrides.clear()
         load_alert_points_table.cache_clear()
-        delete_resource_files(POINTS_DOWNLOAD_ANALYTICS_NAME, resource_id)
+        delete_resource_files(POINTS_EXPORT_ANALYTICS_NAME, resource_id)
 
     assert created.status_code == 202
     assert link.startswith(
-        "http://testserver/v0/land_change/integrated_alerts/points/download/"
+        "http://testserver/v0/land_change/integrated_alerts/points/exports/"
     )
     data = result.json()["data"]
     assert data["status"] == "saved"

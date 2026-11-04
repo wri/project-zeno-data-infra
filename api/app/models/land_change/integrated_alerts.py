@@ -20,9 +20,9 @@ from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "integrated_alerts"
 POINTS_ANALYTICS_NAME = "integrated_alerts_points"
-POINTS_DOWNLOAD_ANALYTICS_NAME = "integrated_alerts_points_download"
-# Keeps shapefiles far below the 2 GB DBF limit and a download's memory bounded.
-POINTS_DOWNLOAD_MAX_POINTS = 1_000_000
+POINTS_EXPORT_ANALYTICS_NAME = "integrated_alerts_points_export"
+# Keeps shapefiles far below the 2 GB DBF limit and an export's memory bounded.
+POINTS_EXPORT_MAX_POINTS = 1_000_000
 POINTS_DEFAULT_LIMIT = 1000
 POINTS_MAX_LIMIT = 10_000
 # Raising this also needs one next_cursor per AOI in the result metadata.
@@ -290,8 +290,8 @@ class IntegratedAlertsPointsResponse(Response):
     data: IntegratedAlertsPoints
 
 
-class IntegratedAlertsPointsDownloadIn(IntegratedAlertsPointsFilterIn):
-    _analytics_name: str = PrivateAttr(default=POINTS_DOWNLOAD_ANALYTICS_NAME)
+class IntegratedAlertsPointsExportIn(IntegratedAlertsPointsFilterIn):
+    _analytics_name: str = PrivateAttr(default=POINTS_EXPORT_ANALYTICS_NAME)
     _version: str = PrivateAttr(default="v20261018")
     format: Literal["csv", "shp"] = Field(
         ...,
@@ -305,7 +305,7 @@ class IntegratedAlertsPointsDownloadIn(IntegratedAlertsPointsFilterIn):
     )
 
 
-class IntegratedAlertsPointsDownload(StrictBaseModel):
+class IntegratedAlertsPointsExport(StrictBaseModel):
     result: Optional[dict] = {
         "download_url": "https://gnw-analytics-api-analysis-results.s3.amazonaws.com/",
         "filename": "integrated_alerts_BRA.1.12_2026-10-01_2026-10-16.csv",
@@ -322,8 +322,8 @@ class IntegratedAlertsPointsDownload(StrictBaseModel):
     }
 
 
-class IntegratedAlertsPointsDownloadResponse(Response):
-    data: IntegratedAlertsPointsDownload
+class IntegratedAlertsPointsExportResponse(Response):
+    data: IntegratedAlertsPointsExport
 
 
 class IntegratedAlertsLatest(StrictBaseModel):
