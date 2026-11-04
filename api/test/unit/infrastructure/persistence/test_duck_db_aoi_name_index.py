@@ -15,8 +15,17 @@ def admin_source(tmp_path):
     uri = str(tmp_path / "gadm.parquet")
     pd.DataFrame(
         {
-            "aoi_id": ["PRY", "BRA.14", "BRA.18", "SUR.6", "USA.5.22", "XXX.1"],
-            "adm_level": [0, 1, 1, 1, 2, 1],
+            "aoi_id": [
+                "PRY",
+                "BRA.14",
+                "BRA.18",
+                "SUR.6",
+                "USA.5.22",
+                "XXX.1",
+                "USA.48",
+                "USA.9.1",
+            ],
+            "adm_level": [0, 1, 1, 1, 2, 1, 1, 2],
             "name_0": [
                 "Paraguay",
                 "Brazil",
@@ -24,12 +33,32 @@ def admin_source(tmp_path):
                 "Suriname",
                 "United States",
                 "Ex",
+                "United States",
+                "United States",
             ],
-            "name_1": [None, "Pará", "Paraná", "Para", "California", "Para"],
-            "name_2": [None, None, None, None, "Yosemite West", None],
-            "varname_1": [None, "Grão-Pará", None, None, None, None],
-            "is_disputed": [False, False, False, False, False, True],
-            "area_ha": [4.0e7, 1.2e8, 2.0e7, 1.5e5, 1.0e4, 1.0],
+            "name_1": [
+                None,
+                "Pará",
+                "Paraná",
+                "Para",
+                "California",
+                "Para",
+                "Washington",
+                "District of Columbia",
+            ],
+            "name_2": [
+                None,
+                None,
+                None,
+                None,
+                "Yosemite West",
+                None,
+                None,
+                "District of Columbia",
+            ],
+            "varname_1": [None, "Grão-Pará", None, None, None, None, None, None],
+            "is_disputed": [False, False, False, False, False, True, False, False],
+            "area_ha": [4.0e7, 1.2e8, 2.0e7, 1.5e5, 1.0e4, 1.0, 1.8e7, 1.8e4],
         }
     ).to_parquet(uri)
     return NameSource(
@@ -98,17 +127,21 @@ def built_index(tmp_path):
     importance_uri = str(tmp_path / "importance.parquet")
     pd.DataFrame(
         {
-            "aoi_type": ["admin"] * 4 + ["protected_area"],
-            "aoi_id": ["PRY", "BRA.14", "BRA.18", "SUR.6", "975"],
-            "importance": [0.77, 0.65, 0.68, 0.44, 0.59],
+            "aoi_type": ["admin"] * 6 + ["protected_area"],
+            "aoi_id": ["PRY", "BRA.14", "BRA.18", "SUR.6", "USA.48", "USA.9.1", "975"],
+            "importance": [0.77, 0.65, 0.68, 0.44, 0.76, 0.81, 0.59],
         }
     ).to_parquet(importance_uri)
     alternate_names_uri = str(tmp_path / "alternate_names.parquet")
     pd.DataFrame(
         {
-            "aoi_type": ["protected_area"],
-            "aoi_id": ["975"],
-            "alternate_name": ["Parc national de Yosemite"],
+            "aoi_type": ["protected_area", "admin", "admin"],
+            "aoi_id": ["975", "USA.9.1", "USA.9.1"],
+            "alternate_name": [
+                "Parc national de Yosemite",
+                "Washington",
+                "Washington, DC",
+            ],
         }
     ).to_parquet(alternate_names_uri)
     return DuckDbAoiNameIndex(
@@ -149,6 +182,17 @@ async def test_a_famous_park_beats_an_obscure_admin_area_with_a_similar_name(ind
 @pytest.mark.asyncio
 async def test_text_after_a_comma_prefers_places_within_it(index):
     assert (await ids(index, "pará, brazil"))[:3] == ["BRA.14", "BRA.18", "SUR.6"]
+
+
+@pytest.mark.asyncio
+async def test_a_misspelled_place_after_a_comma_still_prefers_places_within_it(index):
+    assert (await ids(index, "pará, brazl"))[:3] == ["BRA.14", "BRA.18", "SUR.6"]
+
+
+@pytest.mark.asyncio
+async def test_a_name_matching_the_whole_query_with_its_comma_ranks_first(index):
+    # the state is named exactly "Washington"; DC's alternate is "Washington, DC"
+    assert (await ids(index, "washington, dc"))[:2] == ["USA.9.1", "USA.48"]
 
 
 @pytest.mark.asyncio

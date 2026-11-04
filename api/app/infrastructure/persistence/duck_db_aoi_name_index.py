@@ -60,6 +60,20 @@ class DuckDbAoiNameSearch(AoiNameIndex):
             "CREATE TABLE vocabulary AS"
             " SELECT word, count(*) AS texts FROM text_words GROUP BY word"
         )
+        self.connection.execute(
+            """
+            CREATE TABLE display_vocabulary AS
+            SELECT word, count(*) AS texts
+            FROM (
+                SELECT unnest(regexp_split_to_array(search_display_name, $separators))
+                    AS word
+                FROM names
+            )
+            WHERE word <> ''
+            GROUP BY word
+            """,
+            {"separators": word_separators},
+        )
 
     async def search(
         self,
@@ -89,6 +103,10 @@ class DuckDbAoiNameSearch(AoiNameIndex):
         }
         known_words = [
             self._known_or_nearest(cursor, word, custom_words) for word in words
+        ]
+        containing_words = [
+            self._known_or_nearest(cursor, word, custom_words, "display_vocabulary")
+            for word in self._words(cursor, containing_place)
         ]
         cursor.register(
             "custom_aois",
@@ -133,8 +151,8 @@ class DuckDbAoiNameSearch(AoiNameIndex):
             ),
             query AS (
                 SELECT strip_accents(lower(trim($place))) AS place,
-                    strip_accents(lower(trim($containing_place)))
-                        AS containing_place
+                    strip_accents(lower(trim($text))) AS whole_text,
+                    len($containing_words) > 0 AS has_containing_place
             ),
             query_words AS (
                 SELECT unnest($words) AS word,
@@ -156,7 +174,9 @@ class DuckDbAoiNameSearch(AoiNameIndex):
                             THEN CASE WHEN is_alternate THEN 0.7 ELSE 0.75 END
                         ELSE CASE WHEN is_alternate THEN 0.55 ELSE 0.6 END
                             * $word_match_weight
-                    END AS match
+                    END AS match,
+                    query.has_containing_place
+                        AND starts_with(text, query.whole_text) AS matches_whole_query
                 FROM all_texts, query
                 WHERE (
                     text = query.place
@@ -166,7 +186,8 @@ class DuckDbAoiNameSearch(AoiNameIndex):
                 AND ($aoi_types IS NULL OR list_contains($aoi_types, aoi_type))
             ),
             best_matches AS (
-                SELECT aoi_type, aoi_id, max(match) AS match
+                SELECT aoi_type, aoi_id, max(match) AS match,
+                    bool_or(matches_whole_query) AS matches_whole_query
                 FROM text_matches
                 GROUP BY aoi_type, aoi_id
             )
@@ -176,9 +197,11 @@ class DuckDbAoiNameSearch(AoiNameIndex):
             LEFT JOIN importance USING (aoi_type, aoi_id), query
             ORDER BY
                 0.5 * best_matches.match
-                + 0.2 * (query.containing_place <> ''
-                    AND contains(names.search_display_name,
-                        query.containing_place))::INTEGER
+                + 0.2 * (best_matches.matches_whole_query OR (
+                    query.has_containing_place AND NOT EXISTS (
+                        SELECT 1 FROM unnest($containing_words) AS words(word)
+                        WHERE NOT contains(names.search_display_name, words.word)
+                    )))::INTEGER
                 + 0.3 * coalesce(importance.importance,
                     names.fallback_importance) DESC,
                 names.area_ha DESC NULLS LAST
@@ -186,7 +209,8 @@ class DuckDbAoiNameSearch(AoiNameIndex):
             """,
             {
                 "place": place,
-                "containing_place": containing_place,
+                "text": text,
+                "containing_words": containing_words,
                 "words": known_words,
                 "word_match_weight": (
                     1.0 if known_words == words else self.corrected_match_weight
@@ -208,20 +232,28 @@ class DuckDbAoiNameSearch(AoiNameIndex):
             {"text": text, "separators": self.word_separators},
         ).fetchone()[0]
 
-    def _known_or_nearest(self, cursor, word: str, custom_words: Set[str]) -> str:
-        """The word itself if some name has a word starting with it, else the
-        nearest word any name has, preferring the most common. A word with no
-        near neighbour is kept, so it matches nothing."""
+    def _known_or_nearest(
+        self,
+        cursor,
+        word: str,
+        custom_words: Set[str],
+        vocabulary: str = "vocabulary",
+    ) -> str:
+        """The word itself if some word in the vocabulary starts with it, else
+        the nearest word in it, preferring the most common. A word with no near
+        neighbour is kept, so it matches nothing. Names are corrected against
+        the words of names, and places after a comma against the words of
+        display names."""
         if any(custom_word.startswith(word) for custom_word in custom_words):
             return word
         if cursor.execute(
-            "SELECT 1 FROM vocabulary WHERE starts_with(word, $word) LIMIT 1",
+            f"SELECT 1 FROM {vocabulary} WHERE starts_with(word, $word) LIMIT 1",
             {"word": word},
         ).fetchone():
             return word
         nearest = cursor.execute(
-            """
-            SELECT word FROM vocabulary
+            f"""
+            SELECT word FROM {vocabulary}
             WHERE abs(length(word) - length($word)) <= $max_edits
                 AND levenshtein(word, $word) <= $max_edits
             ORDER BY levenshtein(word, $word), texts DESC, word
