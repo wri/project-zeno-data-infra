@@ -143,9 +143,10 @@ async def profile_request(request: Request, call_next):
 
 app.include_router(land_change.router)
 app.include_router(custom_aois.router)
-# custom AOI writes are batches of large geometries, held in memory while parsed
+# Custom AOI writes are held in memory while parsed. The limit fits the largest
+# area project-zeno accepts: a shapefile of up to 200 MB uncompressed, as GeoJSON.
 app.add_middleware(
-    RequestSizeLimit, max_bytes=50 * 2**20, path_prefix="/v0/custom_aois"
+    RequestSizeLimit, max_bytes=250 * 2**20, path_prefix="/v0/custom_aois"
 )
 app.include_router(aois.router)
 

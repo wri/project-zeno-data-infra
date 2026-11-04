@@ -1,7 +1,6 @@
 import pytest
 from shapely.geometry import MultiPolygon, Polygon, box, mapping
 
-from app.domain.models.custom_aoi import MonitorStatus
 from app.models.custom_aois import CustomAoisIn
 from app.use_cases.custom_aois.custom_aoi_service import (
     CustomAoiService,
@@ -19,8 +18,6 @@ def custom_aois(*geometries_by_id):
                 "geometry": mapping(geometry),
                 "name": "My forest",
                 "user_id": "user-1",
-                "email": "owner@example.org",
-                "monitor_status": "monitored",
             }
             for aoi_id, geometry in geometries_by_id
         ]
@@ -47,12 +44,7 @@ async def test_saved_aois_are_2d_multipolygons_with_geodesic_area():
     await CustomAoiService(repository).save(custom_aois(("a", polygon_z)))
 
     stored = repository.stored["a"]
-    assert (stored.name, stored.user_id, stored.email, stored.monitor_status) == (
-        "My forest",
-        "user-1",
-        "owner@example.org",
-        MonitorStatus.monitored,
-    )
+    assert (stored.name, stored.user_id) == ("My forest", "user-1")
     assert isinstance(stored.geometry, MultiPolygon)
     assert not stored.geometry.has_z
     # a 1x1 degree cell at the equator is ~1,230,000 ha

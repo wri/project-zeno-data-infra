@@ -930,16 +930,6 @@ resource "aws_s3tables_table" "custom_aois" {
           required = true
         }
         field {
-          name     = "email"
-          type     = "string"
-          required = true
-        }
-        field {
-          name     = "monitor_status"
-          type     = "string"
-          required = true
-        }
-        field {
           name     = "geometry"
           type     = "binary"
           required = true

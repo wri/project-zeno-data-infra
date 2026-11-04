@@ -127,6 +127,14 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       TF_WORKSPACE          = terraform.workspace
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
       GEE_SERVICE_ACCOUNT_JSON = var.gee_service_account_json
+      # Custom AOI catalog (S3 Tables), as configured for the API; run_updates
+      # passes PYICEBERG_* on to the Coiled cluster.
+      PYICEBERG_CATALOG__AOIS__TYPE                 = "rest"
+      PYICEBERG_CATALOG__AOIS__URI                  = "https://s3tables.${data.aws_region.current.name}.amazonaws.com/iceberg"
+      PYICEBERG_CATALOG__AOIS__WAREHOUSE            = aws_s3tables_table_bucket.tables.arn
+      PYICEBERG_CATALOG__AOIS__REST__SIGV4_ENABLED  = "true"
+      PYICEBERG_CATALOG__AOIS__REST__SIGNING_NAME   = "s3tables"
+      PYICEBERG_CATALOG__AOIS__REST__SIGNING_REGION = data.aws_region.current.name
     }
   })
 
@@ -160,7 +168,13 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         title   = "Flow Name"
         type    = "string"
         default = "dist_update"
-        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update"]
+        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update"]
+      }
+      content_date = {
+        title       = "Content date"
+        description = "YYYY-MM-DD date up to which the data has been calculated. Required for wur_update."
+        anyOf       = [{ type = "string" }, { type = "null" }]
+        default     = null
       }
     }
   })

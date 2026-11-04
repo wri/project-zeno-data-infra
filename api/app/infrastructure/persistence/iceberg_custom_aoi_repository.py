@@ -39,16 +39,14 @@ def custom_aoi_schema() -> Schema:
         NestedField(1, "aoi_id", StringType(), required=True),
         NestedField(2, "name", StringType(), required=True),
         NestedField(3, "user_id", StringType(), required=True),
-        NestedField(4, "email", StringType(), required=True),
-        NestedField(5, "monitor_status", StringType(), required=True),
-        NestedField(6, "geometry", BinaryType(), required=True),
-        NestedField(7, "area_ha", DoubleType(), required=True),
-        NestedField(8, "xmin", DoubleType(), required=True),
-        NestedField(9, "ymin", DoubleType(), required=True),
-        NestedField(10, "xmax", DoubleType(), required=True),
-        NestedField(11, "ymax", DoubleType(), required=True),
-        NestedField(12, "s2_cell", LongType(), required=True),
-        NestedField(13, "updated_at", TimestamptzType(), required=True),
+        NestedField(4, "geometry", BinaryType(), required=True),
+        NestedField(5, "area_ha", DoubleType(), required=True),
+        NestedField(6, "xmin", DoubleType(), required=True),
+        NestedField(7, "ymin", DoubleType(), required=True),
+        NestedField(8, "xmax", DoubleType(), required=True),
+        NestedField(9, "ymax", DoubleType(), required=True),
+        NestedField(10, "s2_cell", LongType(), required=True),
+        NestedField(11, "updated_at", TimestamptzType(), required=True),
     )
 
 
@@ -155,6 +153,15 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
         by_id = {aoi.aoi_id: aoi for aoi in geometries_from_arrow(rows.to_arrow())}
         return [by_id[aoi_id] for aoi_id in aoi_ids if aoi_id in by_id]
 
+    def _names_owned_by(self, user_id: str) -> List[CustomAoiName]:
+        rows = self.table().scan(
+            row_filter=EqualTo("user_id", user_id), selected_fields=("aoi_id", "name")
+        )
+        return [
+            CustomAoiName(row["aoi_id"], row["name"])
+            for row in rows.to_arrow().to_pylist()
+        ]
+
     def _intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         """Prunes files and rows by bounding box, then keeps the AOIs that
         actually intersect the geometry."""
@@ -184,15 +191,6 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
             return In("aoi_id", unindexed)
         indexed = self.rows_for(list(cells), cells.values())
         return Or(indexed, In("aoi_id", unindexed)) if unindexed else indexed
-
-    def _names_owned_by(self, user_id: str) -> List[CustomAoiName]:
-        rows = self.table().scan(
-            row_filter=EqualTo("user_id", user_id), selected_fields=("aoi_id", "name")
-        )
-        return [
-            CustomAoiName(row["aoi_id"], row["name"])
-            for row in rows.to_arrow().to_pylist()
-        ]
 
     def cells(self, aoi_ids: List[str], fresh: bool = False) -> Dict[str, int]:
         """The indexed S2 cell of each id that has an index entry."""
@@ -267,8 +265,6 @@ def to_arrow(aois: List[CustomAoi], cell_level: int) -> pa.Table:
             "aoi_id": [aoi.aoi_id for aoi in aois],
             "name": [aoi.name for aoi in aois],
             "user_id": [aoi.user_id for aoi in aois],
-            "email": [aoi.email for aoi in aois],
-            "monitor_status": [aoi.monitor_status.value for aoi in aois],
             "geometry": [shapely.to_wkb(aoi.geometry) for aoi in aois],
             "area_ha": [aoi.area_ha for aoi in aois],
             "xmin": bounds[:, 0],

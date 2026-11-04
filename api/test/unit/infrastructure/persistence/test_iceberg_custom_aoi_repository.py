@@ -6,12 +6,7 @@ from pyiceberg.expressions import EqualTo
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from app.domain.models.custom_aoi import (
-    CustomAoi,
-    CustomAoiGeometry,
-    CustomAoiName,
-    MonitorStatus,
-)
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, CustomAoiName
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
     custom_aoi_cell_schema,
@@ -39,13 +34,7 @@ def repository(catalog):
     return IcebergCustomAoiRepository(catalog, TABLE, INDEX)
 
 
-def aoi(
-    aoi_id,
-    size=1,
-    monitor_status=MonitorStatus.not_monitored,
-    origin=(0, 0),
-    user_id="user-1",
-):
+def aoi(aoi_id, size=1, origin=(0, 0), user_id="user-1"):
     x, y = origin
     return CustomAoi(
         aoi_id,
@@ -53,8 +42,6 @@ def aoi(
         float(size),
         name=f"Area {aoi_id}",
         user_id=user_id,
-        email="owner@example.org",
-        monitor_status=monitor_status,
     )
 
 
@@ -71,17 +58,12 @@ def cell_contains(cell, lng, lat):
 @pytest.mark.asyncio
 async def test_upsert_replaces_existing_ids(repository, catalog):
     await repository.upsert([aoi("a"), aoi("b")])
-    await repository.upsert([aoi("b", 2, MonitorStatus.monitored)])
+    await repository.upsert([aoi("b", 2)])
 
     rows = rows_by_id(catalog, TABLE)
     assert sorted(rows) == ["a", "b"]
     assert rows["b"]["area_ha"] == 2.0
-    assert (
-        rows["b"]["name"],
-        rows["b"]["user_id"],
-        rows["b"]["email"],
-        rows["b"]["monitor_status"],
-    ) == ("Area b", "user-1", "owner@example.org", "monitored")
+    assert (rows["b"]["name"], rows["b"]["user_id"]) == ("Area b", "user-1")
     assert from_wkb(rows["b"]["geometry"]).area == 4.0
 
 
@@ -158,15 +140,6 @@ async def test_get_finds_aois_whose_index_entry_is_missing(catalog):
 
 
 @pytest.mark.asyncio
-async def test_names_owned_by_returns_only_that_users_aois(repository):
-    await repository.upsert([aoi("mine"), aoi("theirs", user_id="user-2")])
-
-    owned = await repository.names_owned_by("user-1")
-
-    assert owned == [CustomAoiName("mine", "Area mine")]
-
-
-@pytest.mark.asyncio
 async def test_intersecting_returns_only_aois_touching_the_geometry(repository):
     await repository.upsert(
         [
@@ -183,6 +156,15 @@ async def test_intersecting_returns_only_aois_touching_the_geometry(repository):
     found = await repository.intersecting(l_shape)
 
     assert [stored.aoi_id for stored in found] == ["touched"]
+
+
+@pytest.mark.asyncio
+async def test_names_owned_by_returns_only_that_users_aois(repository):
+    await repository.upsert([aoi("mine"), aoi("theirs", user_id="user-2")])
+
+    owned = await repository.names_owned_by("user-1")
+
+    assert owned == [CustomAoiName("mine", "Area mine")]
 
 
 @pytest.mark.asyncio

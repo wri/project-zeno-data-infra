@@ -1,12 +1,6 @@
 from dataclasses import dataclass
-from enum import Enum
 
 from shapely.geometry import MultiPolygon
-
-
-class MonitorStatus(str, Enum):
-    monitored = "monitored"
-    not_monitored = "not_monitored"
 
 
 @dataclass(frozen=True)
@@ -16,14 +10,6 @@ class CustomAoi:
     area_ha: float
     name: str
     user_id: str
-    email: str
-    monitor_status: MonitorStatus
-
-
-@dataclass(frozen=True)
-class CustomAoiName:
-    aoi_id: str
-    name: str
 
 
 @dataclass(frozen=True)
@@ -32,3 +18,9 @@ class CustomAoiGeometry:
 
     aoi_id: str
     geometry: MultiPolygon
+
+
+@dataclass(frozen=True)
+class CustomAoiName:
+    aoi_id: str
+    name: str

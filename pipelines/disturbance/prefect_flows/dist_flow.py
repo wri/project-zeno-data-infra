@@ -4,8 +4,8 @@ import boto3
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
+from pipelines.data_api import DataApiClient
 from pipelines.disturbance import prefect_flows, validate_zonal_statistics
-from pipelines.disturbance.check_for_new_alerts import get_latest_version
 from pipelines.disturbance.create_zarr import create_zarr as create_zarr_func
 from pipelines.globals import ANALYTICS_BUCKET
 
@@ -14,7 +14,7 @@ logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
 @task
 def get_new_dist_version() -> str:
-    return get_latest_version("umd_glad_dist_alerts")
+    return DataApiClient().get_latest_version("umd_glad_dist_alerts")
 
 
 @task

@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="400" fill="#ffffff"/>
+
+  <!-- Step titles -->
+  <text x="20" y="32" font-size="15" font-weight="600" fill="#111827">1 · Sum each tile in parallel</text>
+  <text x="20" y="50" font-size="12" fill="#6b7280">one Dask task per tile of the alerts grid that has alerts and AOIs</text>
+  <text x="625" y="32" font-size="15" font-weight="600" fill="#111827">2 · Add up per AOI</text>
+  <text x="625" y="50" font-size="12" fill="#6b7280">in parallel, one Dask task</text>
+  <text x="625" y="65" font-size="12" fill="#6b7280">per range of aoi_ids</text>
+  <text x="820" y="32" font-size="15" font-weight="600" fill="#111827">3 · Write the result</text>
+  <text x="820" y="50" font-size="12" fill="#6b7280">client appends in id order</text>
+
+  <!-- Alerts grid: 3 x 2 tiles -->
+  <g stroke="#9ca3af" stroke-width="1.5" fill="none">
+    <rect x="20" y="70" width="330" height="220" rx="4" fill="#f9fafb"/>
+    <line x1="130" y1="70" x2="130" y2="290"/>
+    <line x1="240" y1="70" x2="240" y2="290"/>
+    <line x1="20" y1="180" x2="350" y2="180"/>
+  </g>
+  <text x="26" y="86" font-size="10" fill="#9ca3af">tile = zarr chunk</text>
+
+  <!-- AOI polygons -->
+  <path d="M88,98 L170,92 L186,138 L150,166 L96,158 Z" fill="#4c78a8" fill-opacity="0.18" stroke="#4c78a8" stroke-width="2"/>
+  <text x="123" y="132" font-size="16" font-weight="700" fill="#2f5d8a">A</text>
+  <path d="M268,206 L322,200 L330,250 L280,262 Z" fill="#4c78a8" fill-opacity="0.18" stroke="#4c78a8" stroke-width="2"/>
+  <text x="293" y="238" font-size="16" font-weight="700" fill="#2f5d8a">B</text>
+
+  <!-- Alert pixels: counted (inside an AOI) and others -->
+  <g fill="#e7298a"><rect x="100" y="120" width="4" height="4"/><rect x="100" y="124" width="4" height="4"/><rect x="104" y="116" width="4" height="4"/><rect x="104" y="120" width="4" height="4"/><rect x="104" y="124" width="4" height="4"/><rect x="104" y="128" width="4" height="4"/><rect x="104" y="136" width="4" height="4"/><rect x="108" y="120" width="4" height="4"/><rect x="108" y="124" width="4" height="4"/><rect x="108" y="136" width="4" height="4"/><rect x="112" y="116" width="4" height="4"/><rect x="112" y="120" width="4" height="4"/><rect x="112" y="128" width="4" height="4"/><rect x="112" y="132" width="4" height="4"/><rect x="148" y="100" width="4" height="4"/><rect x="152" y="136" width="4" height="4"/><rect x="156" y="132" width="4" height="4"/><rect x="156" y="140" width="4" height="4"/><rect x="156" y="144" width="4" height="4"/><rect x="156" y="148" width="4" height="4"/><rect x="160" y="136" width="4" height="4"/><rect x="160" y="144" width="4" height="4"/><rect x="164" y="136" width="4" height="4"/><rect x="164" y="144" width="4" height="4"/><rect x="288" y="216" width="4" height="4"/><rect x="296" y="216" width="4" height="4"/><rect x="300" y="216" width="4" height="4"/><rect x="308" y="216" width="4" height="4"/><rect x="308" y="224" width="4" height="4"/><rect x="308" y="228" width="4" height="4"/><rect x="316" y="244" width="4" height="4"/><rect x="316" y="248" width="4" height="4"/></g>
+  <g fill="#e7298a" fill-opacity="0.35"><rect x="40" y="112" width="4" height="4"/><rect x="48" y="116" width="4" height="4"/><rect x="48" y="120" width="4" height="4"/><rect x="48" y="124" width="4" height="4"/><rect x="52" y="108" width="4" height="4"/><rect x="52" y="116" width="4" height="4"/><rect x="56" y="108" width="4" height="4"/><rect x="56" y="112" width="4" height="4"/><rect x="56" y="116" width="4" height="4"/><rect x="56" y="124" width="4" height="4"/><rect x="56" y="236" width="4" height="4"/><rect x="60" y="112" width="4" height="4"/><rect x="60" y="240" width="4" height="4"/><rect x="60" y="244" width="4" height="4"/><rect x="88" y="200" width="4" height="4"/><rect x="88" y="204" width="4" height="4"/><rect x="164" y="244" width="4" height="4"/><rect x="164" y="248" width="4" height="4"/><rect x="168" y="236" width="4" height="4"/><rect x="168" y="252" width="4" height="4"/><rect x="172" y="156" width="4" height="4"/><rect x="172" y="164" width="4" height="4"/><rect x="172" y="240" width="4" height="4"/><rect x="172" y="244" width="4" height="4"/><rect x="172" y="248" width="4" height="4"/><rect x="172" y="256" width="4" height="4"/><rect x="176" y="160" width="4" height="4"/><rect x="176" y="240" width="4" height="4"/><rect x="176" y="256" width="4" height="4"/><rect x="180" y="160" width="4" height="4"/><rect x="180" y="164" width="4" height="4"/><rect x="180" y="244" width="4" height="4"/><rect x="180" y="248" width="4" height="4"/><rect x="184" y="156" width="4" height="4"/><rect x="184" y="160" width="4" height="4"/><rect x="184" y="252" width="4" height="4"/><rect x="208" y="104" width="4" height="4"/><rect x="212" y="96" width="4" height="4"/><rect x="212" y="104" width="4" height="4"/><rect x="212" y="108" width="4" height="4"/><rect x="216" y="100" width="4" height="4"/><rect x="216" y="104" width="4" height="4"/><rect x="228" y="212" width="4" height="4"/><rect x="232" y="212" width="4" height="4"/><rect x="240" y="160" width="4" height="4"/><rect x="240" y="164" width="4" height="4"/><rect x="244" y="156" width="4" height="4"/><rect x="276" y="124" width="4" height="4"/><rect x="276" y="136" width="4" height="4"/><rect x="280" y="128" width="4" height="4"/><rect x="280" y="140" width="4" height="4"/><rect x="280" y="148" width="4" height="4"/><rect x="284" y="132" width="4" height="4"/><rect x="284" y="136" width="4" height="4"/><rect x="284" y="140" width="4" height="4"/><rect x="284" y="148" width="4" height="4"/><rect x="288" y="124" width="4" height="4"/><rect x="288" y="128" width="4" height="4"/><rect x="288" y="136" width="4" height="4"/><rect x="288" y="140" width="4" height="4"/><rect x="292" y="128" width="4" height="4"/><rect x="292" y="132" width="4" height="4"/><rect x="292" y="148" width="4" height="4"/><rect x="296" y="120" width="4" height="4"/><rect x="300" y="128" width="4" height="4"/><rect x="300" y="148" width="4" height="4"/><rect x="316" y="252" width="4" height="4"/><rect x="332" y="276" width="4" height="4"/><rect x="336" y="272" width="4" height="4"/><rect x="336" y="276" width="4" height="4"/></g>
+
+  <!-- Legend under the grid -->
+  <rect x="23.5" y="309.5" width="5" height="5" fill="#e7298a"/>
+  <text x="36" y="316" font-size="12" fill="#374151">alert pixel inside an AOI: counted</text>
+  <rect x="23.5" y="329.5" width="5" height="5" fill="#e7298a" fill-opacity="0.35"/>
+  <text x="36" y="336" font-size="12" fill="#374151">other alert pixels: not counted</text>
+  <text x="20" y="362" font-size="12" fill="#374151">Only alert pixels are tested against the AOIs near each tile.</text>
+  <text x="20" y="380" font-size="12" fill="#374151">A spans two tiles, so it gets a partial sum in each.</text>
+
+  <!-- Part files -->
+  <text x="430" y="86" font-size="11" fill="#6b7280">part files: sums per tile</text>
+  <g font-size="12" fill="#111827">
+    <rect x="430" y="94" width="130" height="44" rx="5" fill="#f3f4f6" stroke="#9ca3af"/>
+    <text x="440" y="112" fill="#6b7280" font-size="11">tile 1</text><text x="440" y="129">A  12 ha</text>
+    <rect x="430" y="146" width="130" height="44" rx="5" fill="#f3f4f6" stroke="#9ca3af"/>
+    <text x="440" y="164" fill="#6b7280" font-size="11">tile 2</text><text x="440" y="181">A  7 ha</text>
+    <rect x="430" y="198" width="130" height="44" rx="5" fill="#f3f4f6" stroke="#9ca3af"/>
+    <text x="440" y="216" fill="#6b7280" font-size="11">tile 6</text><text x="440" y="233">B  3 ha</text>
+  </g>
+
+  <!-- Bucket files -->
+  <text x="625" y="86" font-size="11" fill="#6b7280">bucket files: sums per AOI</text>
+  <g font-size="12" fill="#111827">
+    <rect x="625" y="112" width="150" height="56" rx="5" fill="#eef4fb" stroke="#4c78a8"/>
+    <text x="635" y="131" fill="#6b7280" font-size="11">bucket: ids A … K</text><text x="635" y="152">A  12 + 7 = 19 ha</text>
+    <rect x="625" y="192" width="150" height="56" rx="5" fill="#eef4fb" stroke="#4c78a8"/>
+    <text x="635" y="211" fill="#6b7280" font-size="11">bucket: ids L … Z</text><text x="635" y="232">B  3 ha</text>
+  </g>
+
+  <!-- Result -->
+  <g font-size="12" fill="#111827">
+    <rect x="820" y="120" width="160" height="120" rx="6" fill="#ffffff" stroke="#111827" stroke-width="1.5"/>
+    <text x="832" y="142" font-weight="600">result.parquet</text>
+    <text x="832" y="166">A  19 ha</text>
+    <text x="832" y="186">B  3 ha</text>
+    <text x="832" y="206" fill="#6b7280">…</text>
+    <text x="832" y="226" fill="#6b7280" font-size="11">sorted by aoi_id</text>
+  </g>
+
+  <!-- Arrows -->
+  <g stroke="#4b5563" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <path d="M356,180 C390,180 395,168 426,168"/>
+    <path d="M562,116 C595,116 595,135 621,135"/>
+    <path d="M562,168 C595,168 595,145 621,145"/>
+    <path d="M562,220 C595,220 595,220 621,220"/>
+    <path d="M777,140 C800,140 800,165 816,165"/>
+    <path d="M777,220 C800,220 800,195 816,195"/>
+  </g>
+</svg>

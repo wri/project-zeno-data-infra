@@ -39,8 +39,6 @@ def custom_aoi(aoi: CustomAoiIn) -> CustomAoi:
         area_ha=compute_geodesic_area_ha(geometry),
         name=aoi.name,
         user_id=aoi.user_id,
-        email=aoi.email,
-        monitor_status=aoi.monitor_status,
     )
 
 
