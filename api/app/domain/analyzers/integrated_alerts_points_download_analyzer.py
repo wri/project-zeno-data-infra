@@ -8,7 +8,7 @@ import pandas as pd
 
 from app.analysis.common.analysis import LAND_FILTER_CLASSES
 from app.domain.analyzers.analyzer import Analyzer
-from app.domain.analyzers.integrated_alerts_points_analyzer import (
+from app.domain.analyzers.integrated_alerts_points_analyzer_helpers import (
     POINTS_RESULT_COLUMNS,
     confidence_codes,
     format_points,
