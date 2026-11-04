@@ -1,8 +1,10 @@
 import asyncio
+import json
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Set
 
 import duckdb
+import fsspec
 import pyarrow as pa
 import pyarrow.parquet as parquet
 
@@ -27,7 +29,7 @@ class NameSource:
     excluded: str = "false"
 
 
-class DuckDbAoiNameIndex(AoiNameIndex):
+class DuckDbAoiNameSearch(AoiNameIndex):
     """Searches AOI names held in memory, ignoring case and accents.
 
     A name or alternate name matches when it equals the text, starts with it,
@@ -40,129 +42,20 @@ class DuckDbAoiNameIndex(AoiNameIndex):
     importance, so a well-known place can outrank a better spelled obscure one.
     Ties go to the larger area.
 
-    Importance and extra alternate names come from optional parquets keyed by
-    `aoi_type` and `aoi_id`."""
+    Searches the `names`, `importance`, `search_texts` and `text_words` tables
+    of the given connection."""
 
     def __init__(
         self,
-        sources: Dict[str, NameSource],
-        importance_uri: Optional[str] = None,
-        alternate_names_uri: Optional[str] = None,
-        word_separators: str = r"[\s,.;:()\[\]/'\"-]+",
+        connection: duckdb.DuckDBPyConnection,
+        word_separators: str,
         corrected_match_weight: float = 0.8,
         custom_aoi_importance: float = 1.0,
     ):
+        self.connection = connection
         self.word_separators = word_separators
         self.corrected_match_weight = corrected_match_weight
         self.custom_aoi_importance = custom_aoi_importance
-        self.connection = duckdb.connect()
-        self.connection.execute("CREATE SEQUENCE text_ids")
-        self.connection.execute(
-            "CREATE TABLE names (aoi_type VARCHAR, aoi_id VARCHAR, name VARCHAR,"
-            " display_name VARCHAR, fallback_importance DOUBLE, area_ha DOUBLE,"
-            " search_display_name VARCHAR)"
-        )
-        self.connection.execute(
-            "CREATE TABLE search_texts (text_id BIGINT, aoi_type VARCHAR,"
-            " aoi_id VARCHAR, is_alternate BOOLEAN, text VARCHAR)"
-        )
-        self.connection.execute(
-            "CREATE TABLE importance (aoi_type VARCHAR, aoi_id VARCHAR,"
-            " importance DOUBLE)"
-        )
-        for aoi_type, source in sources.items():
-            self._add_source(aoi_type, source)
-        if alternate_names_uri is not None:
-            self._add_alternate_names(alternate_names_uri)
-        if importance_uri is not None:
-            self._add_importance(importance_uri)
-        self._index_words()
-
-    def _add_source(self, aoi_type: str, source: NameSource) -> None:
-        raw = parquet.read_table(
-            source.uri, columns=["aoi_id", "area_ha", *source.columns]
-        )
-        self.connection.register("raw", raw)
-        self.connection.execute(
-            f"""
-            CREATE TEMP TABLE source AS
-            SELECT aoi_id, area_ha, {source.name} AS name,
-                {source.display_name} AS display_name,
-                {source.fallback_importance} AS fallback_importance,
-                {source.alternate_names} AS alternate_names
-            FROM raw
-            WHERE NOT coalesce({source.excluded}, false) AND name IS NOT NULL
-            """
-        )
-        self.connection.execute(
-            """
-            INSERT INTO names
-            SELECT ?, aoi_id, name, display_name, fallback_importance, area_ha,
-                strip_accents(lower(display_name))
-            FROM source
-            """,
-            [aoi_type],
-        )
-        self.connection.execute(
-            """
-            INSERT INTO search_texts
-            SELECT nextval('text_ids'), ?, aoi_id, false,
-                strip_accents(lower(trim(name)))
-            FROM source
-            """,
-            [aoi_type],
-        )
-        self.connection.execute(
-            "CREATE TEMP TABLE raw_alternate_names AS"
-            " SELECT ? AS aoi_type, aoi_id, unnest(alternate_names) AS alternate_name"
-            " FROM source",
-            [aoi_type],
-        )
-        self._add_raw_alternate_names()
-        self.connection.execute("DROP TABLE raw_alternate_names")
-        self.connection.execute("DROP TABLE source")
-        self.connection.unregister("raw")
-
-    def _add_alternate_names(self, uri: str) -> None:
-        self.connection.register("raw_alternate_names", parquet.read_table(uri))
-        self._add_raw_alternate_names()
-        self.connection.unregister("raw_alternate_names")
-
-    def _add_raw_alternate_names(self) -> None:
-        self.connection.execute(
-            """
-            INSERT INTO search_texts
-            SELECT nextval('text_ids'), aoi_type, aoi_id, true, text
-            FROM (
-                SELECT DISTINCT aoi_type, aoi_id,
-                    strip_accents(lower(trim(alternate_name))) AS text
-                FROM raw_alternate_names
-                WHERE nullif(trim(alternate_name), '') IS NOT NULL
-            )
-            """
-        )
-
-    def _add_importance(self, uri: str) -> None:
-        self.connection.register("raw", parquet.read_table(uri))
-        self.connection.execute(
-            "INSERT INTO importance SELECT aoi_type, aoi_id, importance FROM raw"
-        )
-        self.connection.unregister("raw")
-
-    def _index_words(self) -> None:
-        self.connection.execute(
-            """
-            CREATE TABLE text_words AS
-            SELECT DISTINCT text_id, word
-            FROM (
-                SELECT text_id,
-                    unnest(regexp_split_to_array(text, $separators)) AS word
-                FROM search_texts
-            )
-            WHERE word <> ''
-            """,
-            {"separators": self.word_separators},
-        )
         self.connection.execute(
             "CREATE TABLE vocabulary AS"
             " SELECT word, count(*) AS texts FROM text_words GROUP BY word"
@@ -337,3 +230,176 @@ class DuckDbAoiNameIndex(AoiNameIndex):
             {"word": word, "max_edits": max(1, len(word) // 4)},
         ).fetchone()
         return word if nearest is None else nearest[0]
+
+
+class DuckDbAoiNameIndex(DuckDbAoiNameSearch):
+    """Builds the index at startup from each AOI type's parquet. Importance and
+    extra alternate names come from optional parquets keyed by `aoi_type` and
+    `aoi_id`."""
+
+    def __init__(
+        self,
+        sources: Dict[str, NameSource],
+        importance_uri: Optional[str] = None,
+        alternate_names_uri: Optional[str] = None,
+        word_separators: str = r"[\s,.;:()\[\]/'\"-]+",
+        corrected_match_weight: float = 0.8,
+        custom_aoi_importance: float = 1.0,
+    ):
+        self.word_separators = word_separators
+        self.connection = duckdb.connect()
+        self.connection.execute("CREATE SEQUENCE text_ids")
+        self.connection.execute(
+            "CREATE TABLE names (aoi_type VARCHAR, aoi_id VARCHAR, name VARCHAR,"
+            " display_name VARCHAR, fallback_importance DOUBLE, area_ha DOUBLE,"
+            " search_display_name VARCHAR)"
+        )
+        self.connection.execute(
+            "CREATE TABLE search_texts (text_id BIGINT, aoi_type VARCHAR,"
+            " aoi_id VARCHAR, is_alternate BOOLEAN, text VARCHAR)"
+        )
+        self.connection.execute(
+            "CREATE TABLE importance (aoi_type VARCHAR, aoi_id VARCHAR,"
+            " importance DOUBLE)"
+        )
+        for aoi_type, source in sources.items():
+            self._add_source(aoi_type, source)
+        if alternate_names_uri is not None:
+            self._add_alternate_names(alternate_names_uri)
+        if importance_uri is not None:
+            self._add_importance(importance_uri)
+        self._index_words()
+        super().__init__(
+            self.connection,
+            word_separators,
+            corrected_match_weight,
+            custom_aoi_importance,
+        )
+
+    def _add_source(self, aoi_type: str, source: NameSource) -> None:
+        raw = parquet.read_table(
+            source.uri, columns=["aoi_id", "area_ha", *source.columns]
+        )
+        self.connection.register("raw", raw)
+        self.connection.execute(
+            f"""
+            CREATE TEMP TABLE source AS
+            SELECT aoi_id, area_ha, {source.name} AS name,
+                {source.display_name} AS display_name,
+                {source.fallback_importance} AS fallback_importance,
+                {source.alternate_names} AS alternate_names
+            FROM raw
+            WHERE NOT coalesce({source.excluded}, false) AND name IS NOT NULL
+            """
+        )
+        self.connection.execute(
+            """
+            INSERT INTO names
+            SELECT ?, aoi_id, name, display_name, fallback_importance, area_ha,
+                strip_accents(lower(display_name))
+            FROM source
+            """,
+            [aoi_type],
+        )
+        self.connection.execute(
+            """
+            INSERT INTO search_texts
+            SELECT nextval('text_ids'), ?, aoi_id, false,
+                strip_accents(lower(trim(name)))
+            FROM source
+            """,
+            [aoi_type],
+        )
+        self.connection.execute(
+            "CREATE TEMP TABLE raw_alternate_names AS"
+            " SELECT ? AS aoi_type, aoi_id, unnest(alternate_names) AS alternate_name"
+            " FROM source",
+            [aoi_type],
+        )
+        self._add_raw_alternate_names()
+        self.connection.execute("DROP TABLE raw_alternate_names")
+        self.connection.execute("DROP TABLE source")
+        self.connection.unregister("raw")
+
+    def _add_alternate_names(self, uri: str) -> None:
+        self.connection.register("raw_alternate_names", parquet.read_table(uri))
+        self._add_raw_alternate_names()
+        self.connection.unregister("raw_alternate_names")
+
+    def _add_raw_alternate_names(self) -> None:
+        self.connection.execute(
+            """
+            INSERT INTO search_texts
+            SELECT nextval('text_ids'), aoi_type, aoi_id, true, text
+            FROM (
+                SELECT DISTINCT aoi_type, aoi_id,
+                    strip_accents(lower(trim(alternate_name))) AS text
+                FROM raw_alternate_names
+                WHERE nullif(trim(alternate_name), '') IS NOT NULL
+            )
+            """
+        )
+
+    def _add_importance(self, uri: str) -> None:
+        self.connection.register("raw", parquet.read_table(uri))
+        self.connection.execute(
+            "INSERT INTO importance SELECT aoi_type, aoi_id, importance FROM raw"
+        )
+        self.connection.unregister("raw")
+
+    def _index_words(self) -> None:
+        self.connection.execute(
+            """
+            CREATE TABLE text_words AS
+            SELECT DISTINCT text_id, word
+            FROM (
+                SELECT text_id,
+                    unnest(regexp_split_to_array(text, $separators)) AS word
+                FROM search_texts
+            )
+            WHERE word <> ''
+            """,
+            {"separators": self.word_separators},
+        )
+
+
+class PrebuiltDuckDbAoiNameIndex(DuckDbAoiNameSearch):
+    """Loads an index the AOI pipeline built: parquets of its tables, and a
+    metadata file giving the separators its texts were split into words
+    with."""
+
+    def __init__(
+        self,
+        uri: str,
+        corrected_match_weight: float = 0.8,
+        custom_aoi_importance: float = 1.0,
+    ):
+        with fsspec.open(f"{uri}/metadata.json") as file:
+            metadata = json.load(file)
+        connection = duckdb.connect()
+        tables = {
+            "names": [
+                "aoi_type",
+                "aoi_id",
+                "name",
+                "display_name",
+                "fallback_importance",
+                "area_ha",
+                "search_display_name",
+            ],
+            "importance": ["aoi_type", "aoi_id", "importance"],
+            "search_texts": ["text_id", "aoi_type", "aoi_id", "is_alternate", "text"],
+            "text_words": ["text_id", "word"],
+        }
+        for table, columns in tables.items():
+            connection.register(
+                "raw", parquet.read_table(f"{uri}/{table}.parquet", columns=columns)
+            )
+            connection.execute(f"CREATE TABLE {table} AS SELECT * FROM raw")
+            connection.unregister("raw")
+        super().__init__(
+            connection,
+            metadata["word_separators"],
+            corrected_match_weight,
+            custom_aoi_importance,
+        )

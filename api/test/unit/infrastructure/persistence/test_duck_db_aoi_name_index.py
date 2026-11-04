@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 
@@ -5,6 +7,7 @@ from app.domain.models.custom_aoi import CustomAoiName
 from app.infrastructure.persistence.duck_db_aoi_name_index import (
     DuckDbAoiNameIndex,
     NameSource,
+    PrebuiltDuckDbAoiNameIndex,
 )
 
 
@@ -72,8 +75,26 @@ def protected_area_source(tmp_path):
     )
 
 
-@pytest.fixture
-def index(tmp_path):
+def prebuilt(index, directory):
+    """The same index loaded from the files the AOI pipeline writes."""
+    directory.mkdir()
+    for table in ("names", "importance", "search_texts", "text_words"):
+        index.connection.execute(f"COPY {table} TO '{directory / table}.parquet'")
+    (directory / "metadata.json").write_text(
+        json.dumps({"word_separators": index.word_separators})
+    )
+    return PrebuiltDuckDbAoiNameIndex(str(directory))
+
+
+@pytest.fixture(params=["built at startup", "prebuilt"])
+def index(request, tmp_path):
+    built = built_index(tmp_path)
+    if request.param == "prebuilt":
+        return prebuilt(built, tmp_path / "prebuilt")
+    return built
+
+
+def built_index(tmp_path):
     importance_uri = str(tmp_path / "importance.parquet")
     pd.DataFrame(
         {

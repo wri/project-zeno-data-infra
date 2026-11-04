@@ -17,6 +17,7 @@ from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.infrastructure.persistence.duck_db_aoi_name_index import (
     DuckDbAoiNameIndex,
     NameSource,
+    PrebuiltDuckDbAoiNameIndex,
 )
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
@@ -73,7 +74,17 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
 
 @lru_cache(maxsize=1)
 def get_aoi_name_index() -> AoiNameIndex:
-    """Names of every predefined AOI, loaded once per process.
+    """Names of every predefined AOI, loaded once per process from the index
+    the AOI pipeline built on a pinned date."""
+    return PrebuiltDuckDbAoiNameIndex(
+        "s3://lcl-analytics/vectors/aois/search/v20261104"
+    )
+
+
+@lru_cache(maxsize=1)
+def get_aoi_name_index_built_at_startup() -> AoiNameIndex:
+    """Names of every predefined AOI, built from each AOI type's GeoParquet when
+    first used.
 
     Importance and multilingual alternate names come from Wikipedia, for AOIs
     linked to Wikidata. Unlinked AOIs fall back to an importance by type: admin

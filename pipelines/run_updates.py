@@ -8,10 +8,6 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
-
 from pipelines.aois.prefect_flows import aois_flow
 from pipelines.aois.sources import aoi_sources
 from pipelines.carbon_flux.prefect_flows import carbon_flow
@@ -22,6 +18,9 @@ from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
 from pipelines.wur_alert_drivers.prefect_flows import wur_flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -126,9 +125,20 @@ def run_land_ghg_inventory_update(
 
 @flow
 def run_aois_update(
-    version=None, overwrite=False, is_latest=False, aoi_source=None
+    version=None,
+    overwrite=False,
+    is_latest=False,
+    aoi_source=None,
+    refresh_wikimedia_importance=False,
+    index_only=False,
 ) -> list[str]:
-    return aois_flow.aois_update(aoi_source, overwrite=overwrite)
+    return aois_flow.aois_update(
+        date.today(),
+        aoi_source,
+        overwrite=overwrite,
+        refresh_wikimedia_importance=refresh_wikimedia_importance,
+        index_only=index_only,
+    )
 
 
 def run_wur_update(
@@ -259,6 +269,8 @@ def run_updates(
     local=False,
     performance_report_path=None,
     content_date=None,
+    refresh_wikimedia_importance=False,
+    index_only=False,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -269,6 +281,8 @@ def run_updates(
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
+    refresh_wikimedia_importance = str(refresh_wikimedia_importance).lower() == "true"
+    index_only = str(index_only).lower() == "true"
     # bbox (land_ghg_inventory and integrated_alerts flows only) clips the reduce
     # to one area. It is independent of where compute runs: Coiled by default, or
     # local when local=True.
@@ -303,6 +317,8 @@ def run_updates(
             kwargs["flow_name"] = flow_name.value
         if flow_name == UpdateFlow.AOIS_UPDATE:
             kwargs["aoi_source"] = aoi_source
+            kwargs["refresh_wikimedia_importance"] = refresh_wikimedia_importance
+            kwargs["index_only"] = index_only
         elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
             kwargs["bbox"] = bbox_geom
         elif flow_name == UpdateFlow.WUR_UPDATE:
@@ -351,6 +367,20 @@ def run_updates(
     help="Build only this AOI source (aois_update only); builds all if omitted.",
 )
 @click.option(
+    "--refresh-wikimedia-importance",
+    is_flag=True,
+    help=(
+        "Download Nominatim's Wikimedia importance file again instead of using "
+        "the cached copy (aois_update only)."
+    ),
+)
+@click.option(
+    "--index-only",
+    is_flag=True,
+    help="Build only the AOI name index, from the existing AOI GeoParquets "
+    "(aois_update only).",
+)
+@click.option(
     "--content-date",
     default=None,
     help=(
@@ -377,6 +407,8 @@ def cli(
     is_latest,
     bbox,
     aoi_source,
+    refresh_wikimedia_importance,
+    index_only,
     content_date,
     local,
     performance_report_path,
@@ -391,6 +423,8 @@ def cli(
         local=local,
         performance_report_path=performance_report_path,
         content_date=content_date,
+        refresh_wikimedia_importance=refresh_wikimedia_importance,
+        index_only=index_only,
     )
 
 
