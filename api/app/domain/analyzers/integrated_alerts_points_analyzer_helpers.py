@@ -4,6 +4,7 @@ analyzers."""
 from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 from shapely.geometry.base import BaseGeometry
 
@@ -55,13 +56,15 @@ def served_alerts_metadata(
 def format_points(points: pd.DataFrame) -> Dict[str, list]:
     """Convert repository points to result columns (POINTS_RESULT_COLUMNS), with
     ISO dates and confidence labels."""
+    # A window holds a few dozen distinct dates, so format those once and index
+    # into them rather than formatting every row.
+    date_codes, dates = pd.factorize(points["alert_date"])
+    iso_dates = np.array([d.isoformat() for d in dates], dtype=object)
     return {
         "lat": points["lat"].tolist(),
         "lon": points["lon"].tolist(),
-        "alert_date": [d.isoformat() for d in points["alert_date"]],
-        "alert_confidence": [
-            ALERTS_CONFIDENCE[c] for c in points["confidence"].tolist()
-        ],
+        "alert_date": iso_dates[date_codes].tolist(),
+        "alert_confidence": points["confidence"].map(ALERTS_CONFIDENCE).tolist(),
         "natural_lands_class": points["natural_lands_class"].tolist(),
     }
 
