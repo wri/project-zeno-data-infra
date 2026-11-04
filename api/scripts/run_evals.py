@@ -2,7 +2,8 @@
 
 For each case, checks from the conversation whether the agent analyzed an
 expected dataset and the expected areas, and asks a judge model whether its
-final answer matches the expected answer. Start the API first, then from the
+final answer matches the expected answer and whether every number in it is
+backed by a tool result. Start the API first, then from the
 api directory run:
     uv run --env-file ../.env python scripts/run_evals.py
 
@@ -36,6 +37,30 @@ Numbers agree when within 2% of each other after converting units (for example
 hectares vs. thousand hectares, or different number formats). Yes/no, true/false,
 years and categories agree when they mean the same thing. Extra context in the
 agent's answer is fine; a different or missing headline answer is not."""
+
+
+GROUNDING_PROMPT = """You are checking that an answer only states numbers that
+come from its data sources.
+
+Tool results and script output the agent received:
+<evidence>
+{evidence}
+</evidence>
+
+Agent's final answer:
+<answer>
+{answer}
+</answer>
+
+List every number in the answer (values, percentages, ranks, years, counts)
+that is neither in the evidence nor calculated from numbers in the evidence.
+Rounding and unit conversions count as supported. Dataset metadata such as
+accuracy figures counts as supported when it appears in the evidence."""
+
+
+class Grounding(BaseModel):
+    unsupported_numbers: list[str]
+    reason: str
 
 
 class Verdict(BaseModel):
@@ -105,6 +130,20 @@ def transcript(messages: list) -> list[dict]:
     return entries
 
 
+def tool_evidence(messages: list) -> str:
+    """Everything the tools and scripts returned to the agent, untruncated."""
+    evidence = []
+    for message in messages:
+        if isinstance(message["content"], str):
+            continue
+        for block in message["content"]:
+            if isinstance(block, dict) and block.get("type") == "tool_result":
+                evidence.append(json.dumps(block.get("content"), default=str))
+            elif getattr(block, "type", None) == "code_execution_tool_result":
+                evidence.append(getattr(block.content, "stdout", ""))
+    return "\n\n".join(evidence)
+
+
 def final_text(messages: list) -> str:
     for message in reversed(messages):
         if message["role"] == "assistant":
@@ -125,21 +164,28 @@ def used_expected_areas(case: dict, analyses: AnalysisCalls) -> bool | None:
     return all(aoi_id in analyses.aoi_ids for aoi_id in expected)
 
 
-async def judge(client: AsyncAnthropic, model: str, case: dict, answer: str):
+async def ask_judge(client: AsyncAnthropic, model: str, prompt: str, output_format):
     response = await client.messages.parse(
         model=model,
         max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": JUDGE_PROMPT.format(
-                    question=case["question"], expected=case["answer"], answer=answer
-                ),
-            }
-        ],
-        output_format=Verdict,
+        messages=[{"role": "user", "content": prompt}],
+        output_format=output_format,
     )
     return response.parsed_output
+
+
+async def judge(client: AsyncAnthropic, model: str, case: dict, answer: str):
+    prompt = JUDGE_PROMPT.format(
+        question=case["question"], expected=case["answer"], answer=answer
+    )
+    return await ask_judge(client, model, prompt, Verdict)
+
+
+async def judge_grounding(
+    client: AsyncAnthropic, model: str, messages: list, answer: str
+):
+    prompt = GROUNDING_PROMPT.format(evidence=tool_evidence(messages), answer=answer)
+    return await ask_judge(client, model, prompt, Grounding)
 
 
 class ResultWriter:
@@ -168,8 +214,10 @@ RESULT_COLUMNS = [
     "dataset_ok",
     "areas_ok",
     "answer_ok",
+    "grounded_ok",
     "agent_value",
     "judge_reason",
+    "unsupported_numbers",
     "datasets_used",
     "aoi_ids_used",
     "tool_calls",
@@ -200,6 +248,13 @@ async def run_case(
             verdict = await judge(judge_client, judge_model, case, answer)
         except Exception as exception:
             errors.append(f"judge {type(exception).__name__}: {exception}")
+        grounding = None
+        try:
+            grounding = await judge_grounding(
+                judge_client, judge_model, messages, answer
+            )
+        except Exception as exception:
+            errors.append(f"grounding {type(exception).__name__}: {exception}")
         outcome = (
             "judge failed" if verdict is None else "ok" if verdict.correct else "wrong"
         )
@@ -211,6 +266,10 @@ async def run_case(
             "answer_ok": verdict.correct if verdict else None,
             "agent_value": verdict.agent_value if verdict else "",
             "judge_reason": verdict.reason if verdict else "",
+            "grounded_ok": (not grounding.unsupported_numbers if grounding else None),
+            "unsupported_numbers": (
+                "; ".join(grounding.unsupported_numbers) if grounding else ""
+            ),
             "datasets_used": ";".join(sorted(analyses.datasets)),
             "aoi_ids_used": ";".join(sorted(analyses.aoi_ids)),
             "tool_calls": sum(
@@ -253,7 +312,10 @@ async def run(arguments: argparse.Namespace) -> None:
     limit = asyncio.Semaphore(arguments.concurrency)
     try:
         async with connect_agent(
-            arguments.server_url, arguments.model, os.environ["RW_AUTH_TOKEN"]
+            arguments.server_url,
+            arguments.model,
+            os.environ["RW_AUTH_TOKEN"],
+            arguments.programmatic_tools,
         ) as agent:
             results = await asyncio.gather(
                 *[
@@ -270,6 +332,7 @@ async def run(arguments: argparse.Namespace) -> None:
     print(f"Dataset used:  {pass_rate(results, 'dataset_ok')}")
     print(f"Areas used:    {pass_rate(results, 'areas_ok')}")
     print(f"Answer right:  {pass_rate(results, 'answer_ok')}")
+    print(f"Grounded:      {pass_rate(results, 'grounded_ok')}")
     errors = [r for r in results if r["error"]]
     if errors:
         print(f"Errors: {len(errors)}")
@@ -284,6 +347,11 @@ def main() -> None:
     parser.add_argument("--judge-model", default="claude-haiku-4-5")
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--limit", type=int, help="Run only the first N cases")
+    parser.add_argument(
+        "--programmatic-tools",
+        action="store_true",
+        help="Let Claude call the tools from scripts it runs in a sandbox",
+    )
     asyncio.run(run(parser.parse_args()))
 
 

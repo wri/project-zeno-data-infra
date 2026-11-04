@@ -10,10 +10,20 @@ from anthropic.lib.tools.mcp import async_mcp_tool
 from mcp.client.client import Client
 from mcp.client.streamable_http import streamable_http_client
 
+CODE_EXECUTION = "code_execution_20260120"
+
 SYSTEM_PROMPT = """You help people analyze land change, such as tree cover loss,
-disturbance alerts and land cover, for areas of interest. Use the analytics
-tools to get real numbers rather than answering from memory, and mention the
-dataset's cautions when they affect how a result should be read."""
+disturbance alerts and land cover, for areas of interest.
+
+Every number and factual claim about an area must come from a tool result in
+this conversation. That includes values, rankings, dates and area identifiers:
+find areas with search_areas rather than recalling their IDs. Calculations on
+tool results are fine; say how you derived them. If the tools can't provide
+something, say so rather than filling the gap from memory. People make
+decisions from these answers, and a remembered number can't be traced back to
+a dataset.
+
+Mention the dataset's cautions when they affect how a result should be read."""
 
 
 class AnalyticsAgent:
@@ -42,6 +52,12 @@ class AnalyticsAgent:
             if on_message is not None:
                 on_message(message)
             messages.append({"role": "assistant", "content": message.content})
+            if message.container is not None:
+                # A script paused on a tool call resumes only in its own container.
+                container_id = message.container.id
+                runner.set_messages_params(
+                    lambda params: {**params, "container": container_id}
+                )
             tool_response = await runner.generate_tool_call_response()
             if tool_response is not None:
                 messages.append(tool_response)
@@ -49,10 +65,11 @@ class AnalyticsAgent:
 
 @asynccontextmanager
 async def connect_agent(
-    server_url: str, model: str, bearer_token: str
+    server_url: str, model: str, bearer_token: str, programmatic_tools: bool = False
 ) -> AsyncIterator[AnalyticsAgent]:
     """Connects to the MCP server, sending the bearer token it forwards to the
-    analytics API, and yields an agent that uses its tools."""
+    analytics API, and yields an agent that uses its tools. With programmatic
+    tools, the agent can also call the tools from scripts it runs in a sandbox."""
     http_client = httpx2.AsyncClient(
         headers={"Authorization": f"Bearer {bearer_token}"},
         timeout=httpx2.Timeout(30, read=300),
@@ -60,5 +77,11 @@ async def connect_agent(
     transport = streamable_http_client(server_url, http_client=http_client)
     async with http_client, Client(transport, read_timeout_seconds=180) as mcp_client:
         listed = await mcp_client.list_tools()
-        tools = [async_mcp_tool(tool, mcp_client.session) for tool in listed.tools]
+        allowed_callers = ["direct", CODE_EXECUTION] if programmatic_tools else None
+        tools: list = [
+            async_mcp_tool(tool, mcp_client.session, allowed_callers=allowed_callers)
+            for tool in listed.tools
+        ]
+        if programmatic_tools:
+            tools.append({"type": CODE_EXECUTION, "name": "code_execution"})
         yield AnalyticsAgent(AsyncAnthropic(), tools, model)

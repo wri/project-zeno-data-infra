@@ -20,6 +20,10 @@ def show(message) -> None:
             print(f"\nclaude> {block.text}")
         elif block.type == "tool_use":
             print(f"\n  [calling {block.name} {json.dumps(block.input)[:200]}]")
+        elif block.type == "server_tool_use":
+            print(f"\n  [running script]\n{block.input.get('code', '')}")
+        elif block.type == "code_execution_tool_result":
+            print(f"\n  [script output]\n{getattr(block.content, 'stdout', '')}")
     if message.stop_reason == "refusal":
         print("\n  [the model declined to answer this request]")
 
@@ -31,8 +35,12 @@ async def read_line(prompt: str) -> str | None:
         return None
 
 
-async def chat(server_url: str, model: str, bearer_token: str) -> None:
-    async with connect_agent(server_url, model, bearer_token) as agent:
+async def chat(
+    server_url: str, model: str, bearer_token: str, programmatic_tools: bool
+) -> None:
+    async with connect_agent(
+        server_url, model, bearer_token, programmatic_tools
+    ) as agent:
         print(f"Connected to {server_url}")
         print("Type a question, or press Ctrl-D to quit.")
         messages: list = []
@@ -47,9 +55,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--server-url", default="http://localhost:8000/mcp/")
     parser.add_argument("--model", default="claude-opus-5-5")
+    parser.add_argument(
+        "--programmatic-tools",
+        action="store_true",
+        help="Let Claude call the tools from scripts it runs in a sandbox",
+    )
     arguments = parser.parse_args()
     asyncio.run(
-        chat(arguments.server_url, arguments.model, os.environ["RW_AUTH_TOKEN"])
+        chat(
+            arguments.server_url,
+            arguments.model,
+            os.environ["RW_AUTH_TOKEN"],
+            arguments.programmatic_tools,
+        )
     )
 
 
