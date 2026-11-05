@@ -10,6 +10,7 @@ from pathlib import Path
 import fsspec
 import geopandas as gpd
 import pandas as pd
+
 from pipelines.aois.aoi_source import AoiSource
 
 
@@ -88,7 +89,7 @@ def read_gadm_pieces(path: str) -> pd.DataFrame:
     disputed flag needs."""
     return gpd.read_file(
         path,
-        columns=[*(f"GID_{level}" for level in range(6)), "DISPUTEDBY"],
+        columns=[*gid_columns(), "DISPUTEDBY"],
         ignore_geometry=True,
     )
 
@@ -97,7 +98,7 @@ def mark_disputed(units: pd.DataFrame, pieces: pd.DataFrame) -> pd.DataFrame:
     """A unit is disputed if it has pieces and every one of them is disputed.
     Pieces are matched on all the GIDs the unit has, as in the Data API's GADM
     4.1 import."""
-    gids = gid_columns(units)
+    gids = gid_columns()
     pieces = pieces.assign(piece_disputed=has_value(pieces.DISPUTEDBY))
     gid_count = sum(has_value(units[column]).astype(int) for column in gids)
 
@@ -116,9 +117,9 @@ def mark_disputed(units: pd.DataFrame, pieces: pd.DataFrame) -> pd.DataFrame:
     return units.assign(is_disputed=is_disputed)
 
 
-def gid_columns(features: pd.DataFrame) -> list[str]:
+def gid_columns() -> list[str]:
     """The GID_<level> columns, from country down."""
-    return sorted(features.filter(regex=r"^GID_\d$").columns)
+    return [f"GID_{level}" for level in range(6)]
 
 
 def has_value(column: pd.Series) -> pd.Series:
@@ -127,7 +128,8 @@ def has_value(column: pd.Series) -> pd.Series:
 
 def fix_gadm_gids(features: pd.DataFrame) -> pd.DataFrame:
     """Rewrite GIDs that break the <ISO3>.<region>.<subregion>_<revision>
-    pattern, as the Data API's GADM 4.1 import did."""
+    pattern, as the Data API's GADM 4.1 import did. Some Ghana GIDs are missing
+    the "." after the country code (GHA1_1 becomes GHA.1_1)."""
     ukraine = features.GID_0 == "UKR"
     uk_missing_gid_1 = (
         (features.GID_0 == "GBR") & (features.GID_1 == "NA") & features.GID_2.notna()
@@ -145,14 +147,15 @@ def fix_gadm_gids(features: pd.DataFrame) -> pd.DataFrame:
     )
     deeper_gids = {
         column: without_special_region_prefixes(features[column])
-        for column in gid_columns(features)[3:]
+        for column in gid_columns()[3:]
     }
     return features.assign(GID_1=gid_1, GID_2=gid_2, **deeper_gids)
 
 
 def without_special_region_prefixes(gids: pd.Series) -> pd.Series:
     """Hong Kong and Macau units below level 1 are filed under their own
-    country codes; they become China's regions 998 and 999."""
+    country codes; they become China's regions 998 and 999. Ghana GIDs get
+    their missing "." after the country code."""
     return (
         gids.str.replace(r"^HKG\.", "CHN.998.", regex=True)
         .str.replace(r"^MAC\.", "CHN.999.", regex=True)
@@ -163,9 +166,7 @@ def without_special_region_prefixes(gids: pd.Series) -> pd.Series:
 def fill_gadm_names(features: pd.DataFrame, fills: pd.DataFrame) -> pd.DataFrame:
     """Names GADM leaves as "NA", from a table of (aoi_id, column, name). A fill
     never replaces a name GADM has, and one for an unknown id raises."""
-    ids = gadm_ids(
-        features[["ADM_LEVEL", *gid_columns(features)]].rename(columns=str.lower)
-    )
+    ids = gadm_ids(features[["ADM_LEVEL", *gid_columns()]].rename(columns=str.lower))
     filled = features.copy()
     for fill in fills.itertuples():
         rows = ids == fill.aoi_id
