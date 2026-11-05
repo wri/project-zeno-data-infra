@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -13,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
+from .dependencies import get_aoi_name_index
 from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .request_size_limit import RequestSizeLimit
 from .routers import aois, custom_aois, land_change
@@ -93,6 +95,8 @@ async def lifespan(app: FastAPI):
 
     # Expose a single client for routers that don't use the router yet.
     app.state.dask_client = remote_client or local_client
+
+    await asyncio.to_thread(get_aoi_name_index)
 
     # Create an AWS Session and connections to DyamoDb and S3
     session = aioboto3.Session()

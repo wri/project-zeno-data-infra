@@ -52,7 +52,7 @@ def get_custom_aoi_repository_factory() -> Callable[[], CustomAoiRepository]:
     ),
 )
 async def search_aois(
-    q: str = Query(..., min_length=1, max_length=200),
+    q: str = Query(..., min_length=1, max_length=100),
     type: Optional[List[AoiType]] = Query(None),
     limit: int = Query(10, ge=1, le=50),
     user_id: Optional[str] = Query(None, min_length=1),

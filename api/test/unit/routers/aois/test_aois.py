@@ -86,6 +86,13 @@ def test_search_returns_matching_aois(name_index):
     assert name_index.searches == [("para", ["admin"], 5, [])]
 
 
+def test_long_search_text_is_rejected_before_searching(name_index):
+    response = client.get("/v0/aois/search", params={"q": "a" * 101}, headers=ADMIN)
+
+    assert response.status_code == 422
+    assert name_index.searches == []
+
+
 def test_search_includes_the_users_own_custom_aois(name_index):
     client.get(
         "/v0/aois/search", params={"q": "home", "user_id": "user-1"}, headers=ADMIN
