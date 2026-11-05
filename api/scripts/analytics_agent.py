@@ -38,7 +38,8 @@ class AnalyticsAgent:
         runner = self.anthropic_client.beta.messages.tool_runner(
             model=self.model,
             max_tokens=16000,
-            thinking={"type": "adaptive"},
+            # Summaries of the model's reasoning, which is otherwise omitted.
+            thinking={"type": "adaptive", "display": "summarized"},
             system=SYSTEM_PROMPT,
             tools=self.tools,
             messages=messages,

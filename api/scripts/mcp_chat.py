@@ -16,7 +16,9 @@ from analytics_agent import connect_agent
 
 def show(message) -> None:
     for block in message.content:
-        if block.type == "text":
+        if block.type == "thinking" and block.thinking:
+            print(f"\n  [thinking]\n{block.thinking}")
+        elif block.type == "text":
             print(f"\nclaude> {block.text}")
         elif block.type == "tool_use":
             print(f"\n  [calling {block.name} {json.dumps(block.input)[:200]}]")

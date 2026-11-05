@@ -15,6 +15,7 @@ import asyncio
 import csv
 import json
 import os
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -104,9 +105,27 @@ def successful_analyses(messages: list) -> AnalysisCalls:
     return analyses
 
 
+def assistant_blocks(messages: list) -> list:
+    blocks = []
+    for message in messages:
+        if message["role"] == "assistant":
+            blocks.extend(message["content"])
+    return blocks
+
+
+def is_script(block) -> bool:
+    return block.type == "server_tool_use" and block.name == "code_execution"
+
+
+def is_script_tool_call(block) -> bool:
+    caller = getattr(block, "caller", None)
+    return block.type == "tool_use" and caller is not None and caller.type != "direct"
+
+
 def transcript(messages: list) -> list[dict]:
-    """The conversation as plain data: tool calls with their inputs, tool
-    results (truncated) and the agent's text."""
+    """The conversation as plain data: the agent's reasoning summaries, text,
+    tool calls with their inputs, scripts with their output, and tool results
+    (truncated)."""
     entries = []
     for message in messages:
         if isinstance(message["content"], str):
@@ -127,6 +146,17 @@ def transcript(messages: list) -> list[dict]:
                 )
             elif block.type == "text":
                 entries.append({"role": "assistant", "text": block.text})
+            elif block.type == "thinking":
+                entries.append({"thinking": block.thinking})
+            elif is_script(block):
+                entries.append({"script": block.input.get("code", "")})
+            elif block.type == "code_execution_tool_result":
+                entries.append(
+                    {
+                        "script_output": getattr(block.content, "stdout", "")[:2000],
+                        "stderr": getattr(block.content, "stderr", "")[:2000],
+                    }
+                )
     return entries
 
 
@@ -220,7 +250,10 @@ RESULT_COLUMNS = [
     "unsupported_numbers",
     "datasets_used",
     "aoi_ids_used",
+    "latency_seconds",
     "tool_calls",
+    "scripts",
+    "script_tool_calls",
     "error",
     "final_answer",
 ]
@@ -237,10 +270,12 @@ async def run_case(
     async with limit:
         messages: list = [{"role": "user", "content": case["question"]}]
         errors = []
+        started = time.monotonic()
         try:
             await agent.reply(messages)
         except Exception as exception:
             errors.append(f"agent {type(exception).__name__}: {exception}")
+        latency_seconds = round(time.monotonic() - started, 1)
         analyses = successful_analyses(messages)
         answer = final_text(messages)
         verdict = None
@@ -272,13 +307,14 @@ async def run_case(
             ),
             "datasets_used": ";".join(sorted(analyses.datasets)),
             "aoi_ids_used": ";".join(sorted(analyses.aoi_ids)),
-            "tool_calls": sum(
-                1
-                for m in messages
-                if m["role"] == "assistant"
-                for b in m["content"]
-                if b.type == "tool_use"
+            "tool_calls": len(
+                [b for b in assistant_blocks(messages) if b.type == "tool_use"]
             ),
+            "scripts": len([b for b in assistant_blocks(messages) if is_script(b)]),
+            "script_tool_calls": len(
+                [b for b in assistant_blocks(messages) if is_script_tool_call(b)]
+            ),
+            "latency_seconds": latency_seconds,
             "error": "; ".join(errors),
             "final_answer": answer,
         }
