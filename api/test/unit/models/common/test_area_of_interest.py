@@ -1,9 +1,10 @@
+from typing import ClassVar
+
 import pytest
 
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
-    PrecomputedAdminAreaOfInterest,
     ProtectedAreaOfInterest,
 )
 
@@ -94,13 +95,13 @@ class TestHasPrecomputedResults:
         assert not aoi.has_precomputed_results()
 
 
-class TestPrecomputedAdminAreaOfInterest:
-    def test_accepts_precomputed_levels(self):
-        assert PrecomputedAdminAreaOfInterest(ids=["ETH", "ETH.1", "ETH.1.2"])
+class TestAdminAreaOfInterestSubclass:
+    def test_subclasses_can_lower_the_maximum_admin_level(self):
+        class LevelTwoAdminAreaOfInterest(AdminAreaOfInterest):
+            max_admin_level: ClassVar[int] = 2
 
-    def test_rejects_levels_without_precomputed_results(self):
         with pytest.raises(ValueError, match="admin level allowed is 2"):
-            _ = PrecomputedAdminAreaOfInterest(ids=["ETH.1.2.3"])
+            LevelTwoAdminAreaOfInterest(ids=["ETH.1.2.3"])
 
 
 class TestCustomAreaOfInterestHash:

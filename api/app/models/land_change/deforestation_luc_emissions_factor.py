@@ -1,17 +1,25 @@
 from enum import Enum
-from typing import Annotated, List, Optional, Union
+from typing import Annotated, ClassVar, List, Optional, Union
 
 from pydantic import Field, PrivateAttr, model_validator
 
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn
 from app.models.common.areas_of_interest import (
-    PrecomputedAdminAreaOfInterest,
+    AdminAreaOfInterest,
 )
 from app.models.common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "deforestation_luc_emissions_factor"
 
-AoiUnion = Union[PrecomputedAdminAreaOfInterest,]
+
+class DeforestationLUCEmissionsFactorAdminAreaOfInterest(AdminAreaOfInterest):
+    """Deforestation LUC emissions factor only has precomputed results, down
+    to admin level 2."""
+
+    max_admin_level: ClassVar[int] = 2
+
+
+AoiUnion = Union[DeforestationLUCEmissionsFactorAdminAreaOfInterest,]
 DATE_REGEX = r"^\d{4}$"
 
 

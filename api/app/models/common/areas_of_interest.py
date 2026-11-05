@@ -1,6 +1,6 @@
 import hashlib
 import json
-from typing import Annotated, Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, ClassVar, Dict, List, Literal, Optional
 from uuid import UUID
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
@@ -9,7 +9,6 @@ from .base import StrictBaseModel
 
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 MAX_OTF_FEATURES = 50
-MAX_ADMIN_LEVEL = 5
 # Deeper admin areas have no precomputed results, so they're computed on the fly
 DEEPEST_PRECOMPUTED_ADMIN_LEVEL = 2
 AdminStr = Annotated[str, StringConstraints(pattern=ADMIN_REGEX)]
@@ -35,6 +34,10 @@ class AreaOfInterest(StrictBaseModel):
 
 
 class AdminAreaOfInterest(AreaOfInterest):
+    """Analyses supporting fewer admin levels subclass this with a lower
+    maximum."""
+
+    max_admin_level: ClassVar[int] = 5
     type: Literal["admin"] = "admin"
     ids: List[AdminStr] = Field(
         ..., min_length=1, max_length=1000, title="List of Dot-delimited identifiers"
@@ -65,14 +68,23 @@ class AdminAreaOfInterest(AreaOfInterest):
 
     @field_validator("ids", mode="after")
     def check_admin_levels(cls, v):
-        if max(admin_level(admin_id) for admin_id in v) > MAX_ADMIN_LEVEL:
-            raise ValueError(f"Maximum admin level allowed is {MAX_ADMIN_LEVEL}")
+        if max(admin_level(admin_id) for admin_id in v) > cls.max_admin_level:
+            raise ValueError(f"Maximum admin level allowed is {cls.max_admin_level}")
+        return v
+
+    @field_validator("ids", mode="after")
+    def check_levels_not_mixed(cls, v):
         on_the_fly_ids = [i for i in v if not has_precomputed_level(i)]
         if on_the_fly_ids and len(on_the_fly_ids) < len(v):
             raise ValueError(
                 f"Ids down to admin level {DEEPEST_PRECOMPUTED_ADMIN_LEVEL} and "
                 "deeper ids must be sent as separate requests"
             )
+        return v
+
+    @field_validator("ids", mode="after")
+    def check_on_the_fly_count(cls, v):
+        on_the_fly_ids = [i for i in v if not has_precomputed_level(i)]
         if len(on_the_fly_ids) > MAX_OTF_FEATURES:
             raise ValueError(
                 f"At most {MAX_OTF_FEATURES} ids below admin level "
@@ -87,19 +99,6 @@ class AdminAreaOfInterest(AreaOfInterest):
     @field_validator("version", mode="before")
     def set_version_default(cls, v):
         return v or "4.1"
-
-
-class PrecomputedAdminAreaOfInterest(AdminAreaOfInterest):
-    """Admin areas for analyses that only have precomputed results."""
-
-    @field_validator("ids", mode="after")
-    def check_precomputed_levels(cls, v):
-        if not all(has_precomputed_level(admin_id) for admin_id in v):
-            raise ValueError(
-                "Maximum admin level allowed is "
-                f"{DEEPEST_PRECOMPUTED_ADMIN_LEVEL} for this analysis"
-            )
-        return v
 
 
 class GlobalAreaOfInterest(AreaOfInterest):
