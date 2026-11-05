@@ -16,6 +16,8 @@ from shapely.geometry import mapping
 
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
+)
+from app.domain.analyzers.integrated_alerts_points_analyzer_helpers import (
     served_dates,
 )
 from app.domain.models.analysis import Analysis

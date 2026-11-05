@@ -30,12 +30,14 @@ dependencies = [
     "earthengine-api",
     "xee",
     "distributed==2025.5.1",
+    "pyiceberg[pyarrow]>=0.9",
 ]
 
 [dependency-groups]
 dev = [
     "ipykernel>=7.1.0",
     "pandera>=0.24.0",
+    "pyiceberg[sql-sqlite]>=0.9",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.0.0",
 ]
@@ -55,7 +57,8 @@ packages = [
   "natural_lands",
   "prefect_flows",
   "tree_cover_loss",
-  "integrated_alerts"
+  "integrated_alerts",
+  "zonal_stats"
 ]
 
 [tool.ruff]
