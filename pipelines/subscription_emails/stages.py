@@ -28,6 +28,10 @@ NATURAL_LANDS_CLASSES = list(range(2, 12))
 NATURAL_FOREST_CLASSES = [2, 5, 8, 9]
 # Dashboards shown in the email's table; the rest are only counted.
 MAX_DASHBOARDS = 10
+# Links in the email, to all of the user's dashboards and to each one.
+# (These may later come with the subscriptions from the API instead.)
+DASHBOARDS_URL = "https://horizon.globalnaturewatch.org/dashboards"
+DASHBOARD_URL = "https://horizon.globalnaturewatch.org/dashboards/{dashboard_id}"
 # Each email covers a fixed Wednesday to Tuesday week.
 WEEK_DAYS = 7
 WEEK_END_WEEKDAY = 1  # Tuesday
@@ -261,10 +265,12 @@ def build_emails(
             "total_ha": format_ha(sum(d["total_ha"] for d in ranked)),
             "dashboard_count": len(ranked),
             "more_dashboard_count": len(ranked) - len(shown),
+            "dashboards_url": DASHBOARDS_URL,
             "dashboards": [
                 {
                     "dashboard_id": d["dashboard_id"],
                     "name": d["name"],
+                    "url": DASHBOARD_URL.format(dashboard_id=d["dashboard_id"]),
                     "total_ha": format_ha(d["total_ha"]),
                     "natural_lands_ha": format_ha(d["natural_lands_ha"]),
                     "natural_forest_ha": format_ha(d["natural_forest_ha"]),

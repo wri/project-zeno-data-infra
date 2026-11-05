@@ -68,7 +68,7 @@
     </tr>
     {{each dashboards}}
     <tr>
-      <td style="padding:14px 6px 14px 14px; font-size:14px; line-height:20px; border-top:1px solid #e5e7eb;">{{if loop_var.url}}<a href="{{loop_var.url}}" style="color:#0b4db3; text-decoration:underline;">{{loop_var.name}}</a>{{else}}<span style="color:#111827;">{{loop_var.name}}</span>{{end}}</td>
+      <td style="padding:14px 6px 14px 14px; font-size:14px; line-height:20px; border-top:1px solid #e5e7eb;">{{if loop_var.url}}<a href="{{{loop_var.url}}}" style="color:#0b4db3; text-decoration:underline;">{{loop_var.name}}</a>{{else}}<span style="color:#111827;">{{loop_var.name}}</span>{{end}}</td>
       <td class="bar-col" width="120" style="padding:14px 6px; border-top:1px solid #e5e7eb;">
         <table role="presentation" width="120" cellpadding="0" cellspacing="0" border="0" style="width:120px;">
         <tr>
@@ -107,8 +107,8 @@
     {{if dashboards_url or download_url}}
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
     <tr>
-      {{if dashboards_url}}<td style="padding-right:12px;"><a href="{{dashboards_url}}" style="display:inline-block; padding:12px 22px; background-color:#0b4db3; border-radius:4px; color:#ffffff; font-size:16px; font-weight:600; text-decoration:none;">Go to my dashboards</a></td>{{end}}
-      {{if download_url}}<td><a href="{{download_url}}" style="display:inline-block; padding:11px 20px; border:1px solid #0b4db3; border-radius:4px; color:#0b4db3; font-size:15px; font-weight:600; text-decoration:none;">Download full data (CSV)</a></td>{{end}}
+      {{if dashboards_url}}<td style="padding-right:12px;"><a href="{{{dashboards_url}}}" style="display:inline-block; padding:12px 22px; background-color:#0b4db3; border-radius:4px; color:#ffffff; font-size:16px; font-weight:600; text-decoration:none;">Go to my dashboards</a></td>{{end}}
+      {{if download_url}}<td><a href="{{{download_url}}}" style="display:inline-block; padding:11px 20px; border:1px solid #0b4db3; border-radius:4px; color:#0b4db3; font-size:15px; font-weight:600; text-decoration:none;">Download full data (CSV)</a></td>{{end}}
     </tr>
     </table>
     {{end}}
@@ -126,7 +126,7 @@
     </tr>
     </table>
     {{if manage_url or unsubscribe_url}}
-    <p style="margin:24px 0 0 0; font-size:15px; color:#4b5563;">{{if manage_url}}<a href="{{manage_url}}" style="color:#0b4db3; text-decoration:underline;">Manage alert emails</a>{{end}}{{if manage_url and unsubscribe_url}} &nbsp;&middot;&nbsp; {{end}}{{if unsubscribe_url}}<a href="{{unsubscribe_url}}" style="color:#0b4db3; text-decoration:underline;">Turn off all alert emails</a>{{end}}</p>
+    <p style="margin:24px 0 0 0; font-size:15px; color:#4b5563;">{{if manage_url}}<a href="{{{manage_url}}}" style="color:#0b4db3; text-decoration:underline;">Manage alert emails</a>{{end}}{{if manage_url and unsubscribe_url}} &nbsp;&middot;&nbsp; {{end}}{{if unsubscribe_url}}<a href="{{{unsubscribe_url}}}" style="color:#0b4db3; text-decoration:underline;">Turn off all alert emails</a>{{end}}</p>
     {{end}}
     <p style="margin:24px 0 0 0; font-size:14px; line-height:21px; color:#4b5563;">You're getting this because you turned on alert emails for one or more of your dashboards. We send it once a week, after the integrated alerts data updates, and only when there are new alerts.</p>
     <p style="margin:20px 0 0 0; font-size:14px; color:#4b5563;">Global Nature Watch &middot; A partnership convened by the World Resources Institute</p>

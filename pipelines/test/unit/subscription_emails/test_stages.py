@@ -152,10 +152,12 @@ def test_build_emails_matches_sample_email():
         "total_ha": "162",
         "dashboard_count": 2,
         "more_dashboard_count": 0,
+        "dashboards_url": "https://horizon.globalnaturewatch.org/dashboards",
         "dashboards": [
             {
                 "dashboard_id": "d2",
                 "name": "Paraná, Brazil",
+                "url": "https://horizon.globalnaturewatch.org/dashboards/d2",
                 "total_ha": "128",
                 "natural_lands_ha": "96",
                 "natural_forest_ha": "57",
@@ -166,6 +168,7 @@ def test_build_emails_matches_sample_email():
             {
                 "dashboard_id": "d1",
                 "name": "Madre de Dios, Peru",
+                "url": "https://horizon.globalnaturewatch.org/dashboards/d1",
                 "total_ha": "34",
                 "natural_lands_ha": "32",
                 "natural_forest_ha": "30",
