@@ -2,11 +2,13 @@ import asyncio
 from unittest.mock import patch
 
 import dask
+import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 import pytest
 import rioxarray  # noqa: F401
 import xarray as xr
+from shapely.geometry import box
 
 from app.domain.analyzers import zonal_statistics_analyzer
 from app.domain.analyzers.integrated_alerts_analyzer import (
@@ -16,8 +18,15 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
+from app.domain.repositories.precomputed_table import (
+    EveryAoiCovered,
+    PrecomputedSource,
+)
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
+)
+from app.infrastructure.persistence.results_table_coverage import (
+    ResultsTableCoverage,
 )
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
@@ -31,6 +40,10 @@ def test_build_input_uris_versions_zarr_and_parquet():
     assert uris["admin_results_table_uri"] == (
         "s3://lcl-analytics/zonal-statistics/integrated-alerts/v20260706/"
         "admin-integrated-alerts.parquet"
+    )
+    assert uris["custom_results_table_uri"] == (
+        "s3://lcl-analytics/zonal-statistics/integrated-alerts/v20260706/"
+        "custom-integrated-alerts.parquet"
     )
     # pixel area is version-independent and still resolved
     pixel_area_uri = uris[str(Dataset.pixel_area_m2_10m)]
@@ -69,6 +82,31 @@ def make_analysis(
     return Analysis(result=None, metadata=metadata, status="pending")
 
 
+def admin_sources(table_uri):
+    return {
+        "admin": PrecomputedSource(
+            DuckDbPrecalcQueryService(table_uri=table_uri), EveryAoiCovered()
+        )
+    }
+
+
+def write_results_table(path, rows):
+    df = pd.DataFrame(
+        rows,
+        columns=[
+            "aoi_id",
+            "alert_date",
+            "alert_confidence",
+            "natural_lands_class",
+            "area_ha",
+        ],
+    )
+    df["natural_lands_class"] = df["natural_lands_class"].astype("uint8")
+    df["alert_date"] = pd.to_datetime(df["alert_date"])
+    df.to_parquet(path, index=False)
+    return path
+
+
 class TestOtfTimeout:
     @pytest.mark.asyncio
     async def test_otf_times_out_when_compute_hangs(self, monkeypatch):
@@ -88,6 +126,7 @@ class TestOtfTimeout:
         monkeypatch.setattr(zonal_statistics_analyzer, "get_geojson", fake_get_geojson)
 
         analyzer = IntegratedAlertsAnalyzer(
+            precomputed_sources={},
             compute_engine=HangingEngine(),
             input_uris={"x": "y"},
             otf_timeout_seconds=0.01,
@@ -136,9 +175,7 @@ class TestPrecomputedAdminAnalysis:
     @pytest.mark.asyncio
     async def test_filters_by_aoi_id_and_date_window(self, precomputed_admin_results):
         analyzer = IntegratedAlertsAnalyzer(
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=precomputed_admin_results
-            ),
+            precomputed_sources=admin_sources(precomputed_admin_results),
             input_uris={},
         )
         analysis = make_analysis(
@@ -173,9 +210,7 @@ class TestPrecomputedAdminAnalysis:
         self, precomputed_admin_results
     ):
         analyzer = IntegratedAlertsAnalyzer(
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=precomputed_admin_results
-            ),
+            precomputed_sources=admin_sources(precomputed_admin_results),
             input_uris={},
         )
         analysis = make_analysis(
@@ -200,6 +235,99 @@ class TestPrecomputedAdminAnalysis:
         )
 
         pd.testing.assert_frame_equal(expected, df, check_like=True, check_dtype=False)
+
+
+class TestPrecomputedCustomAnalysis:
+    @pytest.fixture
+    def custom_results_table(self, tmp_path):
+        return write_results_table(
+            tmp_path / "custom-integrated-alerts.parquet",
+            [
+                ("custom-a", "2024-01-01", "low", 2, 6.0),
+                ("custom-a", "2024-01-01", "low", 12, 4.0),
+                ("custom-b", "2024-02-02", "high", 2, 3.0),
+            ],
+        )
+
+    @staticmethod
+    def custom_sources(table_uri):
+        results = DuckDbPrecalcQueryService(table_uri=table_uri)
+        return {"custom_aoi": PrecomputedSource(results, ResultsTableCoverage(results))}
+
+    @pytest.mark.asyncio
+    async def test_custom_ids_with_precomputed_rows_are_read_from_the_table(
+        self, custom_results_table
+    ):
+        analyzer = IntegratedAlertsAnalyzer(
+            precomputed_sources=self.custom_sources(custom_results_table),
+            input_uris={},
+        )
+        analysis = make_analysis(
+            {"type": "custom_aoi", "ids": ["custom-a"]},
+            start_date="2024-01-01",
+            end_date="2024-12-31",
+        )
+
+        await analyzer.analyze(analysis)
+
+        assert analysis.result == {
+            "aoi_id": ["custom-a"],
+            "alert_date": ["2024-01-01"],
+            "alert_confidence": ["low"],
+            "area_ha": [10.0],
+            "aoi_type": ["custom_aoi"],
+        }
+
+    @pytest.mark.asyncio
+    async def test_custom_ids_without_precomputed_rows_are_computed_on_the_fly(
+        self, custom_results_table
+    ):
+        otf_rows = pd.DataFrame(
+            {
+                "alert_date": ["2024-03-03"],
+                "alert_confidence": ["high"],
+                "area_ha": [2.0],
+                "aoi_type": ["custom_aoi"],
+                "aoi_id": ["custom-new"],
+            }
+        )
+
+        class RecordingEngine:
+            def __init__(self):
+                self.aois = []
+
+            def map(self, task, aois, geojsons):
+                self.aois.extend(aois)
+                return []
+
+            async def gather(self, futures):
+                return [dd.from_pandas(otf_rows, npartitions=1)]
+
+            async def compute(self, frame):
+                return frame.compute()
+
+        class StoredGeometries:
+            async def load(self, aoi):
+                return [box(0, 0, 1, 1)] * len(aoi.ids), [0.0] * len(aoi.ids)
+
+        engine = RecordingEngine()
+        analyzer = IntegratedAlertsAnalyzer(
+            precomputed_sources=self.custom_sources(custom_results_table),
+            compute_engine=engine,
+            aoi_geometry_repository=StoredGeometries(),
+            input_uris={},
+        )
+        analysis = make_analysis(
+            {"type": "custom_aoi", "ids": ["custom-a", "custom-new"]},
+            start_date="2024-01-01",
+            end_date="2024-12-31",
+        )
+
+        await analyzer.analyze(analysis)
+
+        assert engine.aois == [{"type": "custom_aoi", "id": "custom-new"}]
+        assert sorted(analysis.result["aoi_id"]) == ["custom-a", "custom-new"]
+        assert set(analysis.result["aoi_type"]) == {"custom_aoi"}
 
 
 class TestOtfAnalysis:

@@ -43,6 +43,14 @@ class TestIntegratedAlertsAnalyticsIn:
                 end_date="2024-12-31",
             )
 
+    def test_accepts_saved_custom_aois(self):
+        analytics_in = IntegratedAlertsAnalyticsIn(
+            aoi={"type": "custom_aoi", "ids": ["0b6c1f8e-3d2a-4c55-9a8e-2f4d6b7c9e10"]},
+            start_date="2024-01-01",
+            end_date="2024-12-31",
+        )
+        assert analytics_in.aoi.type == "custom_aoi"
+
     def test_land_filter_accepts_natural_lands(self):
         analytics_in = IntegratedAlertsAnalyticsIn(
             aoi={"type": "admin", "ids": ["IDN.24.9"]},
