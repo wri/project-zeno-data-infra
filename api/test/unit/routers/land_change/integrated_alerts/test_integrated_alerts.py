@@ -187,8 +187,8 @@ def test_points_post_then_get_returns_points(tmp_path):
     repository = FileSystemAnalysisRepository(POINTS_ANALYTICS_NAME)
 
     class FakeGeometryRepository:
-        async def load(self, aoi_type, aoi_ids):
-            return [aoi_polygon()] * len(aoi_ids), [0] * len(aoi_ids)
+        async def load(self, aoi):
+            return [aoi_polygon()] * len(aoi.ids), [0] * len(aoi.ids)
 
     def points_service():
         return AnalysisService(
@@ -288,8 +288,8 @@ def test_export_post_then_get_returns_a_fresh_download_url(tmp_path):
     file_store = FakeExportFileStore()
 
     class FakeGeometryRepository:
-        async def load(self, aoi_type, aoi_ids):
-            return [aoi_polygon()] * len(aoi_ids), [0] * len(aoi_ids)
+        async def load(self, aoi):
+            return [aoi_polygon()] * len(aoi.ids), [0] * len(aoi.ids)
 
     def export_service():
         return AnalysisService(

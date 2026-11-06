@@ -9,6 +9,7 @@ import shapely
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
@@ -44,6 +45,7 @@ def create_points_analysis_service_for_tests() -> AnalysisService:
         analysis_repository=get_file_system_analysis_repository(),
         analyzer=IntegratedAlertsPointsAnalyzer(
             points_repository=ParquetAlertPointsRepository(TABLE_URI),
+            geometry_repository=get_aoi_geometry_repository(),
             input_uris=build_points_input_uris(VERSION),
         ),
         event=POINTS_ANALYTICS_NAME,

@@ -11,6 +11,7 @@ import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
     IntegratedAlertsPointsExportAnalyzer,
 )
@@ -49,6 +50,7 @@ async def export_points(request_body, file_store):
             analyzer=IntegratedAlertsPointsExportAnalyzer(
                 points_repository=ParquetAlertPointsRepository(TABLE_URI),
                 file_store=file_store,
+                geometry_repository=get_aoi_geometry_repository(),
                 input_uris=build_points_input_uris(VERSION),
             ),
             event=POINTS_EXPORT_ANALYTICS_NAME,

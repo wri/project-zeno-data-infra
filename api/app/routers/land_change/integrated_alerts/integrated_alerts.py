@@ -232,6 +232,9 @@ async def get_points_request_version(
 
 def create_points_analysis_service(
     analysis_repository: AnalysisRepository = Depends(get_points_analysis_repository),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
     version: str = Depends(get_points_request_version),
 ) -> AnalysisService:
     input_uris = build_points_input_uris(version)
@@ -241,6 +244,7 @@ def create_points_analysis_service(
             points_repository=ParquetAlertPointsRepository(
                 input_uris["alert_points_table_uri"]
             ),
+            geometry_repository=aoi_geometry_repository,
             input_uris=input_uris,
         ),
         event=POINTS_ANALYTICS_NAME,
@@ -254,7 +258,7 @@ def create_points_analysis_service(
     status_code=202,
     summary="Create Integrated Alerts Points Task",
     description=(
-        "List the newest integrated alerts in one AOI (one id, or one feature), "
+        "List the newest integrated alerts in one admin or saved custom area, "
         "one row per alert pixel with its pixel center (lat, lon), date, "
         "confidence and SBTN natural lands class, newest date first. Only the "
         "most recent alerts are stored; the result metadata gives the stored and "
@@ -334,6 +338,9 @@ def create_points_export_analysis_service(
         get_points_export_analysis_repository
     ),
     file_store: S3ExportFileStore = Depends(get_export_file_store),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
     version: str = Depends(get_latest_integrated_alerts_version),
 ) -> AnalysisService:
     input_uris = build_points_input_uris(version)
@@ -344,6 +351,7 @@ def create_points_export_analysis_service(
                 input_uris["alert_points_table_uri"]
             ),
             file_store=file_store,
+            geometry_repository=aoi_geometry_repository,
             input_uris=input_uris,
         ),
         event=POINTS_EXPORT_ANALYTICS_NAME,
@@ -357,8 +365,9 @@ def create_points_export_analysis_service(
     status_code=202,
     summary="Create Integrated Alerts Points Export Task",
     description=(
-        "Write the integrated alerts in one GADM area to a CSV or zipped "
-        "shapefile, one row per alert pixel with the same columns as `/points`, "
+        "Write the integrated alerts in one admin or saved custom area to a CSV "
+        "or zipped shapefile, one row per alert pixel with the same columns as "
+        "`/points`, "
         "newest first. Only the most recent alerts are stored, and at most "
         "1,000,000 are written; the result metadata gives the stored and served "
         "date ranges and whether the file was cut at that cap. Once saved, the "

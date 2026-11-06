@@ -12,7 +12,7 @@ from app.domain.analyzers.integrated_alerts_points_analyzer_helpers import (
     POINTS_RESULT_COLUMNS,
     confidence_codes,
     format_points,
-    read_admin_geometries,
+    read_aoi_geometry,
     served_alerts_metadata,
     served_dates,
 )
@@ -21,9 +21,7 @@ from app.domain.repositories.alert_points_repository import (
     AlertPointsQuery,
     AlertPointsRepository,
 )
-from app.domain.repositories.gadm_aoi_geometry_repository import (
-    GadmAoiGeometryRepository,
-)
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.infrastructure.export.alert_points_files import (
     write_alert_points_shapefile_zip,
 )
@@ -41,27 +39,26 @@ EXPORT_FILE_TYPES = {
 
 
 class IntegratedAlertsPointsExportAnalyzer(Analyzer):
-    """Write the newest integrated alert points in a GADM area (one per request),
-    up to POINTS_EXPORT_MAX_POINTS, to a CSV or zipped shapefile in an export
-    file store."""
+    """Write the newest integrated alert points in an admin or saved custom area
+    (one per request), up to the export cap, to a CSV or zipped shapefile in an
+    export file store."""
 
     def __init__(
         self,
         points_repository: AlertPointsRepository,
         file_store,
+        geometry_repository: AoiGeometryRepository,
         input_uris: Dict[str, str] | None = None,
-        geometry_repository=None,
     ):
         self.points_repository = points_repository
         self.file_store = file_store
+        self.geometry_repository = geometry_repository
         self.input_uris = input_uris
-        self.geometry_repository = geometry_repository or GadmAoiGeometryRepository()
 
     @nr_agent.function_trace(name="IntegratedAlertsPointsExportAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
         analytics_in = IntegratedAlertsPointsExportIn(**analysis.metadata)
-        # One AOI per request (validated).
-        (aoi_id,), (geometry,) = await read_admin_geometries(
+        aoi_id, geometry = await read_aoi_geometry(
             self.geometry_repository, analytics_in
         )
         source = await self.points_repository.source()
