@@ -12,6 +12,10 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
     build_input_uris,
 )
 from app.domain.models.environment import Environment
+from app.domain.repositories.precomputed_table import (
+    EveryAoiCovered,
+    PrecomputedSource,
+)
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -55,9 +59,14 @@ def create_analysis_service_for_tests(
         analysis_repository=analysis_repository,
         analyzer=IntegratedAlertsAnalyzer(
             compute_engine=request.app.state.dask_client,
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=INPUT_URIS["admin_results_table_uri"]
-            ),
+            precomputed_sources={
+                "admin": PrecomputedSource(
+                    DuckDbPrecalcQueryService(
+                        table_uri=INPUT_URIS["admin_results_table_uri"]
+                    ),
+                    EveryAoiCovered(),
+                )
+            },
             input_uris=INPUT_URIS,
         ),
         event=ANALYTICS_NAME,
@@ -68,7 +77,7 @@ async def post_analytics(analytics_in):
     # The router sets _version from the S3 `latest` marker; pin it here so the
     # expected thumbprint matches the API's regardless of the live marker.
     analytics_in._version = VERSION
-    analyzer = IntegratedAlertsAnalyzer(input_uris=INPUT_URIS)
+    analyzer = IntegratedAlertsAnalyzer(precomputed_sources={}, input_uris=INPUT_URIS)
     resource_tp = resource_thumbprint(analytics_in, analyzer)
 
     delete_resource_files(ANALYTICS_NAME, resource_tp)

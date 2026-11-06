@@ -15,6 +15,7 @@ from ..common.areas_of_interest import (
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
+    SavedCustomAreaOfInterest,
 )
 from ..common.base import Response, StrictBaseModel
 
@@ -37,6 +38,7 @@ AoiUnion = Union[
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,
     CustomAreaOfInterest,
+    SavedCustomAreaOfInterest,
 ]
 
 
