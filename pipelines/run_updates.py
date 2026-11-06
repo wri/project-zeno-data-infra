@@ -20,6 +20,7 @@ from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
+from pipelines.subscription_emails.prefect_flows import subscription_emails_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
 from pipelines.wur_alert_drivers.prefect_flows import wur_flow
 
@@ -140,6 +141,21 @@ def run_wur_update(
     )
 
 
+def run_subscription_emails(
+    version=None,
+    overwrite=False,
+    is_latest=False,
+    dry_run=False,
+    test_recipient=None,
+) -> list[str]:
+    # version, overwrite and is_latest aren't used: the emails are always for the
+    # latest integrated alerts version, and re-running only sends unsent emails.
+    count = subscription_emails_flow.subscription_emails_flow(
+        dry_run=dry_run, test_recipient=test_recipient
+    )
+    return [f"{count} subscription emails"]
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -165,6 +181,9 @@ class UpdateFlow(str, Enum):
     AOIS_UPDATE = "aois_update"
     # Currently run by hand about once a month when new WUR drivers data is available
     WUR_UPDATE = "wur_update"
+    # Run as a subflow at the end of integrated_alerts_update; run by hand to send
+    # emails left unsent after a failure
+    SUBSCRIPTION_EMAILS = "subscription_emails"
 
 
 update_flows = {
@@ -178,6 +197,7 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.AOIS_UPDATE: run_aois_update,
     UpdateFlow.WUR_UPDATE: run_wur_update,
+    UpdateFlow.SUBSCRIPTION_EMAILS: run_subscription_emails,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -195,6 +215,7 @@ VERSION_REQUIRED_FLOWS = (
 CLUSTERLESS_FLOWS = (
     UpdateFlow.AOIS_UPDATE,
     UpdateFlow.WUR_UPDATE,
+    UpdateFlow.SUBSCRIPTION_EMAILS,
 )
 
 # flow_name values that route into run_land_ghg_inventory_update
@@ -247,6 +268,8 @@ def _is_iso_date(value) -> bool:
         "all necessary updates for TCL."
         "-'wur_update' will create a new Data API version of the WUR alert drivers "
         "dataset (needs version and content_date)."
+        "-'subscription_emails' will email subscribers the past week's integrated "
+        "alerts in their dashboards' areas."
     ),
 )
 def run_updates(
@@ -259,6 +282,8 @@ def run_updates(
     local=False,
     performance_report_path=None,
     content_date=None,
+    dry_run=False,
+    test_recipient=None,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -269,6 +294,7 @@ def run_updates(
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
+    dry_run = str(dry_run).lower() == "true"
     # bbox (land_ghg_inventory and integrated_alerts flows only) clips the reduce
     # to one area. It is independent of where compute runs: Coiled by default, or
     # local when local=True.
@@ -307,6 +333,9 @@ def run_updates(
             kwargs["bbox"] = bbox_geom
         elif flow_name == UpdateFlow.WUR_UPDATE:
             kwargs["content_date"] = content_date
+        elif flow_name == UpdateFlow.SUBSCRIPTION_EMAILS:
+            kwargs["dry_run"] = dry_run
+            kwargs["test_recipient"] = test_recipient or None
         with report:
             result_uris = flow_fn(**kwargs)
 
@@ -359,6 +388,19 @@ def run_updates(
     ),
 )
 @click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Log the emails instead of sending them (subscription_emails only).",
+)
+@click.option(
+    "--test-recipient",
+    default=None,
+    help=(
+        "Send every email to this address instead of the subscriber's "
+        "(subscription_emails only)."
+    ),
+)
+@click.option(
     "--local",
     is_flag=True,
     help="Run compute on this machine instead of a Coiled cluster.",
@@ -378,6 +420,8 @@ def cli(
     bbox,
     aoi_source,
     content_date,
+    dry_run,
+    test_recipient,
     local,
     performance_report_path,
 ):
@@ -391,6 +435,8 @@ def cli(
         local=local,
         performance_report_path=performance_report_path,
         content_date=content_date,
+        dry_run=dry_run,
+        test_recipient=test_recipient,
     )
 
 
