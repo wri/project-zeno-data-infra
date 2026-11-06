@@ -1,91 +1,64 @@
-from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
 
-import duckdb
-import pyarrow as pa
+import pandas as pd
 
-
-@dataclass(frozen=True)
-class NameSpec:
-    """How one AOI type is named, as SQL over the attributes of its pipeline
-    source's AOIs: its name, display name, list of alternate names, importance
-    when Wikipedia gives none (0 to 1), and whether to leave it out of search."""
-
-    aoi_type: str
-    source: str
-    name: str
-    display_name: str
-    fallback_importance: str
-    alternate_names: str = "[]"
-    excluded: str = "false"
+from pipelines.aois.name_index.external_importance import ExternalDetails
+from pipelines.aois.name_index.namers.aoi_namer import AoiNamer, present
 
 
 def name_records(
-    aois: Mapping[str, pa.Table],
-    specs: Sequence[NameSpec],
-    importance: pa.Table,
-    alternate_names: pa.Table,
-) -> pa.Table:
+    aois: Mapping[str, pd.DataFrame],
+    namers: Sequence[AoiNamer],
+    external: ExternalDetails,
+) -> pd.DataFrame:
     """One record per named AOI: its name, display name, alternate names from
-    both its source and Wikipedia, importance and area."""
-    connection = duckdb.connect()
-    named = pa.concat_tables(
-        [own_names(connection, spec, aois[spec.aoi_type]) for spec in specs]
+    both its source and the external source, importance and area. AOIs the
+    external source doesn't know fall back to their type's importance."""
+    named = pd.concat(
+        [
+            namer.names(aois[namer.aoi_type]).assign(aoi_type=namer.aoi_type)
+            for namer in namers
+        ],
+        ignore_index=True,
     )
-    connection.register("named", named)
-    connection.register("wikipedia_importance", importance)
-    connection.register("wikipedia_names", alternate_names)
-    return connection.sql(
-        """
-        WITH wikipedia_alternates AS (
-            SELECT aoi_type, aoi_id, list(alternate_name) AS alternate_names
-            FROM wikipedia_names
-            GROUP BY aoi_type, aoi_id
-        ),
-        all_alternates AS (
-            SELECT aoi_type, aoi_id,
-                list_transform(
-                    list_concat(
-                        named.alternate_names,
-                        coalesce(wikipedia_alternates.alternate_names, [])
-                    ),
-                    alternate_name -> trim(alternate_name)
-                ) AS alternate_names
-            FROM named
-            LEFT JOIN wikipedia_alternates USING (aoi_type, aoi_id)
-        )
-        SELECT aoi_type, aoi_id, name, display_name,
-            list_distinct(list_filter(
-                all_alternates.alternate_names,
-                alternate_name -> alternate_name <> ''
-            )) AS alternate_names,
-            coalesce(wikipedia_importance.importance, fallback_importance)
-                AS importance,
-            area_ha
-        FROM named
-        JOIN all_alternates USING (aoi_type, aoi_id)
-        LEFT JOIN wikipedia_importance USING (aoi_type, aoi_id)
-        """
-    ).to_arrow_table()
+    named = named[named["name"].notna()]
+    external_names = (
+        external.alternate_names.groupby(["aoi_type", "aoi_id"])["alternate_name"]
+        .agg(list)
+        .rename("external_names")
+        .reset_index()
+    )
+    records = named.merge(external_names, how="left", on=["aoi_type", "aoi_id"])
+    records = records.merge(
+        external.importance[["aoi_type", "aoi_id", "importance"]],
+        how="left",
+        on=["aoi_type", "aoi_id"],
+    )
+    records["alternate_names"] = [
+        distinct(own, outside)
+        for own, outside in zip(records["alternate_names"], records["external_names"])
+    ]
+    records["importance"] = records["importance"].fillna(records["fallback_importance"])
+    return records[
+        [
+            "aoi_type",
+            "aoi_id",
+            "name",
+            "display_name",
+            "alternate_names",
+            "importance",
+            "area_ha",
+        ]
+    ]
 
 
-def own_names(
-    connection: duckdb.DuckDBPyConnection, spec: NameSpec, aois: pa.Table
-) -> pa.Table:
-    """Each AOI's names as its spec gives them, leaving out excluded and
-    unnamed AOIs."""
-    connection.register("aois", aois)
-    names = connection.sql(
-        f"""
-        SELECT $aoi_type AS aoi_type, aoi_id, {spec.name} AS name,
-            {spec.display_name} AS display_name,
-            {spec.alternate_names}::VARCHAR[] AS alternate_names,
-            ({spec.fallback_importance})::DOUBLE AS fallback_importance,
-            area_ha::DOUBLE AS area_ha
-        FROM aois
-        WHERE NOT coalesce({spec.excluded}, false) AND {spec.name} IS NOT NULL
-        """,
-        params={"aoi_type": spec.aoi_type},
-    ).to_arrow_table()
-    connection.unregister("aois")
+def distinct(*name_lists: Iterable[str] | float) -> list[str]:
+    """Every non-blank name, trimmed and kept once, in order."""
+    names: list[str] = []
+    for name_list in name_lists:
+        if not isinstance(name_list, list):
+            continue
+        for name in present(*name_list):
+            if name.strip() not in names:
+                names.append(name.strip())
     return names

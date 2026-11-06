@@ -1,4 +1,4 @@
-import pyarrow as pa
+import pandas as pd
 import tantivy
 
 
@@ -37,15 +37,14 @@ def search_schema() -> tantivy.Schema:
     return builder.build()
 
 
-def write_search_index(records: pa.Table, directory: str, word_pattern: str) -> str:
+def write_search_index(records: pd.DataFrame, directory: str, word_pattern: str) -> str:
     """Writes a Tantivy index of the AOI name records to a local directory."""
     index = tantivy.Index(search_schema(), path=directory)
     for name, analyzer in name_analyzers(word_pattern).items():
         index.register_tokenizer(name, analyzer)
     writer = index.writer(heap_size=1_000_000_000, num_threads=1)
-    for batch in records.to_batches():
-        for record in batch.to_pylist():
-            writer.add_document(search_document(record))
+    for record in records.to_dict("records"):
+        writer.add_document(search_document(record))
     writer.commit()
     writer.wait_merging_threads()
     return directory
@@ -60,6 +59,6 @@ def search_document(record: dict) -> tantivy.Document:
         display_name=record["display_name"],
         alternate_names=record["alternate_names"],
         alternate_words=record["alternate_names"],
-        importance=record["importance"],
-        area_ha=record["area_ha"] or 0.0,
+        importance=float(record["importance"]),
+        area_ha=0.0 if pd.isna(record["area_ha"]) else float(record["area_ha"]),
     )

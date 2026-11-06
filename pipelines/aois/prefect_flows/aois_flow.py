@@ -1,12 +1,13 @@
 from datetime import date
 
+from prefect import flow, task
+
 from pipelines.aois import stages
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.geometry_repair import repair_geometries
 from pipelines.aois.prefect_flows.aoi_name_index_flow import aoi_name_index_flow
 from pipelines.aois.sources import aoi_prefix, aoi_sources, select_aoi_sources
 from pipelines.utils import s3_uri_exists
-from prefect import flow, task
 
 
 @flow(name="AOI vectors")
@@ -36,7 +37,7 @@ def aois_update(
     build_date: date,
     aoi_source: str | None = None,
     overwrite: bool = False,
-    refresh_wikimedia_importance: bool = False,
+    refresh_importance: bool = False,
     index_only: bool = False,
 ) -> list[str]:
     """Builds every AOI source's GeoParquet, or only the named source's, then
@@ -50,7 +51,7 @@ def aois_update(
             sources,
             build_date,
             overwrite=overwrite,
-            refresh_wikimedia_importance=refresh_wikimedia_importance,
+            refresh_importance=refresh_importance,
         )
     )
     return uris

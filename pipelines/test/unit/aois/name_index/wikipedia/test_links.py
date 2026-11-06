@@ -1,18 +1,16 @@
-import pyarrow as pa
-from pipelines.aois.name_index.links import (
+import pandas as pd
+
+from pipelines.aois.name_index.wikipedia.links import (
     WikidataLink,
+    at_admin_level,
     link_to_wikidata,
     wikipedia_details,
+    without_revision,
 )
 
 
 def identifiers(*pairs):
-    return pa.table(
-        {
-            "wikidata_id": [wikidata_id for wikidata_id, _ in pairs],
-            "id": [identifier for _, identifier in pairs],
-        }
-    )
+    return pd.DataFrame(pairs, columns=["wikidata_id", "id"])
 
 
 def wikimedia_file(tmp_path, rows):
@@ -24,12 +22,12 @@ def wikimedia_file(tmp_path, rows):
     return str(path)
 
 
-def as_tuples(table):
-    return sorted(tuple(row.values()) for row in table.to_pylist())
+def as_tuples(frame):
+    return sorted(frame.itertuples(index=False, name=None))
 
 
 def test_each_property_links_only_the_aois_its_rule_applies_to():
-    gadm = pa.table(
+    gadm = pd.DataFrame(
         {
             "aoi_id": ["BRA", "BRA.14", "BRA.14.3"],
             "adm_level": [0, 1, 2],
@@ -46,12 +44,10 @@ def test_each_property_links_only_the_aois_its_rule_applies_to():
             "P8119": identifiers(("Q40", "BR.PA"), ("Q41", "BR.PA.XX")),
         },
         [
-            WikidataLink(
-                "P8714", "admin", wikidata_identifier=r"regexp_replace(id, '_\d+$', '')"
-            ),
-            WikidataLink("P298", "admin", applies_to="adm_level = 0"),
-            WikidataLink("P8119", "admin", "hasc_1", "adm_level = 1"),
-            WikidataLink("P8119", "admin", "hasc_2", "adm_level = 2"),
+            WikidataLink("P8714", "admin", wikidata_identifier=without_revision),
+            WikidataLink("P298", "admin", applies_to=at_admin_level(0)),
+            WikidataLink("P8119", "admin", "hasc_1", at_admin_level(1)),
+            WikidataLink("P8119", "admin", "hasc_2", at_admin_level(2)),
         ],
     )
 
@@ -64,7 +60,7 @@ def test_each_property_links_only_the_aois_its_rule_applies_to():
 
 
 def test_importance_is_each_aois_best_known_linked_item(tmp_path):
-    links = pa.table(
+    links = pd.DataFrame(
         {
             "aoi_type": ["admin", "admin"],
             "aoi_id": ["BRA.14", "BRA.14"],
@@ -86,7 +82,7 @@ def test_importance_is_each_aois_best_known_linked_item(tmp_path):
 
 
 def test_alternate_names_are_cleaned_article_titles_of_the_chosen_item(tmp_path):
-    links = pa.table(
+    links = pd.DataFrame(
         {"aoi_type": ["admin"], "aoi_id": ["BRA.14"], "wikidata_id": ["Q1"]}
     )
     wikimedia = wikimedia_file(

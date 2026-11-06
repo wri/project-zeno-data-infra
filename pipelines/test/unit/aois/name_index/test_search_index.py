@@ -1,12 +1,13 @@
-import pyarrow as pa
+import pandas as pd
 import tantivy
+
 from pipelines.aois.name_index.search_index import name_analyzers, write_search_index
 
 WORD_PATTERN = r"[^\s,.;:()\[\]/'\"-]+"
 
 
 def test_names_are_found_by_any_word_ignoring_case_and_accents(tmp_path):
-    records = pa.table(
+    records = pd.DataFrame(
         {
             "aoi_type": ["admin"],
             "aoi_id": ["BRA.14"],

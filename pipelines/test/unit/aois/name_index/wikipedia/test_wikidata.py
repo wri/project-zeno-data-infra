@@ -1,4 +1,4 @@
-from pipelines.aois.name_index.wikidata import parse_identifiers
+from pipelines.aois.name_index.wikipedia.wikidata import parse_identifiers
 
 
 def test_identifiers_keep_the_item_id_and_text_values_like_na():
@@ -10,7 +10,7 @@ def test_identifiers_keep_the_item_id_and_text_values_like_na():
 
     identifiers = parse_identifiers(csv)
 
-    assert identifiers.to_pylist() == [
+    assert identifiers.to_dict("records") == [
         {"wikidata_id": "Q155", "id": "BRA"},
         {"wikidata_id": "Q1033", "id": "NA"},
     ]

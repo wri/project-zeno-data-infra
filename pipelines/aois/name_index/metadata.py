@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import fsspec
 
@@ -13,26 +14,6 @@ class AoiFile:
 
 
 @dataclass(frozen=True)
-class WikidataQuery:
-    """Wikidata has no version, so the time of the last query stands in for
-    one."""
-
-    endpoint: str
-    properties: list[str]
-    queried_at: str
-
-
-@dataclass(frozen=True)
-class WikimediaImportanceFile:
-    """The file has no version, so the date its source was last modified
-    stands in for one."""
-
-    url: str
-    source_date: str
-    cache_uri: str
-
-
-@dataclass(frozen=True)
 class NameIndexMetadata:
     """What one build of the AOI name index was made from, and the pattern its
     names were split into words with, which search must split queries with."""
@@ -40,8 +21,7 @@ class NameIndexMetadata:
     version: str
     word_pattern: str
     aoi_files: list[AoiFile]
-    wikidata: WikidataQuery
-    wikimedia_importance: WikimediaImportanceFile
+    external_importance: dict[str, Any]
 
 
 def write_metadata(metadata: NameIndexMetadata, uri: str) -> str:

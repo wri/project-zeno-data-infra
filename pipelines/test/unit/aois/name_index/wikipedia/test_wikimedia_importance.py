@@ -1,7 +1,10 @@
 from pathlib import Path
 
 import pytest
-from pipelines.aois.name_index.wikimedia_importance import WikimediaImportanceCache
+
+from pipelines.aois.name_index.wikipedia.wikimedia_importance import (
+    WikimediaImportanceCache,
+)
 
 URL = "https://nominatim.org/data/wikimedia-importance.csv.gz"
 
