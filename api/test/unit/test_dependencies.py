@@ -6,6 +6,9 @@ from fastapi.testclient import TestClient
 
 from app.dependencies import get_aoi_geometry_repository, get_environment
 from app.domain.models.environment import Environment
+from app.domain.repositories.custom_aoi_geometry_repository import (
+    CustomAoiGeometryRepository,
+)
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
 )
@@ -62,7 +65,7 @@ class TestGetEnvironmentDependency:
                     )
 
 
-def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
+def test_each_aoi_type_has_a_geometry_source():
     repository = get_aoi_geometry_repository()
 
     assert set(repository.repositories) == {
@@ -70,7 +73,11 @@ def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
         "key_biodiversity_area",
         "protected_area",
         "indigenous_land",
+        "custom_aoi",
     }
+    assert isinstance(
+        repository.repositories.pop("custom_aoi"), CustomAoiGeometryRepository
+    )
     for source in repository.repositories.values():
         assert isinstance(source, GeoParquetAoiGeometryRepository)
         assert re.fullmatch(

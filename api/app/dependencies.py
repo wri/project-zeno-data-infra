@@ -9,6 +9,9 @@ from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepositor
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
+from app.domain.repositories.custom_aoi_geometry_repository import (
+    CustomAoiGeometryRepository,
+)
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
@@ -43,7 +46,7 @@ async def get_environment(
 
 def get_aoi_geometry_repository() -> AoiGeometryRepository:
     """Geometries for predefined AOIs, from the pipeline's GeoParquet copy of
-    each dataset at a pinned version."""
+    each dataset at a pinned version, and for stored custom AOIs."""
     vectors = "s3://lcl-analytics/vectors/aois"
     return AoiTypeRoutingGeometryRepository(
         {
@@ -59,6 +62,7 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
             "indigenous_land": GeoParquetAoiGeometryRepository(
                 f"{vectors}/landmark/v20260617/aois.parquet"
             ),
+            "custom_aoi": CustomAoiGeometryRepository(get_custom_aoi_repository),
         }
     )
 
