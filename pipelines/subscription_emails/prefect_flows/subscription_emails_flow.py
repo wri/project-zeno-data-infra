@@ -64,6 +64,9 @@ def send_email_task(
 @flow(
     name="Subscription emails",
     log_prints=True,
+    # Safe to retry: emails already sent are recorded and skipped.
+    retries=2,
+    retry_delay_seconds=600,
     description=(
         "Send each dashboard subscriber a weekly email of the high and highest "
         "confidence integrated alerts in their dashboards' areas"

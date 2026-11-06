@@ -181,7 +181,8 @@ class UpdateFlow(str, Enum):
     AOIS_UPDATE = "aois_update"
     # Currently run by hand about once a month when new WUR drivers data is available
     WUR_UPDATE = "wur_update"
-    # Run right after each weekly integrated alerts update
+    # Run as a subflow at the end of integrated_alerts_update; run by hand to send
+    # emails left unsent after a failure
     SUBSCRIPTION_EMAILS = "subscription_emails"
 
 

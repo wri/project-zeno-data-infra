@@ -284,33 +284,6 @@ resource "prefect_automation" "run_pipelines_on_intdist_update" {
   ]
 }
 
-# The integrated alerts flow emits intdist_latest once it has marked a new
-# version as latest, which then sends the week's subscription emails.
-resource "prefect_automation" "run_subscription_emails_on_intdist_latest" {
-  name    = "run-subscription-emails-on-intdist-latest${local.name_suffix}"
-  enabled = terraform.workspace == "default"
-
-  trigger = {
-    event = {
-      posture   = "Reactive"
-      expect    = ["intdist_latest${local.name_suffix}"]
-      threshold = 1
-      within    = 0
-    }
-  }
-  actions = [
-    {
-      type          = "run-deployment"
-      source        = "selected"
-      deployment_id = prefect_deployment.gnw_zonal_stats_update.id
-      parameters    = jsonencode({
-        flow_name = "subscription_emails"
-      })
-      job_variables = jsonencode({})
-    },
-  ]
-}
-
 
 # taken from https://github.com/PrefectHQ/terraform-prefect-ecs-worker/tree/main/examples/ecs-worker
 module "prefect_vpc" {

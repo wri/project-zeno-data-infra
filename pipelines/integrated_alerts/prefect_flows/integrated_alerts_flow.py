@@ -3,7 +3,6 @@ import os
 
 import boto3
 from prefect import flow, task
-from prefect.events import emit_event
 from prefect.logging import get_run_logger
 
 from pipelines.data_api import DataApiClient
@@ -23,8 +22,14 @@ from pipelines.integrated_alerts.prefect_flows.gadm_integrated_alerts import (
 from pipelines.integrated_alerts.prefect_flows.vector_zonal_stats import (
     integrated_alerts_vector_zonal_stats,
 )
+from pipelines.subscription_emails.prefect_flows.subscription_emails_flow import (
+    subscription_emails_flow,
+)
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
+
+# TODO: enable once the subscription emails are ready to go out.
+SEND_SUBSCRIPTION_EMAILS = False
 
 
 @task
@@ -51,25 +56,6 @@ def write_int_latest_version(version) -> None:
         Body=version.encode("utf-8"),
         ContentType="text/plain",
     )
-
-
-@task
-def emit_int_latest_version_event(version) -> None:
-    """Tell Prefect a new integrated alerts version is the latest, which starts
-    the subscription emails (the run_subscription_emails_on_intdist_latest
-    automation in terraform/prefect.tf)."""
-    # TODO: enable once the subscription emails are ready to go out.
-    if False:
-        # Event names have the same Terraform workspace suffix as the automation.
-        workspace = os.getenv("TF_WORKSPACE", "default")
-        suffix = "" if workspace == "default" else f"-{workspace}"
-        emit_event(
-            event=f"intdist_latest{suffix}",
-            resource={
-                "prefect.resource.id": f"gfw_integrated_dist_alerts/{version}",
-            },
-            payload={"version": version},
-        )
 
 
 @flow(
@@ -137,7 +123,6 @@ def compute_integrated_alerts_zonal_stats(
     # look for a global parquet for this version that may not exist.
     if is_latest and bbox is None:
         write_int_latest_version(version)
-        emit_int_latest_version_event(version)
 
     # Zonal stats for vector AOIs run after the version is marked latest, and a
     # failure (e.g. the custom AOI catalog being unreachable) is logged without
@@ -153,6 +138,18 @@ def compute_integrated_alerts_zonal_stats(
         logger.warning(f"Vector AOI zonal stats failed: {vector_state.message}")
     else:
         result_uris.extend(vector_state.result())
+
+    # Only production emails subscribers. A failure is logged without failing the
+    # release; the emails flow can be re-run by hand, and only sends unsent emails.
+    if (
+        SEND_SUBSCRIPTION_EMAILS
+        and is_latest
+        and bbox is None
+        and os.getenv("TF_WORKSPACE", "default") == "default"
+    ):
+        emails_state = subscription_emails_flow(return_state=True)
+        if emails_state.is_failed():
+            logger.warning(f"Subscription emails failed: {emails_state.message}")
 
     if extra_processing_future is not None:
         # Propagates failure, so fails the flow if the extra processing
