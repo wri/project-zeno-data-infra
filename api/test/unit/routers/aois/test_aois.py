@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from shapely.geometry import box
 
 from app.authentication import get_authenticator
-from app.dependencies import get_aoi_geometry_repository, get_aoi_name_index
+from app.dependencies import get_aoi_geometry_repository, get_aoi_name_search
 from app.domain.models.aoi_match import AoiMatch
 from app.domain.models.custom_aoi import CustomAoiName
 from app.domain.repositories.aoi_geometry_repository import AoiNotFoundError
@@ -23,7 +23,7 @@ class FakeAuthenticator:
         return User(id=token, role=roles[token], extraUserData={})
 
 
-class FakeNameIndex:
+class FakeNameSearch:
     def __init__(self):
         self.searches = []
 
@@ -46,9 +46,9 @@ class FakeGeometryRepository:
 
 @pytest.fixture
 def name_index():
-    index = FakeNameIndex()
+    index = FakeNameSearch()
     app.dependency_overrides[get_authenticator] = FakeAuthenticator
-    app.dependency_overrides[get_aoi_name_index] = lambda: index
+    app.dependency_overrides[get_aoi_name_search] = lambda: index
     app.dependency_overrides[get_custom_aoi_repository_factory] = lambda: (
         FakeCustomAoiRepository
     )

@@ -6,7 +6,6 @@ from pyiceberg.catalog import Catalog, load_catalog
 
 from app.domain.models.environment import Environment
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
-from app.domain.repositories.aoi_name_index import AoiNameIndex
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
@@ -14,13 +13,17 @@ from app.domain.repositories.custom_aoi_geometry_repository import (
     CustomAoiGeometryRepository,
 )
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
+from app.domain.services.aoi_name_ranking import AoiNameRanking
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
 )
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
 )
-from app.infrastructure.persistence.tantivy_aoi_name_index import TantivyAoiNameIndex
+from app.infrastructure.persistence.tantivy_aoi_name_candidates import (
+    TantivyAoiNameCandidates,
+)
+from app.use_cases.aois.aoi_name_search import AoiNameSearch
 
 
 async def get_environment(
@@ -70,10 +73,13 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
 
 
 @lru_cache(maxsize=1)
-def get_aoi_name_index() -> AoiNameIndex:
-    """Names of every predefined AOI, loaded once per process from the index
-    the AOI pipeline built on a pinned date."""
-    return TantivyAoiNameIndex("s3://lcl-analytics/vectors/aois/search/v20261105")
+def get_aoi_name_search() -> AoiNameSearch:
+    """Searches the names of every predefined AOI, in the index the AOI pipeline
+    built on a pinned date, loaded once per process."""
+    return AoiNameSearch(
+        TantivyAoiNameCandidates("s3://lcl-analytics/vectors/aois/search/v20261105"),
+        AoiNameRanking(),
+    )
 
 
 @lru_cache

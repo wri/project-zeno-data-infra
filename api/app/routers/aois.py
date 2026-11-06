@@ -9,14 +9,13 @@ from shapely.geometry import mapping
 from app.authentication import require_resource_watch_admin
 from app.dependencies import (
     get_aoi_geometry_repository,
-    get_aoi_name_index,
+    get_aoi_name_search,
     get_custom_aoi_repository,
 )
 from app.domain.repositories.aoi_geometry_repository import (
     AoiGeometryRepository,
     AoiNotFoundError,
 )
-from app.domain.repositories.aoi_name_index import AoiNameIndex
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.models.aois import (
     AoiFeature,
@@ -26,6 +25,7 @@ from app.models.aois import (
     AoiType,
     aoi_by_type,
 )
+from app.use_cases.aois.aoi_name_search import AoiNameSearch
 
 router = APIRouter(
     prefix="/v0/aois",
@@ -56,7 +56,7 @@ async def search_aois(
     type: Optional[List[AoiType]] = Query(None),
     limit: int = Query(10, ge=1, le=50),
     user_id: Optional[str] = Query(None, min_length=1),
-    name_index: AoiNameIndex = Depends(get_aoi_name_index),
+    name_search: AoiNameSearch = Depends(get_aoi_name_search),
     custom_aoi_repository: Callable[[], CustomAoiRepository] = Depends(
         get_custom_aoi_repository_factory
     ),
@@ -64,7 +64,7 @@ async def search_aois(
     custom_aois = (
         await custom_aoi_repository().names_owned_by(user_id) if user_id else []
     )
-    matches = await name_index.search(
+    matches = await name_search.search(
         q, aoi_types=type, limit=limit, custom_aois=custom_aois
     )
     return AoiSearchResponse(data=[AoiMatchOut(**asdict(m)) for m in matches])

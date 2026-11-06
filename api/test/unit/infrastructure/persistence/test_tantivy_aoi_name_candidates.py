@@ -4,10 +4,12 @@ import pytest
 import tantivy
 
 from app.domain.models.custom_aoi import CustomAoiName
-from app.infrastructure.persistence.tantivy_aoi_name_index import (
-    TantivyAoiNameIndex,
+from app.domain.services.aoi_name_ranking import AoiNameRanking
+from app.infrastructure.persistence.tantivy_aoi_name_candidates import (
+    TantivyAoiNameCandidates,
     name_analyzers,
 )
+from app.use_cases.aois.aoi_name_search import AoiNameSearch
 
 WORD_PATTERN = r"[^\s,.;:()\[\]/'\"-]+"
 
@@ -125,7 +127,7 @@ def index(tmp_path):
             ),
         ],
     )
-    return TantivyAoiNameIndex(str(tmp_path))
+    return AoiNameSearch(TantivyAoiNameCandidates(str(tmp_path)), AoiNameRanking())
 
 
 async def ids(index, text, aoi_types=None):
