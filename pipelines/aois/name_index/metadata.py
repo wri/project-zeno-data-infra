@@ -34,11 +34,11 @@ class WikimediaImportanceFile:
 
 @dataclass(frozen=True)
 class NameIndexMetadata:
-    """What one build of the AOI name index was made from, and how its texts
-    were split into words, which search queries must match."""
+    """What one build of the AOI name index was made from, and the pattern its
+    names were split into words with, which search must split queries with."""
 
     version: str
-    word_separators: str
+    word_pattern: str
     aoi_files: list[AoiFile]
     wikidata: WikidataQuery
     wikimedia_importance: WikimediaImportanceFile

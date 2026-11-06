@@ -3,10 +3,9 @@ from datetime import date, datetime, timezone
 from functools import partial
 from pathlib import Path
 
-import pyarrow.parquet as pq
+import fsspec
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.name_index.aoi_attributes import read_aoi_attributes
-from pipelines.aois.name_index.index_tables import name_index_tables
 from pipelines.aois.name_index.links import link_to_wikidata, wikipedia_details
 from pipelines.aois.name_index.metadata import (
     AoiFile,
@@ -15,6 +14,8 @@ from pipelines.aois.name_index.metadata import (
     WikimediaImportanceFile,
     write_metadata,
 )
+from pipelines.aois.name_index.name_records import name_records
+from pipelines.aois.name_index.search_index import write_search_index
 from pipelines.aois.name_index.specs import name_specs, wikidata_links
 from pipelines.aois.name_index.wikidata import WikidataIdentifiers
 from pipelines.aois.name_index.wikimedia_importance import (
@@ -34,9 +35,9 @@ def aoi_name_index_flow(
     overwrite: bool = False,
     refresh_wikimedia_importance: bool = False,
 ) -> str:
-    """Writes the tables AOI search loads, built from each AOI source's
-    GeoParquet and from Wikipedia, with a metadata file of what they were
-    built from. The metadata is written last, so it marks a complete build.
+    """Writes the Tantivy index AOI search loads, built from each AOI source's
+    GeoParquet and from Wikipedia, with a metadata file of what it was built
+    from. The metadata is written last, so it marks a complete build.
 
     Wikipedia importance comes from the newest cached copy of Nominatim's file,
     unless a refresh is asked for."""
@@ -46,7 +47,7 @@ def aoi_name_index_flow(
     if not overwrite and s3_uri_exists(metadata_uri):
         return prefix
 
-    word_separators = r"[\s,.;:()\[\]/'\"-]+"
+    word_pattern = r"[^\s,.;:()\[\]/'\"-]+"
     user_agent = "gnw-aoi-search/0.1"
     wikidata = WikidataIdentifiers("https://query.wikidata.org/sparql", user_agent)
     wikimedia_url = "https://nominatim.org/data/wikimedia-importance.csv.gz"
@@ -77,16 +78,15 @@ def aoi_name_index_flow(
         linked = task(link_to_wikidata)(aois, identifiers, links)
         importance, alternate_names = task(wikipedia_details)(linked, wikimedia_path)
 
-    tables = task(name_index_tables)(
-        aois, specs, importance, alternate_names, word_separators
-    )
-    for name, table in tables._asdict().items():
-        pq.write_table(table, f"{prefix}/{name}.parquet")
+    records = task(name_records)(aois, specs, importance, alternate_names)
+    with tempfile.TemporaryDirectory() as directory:
+        task(write_search_index)(records, directory, word_pattern)
+        task(upload_directory)(directory, f"{prefix}/index")
 
     write_metadata(
         NameIndexMetadata(
             version=version,
-            word_separators=word_separators,
+            word_pattern=word_pattern,
             aoi_files=aoi_files,
             wikidata=WikidataQuery(
                 endpoint=wikidata.endpoint,
@@ -117,3 +117,9 @@ def aoi_files_for(specs, sources: tuple[AoiSource, ...]) -> list[AoiFile]:
             )
         )
     return aoi_files
+
+
+def upload_directory(directory: str, uri: str) -> str:
+    filesystem, path = fsspec.core.url_to_fs(uri)
+    filesystem.put(f"{directory}/", f"{path}/", recursive=True)
+    return uri

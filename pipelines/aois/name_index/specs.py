@@ -1,5 +1,5 @@
-from pipelines.aois.name_index.index_tables import NameSpec
 from pipelines.aois.name_index.links import WikidataLink
+from pipelines.aois.name_index.name_records import NameSpec
 
 
 def name_specs() -> tuple[NameSpec, ...]:

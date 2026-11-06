@@ -14,13 +14,13 @@ from app.domain.repositories.custom_aoi_geometry_repository import (
     CustomAoiGeometryRepository,
 )
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
-from app.infrastructure.persistence.duck_db_aoi_name_index import DuckDbAoiNameIndex
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
 )
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
 )
+from app.infrastructure.persistence.tantivy_aoi_name_index import TantivyAoiNameIndex
 
 
 async def get_environment(
@@ -73,7 +73,7 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
 def get_aoi_name_index() -> AoiNameIndex:
     """Names of every predefined AOI, loaded once per process from the index
     the AOI pipeline built on a pinned date."""
-    return DuckDbAoiNameIndex("s3://lcl-analytics/vectors/aois/search/v20261104")
+    return TantivyAoiNameIndex("s3://lcl-analytics/vectors/aois/search/v20261105")
 
 
 @lru_cache

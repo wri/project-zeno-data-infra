@@ -1,5 +1,5 @@
 import pyarrow as pa
-from pipelines.aois.name_index.index_tables import name_index_tables
+from pipelines.aois.name_index.name_records import name_records
 from pipelines.aois.name_index.specs import name_specs
 
 
@@ -42,16 +42,12 @@ def test_each_admin_level_is_named_with_its_own_name_and_its_parents():
         }
     )
 
-    tables = name_index_tables({"admin": gadm}, admin, no_importance, empty, r"[\s,]+")
+    rows = name_records({"admin": gadm}, admin, no_importance, empty).to_pylist()
 
     names = sorted(
-        (row["name"], row["display_name"]) for row in tables.names.to_pylist()
+        (row["name"], row["display_name"], row["alternate_names"]) for row in rows
     )
     assert names == [
-        ("Schwyz", "Schwyz, Switzerland"),
-        ("Wollerau", "Wollerau, Höfe, Schwyz, Switzerland"),
+        ("Schwyz", "Schwyz, Switzerland", []),
+        ("Wollerau", "Wollerau, Höfe, Schwyz, Switzerland", ["Wolrau"]),
     ]
-    alternates = [
-        row["text"] for row in tables.search_texts.to_pylist() if row["is_alternate"]
-    ]
-    assert alternates == ["wolrau"]
