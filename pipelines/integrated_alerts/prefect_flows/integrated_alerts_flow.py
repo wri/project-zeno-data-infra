@@ -123,6 +123,7 @@ def compute_integrated_alerts_zonal_stats(
     vector_state = integrated_alerts_vector_zonal_stats(
         integrated_alerts_zarr_uri,
         version,
+        aoi_types=["admin"],
         overwrite=overwrite,
         bbox=bbox,
         return_state=True,
