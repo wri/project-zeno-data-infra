@@ -529,3 +529,9 @@ async def test_flox_handler_tree_cover_loss_from_fires():
         atol=1e-8,  # Absolute tolerance
         rtol=1e-4,  # Relative tolerance
     )
+
+
+def test_input_uris_include_intact_forest():
+    # Results are cached by input URIs, so every dataset a request can read
+    # must be listed for a change to it to invalidate cached results.
+    assert str(Dataset.intact_forest) in INPUT_URIS[Environment.production]
