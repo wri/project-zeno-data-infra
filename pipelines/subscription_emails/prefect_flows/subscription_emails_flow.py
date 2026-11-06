@@ -14,7 +14,7 @@ SPARKPOST_API_KEY_SECRET_ID = "sparkpost/api-key"
 ZENO_SUPERUSER_KEY_SECRET_ID = "project-zeno/superuser-key"
 # The SparkPost template's HTML is kept in ../templates/gnw_weekly_alerts.html.
 # Its subject (set in SparkPost) is
-#   Your weekly alerts: {{total_ha}} ha across {{dashboard_count}}
+#   Your weekly alerts: {{total_area}} across {{dashboard_count}}
 #   {{if dashboard_count == 1}}dashboard{{else}}dashboards{{end}}
 TEMPLATE_ID = "gnw-weekly-alerts"
 

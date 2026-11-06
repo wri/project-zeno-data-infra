@@ -195,12 +195,15 @@ def aoi_names(aois: pd.DataFrame) -> dict[str, str]:
     return names
 
 
-def format_ha(area_ha: float) -> str:
-    """Whole hectares with thousands separators, or "<1" for a non-zero area
-    under 1 ha."""
+def format_area(area_ha: float) -> str:
+    """An area with its unit: thousands of hectares to one decimal (e.g.
+    "48.0 kha") from 1,000 ha up, else whole hectares (e.g. "860 ha"), or
+    "<1 ha" for a non-zero area under 1 ha."""
     if 0 < area_ha < 1:
-        return "<1"
-    return f"{round(area_ha):,}"
+        return "<1 ha"
+    if round(area_ha) >= 1000:
+        return f"{area_ha / 1000:,.1f} kha"
+    return f"{round(area_ha)} ha"
 
 
 def format_date(day: date) -> str:
@@ -262,7 +265,7 @@ def build_emails(
         emails[email] = {
             "week_label": format_week(start_date, end_date),
             "latest_update": format_date(latest_update),
-            "total_ha": format_ha(sum(d["total_ha"] for d in ranked)),
+            "total_area": format_area(sum(d["total_ha"] for d in ranked)),
             "dashboard_count": len(ranked),
             "more_dashboard_count": len(ranked) - len(shown),
             "dashboards_url": DASHBOARDS_URL,
@@ -271,9 +274,9 @@ def build_emails(
                     "dashboard_id": d["dashboard_id"],
                     "name": d["name"],
                     "url": DASHBOARD_URL.format(dashboard_id=d["dashboard_id"]),
-                    "total_ha": format_ha(d["total_ha"]),
-                    "natural_lands_ha": format_ha(d["natural_lands_ha"]),
-                    "natural_forest_ha": format_ha(d["natural_forest_ha"]),
+                    "total_area": format_area(d["total_ha"]),
+                    "natural_lands_area": format_area(d["natural_lands_ha"]),
+                    "natural_forest_area": format_area(d["natural_forest_ha"]),
                     # Bar segment widths, as percents of the full bar width,
                     # which is the largest row's total.
                     "bar_natural_forest_pct": _bar_pct(

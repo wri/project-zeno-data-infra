@@ -117,10 +117,19 @@ def test_aoi_names_go_from_aoi_up_to_country():
 
 @pytest.mark.parametrize(
     "area_ha, expected",
-    [(0, "0"), (0.4, "<1"), (0.99, "<1"), (1.4, "1"), (12345.6, "12,346")],
+    [
+        (0, "0 ha"),
+        (0.4, "<1 ha"),
+        (0.99, "<1 ha"),
+        (1.4, "1 ha"),
+        (860.2, "860 ha"),
+        (999.6, "1.0 kha"),
+        (48012.0, "48.0 kha"),
+        (1234567.0, "1,234.6 kha"),
+    ],
 )
-def test_format_ha(area_ha, expected):
-    assert stages.format_ha(area_ha) == expected
+def test_format_area(area_ha, expected):
+    assert stages.format_area(area_ha) == expected
 
 
 @pytest.mark.parametrize(
@@ -149,7 +158,7 @@ def test_build_emails_matches_sample_email():
     assert emails["a@x.org"] == {
         "week_label": "22 – 28 Sep 2026",
         "latest_update": "4 Oct 2026",
-        "total_ha": "162",
+        "total_area": "162 ha",
         "dashboard_count": 2,
         "more_dashboard_count": 0,
         "dashboards_url": "https://horizon.globalnaturewatch.org/dashboards",
@@ -158,9 +167,9 @@ def test_build_emails_matches_sample_email():
                 "dashboard_id": "d2",
                 "name": "Paraná, Brazil",
                 "url": "https://horizon.globalnaturewatch.org/dashboards/d2",
-                "total_ha": "128",
-                "natural_lands_ha": "96",
-                "natural_forest_ha": "57",
+                "total_area": "128 ha",
+                "natural_lands_area": "96 ha",
+                "natural_forest_area": "57 ha",
                 "bar_natural_forest_pct": 45,
                 "bar_other_natural_pct": 30,
                 "bar_outside_pct": 25,
@@ -169,9 +178,9 @@ def test_build_emails_matches_sample_email():
                 "dashboard_id": "d1",
                 "name": "Madre de Dios, Peru",
                 "url": "https://horizon.globalnaturewatch.org/dashboards/d1",
-                "total_ha": "34",
-                "natural_lands_ha": "32",
-                "natural_forest_ha": "30",
+                "total_area": "34 ha",
+                "natural_lands_area": "32 ha",
+                "natural_forest_area": "30 ha",
                 # Scaled to Paraná's total, the longest bar.
                 "bar_natural_forest_pct": 23,
                 "bar_other_natural_pct": 2,
@@ -212,9 +221,9 @@ def test_build_emails_shows_top_dashboards_and_counts_the_rest():
 
     assert email["dashboard_count"] == count
     assert email["more_dashboard_count"] == 2
-    assert email["total_ha"] == str(sum(range(1, count + 1)))
-    assert [d["total_ha"] for d in email["dashboards"]] == [
-        str(i) for i in range(count, 2, -1)
+    assert email["total_area"] == f"{sum(range(1, count + 1))} ha"
+    assert [d["total_area"] for d in email["dashboards"]] == [
+        f"{i} ha" for i in range(count, 2, -1)
     ]
 
 
