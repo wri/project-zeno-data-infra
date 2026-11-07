@@ -25,18 +25,24 @@ class GeneralPrecalcHandler(AnalyticsPrecalcHandler, ABC):
 
 class TreeCoverPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
-        return aoi.type == "admin" and Dataset.area_hectares in query.aggregate.datasets
+        return (
+            aoi.has_precomputed_results()
+            and Dataset.area_hectares in query.aggregate.datasets
+        )
 
 
 class TreeCoverGainPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
-        return aoi.type == "admin" and Dataset.area_hectares in query.aggregate.datasets
+        return (
+            aoi.has_precomputed_results()
+            and Dataset.area_hectares in query.aggregate.datasets
+        )
 
 
 class TreeCoverLossPrecalcHandler(GeneralPrecalcHandler):
     def should_handle(self, aoi, query: DatasetQuery) -> bool:
         return (
-            aoi.type == "admin"
+            aoi.has_precomputed_results()
             and (
                 Dataset.area_hectares in query.aggregate.datasets
                 or Dataset.carbon_emissions in query.aggregate.datasets

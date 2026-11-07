@@ -63,7 +63,7 @@ class LandCoverChangeAnalyzer(Analyzer):
 
         land_cover_change_analytics_in = LandCoverChangeAnalyticsIn(**analysis.metadata)
 
-        if land_cover_change_analytics_in.aoi.type == "admin":
+        if land_cover_change_analytics_in.aoi.has_precomputed_results():
             gadm_ids = land_cover_change_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)
         else:
