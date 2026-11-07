@@ -3,7 +3,10 @@ import asyncio
 import pyarrow.parquet as parquet
 import shapely
 
-from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
+from app.domain.repositories.aoi_geometry_repository import (
+    AoiGeometryRepository,
+    AoiNotFoundError,
+)
 
 
 class GeoParquetAoiGeometryRepository(AoiGeometryRepository):
@@ -29,7 +32,7 @@ class GeoParquetAoiGeometryRepository(AoiGeometryRepository):
 
         missing = [aoi_id for aoi_id in aoi_ids if aoi_id not in rows]
         if missing:
-            raise ValueError(f"AOI ids not found: {missing}")
+            raise AoiNotFoundError(f"AOI ids not found: {missing}")
 
         geometries = [shapely.from_wkb(rows[aoi_id]["geometry"]) for aoi_id in aoi_ids]
         areas_ha = [rows[aoi_id]["area_ha"] for aoi_id in aoi_ids]
