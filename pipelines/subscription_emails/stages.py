@@ -42,6 +42,11 @@ MIN_DAYS_AFTER_WEEK = 4
 # The last week emailed, and a marker for each email sent, live here.
 SUBSCRIPTION_EMAILS_PREFIX = f"{INTEGRATED_ALERTS_PREFIX}/subscription-emails"
 LAST_SENT_WEEK_URI = f"{SUBSCRIPTION_EMAILS_PREFIX}/last_sent_week_end"
+SENT_MARKERS_PREFIX = f"{SUBSCRIPTION_EMAILS_PREFIX}/sent"
+# A week's sent markers are only needed while the week is being sent, so they're
+# deleted once the week ended this many days ago (keeping them a while for
+# debugging).
+SENT_MARKER_DAYS = 30
 
 
 def read_latest_integrated_alerts_version() -> str:
@@ -299,7 +304,7 @@ def sent_marker_uri(week_end: date, email: str) -> str:
     """Where a week's sent email is recorded, so a re-run doesn't send it again.
     Keyed by a hash, to keep email addresses out of S3 keys."""
     email_hash = hashlib.sha256(email.encode("utf-8")).hexdigest()[:16]
-    return f"{SUBSCRIPTION_EMAILS_PREFIX}/{week_end.isoformat()}/{email_hash}.json"
+    return f"{SENT_MARKERS_PREFIX}/{week_end.isoformat()}/{email_hash}.json"
 
 
 def was_sent(week_end: date, email: str) -> bool:
@@ -314,3 +319,32 @@ def mark_sent(week_end: date, email: str, results: dict) -> None:
         Body=json.dumps(results).encode("utf-8"),
         ContentType="application/json",
     )
+
+
+def old_sent_marker_keys(keys: list[str], today: date) -> list[str]:
+    """The sent marker keys (.../sent/{week_end}/{hash}.json) of weeks that ended
+    more than SENT_MARKER_DAYS days before today."""
+    cutoff = today - timedelta(days=SENT_MARKER_DAYS)
+    return [key for key in keys if date.fromisoformat(key.split("/")[-2]) < cutoff]
+
+
+def delete_old_sent_markers(today: date) -> int:
+    """Delete the sent markers of weeks that ended more than SENT_MARKER_DAYS days
+    before today, and return how many were deleted."""
+    bucket, prefix = parse_s3_uri(f"{SENT_MARKERS_PREFIX}/")
+    s3_client = boto3.client("s3")
+    keys = [
+        obj["Key"]
+        for page in s3_client.get_paginator("list_objects_v2").paginate(
+            Bucket=bucket, Prefix=prefix
+        )
+        for obj in page.get("Contents", [])
+    ]
+    old_keys = old_sent_marker_keys(keys, today)
+    # delete_objects takes at most 1000 keys at a time.
+    for start in range(0, len(old_keys), 1000):
+        batch = old_keys[start:][:1000]
+        s3_client.delete_objects(
+            Bucket=bucket, Delete={"Objects": [{"Key": key} for key in batch]}
+        )
+    return len(old_keys)

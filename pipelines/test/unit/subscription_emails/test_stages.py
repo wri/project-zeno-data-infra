@@ -232,6 +232,18 @@ def test_sent_marker_uri_hides_email_address():
 
     assert uri.startswith(
         "s3://lcl-analytics/zonal-statistics/integrated-alerts/"
-        "subscription-emails/2026-10-20/"
+        "subscription-emails/sent/2026-10-20/"
     )
     assert "a@x.org" not in uri
+
+
+def test_old_sent_marker_keys_are_weeks_ended_over_30_days_ago():
+    prefix = "zonal-statistics/integrated-alerts/subscription-emails/sent"
+    keys = [
+        f"{prefix}/2026-09-29/aaaa.json",
+        f"{prefix}/2026-09-29/bbbb.json",
+        f"{prefix}/2026-10-06/aaaa.json",  # exactly 30 days before: kept
+        f"{prefix}/2026-10-13/aaaa.json",
+    ]
+
+    assert stages.old_sent_marker_keys(keys, date(2026, 11, 5)) == keys[:2]

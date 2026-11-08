@@ -148,4 +148,6 @@ def subscription_emails_flow(
         raise RuntimeError(f"{len(failed)} of {len(emails)} emails failed to send")
     if test_recipient is None:
         stages.write_last_sent_week_end(end_date)
+        deleted = stages.delete_old_sent_markers(date.today())
+        logger.info(f"Deleted {deleted} sent markers of old weeks")
     return len(emails)
