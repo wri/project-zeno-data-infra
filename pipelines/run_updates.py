@@ -84,12 +84,16 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 
 @flow
 def run_integrated_alerts_update(
-    version, overwrite=False, is_latest=False, bbox=None
+    version, overwrite=False, is_latest=False, bbox=None, send_emails=False
 ) -> list[str]:
     result_uris = []
 
     result = integrated_alerts_flow.compute_integrated_alerts_zonal_stats(
-        version, overwrite=overwrite, is_latest=is_latest, bbox=bbox
+        version,
+        overwrite=overwrite,
+        is_latest=is_latest,
+        bbox=bbox,
+        send_emails=send_emails,
     )
     result_uris.append(result)
 
@@ -145,13 +149,13 @@ def run_subscription_emails(
     version=None,
     overwrite=False,
     is_latest=False,
-    dry_run=False,
+    send_emails=False,
     test_recipient=None,
 ) -> list[str]:
     # version, overwrite and is_latest aren't used: the emails are always for the
     # latest integrated alerts version, and re-running only sends unsent emails.
     count = subscription_emails_flow.subscription_emails_flow(
-        dry_run=dry_run, test_recipient=test_recipient
+        send_emails=send_emails, test_recipient=test_recipient
     )
     return [f"{count} subscription emails"]
 
@@ -181,8 +185,8 @@ class UpdateFlow(str, Enum):
     AOIS_UPDATE = "aois_update"
     # Currently run by hand about once a month when new WUR drivers data is available
     WUR_UPDATE = "wur_update"
-    # Run as a subflow at the end of integrated_alerts_update; run by hand to send
-    # emails left unsent after a failure
+    # Run as a subflow at the end of integrated_alerts_update with send_emails; run
+    # by hand (with --send-emails) to send emails left unsent after a failure
     SUBSCRIPTION_EMAILS = "subscription_emails"
 
 
@@ -282,7 +286,7 @@ def run_updates(
     local=False,
     performance_report_path=None,
     content_date=None,
-    dry_run=False,
+    send_emails=False,
     test_recipient=None,
 ) -> list[str]:
     logger = get_run_logger()
@@ -294,7 +298,7 @@ def run_updates(
     is_latest = str(is_latest).lower() == "true"
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
-    dry_run = str(dry_run).lower() == "true"
+    send_emails = str(send_emails).lower() == "true"
     # bbox (land_ghg_inventory and integrated_alerts flows only) clips the reduce
     # to one area. It is independent of where compute runs: Coiled by default, or
     # local when local=True.
@@ -331,10 +335,11 @@ def run_updates(
             kwargs["aoi_source"] = aoi_source
         elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
             kwargs["bbox"] = bbox_geom
+            kwargs["send_emails"] = send_emails
         elif flow_name == UpdateFlow.WUR_UPDATE:
             kwargs["content_date"] = content_date
         elif flow_name == UpdateFlow.SUBSCRIPTION_EMAILS:
-            kwargs["dry_run"] = dry_run
+            kwargs["send_emails"] = send_emails
             kwargs["test_recipient"] = test_recipient or None
         with report:
             result_uris = flow_fn(**kwargs)
@@ -388,9 +393,12 @@ def run_updates(
     ),
 )
 @click.option(
-    "--dry-run",
+    "--send-emails",
     is_flag=True,
-    help="Log the emails instead of sending them (subscription_emails only).",
+    help=(
+        "Actually send the subscription emails (integrated_alerts_update and "
+        "subscription_emails only); without it, subscription_emails only logs them."
+    ),
 )
 @click.option(
     "--test-recipient",
@@ -420,7 +428,7 @@ def cli(
     bbox,
     aoi_source,
     content_date,
-    dry_run,
+    send_emails,
     test_recipient,
     local,
     performance_report_path,
@@ -435,7 +443,7 @@ def cli(
         local=local,
         performance_report_path=performance_report_path,
         content_date=content_date,
-        dry_run=dry_run,
+        send_emails=send_emails,
         test_recipient=test_recipient,
     )
 

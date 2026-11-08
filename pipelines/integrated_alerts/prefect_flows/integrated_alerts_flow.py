@@ -1,5 +1,4 @@
 import logging
-import os
 
 import boto3
 from prefect import flow, task
@@ -27,9 +26,6 @@ from pipelines.subscription_emails.prefect_flows.subscription_emails_flow import
 )
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
-
-# TODO: enable once the subscription emails are ready to go out.
-SEND_SUBSCRIPTION_EMAILS = False
 
 
 @task
@@ -72,12 +68,14 @@ def compute_integrated_alerts_zonal_stats(
     is_latest=False,
     bbox=None,
     days_stored=DAYS_STORED,
+    send_emails=False,
 ) -> list[str]:
     """Compute integrated alerts zonal statistics by AOI for one alerts version,
     from the version's zarr, which is created first. Also writes the alert
     points table (the newest days_stored days of alerts, as points) that the API
     lists alerts from. bbox (a shapely Polygon) limits the results to a small
-    area, written locally, for test runs."""
+    area, written locally, for test runs. If send_emails is True (and the version
+    is marked latest), the week's subscription emails are sent at the end."""
     logger = get_run_logger()
     result_uris = []
 
@@ -139,15 +137,11 @@ def compute_integrated_alerts_zonal_stats(
     else:
         result_uris.extend(vector_state.result())
 
-    # Only production emails subscribers. A failure is logged without failing the
+    # Subscribers are only emailed when explicitly asked for (the weekly
+    # production automation does). A failure is logged without failing the
     # release; the emails flow can be re-run by hand, and only sends unsent emails.
-    if (
-        SEND_SUBSCRIPTION_EMAILS
-        and is_latest
-        and bbox is None
-        and os.getenv("TF_WORKSPACE", "default") == "default"
-    ):
-        emails_state = subscription_emails_flow(return_state=True)
+    if send_emails and is_latest and bbox is None:
+        emails_state = subscription_emails_flow(send_emails=True, return_state=True)
         if emails_state.is_failed():
             logger.warning(f"Subscription emails failed: {emails_state.message}")
 

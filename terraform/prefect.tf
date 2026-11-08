@@ -176,9 +176,9 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         anyOf       = [{ type = "string" }, { type = "null" }]
         default     = null
       }
-      dry_run = {
-        title       = "Dry run"
-        description = "For subscription_emails only: if true, log the emails instead of sending them."
+      send_emails = {
+        title       = "Send emails"
+        description = "For integrated_alerts_update and subscription_emails only: if true, send the week's subscription emails (subscription_emails otherwise only logs them)."
         type        = "boolean"
         default     = false
       }
@@ -278,6 +278,8 @@ resource "prefect_automation" "run_pipelines_on_intdist_update" {
         version   = "{{ event.payload.version }}"
         is_latest = "{{ event.payload.is_latest }}"
         flow_name = "integrated_alerts_update"
+        # TODO: add send_emails = true once the subscription emails are ready to
+        # go out.
       })
       job_variables = jsonencode({})
     },

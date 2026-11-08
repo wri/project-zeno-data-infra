@@ -73,7 +73,7 @@ def send_email_task(
     ),
 )
 def subscription_emails_flow(
-    dry_run: bool = False, test_recipient: Optional[str] = None
+    send_emails: bool = False, test_recipient: Optional[str] = None
 ) -> int:
     """Email each subscriber a Wednesday to Tuesday week's integrated alerts in
     the admin AOIs of their subscribed dashboards.
@@ -87,12 +87,14 @@ def subscription_emails_flow(
     all have been.
 
     Args:
-        dry_run: If True, log each email's substitution data instead of sending.
-        test_recipient: If set, send every email to this address instead of the
-            subscriber's, and don't record them or the week as sent.
+        send_emails: Only if True are the emails sent; otherwise each email's
+            substitution data is logged instead, and nothing is recorded.
+        test_recipient: If set (with send_emails), send every email to this
+            address instead of the subscriber's, and don't record them or the
+            week as sent.
 
     Returns:
-        The number of emails sent (or that would be sent, in a dry run).
+        The number of emails sent (or that would be sent, without send_emails).
     """
     logger = get_run_logger()
 
@@ -127,7 +129,7 @@ def subscription_emails_flow(
         )
     logger.info(f"{len(emails)} emails for {len(subscriptions)} subscriptions")
 
-    if dry_run:
+    if not send_emails:
         for email, substitution_data in emails.items():
             print(f"{email}: {json.dumps(substitution_data, ensure_ascii=False)}")
         return len(emails)
