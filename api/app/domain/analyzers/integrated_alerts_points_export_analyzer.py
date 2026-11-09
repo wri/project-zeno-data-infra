@@ -86,7 +86,9 @@ class IntegratedAlertsPointsExportAnalyzer(Analyzer):
                     after=None,
                 )
             )
-            points, more = format_points(page.points), page.more
+            # Formatting up to a million points blocks, so it runs in a thread.
+            points = await asyncio.to_thread(format_points, page.points)
+            more = page.more
 
         extension, content_type = EXPORT_FILE_TYPES[analytics_in.format]
         alerts = served_alerts_metadata(source, start_date, end_date)
