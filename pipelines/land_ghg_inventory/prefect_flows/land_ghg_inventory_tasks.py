@@ -15,6 +15,12 @@ from pipelines.land_ghg_inventory.create_agriculture_assets import (
     create_agriculture_cogs,
     create_agriculture_zarr,
 )
+from pipelines.land_ghg_inventory.create_lulucf_assets import (
+    COG_TILE_PREFIX,
+    create_cogs,
+    create_mosaic,
+    create_net_flux_zarr,
+)
 
 
 @task
@@ -49,6 +55,46 @@ def prepare_agriculture_zarr(overwrite: bool = False) -> str:
 @task
 def prepare_agriculture_cogs(overwrite: bool = False) -> Tuple[str, str]:
     return create_agriculture_cogs(overwrite=overwrite)
+
+
+@task
+def prepare_net_flux_zarr(overwrite: bool = False) -> str:
+    return create_net_flux_zarr(overwrite=overwrite)
+
+
+@task
+def prepare_lulucf_cogs(
+    net_flux_zarr_uri: str,
+    bbox: Optional[Polygon] = None,
+    prefix: Optional[str] = None,
+    overwrite: bool = False,
+    clip_to_bbox: bool = False,
+) -> dict:
+    written, failed = create_cogs(
+        bbox=bbox,
+        prefix=COG_TILE_PREFIX if prefix is None else prefix,
+        overwrite=overwrite,
+        net_flux_zarr_uri=net_flux_zarr_uri,
+        clip_to_bbox=clip_to_bbox,
+    )
+    if failed:
+        raise RuntimeError(f"{len(failed)} COG tiles failed: {sorted(failed)}")
+    return written
+
+
+@task
+def prepare_lulucf_mosaic(
+    written: dict,
+    prefix: Optional[str] = None,
+    overwrite: bool = False,
+    clamp_global: bool = True,
+) -> str:
+    return create_mosaic(
+        sorted(written.values()),
+        prefix=COG_TILE_PREFIX if prefix is None else prefix,
+        overwrite=overwrite,
+        clamp_global=clamp_global,
+    )
 
 
 @task
