@@ -3,7 +3,11 @@ import json
 import httpx
 import pytest
 
-from pipelines.sparkpost import SparkPostClient
+from pipelines.sparkpost import (
+    RejectedRecipientError,
+    SparkPostClient,
+    is_transient_error,
+)
 
 
 def _client(handler, **kwargs):
@@ -67,3 +71,75 @@ def test_send_template_raises_on_error():
 
     with pytest.raises(httpx.HTTPStatusError):
         _client(handler).send_template("weekly-alerts", {}, ["a@example.com"])
+
+
+def test_send_template_raises_rejected_recipient_for_invalid_address():
+    # SparkPost's real response for e.g. "not-an-email".
+    def handler(request):
+        return httpx.Response(
+            400,
+            json={
+                "errors": [
+                    {
+                        "message": "At least one valid recipient is required",
+                        "code": 5002,
+                    }
+                ]
+            },
+        )
+
+    with pytest.raises(RejectedRecipientError, match="valid recipient"):
+        _client(handler).send_template("weekly-alerts", {}, ["not-an-email"])
+
+
+def test_send_template_raises_rejected_recipient_if_none_accepted():
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "results": {
+                    "id": "123",
+                    "total_accepted_recipients": 0,
+                    "total_rejected_recipients": 1,
+                }
+            },
+        )
+
+    with pytest.raises(RejectedRecipientError):
+        _client(handler).send_template("weekly-alerts", {}, ["a@example.com"])
+
+
+def test_send_template_raises_http_error_for_unknown_template():
+    # SparkPost's real response for a template that doesn't exist.
+    def handler(request):
+        return httpx.Response(
+            422,
+            json={
+                "errors": [{"message": "template 'x' does not exist", "code": "1603"}]
+            },
+        )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        _client(handler).send_template("x", {}, ["a@example.com"])
+
+
+def _status_error(status):
+    request = httpx.Request("POST", "https://api.sparkpost.com/api/v1/transmissions")
+    return httpx.HTTPStatusError(
+        "error", request=request, response=httpx.Response(status, request=request)
+    )
+
+
+@pytest.mark.parametrize(
+    "error, transient",
+    [
+        (_status_error(429), True),
+        (_status_error(503), True),
+        (_status_error(401), False),
+        (_status_error(422), False),
+        (httpx.ConnectError("no network"), True),
+        (ValueError("bug"), False),
+    ],
+)
+def test_is_transient_error(error, transient):
+    assert is_transient_error(error) == transient

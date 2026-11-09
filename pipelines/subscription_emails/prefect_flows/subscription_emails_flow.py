@@ -1,11 +1,16 @@
 import json
+from collections import Counter
 from datetime import date
 from typing import Optional
 
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
-from pipelines.sparkpost import SparkPostClient
+from pipelines.sparkpost import (
+    RejectedRecipientError,
+    SparkPostClient,
+    is_transient_error,
+)
 from pipelines.subscription_emails import stages
 from pipelines.utils import get_secret
 from pipelines.zeno_api import Subscription, ZenoApiClient
@@ -40,25 +45,40 @@ def read_aoi_names_task(aoi_ids):
     return stages.read_aoi_names(aoi_ids)
 
 
-@task(retries=2, retry_delay_seconds=60)
+def retry_if_transient(task, task_run, state) -> bool:
+    """A Prefect retry condition: only retry a send that may succeed later (see
+    is_transient_error), not e.g. one with a bad API key or template."""
+    return isinstance(state.data, BaseException) and is_transient_error(state.data)
+
+
+@task(retries=2, retry_delay_seconds=60, retry_condition_fn=retry_if_transient)
 def send_email_task(
     week_end: date,
     email: str,
     substitution_data: dict,
     test_recipient: Optional[str],
-) -> None:
+) -> str:
+    """Send one email, and return "sent", "rejected" or "already sent"."""
     logger = get_run_logger()
     # Test sends aren't recorded, so they never stop the real email being sent.
     if test_recipient is None and stages.was_sent(week_end, email):
         logger.info("Already sent this week's email; skipping")
-        return
+        return "already sent"
     client = SparkPostClient(api_key=get_secret(SPARKPOST_API_KEY_SECRET_ID))
-    results = client.send_template(
-        TEMPLATE_ID, substitution_data, [test_recipient or email]
-    )
-    logger.info(f"Sent email, SparkPost transmission {results.get('id')}")
+    recipient = test_recipient or email
+    try:
+        results = client.send_template(TEMPLATE_ID, substitution_data, [recipient])
+        status = "sent"
+        logger.info(f"Sent email, SparkPost transmission {results.get('id')}")
+    except RejectedRecipientError as e:
+        # Sending again won't help (e.g. an invalid address), so this is recorded
+        # like a sent email, so that it doesn't keep the week from completing.
+        results = {"rejected": str(e)}
+        status = "rejected"
+        logger.warning(f"SparkPost rejected recipient {recipient}: {e}")
     if test_recipient is None:
         stages.mark_sent(week_end, email, results)
+    return status
 
 
 @flow(
@@ -146,6 +166,8 @@ def subscription_emails_flow(
     failed = [email for email, future in futures.items() if future.state.is_failed()]
     if failed:
         raise RuntimeError(f"{len(failed)} of {len(emails)} emails failed to send")
+    statuses = Counter(future.result() for future in futures.values())
+    logger.info(f"Emails: {dict(statuses)}")
     if test_recipient is None:
         stages.write_last_sent_week_end(end_date)
         deleted = stages.delete_old_sent_markers(date.today())

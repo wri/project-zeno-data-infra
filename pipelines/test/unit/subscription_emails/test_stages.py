@@ -1,4 +1,6 @@
+import re
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -191,6 +193,43 @@ def test_build_emails_matches_sample_email():
     # b's only dashboard is scaled to its own total.
     (dashboard,) = emails["b@x.org"]["dashboards"]
     assert dashboard["bar_natural_forest_pct"] == 88
+
+
+TEMPLATE_PATH = Path(stages.__file__).parent / "templates" / "gnw_weekly_alerts.html"
+# Links the template only shows when they're given, which aren't yet.
+OPTIONAL_TEMPLATE_FIELDS = {"download_url", "manage_url", "unsubscribe_url"}
+TEMPLATE_KEYWORDS = {"if", "elseif", "else", "end", "each", "and", "or", "not"}
+
+
+def _template_fields():
+    """The top-level and per-dashboard (loop_var.*) fields the template uses."""
+    fields, dashboard_fields = set(), set()
+    for expression in re.findall(r"\{\{\{?(.*?)\}?\}\}", TEMPLATE_PATH.read_text()):
+        for name in re.findall(r"[A-Za-z_][\w.]*", expression):
+            if name in TEMPLATE_KEYWORDS:
+                continue
+            if name.startswith("loop_var."):
+                dashboard_fields.add(name.removeprefix("loop_var."))
+            else:
+                fields.add(name)
+    return fields, dashboard_fields
+
+
+def test_build_emails_gives_every_field_the_template_uses():
+    # SparkPost accepts a send whose data lacks a field the template uses, then
+    # fails to render it (e.g. comparing a missing number), and the email is
+    # silently never sent. So the template and build_emails must stay in sync.
+    subscriptions = [_subscription("a@x.org", "d1", "BRA.16")]
+    areas = _areas([["BRA.16", 128.0, 96.0, 57.0]])
+
+    email = stages.build_emails(subscriptions, areas, {}, *WEEK, LATEST_UPDATE)[
+        "a@x.org"
+    ]
+
+    fields, dashboard_fields = _template_fields()
+    assert "total_area" in fields and "name" in dashboard_fields  # parsed
+    assert fields - OPTIONAL_TEMPLATE_FIELDS <= set(email)
+    assert dashboard_fields <= set(email["dashboards"][0])
 
 
 def test_build_emails_leaves_out_dashboards_and_subscribers_without_alerts():

@@ -3,11 +3,34 @@ from typing import Any, Optional
 import httpx
 
 SPARKPOST_URL = "https://api.sparkpost.com/api/v1"
+# SparkPost's error code for a request with no valid recipient address.
+INVALID_RECIPIENT_CODE = "5002"
+
+
+class RejectedRecipientError(Exception):
+    """SparkPost won't send to the recipients (e.g. an invalid address), so
+    sending again won't help.
+
+    Recipients SparkPost has suppressed (after earlier hard bounces, spam
+    complaints or unsubscribes) don't raise this: SparkPost accepts those sends,
+    and they bounce afterwards.
+    """
+
+
+def is_transient_error(error: BaseException) -> bool:
+    """Whether a send that failed with this error may succeed if retried: rate
+    limits, SparkPost server errors and network errors, but not errors in the
+    request (e.g. a bad API key or template)."""
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        return status == 429 or status >= 500
+    return isinstance(error, httpx.TransportError)
 
 
 class SparkPostClient:
     """Minimal SparkPost client for sending emails from stored templates.
-    Any non-2xx response raises httpx.HTTPStatusError.
+    Rejected recipients raise RejectedRecipientError, and any other non-2xx
+    response raises httpx.HTTPStatusError.
     """
 
     def __init__(
@@ -43,5 +66,22 @@ class SparkPostClient:
         response = self.http_client.post(
             f"{self.base_url}/transmissions", json=body, headers=self.headers
         )
+        if response.status_code == 400:
+            errors = _errors(response)
+            # SparkPost's codes are numbers or strings, depending on the error.
+            if any(str(e.get("code")) == INVALID_RECIPIENT_CODE for e in errors):
+                raise RejectedRecipientError(
+                    "; ".join(str(e.get("message")) for e in errors)
+                )
         response.raise_for_status()
-        return response.json()["results"]
+        results = response.json()["results"]
+        if results.get("total_accepted_recipients") == 0:
+            raise RejectedRecipientError(f"No recipients accepted: {results}")
+        return results
+
+
+def _errors(response: httpx.Response) -> list[dict]:
+    try:
+        return response.json().get("errors", [])
+    except ValueError:
+        return []
