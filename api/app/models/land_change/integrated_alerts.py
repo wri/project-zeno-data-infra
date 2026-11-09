@@ -20,6 +20,9 @@ from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "integrated_alerts"
 POINTS_ANALYTICS_NAME = "integrated_alerts_points"
+POINTS_EXPORT_ANALYTICS_NAME = "integrated_alerts_points_export"
+# Keeps shapefiles far below the 2 GB DBF limit and an export's memory bounded.
+POINTS_EXPORT_MAX_POINTS = 1_000_000
 POINTS_DEFAULT_LIMIT = 1000
 POINTS_MAX_LIMIT = 10_000
 # Raising this also needs one next_cursor per AOI in the result metadata.
@@ -130,9 +133,10 @@ def decode_cursor(value: str) -> PointsCursor:
     return cursor
 
 
-class IntegratedAlertsPointsAnalyticsIn(AnalyticsIn):
-    _analytics_name: str = PrivateAttr(default=POINTS_ANALYTICS_NAME)
-    _version: str = PrivateAttr(default="v20261018")
+class IntegratedAlertsPointsFilterIn(AnalyticsIn):
+    """The alert points a points request selects: one GADM area, a date range
+    and confidence and land filters."""
+
     aoi: AdminAreaOfInterest = Field(
         ...,
         title="AOI",
@@ -178,6 +182,31 @@ class IntegratedAlertsPointsAnalyticsIn(AnalyticsIn):
             "natural_forests = classes 2, 5, 8, 9."
         ),
     )
+
+    @model_validator(mode="after")
+    def validate_date_range(self) -> "IntegratedAlertsPointsFilterIn":
+        if self.start_date is not None and self.end_date is not None:
+            start = datetime.strptime(self.start_date, "%Y-%m-%d").date()
+            end = datetime.strptime(self.end_date, "%Y-%m-%d").date()
+            if end < start:
+                raise ValueError("end_date must be on or after start_date")
+        return self
+
+    @model_validator(mode="after")
+    def validate_aoi_count(self) -> "IntegratedAlertsPointsFilterIn":
+        # One list per request keeps the result bounded by limit, and lets
+        # dashboards showing the same area share a cached result.
+        if len(self.aoi.ids) > POINTS_MAX_AOIS:
+            raise ValueError(
+                f"The points endpoint takes {POINTS_MAX_AOIS} AOI per request for "
+                "now: send one id."
+            )
+        return self
+
+
+class IntegratedAlertsPointsAnalyticsIn(IntegratedAlertsPointsFilterIn):
+    _analytics_name: str = PrivateAttr(default=POINTS_ANALYTICS_NAME)
+    _version: str = PrivateAttr(default="v20261018")
     limit: int = Field(
         default=POINTS_DEFAULT_LIMIT,
         ge=1,
@@ -203,26 +232,6 @@ class IntegratedAlertsPointsAnalyticsIn(AnalyticsIn):
         if value is not None:
             decode_cursor(value)  # raises ValueError for anything malformed
         return value
-
-    @model_validator(mode="after")
-    def validate_date_range(self) -> "IntegratedAlertsPointsAnalyticsIn":
-        if self.start_date is not None and self.end_date is not None:
-            start = datetime.strptime(self.start_date, "%Y-%m-%d").date()
-            end = datetime.strptime(self.end_date, "%Y-%m-%d").date()
-            if end < start:
-                raise ValueError("end_date must be on or after start_date")
-        return self
-
-    @model_validator(mode="after")
-    def validate_aoi_count(self) -> "IntegratedAlertsPointsAnalyticsIn":
-        # One list per request keeps the result bounded by limit, and lets
-        # dashboards showing the same area share a cached result.
-        if len(self.aoi.ids) > POINTS_MAX_AOIS:
-            raise ValueError(
-                f"The points endpoint takes {POINTS_MAX_AOIS} AOI per request for "
-                "now: send one id."
-            )
-        return self
 
     @model_validator(mode="after")
     def validate_cursor_list(self) -> "IntegratedAlertsPointsAnalyticsIn":
@@ -279,6 +288,42 @@ class IntegratedAlertsPoints(StrictBaseModel):
 
 class IntegratedAlertsPointsResponse(Response):
     data: IntegratedAlertsPoints
+
+
+class IntegratedAlertsPointsExportIn(IntegratedAlertsPointsFilterIn):
+    _analytics_name: str = PrivateAttr(default=POINTS_EXPORT_ANALYTICS_NAME)
+    _version: str = PrivateAttr(default="v20261018")
+    format: Literal["csv", "shp"] = Field(
+        ...,
+        title="Format",
+        description=(
+            "csv: one row per alert with the /points columns. shp: a zipped point "
+            "shapefile (EPSG:4326) with the same attributes, renamed to fit "
+            "shapefile limits: alert_confidence as confidence and "
+            "natural_lands_class as nl_class."
+        ),
+    )
+
+
+class IntegratedAlertsPointsExport(StrictBaseModel):
+    result: Optional[dict] = {
+        "download_url": "https://gnw-analytics-api-analysis-results.s3.amazonaws.com/",
+        "filename": "integrated_alerts_BRA.1.12_2026-10-01_2026-10-16.csv",
+        "format": "csv",
+        "point_count": 1532,
+    }
+    metadata: Optional[dict] = None
+    message: Optional[str] = None
+    status: AnalysisStatus
+
+    model_config = {
+        "from_attributes": True,
+        "validate_by_name": True,
+    }
+
+
+class IntegratedAlertsPointsExportResponse(Response):
+    data: IntegratedAlertsPointsExport
 
 
 class IntegratedAlertsLatest(StrictBaseModel):

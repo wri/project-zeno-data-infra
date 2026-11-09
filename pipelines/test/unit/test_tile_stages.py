@@ -174,14 +174,33 @@ def _fail_on_three(n):
     return n
 
 
+# Tasks that have failed once, so _fail_once_on_three succeeds when retried
+# (the test's Dask cluster runs in this process).
+FAILED_ONCE = set()
+
+
+def _fail_once_on_three(n):
+    if n == 3 and n not in FAILED_ONCE:
+        FAILED_ONCE.add(n)
+        raise OSError(22, "The request body terminated unexpectedly")
+    return n
+
+
 def test_map_tiles_yields_every_result():
     assert sorted(map_tiles(_square, [1, 2, 3, 4])) == [1, 4, 9, 16]
     assert list(map_tiles(_square, [])) == []
 
 
+def test_map_tiles_retries_a_failed_task():
+    FAILED_ONCE.clear()
+
+    assert sorted(map_tiles(_fail_once_on_three, [1, 2, 3, 4])) == [1, 2, 3, 4]
+    assert FAILED_ONCE == {3}
+
+
 def test_map_tiles_fails_after_the_rest_finish():
     results = []
     with pytest.raises(RuntimeError, match="1 tiles failed"):
-        for result in map_tiles(_fail_on_three, [1, 2, 3, 4]):
+        for result in map_tiles(_fail_on_three, [1, 2, 3, 4], retries=1):
             results.append(result)
     assert sorted(results) == [1, 2, 4]
