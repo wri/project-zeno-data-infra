@@ -143,12 +143,27 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
         )
 
     def _get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
-        rows = self.table().scan(
-            row_filter=self.rows_with_ids(aoi_ids),
-            selected_fields=("aoi_id", "geometry"),
-        )
-        by_id = {aoi.aoi_id: aoi for aoi in geometries_from_arrow(rows.to_arrow())}
+        rows = self.read_rows(aoi_ids, ("aoi_id", "geometry"))
+        by_id = {aoi.aoi_id: aoi for aoi in geometries_from_arrow(rows)}
         return [by_id[aoi_id] for aoi_id in aoi_ids if aoi_id in by_id]
+
+    def read_rows(self, aoi_ids: List[str], fields: Tuple[str, ...]) -> pa.Table:
+        """Read these ids' rows, reloading the tables once if any are missing."""
+        rows = self.scan_rows(aoi_ids, fields, fresh=False)
+        if len(set(rows.column("aoi_id").to_pylist())) < len(set(aoi_ids)):
+            # The cached tables can predate an AOI another process just saved.
+            rows = self.scan_rows(aoi_ids, fields, fresh=True)
+        return rows
+
+    def scan_rows(
+        self, aoi_ids: List[str], fields: Tuple[str, ...], fresh: bool
+    ) -> pa.Table:
+        """Scan these ids' rows, reading the tables from the catalog if fresh."""
+        return (
+            self.table(fresh)
+            .scan(row_filter=self.rows_with_ids(aoi_ids, fresh), selected_fields=fields)
+            .to_arrow()
+        )
 
     def _intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         """Prunes files and rows by bounding box, then keeps the AOIs that
