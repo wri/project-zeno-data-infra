@@ -22,6 +22,10 @@ from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
+from app.infrastructure.export.alert_points_files import (
+    CsvAlertPointsFile,
+    ShapefileZipAlertPointsFile,
+)
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
@@ -352,6 +356,8 @@ def create_points_export_analysis_service(
             ),
             file_store=file_store,
             geometry_repository=aoi_geometry_repository,
+            file_types={"csv": CsvAlertPointsFile, "shp": ShapefileZipAlertPointsFile},
+            page_size=100_000,
             input_uris=input_uris,
         ),
         event=POINTS_EXPORT_ANALYTICS_NAME,

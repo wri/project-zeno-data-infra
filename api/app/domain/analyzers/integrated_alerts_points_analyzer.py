@@ -82,7 +82,8 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                     after=after,
                 )
             )
-            result, more = format_points(page.points), page.more
+            result = format_points(page.points).to_dict(orient="list")
+            more = page.more
             if page.more and page.last_position is not None:
                 next_cursor = encode_cursor(
                     PointsCursor(

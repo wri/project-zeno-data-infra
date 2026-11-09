@@ -12,6 +12,7 @@ from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
     IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.environment import Environment
+from app.infrastructure.export.alert_points_files import CsvAlertPointsFile
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -299,6 +300,8 @@ def test_export_post_then_get_returns_a_fresh_download_url(tmp_path):
                 file_store=file_store,
                 input_uris={"alert_points_table_uri": table_uri},
                 geometry_repository=FakeGeometryRepository(),
+                file_types={"csv": CsvAlertPointsFile},
+                page_size=1000,
             ),
             event=POINTS_EXPORT_ANALYTICS_NAME,
         )

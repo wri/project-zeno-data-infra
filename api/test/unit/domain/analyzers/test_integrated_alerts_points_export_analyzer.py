@@ -20,6 +20,10 @@ from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
     IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.analysis import Analysis
+from app.infrastructure.export.alert_points_files import (
+    CsvAlertPointsFile,
+    ShapefileZipAlertPointsFile,
+)
 from app.infrastructure.persistence.parquet_alert_points_repository import (
     ParquetAlertPointsRepository,
     day_to_date,
@@ -32,6 +36,7 @@ from app.models.common.areas_of_interest import (
 from app.models.land_change.integrated_alerts import IntegratedAlertsPointsExportIn
 
 FIRST_DAY = LATEST_DAY - DAYS_STORED + 1
+PAGE_SIZE = 500
 
 
 class FakeGeometryRepository:
@@ -65,6 +70,8 @@ async def _export(table_uri, **request):
         points_repository=ParquetAlertPointsRepository(table_uri),
         file_store=file_store,
         geometry_repository=FakeGeometryRepository(),
+        file_types={"csv": CsvAlertPointsFile, "shp": ShapefileZipAlertPointsFile},
+        page_size=PAGE_SIZE,
     )
     analytics_in = IntegratedAlertsPointsExportIn(
         **{"aoi": AdminAreaOfInterest(ids=["BRA.14.87"]), **request}
@@ -145,16 +152,18 @@ async def test_export_shapefile_zip_holds_point_layer_with_short_column_names(
 
 
 @pytest.mark.asyncio
-async def test_export_is_truncated_past_max_points(table_uri, points, monkeypatch):
+async def test_export_is_truncated_past_max_points_across_pages(
+    table_uri, points, monkeypatch
+):
     monkeypatch.setattr(
-        integrated_alerts_points_export_analyzer, "POINTS_EXPORT_MAX_POINTS", 25
+        integrated_alerts_points_export_analyzer, "POINTS_EXPORT_MAX_POINTS", 1200
     )
 
     analysis, content, _ = await _export(table_uri, format="csv")
 
     csv = pd.read_csv(io.BytesIO(content))
     expected = _expected_rows(points, FIRST_DAY, LATEST_DAY, [2, 3, 4], None)
-    pd.testing.assert_frame_equal(csv, expected.head(25), check_dtype=False)
+    pd.testing.assert_frame_equal(csv, expected.head(1200), check_dtype=False)
     assert analysis.metadata["truncated"] == {"BRA.14.87": True}
 
 
