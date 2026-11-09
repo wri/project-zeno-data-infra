@@ -171,6 +171,20 @@ async def test_cached_tables_see_other_writers_once_they_expire(catalog):
 
 
 @pytest.mark.asyncio
+async def test_reads_find_aois_another_writer_saved_after_the_cache_loaded(catalog):
+    reader = IcebergCustomAoiRepository(
+        catalog, TABLE, INDEX, max_table_age_seconds=3600
+    )
+    writer = IcebergCustomAoiRepository(catalog, TABLE, INDEX)
+    await writer.upsert([aoi("a")])
+    await reader.get(["a"])
+
+    await writer.upsert([aoi("b", origin=(100, 40))])
+
+    assert [stored.aoi_id for stored in await reader.get(["b"])] == ["b"]
+
+
+@pytest.mark.asyncio
 async def test_own_writes_are_visible_immediately_despite_the_cache(catalog):
     repository = IcebergCustomAoiRepository(
         catalog, TABLE, INDEX, max_table_age_seconds=3600
