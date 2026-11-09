@@ -1,4 +1,5 @@
 import json
+import logging
 import dask
 import time
 import traceback
@@ -19,6 +20,8 @@ from pipelines.globals import (
 )
 from pipelines.prefect_flows.common_stages import clip_ds_to_bbox
 from pipelines.utils import s3_uri_exists
+
+logger = logging.getLogger(__name__)
 
 # xarray variable names
 NET_FLUX_VAR = "lulucf_net_flux_MgCO2e_ha_yr"
@@ -155,7 +158,7 @@ def create_cogs(
         uri = f"{prefix}/{name}.tif"
         if not overwrite and s3_uri_exists(uri):
             written[name] = uri
-            print(f"[{i:2d}/{len(tiles)}] {name:9s} exists, skipped  {uri}", flush=True)
+            logger.info(f"[{i:2d}/{len(tiles)}] {name:9s} exists, skipped  {uri}")
             continue
         clip_geom = tiles[name]
         if clip_to_bbox and bbox is not None:
@@ -165,14 +168,13 @@ def create_cogs(
             dask.compute(task)
         except Exception as err:
             failed[name] = traceback.format_exc()
-            print(f"[{i:2d}/{len(tiles)}] {name:9s} FAILED after "
-                  f"{time.time() - started:5.0f}s  {type(err).__name__}: {err}", flush=True)
+            logger.error(f"[{i:2d}/{len(tiles)}] {name:9s} FAILED after "
+                         f"{time.time() - started:5.0f}s  {type(err).__name__}: {err}")
             continue
         written[name] = uri
-        print(f"[{i:2d}/{len(tiles)}] {name:9s} {time.time() - started:5.0f}s  {uri}",
-              flush=True)
-    print(f"\n{len(written)} written, {len(failed)} failed in "
-          f"{(time.time() - started_all) / 60:.0f} min")
+        logger.info(f"[{i:2d}/{len(tiles)}] {name:9s} {time.time() - started:5.0f}s  {uri}")
+    logger.info(f"{len(written)} written, {len(failed)} failed in "
+                f"{(time.time() - started_all) / 60:.0f} min")
     return written, failed
 
 
@@ -204,7 +206,7 @@ def create_mosaic(tile_uris, prefix=COG_TILE_PREFIX, overwrite=False, clamp_glob
 
     per_quadkey = [len(v) for v in definition["tiles"].values()]
     assets = len(set().union(*definition["tiles"].values())) if per_quadkey else 0
-    print(f"wrote {mosaic_uri}: {len(per_quadkey)} quadkeys, {assets} assets, "
-          f"{min(per_quadkey, default=0)}-{max(per_quadkey, default=0)} assets/quadkey, "
-          f"bounds {definition['bounds']}", flush=True)
+    logger.info(f"wrote {mosaic_uri}: {len(per_quadkey)} quadkeys, {assets} assets, "
+                f"{min(per_quadkey, default=0)}-{max(per_quadkey, default=0)} assets/quadkey, "
+                f"bounds {definition['bounds']}")
     return mosaic_uri
