@@ -2,7 +2,7 @@ import asyncio
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Set, Tuple
 
 import pyarrow as pa
 import s2sphere
@@ -108,6 +108,10 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
 
     async def get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._get, aoi_ids)
+
+    async def list_saved_ids(self, aoi_ids: List[str]) -> Set[str]:
+        rows = await asyncio.to_thread(self.read_rows, aoi_ids, ("aoi_id",))
+        return set(rows.column("aoi_id").to_pylist())
 
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._intersecting, geometry)
