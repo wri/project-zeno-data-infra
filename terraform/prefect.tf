@@ -168,11 +168,23 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         title   = "Flow Name"
         type    = "string"
         default = "dist_update"
-        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update"]
+        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update", "subscription_emails"]
       }
       content_date = {
         title       = "Content date"
         description = "YYYY-MM-DD date up to which the data has been calculated. Required for wur_update."
+        anyOf       = [{ type = "string" }, { type = "null" }]
+        default     = null
+      }
+      send_emails = {
+        title       = "Send emails"
+        description = "For integrated_alerts_update and subscription_emails only: if true, send the week's subscription emails (subscription_emails otherwise only logs them)."
+        type        = "boolean"
+        default     = false
+      }
+      test_recipient = {
+        title       = "Test recipient"
+        description = "For subscription_emails only: send every email to this address instead of the subscriber's."
         anyOf       = [{ type = "string" }, { type = "null" }]
         default     = null
       }
@@ -266,6 +278,8 @@ resource "prefect_automation" "run_pipelines_on_intdist_update" {
         version   = "{{ event.payload.version }}"
         is_latest = "{{ event.payload.is_latest }}"
         flow_name = "integrated_alerts_update"
+        # TODO: add send_emails = true once the subscription emails are ready to
+        # go out.
       })
       job_variables = jsonencode({})
     },
