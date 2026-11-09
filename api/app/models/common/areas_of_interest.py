@@ -1,6 +1,6 @@
 import hashlib
 import json
-from typing import Annotated, Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, ClassVar, Dict, List, Literal, Optional
 from uuid import UUID
 
 from pydantic import Field, StringConstraints, field_validator, model_validator
@@ -9,7 +9,18 @@ from .base import StrictBaseModel
 
 ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
 MAX_OTF_FEATURES = 50
+# Deeper admin areas have no precomputed results, so they're computed on the fly
+DEEPEST_PRECOMPUTED_ADMIN_LEVEL = 2
 AdminStr = Annotated[str, StringConstraints(pattern=ADMIN_REGEX)]
+
+
+def admin_level(admin_id: str) -> int:
+    """BRA is level 0, BRA.1 level 1, BRA.1.12 level 2, and so on."""
+    return admin_id.count(".")
+
+
+def has_precomputed_level(admin_id: str) -> bool:
+    return admin_level(admin_id) <= DEEPEST_PRECOMPUTED_ADMIN_LEVEL
 
 
 class AreaOfInterest(StrictBaseModel):
@@ -17,8 +28,16 @@ class AreaOfInterest(StrictBaseModel):
         """Return the unique identifier for the area of interest."""
         raise NotImplementedError("This method is not implemented.")
 
+    def has_precomputed_results(self) -> bool:
+        """Whether every area of the request has precomputed results."""
+        return False
+
 
 class AdminAreaOfInterest(AreaOfInterest):
+    """Analyses supporting fewer admin levels subclass this with a lower
+    maximum."""
+
+    max_admin_level: ClassVar[int] = 5
     type: Literal["admin"] = "admin"
     ids: List[AdminStr] = Field(
         ..., min_length=1, max_length=1000, title="List of Dot-delimited identifiers"
@@ -30,6 +49,9 @@ class AdminAreaOfInterest(AreaOfInterest):
         # admin_level = self.get_admin_level()
         geostore_id = None
         return geostore_id
+
+    def has_precomputed_results(self) -> bool:
+        return all(has_precomputed_level(admin_id) for admin_id in self.ids)
 
     def get_ids_at_admin_level(self, admin_level):
         ids = []
@@ -45,10 +67,29 @@ class AdminAreaOfInterest(AreaOfInterest):
         return ids
 
     @field_validator("ids", mode="after")
-    def check_max_admin_level_2(cls, v):
-        for i in v:
-            if len(i.split(".")) > 3:
-                raise ValueError("Maximum admin level allowed is 2")
+    def check_admin_levels(cls, v):
+        if max(admin_level(admin_id) for admin_id in v) > cls.max_admin_level:
+            raise ValueError(f"Maximum admin level allowed is {cls.max_admin_level}")
+        return v
+
+    @field_validator("ids", mode="after")
+    def check_levels_not_mixed(cls, v):
+        on_the_fly_ids = [i for i in v if not has_precomputed_level(i)]
+        if on_the_fly_ids and len(on_the_fly_ids) < len(v):
+            raise ValueError(
+                f"Ids down to admin level {DEEPEST_PRECOMPUTED_ADMIN_LEVEL} and "
+                "deeper ids must be sent as separate requests"
+            )
+        return v
+
+    @field_validator("ids", mode="after")
+    def check_on_the_fly_count(cls, v):
+        on_the_fly_ids = [i for i in v if not has_precomputed_level(i)]
+        if len(on_the_fly_ids) > MAX_OTF_FEATURES:
+            raise ValueError(
+                f"At most {MAX_OTF_FEATURES} ids below admin level "
+                f"{DEEPEST_PRECOMPUTED_ADMIN_LEVEL} are allowed per request"
+            )
         return v
 
     @field_validator("provider", mode="before")

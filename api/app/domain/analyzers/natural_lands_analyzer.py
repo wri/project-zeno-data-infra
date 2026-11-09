@@ -76,7 +76,7 @@ class NaturalLandsAnalyzer(Analyzer):
 
         natural_lands_analytics_in = NaturalLandsAnalyticsIn(**analysis.metadata)
 
-        if natural_lands_analytics_in.aoi.type == "admin":
+        if natural_lands_analytics_in.aoi.has_precomputed_results():
             gadm_ids = natural_lands_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(gadm_ids)
         else:

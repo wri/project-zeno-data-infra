@@ -163,7 +163,7 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        if analytics_in.aoi.type == "admin":
+        if analytics_in.aoi.has_precomputed_results():
             results = await self.analyze_admin_areas(analytics_in)
         else:
             results = await self.analyze_otf(analytics_in)

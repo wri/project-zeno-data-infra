@@ -1,8 +1,11 @@
+from typing import ClassVar
+
 import pytest
 
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
     CustomAreaOfInterest,
+    ProtectedAreaOfInterest,
 )
 
 SAMPLE_FEATURE_COLLECTION = {
@@ -36,9 +39,27 @@ class TestAdminAreaOfInterest:
         with pytest.raises(ValueError):
             _ = AdminAreaOfInterest(type="admin", ids=["ETH.1..2"])
 
-    def test_aaoi_max_level_is_2(self):
+    def test_aaoi_accepts_ids_down_to_level_5(self):
+        assert AdminAreaOfInterest(type="admin", ids=["ETH.1.2.3.4.5"])
+
+    def test_aaoi_max_level_is_5(self):
         with pytest.raises(ValueError):
-            _ = AdminAreaOfInterest(type="admin", ids=["ETH.1.2.3"])
+            _ = AdminAreaOfInterest(type="admin", ids=["ETH.1.2.3.4.5.6"])
+
+    def test_aaoi_allows_up_to_50_ids_below_level_2(self):
+        assert AdminAreaOfInterest(
+            type="admin", ids=[f"BRA.14.1.{i}" for i in range(50)]
+        )
+
+    def test_aaoi_rejects_mixing_levels_with_and_without_precomputed_results(self):
+        with pytest.raises(ValueError, match="separate requests"):
+            _ = AdminAreaOfInterest(type="admin", ids=["BRA.14", "BRA.14.1.2"])
+
+    def test_aaoi_rejects_more_than_50_ids_below_level_2(self):
+        with pytest.raises(ValueError):
+            _ = AdminAreaOfInterest(
+                type="admin", ids=[f"BRA.14.1.{i}" for i in range(51)]
+            )
 
     def test_aaoi_regex_no_empty_strings(self):
         with pytest.raises(ValueError):
@@ -57,6 +78,30 @@ class TestAdminAreaOfInterest:
             _ = AdminAreaOfInterest(
                 type="admin", ids=[f"BRA.14.{i}" for i in range(1200)]
             )
+
+
+class TestHasPrecomputedResults:
+    def test_admin_areas_down_to_level_2_have_precomputed_results(self):
+        aoi = AdminAreaOfInterest(ids=["BRA", "BRA.1", "BRA.1.12"])
+
+        assert aoi.has_precomputed_results()
+
+    def test_admin_areas_below_level_2_have_no_precomputed_results(self):
+        assert not AdminAreaOfInterest(ids=["BRA.1.12.3"]).has_precomputed_results()
+
+    def test_other_area_types_have_no_precomputed_results(self):
+        aoi = ProtectedAreaOfInterest(ids=["555625448"])
+
+        assert not aoi.has_precomputed_results()
+
+
+class TestAdminAreaOfInterestSubclass:
+    def test_subclasses_can_lower_the_maximum_admin_level(self):
+        class LevelTwoAdminAreaOfInterest(AdminAreaOfInterest):
+            max_admin_level: ClassVar[int] = 2
+
+        with pytest.raises(ValueError, match="admin level allowed is 2"):
+            LevelTwoAdminAreaOfInterest(ids=["ETH.1.2.3"])
 
 
 class TestCustomAreaOfInterestHash:
