@@ -57,7 +57,7 @@ class CarbonFluxAnalyzer(Analyzer):
 
         carbon_flux_analytics_in = CarbonFluxAnalyticsIn(**analysis.metadata)
 
-        if carbon_flux_analytics_in.aoi.type == "admin":
+        if carbon_flux_analytics_in.aoi.has_precomputed_results():
             gadm_ids = carbon_flux_analytics_in.aoi.ids
             results = await self.analyze_admin_areas(
                 gadm_ids, carbon_flux_analytics_in.canopy_cover

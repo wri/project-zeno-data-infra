@@ -1,14 +1,27 @@
-from typing import Annotated, Optional, Union
+from typing import Annotated, ClassVar, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
 from ..common.analysis import AnalysisStatus, AnalyticsIn
-from ..common.areas_of_interest import AdminAreaOfInterest, GlobalAreaOfInterest
+from ..common.areas_of_interest import (
+    AdminAreaOfInterest,
+    GlobalAreaOfInterest,
+)
 from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "land_ghg_inventory"
 
-AoiUnion = Union[AdminAreaOfInterest, GlobalAreaOfInterest]
+
+class LandGHGInventoryAdminAreaOfInterest(AdminAreaOfInterest):
+    """Land GHG inventory only has precomputed results, down to admin level 2."""
+
+    max_admin_level: ClassVar[int] = 2
+
+
+AoiUnion = Union[
+    LandGHGInventoryAdminAreaOfInterest,
+    GlobalAreaOfInterest,
+]
 
 
 class LandGHGInventoryAnalyticsIn(AnalyticsIn):

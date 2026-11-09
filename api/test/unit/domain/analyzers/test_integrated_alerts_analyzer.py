@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import dask
 import numpy as np
@@ -348,3 +348,22 @@ class TestOtfAnalysis:
             check_dtype=False,
             rtol=1e-4,
         )
+
+
+@pytest.mark.asyncio
+async def test_admin_areas_below_precomputed_levels_are_computed_on_the_fly():
+    analyzer = IntegratedAlertsAnalyzer(
+        input_uris={"x": "y"},
+    )
+    analysis = make_analysis({"type": "admin", "ids": ["BRA.1.2.3"]})
+
+    with (
+        patch.object(
+            analyzer, "_run_on_the_fly", AsyncMock(return_value={"aoi_id": []})
+        ) as on_the_fly,
+        patch.object(analyzer, "_run_precomputed", AsyncMock()) as precomputed,
+    ):
+        await analyzer.analyze(analysis)
+
+    on_the_fly.assert_awaited_once()
+    precomputed.assert_not_awaited()
