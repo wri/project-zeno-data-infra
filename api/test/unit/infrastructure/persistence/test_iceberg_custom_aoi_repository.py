@@ -182,6 +182,7 @@ async def test_reads_find_aois_another_writer_saved_after_the_cache_loaded(catal
     await writer.upsert([aoi("b", origin=(100, 40))])
 
     assert [stored.aoi_id for stored in await reader.get(["b"])] == ["b"]
+    assert await reader.list_saved_ids(["a", "b", "missing"]) == {"a", "b"}
 
 
 @pytest.mark.asyncio

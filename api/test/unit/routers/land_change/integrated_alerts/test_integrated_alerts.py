@@ -353,3 +353,44 @@ def test_export_post_then_get_returns_a_fresh_download_url(tmp_path):
     assert filename.endswith("_2026-10-16.csv")
     assert data["metadata"]["alerts"]["version"] == "v20261018"
     assert data["metadata"]["truncated"] == {"BRA.14.87": False}
+
+
+@pytest.mark.parametrize(
+    "path, request_body",
+    [
+        ("/points", {}),
+        ("/points/exports", {"format": "csv"}),
+    ],
+)
+def test_points_request_for_an_unsaved_custom_aoi_gets_404_without_an_analysis(
+    monkeypatch, path, request_body
+):
+    class SavedIds:
+        async def list_saved_ids(self, aoi_ids):
+            return set()
+
+    monkeypatch.setattr(integrated_alerts, "get_custom_aoi_repository", SavedIds)
+    app.dependency_overrides[integrated_alerts.get_points_request_version] = lambda: (
+        "v1"
+    )
+    app.dependency_overrides[get_latest_integrated_alerts_version] = lambda: "v1"
+    # Building an analysis would fail, so a 404 shows the request stopped first.
+    app.dependency_overrides[integrated_alerts.create_points_analysis_service] = (
+        lambda: None
+    )
+    app.dependency_overrides[
+        integrated_alerts.create_points_export_analysis_service
+    ] = lambda: None
+    try:
+        response = client.post(
+            f"/v0/land_change/integrated_alerts{path}",
+            json={
+                "aoi": {"type": "custom_aoi", "ids": ["not-yet-saved"]},
+                **request_body,
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert "not-yet-saved" in response.json()["detail"]

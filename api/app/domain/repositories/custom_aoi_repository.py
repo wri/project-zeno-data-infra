@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Set
 
 from shapely.geometry.base import BaseGeometry
 
@@ -19,6 +19,10 @@ class CustomAoiRepository(ABC):
     async def get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
         """The geometries of the stored AOIs with these ids, in the order
         requested. Ids that aren't stored are left out."""
+
+    @abstractmethod
+    async def list_saved_ids(self, aoi_ids: List[str]) -> Set[str]:
+        """List which of these ids are stored."""
 
     @abstractmethod
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:

@@ -8,7 +8,11 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_aoi_geometry_repository, get_environment
+from app.dependencies import (
+    get_aoi_geometry_repository,
+    get_custom_aoi_repository,
+    get_environment,
+)
 from app.domain.analyzers.integrated_alerts_analyzer import (
     IntegratedAlertsAnalyzer,
     build_input_uris,
@@ -59,7 +63,11 @@ from app.models.land_change.integrated_alerts import (
     IntegratedAlertsPointsResponse,
     decode_cursor,
 )
-from app.routers.common_analytics import create_analysis, get_analysis
+from app.routers.common_analytics import (
+    create_analysis,
+    get_analysis,
+    reject_unsaved_custom_aois,
+)
 from app.use_cases.analysis.analysis_service import AnalysisService
 from app.use_cases.integrated_alerts.latest_alert_date import (
     IntegratedAlertsLatestDate,
@@ -278,6 +286,7 @@ async def create_points(
     service: AnalysisService = Depends(create_points_analysis_service),
     version: str = Depends(get_points_request_version),
 ):
+    await reject_unsaved_custom_aois(data.aoi, get_custom_aoi_repository)
     data._version = version
     return await create_analysis(
         data=data,
@@ -389,6 +398,7 @@ async def create_points_export(
     service: AnalysisService = Depends(create_points_export_analysis_service),
     version: str = Depends(get_latest_integrated_alerts_version),
 ):
+    await reject_unsaved_custom_aois(data.aoi, get_custom_aoi_repository)
     data._version = version
     return await create_analysis(
         data=data,
