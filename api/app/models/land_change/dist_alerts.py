@@ -1,4 +1,4 @@
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, ClassVar, List, Literal, Optional, Union
 
 from pydantic import Field, PrivateAttr
 
@@ -14,8 +14,15 @@ from ..common.base import Response, StrictBaseModel
 
 ANALYTICS_NAME = "dist_alerts"
 
+
+class DistAlertsAdminAreaOfInterest(AdminAreaOfInterest):
+    """DIST alerts only has precomputed results, down to admin level 2."""
+
+    max_admin_level: ClassVar[int] = 2
+
+
 AoiUnion = Union[
-    AdminAreaOfInterest,
+    DistAlertsAdminAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,

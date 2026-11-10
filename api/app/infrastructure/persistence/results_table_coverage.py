@@ -1,4 +1,4 @@
-from typing import List, Set
+from typing import Set
 
 import duckdb
 
@@ -6,6 +6,7 @@ from app.domain.repositories.precomputed_table import (
     PrecomputedCoverage,
     sql_string_list,
 )
+from app.models.common.areas_of_interest import AreaOfInterest
 
 
 class ResultsTableCoverage(PrecomputedCoverage):
@@ -19,11 +20,11 @@ class ResultsTableCoverage(PrecomputedCoverage):
     def __init__(self, query_service):
         self.query_service = query_service
 
-    async def select_precomputed_ids(self, aoi_ids: List[str]) -> Set[str]:
+    async def select_precomputed_ids(self, aoi: AreaOfInterest) -> Set[str]:
         try:
             rows = await self.query_service.execute(
                 "SELECT DISTINCT aoi_id FROM data_source "
-                f"WHERE aoi_id IN ({sql_string_list(aoi_ids)})"
+                f"WHERE aoi_id IN ({sql_string_list(aoi.ids)})"
             )
         except duckdb.IOException:
             # A version can be served before its results table is written.

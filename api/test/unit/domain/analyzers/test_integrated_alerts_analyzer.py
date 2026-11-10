@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import dask
 import dask.dataframe as dd
@@ -19,7 +19,7 @@ from app.domain.models.analysis import Analysis
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment
 from app.domain.repositories.precomputed_table import (
-    EveryAoiCovered,
+    PrecomputedAdminLevels,
     PrecomputedSource,
 )
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -85,7 +85,7 @@ def make_analysis(
 def admin_sources(table_uri):
     return {
         "admin": PrecomputedSource(
-            DuckDbPrecalcQueryService(table_uri=table_uri), EveryAoiCovered()
+            DuckDbPrecalcQueryService(table_uri=table_uri), PrecomputedAdminLevels()
         )
     }
 
@@ -476,3 +476,25 @@ class TestOtfAnalysis:
             check_dtype=False,
             rtol=1e-4,
         )
+
+
+@pytest.mark.asyncio
+async def test_admin_areas_below_precomputed_levels_are_computed_on_the_fly(
+    tmp_path,
+):
+    analyzer = IntegratedAlertsAnalyzer(
+        precomputed_sources=admin_sources(tmp_path / "admin.parquet"),
+        input_uris={"x": "y"},
+    )
+    analysis = make_analysis({"type": "admin", "ids": ["BRA.1.2.3"]})
+
+    with (
+        patch.object(
+            analyzer, "_run_on_the_fly", AsyncMock(return_value={"aoi_id": []})
+        ) as on_the_fly,
+        patch.object(analyzer, "_run_precomputed", AsyncMock()) as precomputed,
+    ):
+        await analyzer.analyze(analysis)
+
+    on_the_fly.assert_awaited_once()
+    precomputed.assert_not_awaited()

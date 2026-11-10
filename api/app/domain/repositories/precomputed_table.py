@@ -1,21 +1,25 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Set
+from typing import Any, Iterable, Set
+
+from app.models.common.areas_of_interest import AreaOfInterest
 
 
 class PrecomputedCoverage(ABC):
     """Decides which AOI ids a precomputed results table can serve."""
 
     @abstractmethod
-    async def select_precomputed_ids(self, aoi_ids: List[str]) -> Set[str]:
-        """Select which of these ids the table holds statistics for."""
+    async def select_precomputed_ids(self, aoi: AreaOfInterest) -> Set[str]:
+        """Select which of the AOI's ids the table holds statistics for."""
 
 
-class EveryAoiCovered(PrecomputedCoverage):
-    """Coverage of a table built for every AOI of its type."""
+class PrecomputedAdminLevels(PrecomputedCoverage):
+    """Coverage of a table built for every admin area down to the deepest
+    precomputed level."""
 
-    async def select_precomputed_ids(self, aoi_ids: List[str]) -> Set[str]:
-        return set(aoi_ids)
+    async def select_precomputed_ids(self, aoi: AreaOfInterest) -> Set[str]:
+        # A request's admin areas are all above or all below that level.
+        return set(aoi.ids) if aoi.has_precomputed_results() else set()
 
 
 @dataclass(frozen=True)

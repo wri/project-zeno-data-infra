@@ -22,11 +22,12 @@ from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
 from app.main import app
-from app.models.common.areas_of_interest import (
-    AdminAreaOfInterest,
-    KeyBiodiversityAreaOfInterest,
+from app.models.common.areas_of_interest import KeyBiodiversityAreaOfInterest
+from app.models.land_change.dist_alerts import (
+    ANALYTICS_NAME,
+    DistAlertsAdminAreaOfInterest,
+    DistAlertsAnalyticsIn,
 )
-from app.models.land_change.dist_alerts import ANALYTICS_NAME, DistAlertsAnalyticsIn
 from app.routers.land_change.dist_alerts.dist_alerts import (
     create_analysis_service,
     get_analysis_repository,
@@ -66,7 +67,7 @@ class TestDistAnalyticsPostWithNoPreviousRequest:
     async def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
@@ -124,7 +125,7 @@ class TestDistAnalyticsPostWhenPreviousRequestStillProcessing:
     def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
@@ -178,7 +179,7 @@ class TestDistAnalyticsPostWhenPreviousRequestComplete:
     def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
@@ -234,7 +235,7 @@ class TestDistAnalyticsGetWithNoPreviousRequest:
     def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
@@ -269,7 +270,7 @@ class TestDistAnalyticsGetWithPreviousRequestStillProcessing:
     def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
@@ -326,7 +327,7 @@ class TestDistAnalyticsGetWithPreviousRequestComplete:
     def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+            aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
             start_date="2024-08-15",
             end_date="2024-08-16",
             intersections=[],
@@ -407,7 +408,7 @@ class TestDistAnalyticsPostWithMultipleAdminAOIs:
     async def setup(self):
         """Runs before each test in this class"""
         analytics_in = DistAlertsAnalyticsIn(
-            aoi=AdminAreaOfInterest(
+            aoi=DistAlertsAdminAreaOfInterest(
                 type="admin", ids=["IDN.24.9", "IDN.14.13", "BRA.1.1"]
             ),
             start_date="2024-08-15",
@@ -598,7 +599,7 @@ class TestDistAnalyticsPostWithMultipleKBAAOIs:
 @pytest.mark.asyncio
 async def test_gadm_dist_analytics_no_intersection():
     analytics_in = DistAlertsAnalyticsIn(
-        aoi=AdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
+        aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["IDN.24.9"]),
         start_date="2024-08-15",
         end_date="2024-08-16",
         intersections=[],
@@ -720,7 +721,7 @@ async def test_kba_dist_analytics_no_intersection():
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_grasslands():
     analytics_in = DistAlertsAnalyticsIn(
-        aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
+        aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
         start_date="2024-08-15",
         end_date="2024-08-16",
         intersections=["grasslands"],
@@ -780,7 +781,7 @@ async def test_admin_dist_analytics_by_grasslands():
 @pytest.mark.asyncio
 async def test_admin_dist_analytics_by_land_cover():
     analytics_in = DistAlertsAnalyticsIn(
-        aoi=AdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
+        aoi=DistAlertsAdminAreaOfInterest(type="admin", ids=["TZA.24.3"]),
         start_date="2024-08-15",
         end_date="2024-08-16",
         intersections=["land_cover"],

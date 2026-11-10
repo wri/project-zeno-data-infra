@@ -27,7 +27,7 @@ from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.repositories.precomputed_table import (
-    EveryAoiCovered,
+    PrecomputedAdminLevels,
     PrecomputedSource,
 )
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -121,7 +121,7 @@ def create_analysis_service(
         analysis_repository=analysis_repository,
         analyzer=IntegratedAlertsAnalyzer(
             precomputed_sources={
-                "admin": PrecomputedSource(admin_results, EveryAoiCovered()),
+                "admin": PrecomputedSource(admin_results, PrecomputedAdminLevels()),
                 "custom_aoi": PrecomputedSource(
                     custom_results, ResultsTableCoverage(custom_results)
                 ),

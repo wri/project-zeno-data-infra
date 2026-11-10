@@ -7,6 +7,7 @@ from app.infrastructure.external_services.duck_db_query_service import (
 from app.infrastructure.persistence.results_table_coverage import (
     ResultsTableCoverage,
 )
+from app.models.common.areas_of_interest import SavedCustomAreaOfInterest
 
 
 @pytest.fixture
@@ -23,7 +24,7 @@ async def test_covers_only_ids_with_rows(results_table):
     coverage = ResultsTableCoverage(DuckDbPrecalcQueryService(table_uri=results_table))
 
     precomputed_ids = await coverage.select_precomputed_ids(
-        ["a", "o'brien", "saved-later"]
+        SavedCustomAreaOfInterest(ids=["a", "o'brien", "saved-later"])
     )
 
     assert precomputed_ids == {"a", "o'brien"}
@@ -35,4 +36,6 @@ async def test_missing_results_table_covers_nothing(tmp_path):
         DuckDbPrecalcQueryService(table_uri=tmp_path / "missing.parquet")
     )
 
-    assert await coverage.select_precomputed_ids(["a"]) == set()
+    aoi = SavedCustomAreaOfInterest(ids=["a"])
+
+    assert await coverage.select_precomputed_ids(aoi) == set()

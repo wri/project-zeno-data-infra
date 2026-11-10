@@ -48,7 +48,7 @@ class ZonalStatisticsAnalyzer(Analyzer):
         results = []
         otf_ids = aoi.ids
         if source is not None:
-            precomputed_ids = await source.coverage.select_precomputed_ids(aoi.ids)
+            precomputed_ids = await source.coverage.select_precomputed_ids(aoi)
             otf_ids = sorted(set(aoi.ids) - precomputed_ids)
             if precomputed_ids:
                 # Sorted so the generated SQL is the same for the same request.

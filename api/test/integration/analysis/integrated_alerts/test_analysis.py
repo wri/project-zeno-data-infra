@@ -13,7 +13,7 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 )
 from app.domain.models.environment import Environment
 from app.domain.repositories.precomputed_table import (
-    EveryAoiCovered,
+    PrecomputedAdminLevels,
     PrecomputedSource,
 )
 from app.infrastructure.external_services.duck_db_query_service import (
@@ -64,7 +64,7 @@ def create_analysis_service_for_tests(
                     DuckDbPrecalcQueryService(
                         table_uri=INPUT_URIS["admin_results_table_uri"]
                     ),
-                    EveryAoiCovered(),
+                    PrecomputedAdminLevels(),
                 )
             },
             input_uris=INPUT_URIS,
