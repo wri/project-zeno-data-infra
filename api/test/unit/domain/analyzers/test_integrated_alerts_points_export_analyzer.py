@@ -20,10 +20,7 @@ from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
     IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.analysis import Analysis
-from app.infrastructure.export.alert_points_files import (
-    CsvAlertPointsFile,
-    ShapefileZipAlertPointsFile,
-)
+from app.infrastructure.export.alert_points_files import ALERT_POINTS_FILE_TYPES
 from app.infrastructure.persistence.parquet_alert_points_repository import (
     ParquetAlertPointsRepository,
     day_to_date,
@@ -70,7 +67,7 @@ async def _export(table_uri, **request):
         points_repository=ParquetAlertPointsRepository(table_uri),
         file_store=file_store,
         geometry_repository=FakeGeometryRepository(),
-        file_types={"csv": CsvAlertPointsFile, "shp": ShapefileZipAlertPointsFile},
+        file_types=ALERT_POINTS_FILE_TYPES,
         page_size=PAGE_SIZE,
     )
     analytics_in = IntegratedAlertsPointsExportIn(

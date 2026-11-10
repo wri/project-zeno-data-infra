@@ -1,5 +1,6 @@
 import zipfile
 from pathlib import Path
+from typing import Dict, Type
 
 import geopandas as gpd
 import pandas as pd
@@ -62,3 +63,9 @@ class ShapefileZipAlertPointsFile(AlertPointsFile):
         with zipfile.ZipFile(self.path, "w", zipfile.ZIP_DEFLATED) as archive:
             for part in sorted(self.shapefile_dir.iterdir()):
                 archive.write(part, arcname=part.name)
+
+
+ALERT_POINTS_FILE_TYPES: Dict[str, Type[AlertPointsFile]] = {
+    "csv": CsvAlertPointsFile,
+    "shp": ShapefileZipAlertPointsFile,
+}

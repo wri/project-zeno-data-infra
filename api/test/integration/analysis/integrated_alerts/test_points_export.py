@@ -15,10 +15,7 @@ from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
     IntegratedAlertsPointsExportAnalyzer,
 )
-from app.infrastructure.export.alert_points_files import (
-    CsvAlertPointsFile,
-    ShapefileZipAlertPointsFile,
-)
+from app.infrastructure.export.alert_points_files import ALERT_POINTS_FILE_TYPES
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -55,10 +52,7 @@ async def export_points(request_body, file_store):
                 points_repository=ParquetAlertPointsRepository(TABLE_URI),
                 file_store=file_store,
                 geometry_repository=get_aoi_geometry_repository(),
-                file_types={
-                    "csv": CsvAlertPointsFile,
-                    "shp": ShapefileZipAlertPointsFile,
-                },
+                file_types=ALERT_POINTS_FILE_TYPES,
                 page_size=100_000,
                 input_uris=build_points_input_uris(VERSION),
             ),
