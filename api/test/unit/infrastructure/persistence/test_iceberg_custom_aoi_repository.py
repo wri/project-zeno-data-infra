@@ -6,12 +6,14 @@ from pyiceberg.expressions import EqualTo
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
+from app.domain.models.custom_aoi import CustomAoi
+from app.domain.repositories.aoi_geometry_repository import AoiNotFoundError
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
     custom_aoi_cell_schema,
     custom_aoi_schema,
 )
+from app.models.common.areas_of_interest import SavedCustomAreaOfInterest
 
 TABLE = "custom.custom_aois"
 INDEX = "custom.custom_aoi_cells"
@@ -31,7 +33,7 @@ def catalog(tmp_path):
 
 @pytest.fixture
 def repository(catalog):
-    return IcebergCustomAoiRepository(catalog, TABLE, INDEX)
+    return IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX)
 
 
 def aoi(aoi_id, size=1, origin=(0, 0)):
@@ -69,8 +71,8 @@ async def test_upsert_replaces_existing_ids(repository, catalog):
 
 @pytest.mark.asyncio
 async def test_first_use_partitions_the_table_by_s2_cell_once(catalog):
-    await IcebergCustomAoiRepository(catalog, TABLE, INDEX).upsert([aoi("a")])
-    await IcebergCustomAoiRepository(catalog, TABLE, INDEX).upsert([aoi("b")])
+    await IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX).upsert([aoi("a")])
+    await IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX).upsert([aoi("b")])
 
     fields = catalog.load_table(TABLE).spec().fields
     assert [field.name for field in fields] == ["s2_cell"]
@@ -115,28 +117,39 @@ async def test_delete_removes_the_aoi_and_its_index_entry_idempotently(
 
 
 @pytest.mark.asyncio
-async def test_get_returns_only_ids_and_geometries_in_requested_order(repository):
+async def test_load_returns_geometries_and_stored_areas_in_requested_order(
+    repository,
+):
     await repository.upsert([aoi("a"), aoi("b", size=2, origin=(100, 40))])
 
-    found = await repository.get(["b", "missing", "a"])
+    geometries, areas_ha = await repository.load(
+        SavedCustomAreaOfInterest(ids=["b", "a"])
+    )
 
-    assert found == [
-        CustomAoiGeometry("b", MultiPolygon([box(100, 40, 102, 42)])),
-        CustomAoiGeometry("a", MultiPolygon([box(0, 0, 1, 1)])),
+    assert geometries == [
+        MultiPolygon([box(100, 40, 102, 42)]),
+        MultiPolygon([box(0, 0, 1, 1)]),
     ]
+    assert areas_ha == [2.0, 1.0]
 
 
 @pytest.mark.asyncio
-async def test_get_finds_aois_whose_index_entry_is_missing(catalog):
+async def test_load_rejects_unsaved_ids(repository):
+    await repository.upsert([aoi("a")])
+
+    with pytest.raises(AoiNotFoundError, match="missing"):
+        await repository.load(SavedCustomAreaOfInterest(ids=["a", "missing"]))
+
+
+@pytest.mark.asyncio
+async def test_reads_find_aois_whose_index_entry_is_missing(catalog):
     repository = IcebergCustomAoiRepository(
-        catalog, TABLE, INDEX, max_table_age_seconds=0
+        lambda: catalog, TABLE, INDEX, max_table_age_seconds=0
     )
     await repository.upsert([aoi("a")])
     catalog.load_table(INDEX).delete(EqualTo("aoi_id", "a"))
 
-    found = await repository.get(["a"])
-
-    assert [stored.aoi_id for stored in found] == ["a"]
+    assert await repository.list_saved_ids(["a"]) == {"a"}
 
 
 @pytest.mark.asyncio
@@ -160,43 +173,44 @@ async def test_intersecting_returns_only_aois_touching_the_geometry(repository):
 
 @pytest.mark.asyncio
 async def test_cached_tables_see_other_writers_once_they_expire(catalog):
-    reader = IcebergCustomAoiRepository(catalog, TABLE, INDEX, max_table_age_seconds=0)
-    writer = IcebergCustomAoiRepository(catalog, TABLE, INDEX)
+    reader = IcebergCustomAoiRepository(
+        lambda: catalog, TABLE, INDEX, max_table_age_seconds=0
+    )
+    writer = IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX)
     await writer.upsert([aoi("a")])
-    assert [stored.aoi_id for stored in await reader.get(["a"])] == ["a"]
+    assert await reader.list_saved_ids(["a"]) == {"a"}
 
     await writer.upsert([aoi("b", origin=(100, 40))])
 
-    assert [stored.aoi_id for stored in await reader.get(["b"])] == ["b"]
+    assert await reader.list_saved_ids(["b"]) == {"b"}
 
 
 @pytest.mark.asyncio
 async def test_reads_find_aois_another_writer_saved_after_the_cache_loaded(catalog):
     reader = IcebergCustomAoiRepository(
-        catalog, TABLE, INDEX, max_table_age_seconds=3600
+        lambda: catalog, TABLE, INDEX, max_table_age_seconds=3600
     )
-    writer = IcebergCustomAoiRepository(catalog, TABLE, INDEX)
+    writer = IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX)
     await writer.upsert([aoi("a")])
-    await reader.get(["a"])
+    await reader.list_saved_ids(["a"])
 
     await writer.upsert([aoi("b", origin=(100, 40))])
 
-    assert [stored.aoi_id for stored in await reader.get(["b"])] == ["b"]
     assert await reader.list_saved_ids(["a", "b", "missing"]) == {"a", "b"}
 
 
 @pytest.mark.asyncio
 async def test_own_writes_are_visible_immediately_despite_the_cache(catalog):
     repository = IcebergCustomAoiRepository(
-        catalog, TABLE, INDEX, max_table_age_seconds=3600
+        lambda: catalog, TABLE, INDEX, max_table_age_seconds=3600
     )
     await repository.upsert([aoi("a")])
-    await repository.get(["a"])
+    await repository.list_saved_ids(["a"])
 
     await repository.upsert([aoi("b", origin=(100, 40))])
     await repository.delete("a")
 
-    assert [stored.aoi_id for stored in await repository.get(["a", "b"])] == ["b"]
+    assert await repository.list_saved_ids(["a", "b"]) == {"b"}
 
 
 @pytest.mark.asyncio
@@ -204,7 +218,7 @@ async def test_writes_fail_when_the_tables_were_never_provisioned(tmp_path):
     catalog = SqlCatalog(
         "test", uri=f"sqlite:///{tmp_path}/catalog.db", warehouse=f"file://{tmp_path}"
     )
-    repository = IcebergCustomAoiRepository(catalog, TABLE, INDEX)
+    repository = IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX)
 
     with pytest.raises(NoSuchTableError):
         await repository.upsert([aoi("a")])
