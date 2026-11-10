@@ -48,12 +48,14 @@ class ZonalStatisticsAnalyzer(Analyzer):
         results = []
         otf_ids = aoi.ids
         if source is not None:
-            covered_ids = await source.coverage.select_covered_ids(aoi.ids)
-            precomputed_ids = [aoi_id for aoi_id in aoi.ids if aoi_id in covered_ids]
-            otf_ids = [aoi_id for aoi_id in aoi.ids if aoi_id not in covered_ids]
+            precomputed_ids = await source.coverage.select_precomputed_ids(aoi.ids)
+            otf_ids = sorted(set(aoi.ids) - precomputed_ids)
             if precomputed_ids:
+                # Sorted so the generated SQL is the same for the same request.
                 results.append(
-                    await self._run_precomputed(source, analytics_in, precomputed_ids)
+                    await self._run_precomputed(
+                        source, analytics_in, sorted(precomputed_ids)
+                    )
                 )
         if otf_ids:
             results.append(

@@ -7,14 +7,14 @@ class PrecomputedCoverage(ABC):
     """Decides which AOI ids a precomputed results table can serve."""
 
     @abstractmethod
-    async def select_covered_ids(self, aoi_ids: List[str]) -> Set[str]:
-        """Select the ids whose statistics the table holds."""
+    async def select_precomputed_ids(self, aoi_ids: List[str]) -> Set[str]:
+        """Select which of these ids the table holds statistics for."""
 
 
 class EveryAoiCovered(PrecomputedCoverage):
     """Coverage of a table built for every AOI of its type."""
 
-    async def select_covered_ids(self, aoi_ids: List[str]) -> Set[str]:
+    async def select_precomputed_ids(self, aoi_ids: List[str]) -> Set[str]:
         return set(aoi_ids)
 
 

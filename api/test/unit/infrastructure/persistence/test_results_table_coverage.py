@@ -22,9 +22,11 @@ def results_table(tmp_path):
 async def test_covers_only_ids_with_rows(results_table):
     coverage = ResultsTableCoverage(DuckDbPrecalcQueryService(table_uri=results_table))
 
-    covered = await coverage.select_covered_ids(["a", "o'brien", "saved-later"])
+    precomputed_ids = await coverage.select_precomputed_ids(
+        ["a", "o'brien", "saved-later"]
+    )
 
-    assert covered == {"a", "o'brien"}
+    assert precomputed_ids == {"a", "o'brien"}
 
 
 @pytest.mark.asyncio
@@ -33,4 +35,4 @@ async def test_missing_results_table_covers_nothing(tmp_path):
         DuckDbPrecalcQueryService(table_uri=tmp_path / "missing.parquet")
     )
 
-    assert await coverage.select_covered_ids(["a"]) == set()
+    assert await coverage.select_precomputed_ids(["a"]) == set()

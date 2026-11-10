@@ -19,7 +19,7 @@ class ResultsTableCoverage(PrecomputedCoverage):
     def __init__(self, query_service):
         self.query_service = query_service
 
-    async def select_covered_ids(self, aoi_ids: List[str]) -> Set[str]:
+    async def select_precomputed_ids(self, aoi_ids: List[str]) -> Set[str]:
         try:
             rows = await self.query_service.execute(
                 "SELECT DISTINCT aoi_id FROM data_source "
