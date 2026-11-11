@@ -213,13 +213,13 @@ def summarize_alert_areas(alerts: pd.DataFrame) -> pd.DataFrame:
     return areas.groupby("aoi_id", as_index=False).sum()
 
 
-def read_aoi_names(aoi_ids: list[str]) -> dict[str, str]:
+def read_admin_aoi_names(aoi_ids: list[str]) -> dict[str, str]:
     """Display names like "Paraná, Brazil" for GADM aoi_ids."""
     table = _s3_dataset([GADM_AOIS_URI]).to_table(
         columns=["aoi_id", "adm_level", "country", "name_1", "name_2"],
         filter=ds.field("aoi_id").isin(aoi_ids),
     )
-    return aoi_names(table.to_pandas())
+    return admin_aoi_names(table.to_pandas())
 
 
 def read_custom_aoi_names(aoi_ids: list[str]) -> dict[str, str]:
@@ -242,7 +242,7 @@ class EmailAoiType:
 
 # The AOI types the email covers. Their results files share one schema.
 EMAIL_AOI_TYPES = {
-    "admin": EmailAoiType("admin-integrated-alerts.parquet", read_aoi_names),
+    "admin": EmailAoiType("admin-integrated-alerts.parquet", read_admin_aoi_names),
     "custom": EmailAoiType("custom-integrated-alerts.parquet", read_custom_aoi_names),
 }
 
@@ -255,7 +255,7 @@ def read_names(aoi_ids_by_type: dict[str, list[str]]) -> dict[str, str]:
     return names
 
 
-def aoi_names(aois: pd.DataFrame) -> dict[str, str]:
+def admin_aoi_names(aois: pd.DataFrame) -> dict[str, str]:
     """Names of GADM AOIs, from the AOI itself up to its country, e.g. "Brazil",
     "Paraná, Brazil" or "Abatiá, Paraná, Brazil"."""
     name_columns = {0: ["country"], 1: ["name_1", "country"]}

@@ -194,7 +194,7 @@ def test_summarize_alert_areas_splits_natural_lands_and_forest():
     )
 
 
-def test_aoi_names_go_from_aoi_up_to_country():
+def test_admin_aoi_names_go_from_aoi_up_to_country():
     aois = pd.DataFrame(
         {
             "aoi_id": ["BRA", "BRA.16", "BRA.16.1"],
@@ -205,7 +205,7 @@ def test_aoi_names_go_from_aoi_up_to_country():
         }
     )
 
-    assert stages.aoi_names(aois) == {
+    assert stages.admin_aoi_names(aois) == {
         "BRA": "Brazil",
         "BRA.16": "Paraná, Brazil",
         "BRA.16.1": "Abatiá, Paraná, Brazil",
