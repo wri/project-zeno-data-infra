@@ -10,6 +10,7 @@ from shapely.geometry.base import BaseGeometry
 
 from app.domain.analyzers.integrated_alerts_analyzer import ALERTS_CONFIDENCE
 from app.domain.repositories.alert_points_repository import AlertPointsSource
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.models.land_change.integrated_alerts import IntegratedAlertsPointsFilterIn
 
 CONFIDENCE_CODES = {label: code for code, label in ALERTS_CONFIDENCE.items()}
@@ -23,18 +24,14 @@ POINTS_RESULT_COLUMNS = [
 ]
 
 
-async def read_admin_geometries(
-    geometry_repository, analytics_in: IntegratedAlertsPointsFilterIn
-) -> Tuple[List[str], List[BaseGeometry]]:
-    """Read the request's GADM geometries, sorted by aoi_id."""
-    aoi_ids = sorted(set(analytics_in.aoi.ids))
-    geometries, _ = await geometry_repository.load("admin", aoi_ids)
-    if len(geometries) != len(aoi_ids):
-        raise ValueError(
-            f"Expected {len(aoi_ids)} geometries for admin AOIs, "
-            f"got {len(geometries)}."
-        )
-    return aoi_ids, list(geometries)
+async def read_aoi_geometry(
+    geometry_repository: AoiGeometryRepository,
+    analytics_in: IntegratedAlertsPointsFilterIn,
+) -> Tuple[str, BaseGeometry]:
+    """Read the id and geometry of the request's one AOI."""
+    (aoi_id,) = analytics_in.aoi.ids
+    (geometry,), _ = await geometry_repository.load(analytics_in.aoi)
+    return aoi_id, geometry
 
 
 def served_alerts_metadata(
@@ -53,20 +50,22 @@ def served_alerts_metadata(
     }
 
 
-def format_points(points: pd.DataFrame) -> Dict[str, list]:
-    """Convert repository points to result columns (POINTS_RESULT_COLUMNS), with
+def format_points(points: pd.DataFrame) -> pd.DataFrame:
+    """Format repository points as result columns (POINTS_RESULT_COLUMNS), with
     ISO dates and confidence labels."""
     # A window holds a few dozen distinct dates, so format those once and index
     # into them rather than formatting every row.
     date_codes, dates = pd.factorize(points["alert_date"])
     iso_dates = np.array([d.isoformat() for d in dates], dtype=object)
-    return {
-        "lat": points["lat"].tolist(),
-        "lon": points["lon"].tolist(),
-        "alert_date": iso_dates[date_codes].tolist(),
-        "alert_confidence": points["confidence"].map(ALERTS_CONFIDENCE).tolist(),
-        "natural_lands_class": points["natural_lands_class"].tolist(),
-    }
+    return pd.DataFrame(
+        {
+            "lat": points["lat"].to_numpy(),
+            "lon": points["lon"].to_numpy(),
+            "alert_date": iso_dates[date_codes],
+            "alert_confidence": points["confidence"].map(ALERTS_CONFIDENCE).to_numpy(),
+            "natural_lands_class": points["natural_lands_class"].to_numpy(),
+        }
+    )
 
 
 def confidence_codes(analytics_in) -> List[int]:

@@ -101,6 +101,18 @@ class AdminAreaOfInterest(AreaOfInterest):
         return v or "4.1"
 
 
+class SavedCustomAreaOfInterest(AreaOfInterest):
+    """Custom AOIs stored through the admin custom AOI endpoints, by id."""
+
+    type: Literal["custom_aoi"] = "custom_aoi"
+    ids: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=MAX_OTF_FEATURES,
+        title="List of stored custom AOI ids",
+    )
+
+
 class GlobalAreaOfInterest(AreaOfInterest):
     """The whole world as a single aggregate area.
 
@@ -169,7 +181,8 @@ class CustomAreaOfInterest(AreaOfInterest):
 
         if len(features) > MAX_OTF_FEATURES:
             raise ValueError(
-                f"feature_collection.features can have a maxmimum of {MAX_OTF_FEATURES} features."
+                "feature_collection.features can have a maxmimum of "
+                f"{MAX_OTF_FEATURES} features."
             )
 
         ids: List[str] = []

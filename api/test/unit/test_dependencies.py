@@ -4,10 +4,19 @@ import pytest
 from fastapi import Depends, FastAPI  # noqa: E402
 from fastapi.testclient import TestClient
 
-from app.dependencies import get_aoi_geometry_repository, get_environment
+import app.dependencies
+from app.dependencies import (
+    get_aoi_geometry_repository,
+    get_custom_aoi_catalog,
+    get_custom_aoi_repository,
+    get_environment,
+)
 from app.domain.models.environment import Environment
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
+)
+from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
+    IcebergCustomAoiRepository,
 )
 
 # FastAPI dependencies can't be used directly as default values in path
@@ -62,7 +71,7 @@ class TestGetEnvironmentDependency:
                     )
 
 
-def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
+def test_each_aoi_type_has_a_geometry_source():
     repository = get_aoi_geometry_repository()
 
     assert set(repository.repositories) == {
@@ -70,9 +79,24 @@ def test_geometries_for_every_predefined_aoi_type_come_from_geoparquet():
         "key_biodiversity_area",
         "protected_area",
         "indigenous_land",
+        "custom_aoi",
     }
+    assert isinstance(
+        repository.repositories.pop("custom_aoi"), IcebergCustomAoiRepository
+    )
     for source in repository.repositories.values():
         assert isinstance(source, GeoParquetAoiGeometryRepository)
         assert re.fullmatch(
             r"s3://lcl-analytics/vectors/aois/\w+/v[\w.]+/aois\.parquet", source.uri
         )
+
+
+def test_geometry_sources_open_the_custom_aoi_catalog_only_when_used(monkeypatch):
+    def unreachable_catalog(name):
+        raise ConnectionError("catalog unreachable")
+
+    monkeypatch.setattr(app.dependencies, "load_catalog", unreachable_catalog)
+    get_custom_aoi_catalog.cache_clear()
+    get_custom_aoi_repository.cache_clear()
+
+    get_aoi_geometry_repository()

@@ -9,3 +9,7 @@ class AoiGeometryRepository(ABC):
     async def load(self, aoi) -> Tuple[List[BaseGeometry], List[float]]:
         """Return the geometries and areas (ha) of an AOI's features, in the
         order of its ids."""
+
+
+class AoiNotFoundError(ValueError):
+    """Raised when requested AOI ids don't exist in the geometry source."""

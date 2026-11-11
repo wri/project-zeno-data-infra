@@ -15,6 +15,7 @@ from ..common.areas_of_interest import (
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
+    SavedCustomAreaOfInterest,
 )
 from ..common.base import Response, StrictBaseModel
 
@@ -134,16 +135,18 @@ def decode_cursor(value: str) -> PointsCursor:
 
 
 class IntegratedAlertsPointsFilterIn(AnalyticsIn):
-    """The alert points a points request selects: one GADM area, a date range
-    and confidence and land filters."""
+    """The alert points a points request selects: one admin or saved custom
+    area, a date range and confidence and land filters."""
 
-    aoi: AdminAreaOfInterest = Field(
+    aoi: Annotated[
+        Union[AdminAreaOfInterest, SavedCustomAreaOfInterest],
+        Field(discriminator="type"),
+    ] = Field(
         ...,
         title="AOI",
         description=(
-            "GADM admin area to list alerts in, as for the other analytics "
-            f"endpoints. Only GADM areas are supported for now, {POINTS_MAX_AOIS} "
-            "per request: one id in `ids`."
+            "Admin area or saved custom area to list alerts in, as for the other "
+            f"analytics endpoints, {POINTS_MAX_AOIS} per request: one id in `ids`."
         ),
     )
     start_date: Optional[str] = Field(

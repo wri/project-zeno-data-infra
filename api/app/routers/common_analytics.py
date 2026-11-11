@@ -8,9 +8,25 @@ from fastapi import Response as FastAPIResponse
 
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
+from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.models.common.analysis import AnalysisStatus, AnalyticsIn, AnalyticsOut
 from app.models.common.base import DataMartResourceLink, DataMartResourceLinkResponse
 from app.use_cases.analysis.analysis_service import AnalysisService
+
+
+async def reject_unsaved_custom_aois(
+    aoi, custom_aoi_repository: Callable[[], CustomAoiRepository]
+) -> None:
+    """Reject a request for saved custom AOIs that aren't stored, before an
+    analysis is created, so the request succeeds once they are saved."""
+    if aoi.type != "custom_aoi":
+        return
+    saved_ids = await custom_aoi_repository().list_saved_ids(aoi.ids)
+    missing_ids = sorted(set(aoi.ids) - saved_ids)
+    if missing_ids:
+        raise HTTPException(
+            status_code=404, detail=f"Saved custom AOIs not found: {missing_ids}"
+        )
 
 
 async def create_analysis(
