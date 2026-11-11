@@ -1,14 +1,17 @@
 import hashlib
 import json
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 import boto3
 import pandas as pd
 import pyarrow.dataset as ds
 from botocore.exceptions import ClientError
 from pyarrow import fs as pafs
+from pyiceberg.catalog import load_catalog
+from pyiceberg.expressions import In
 
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.utils import parse_s3_uri, s3_uri_exists
@@ -121,12 +124,12 @@ def email_subscriptions(
     subscriptions: list[Subscription],
 ) -> tuple[list[Subscription], list[Subscription]]:
     """Split subscriptions into those the email handles (integrated alerts on
-    admin AOIs) and the rest."""
+    admin and custom AOIs) and the rest."""
     handled, skipped = [], []
     for subscription in subscriptions:
         if (
             subscription.dataset == "integrated_alerts"
-            and subscription.aoi_type == "admin"
+            and subscription.aoi_type in EMAIL_AOI_TYPES
         ):
             handled.append(subscription)
         else:
@@ -134,22 +137,47 @@ def email_subscriptions(
     return handled, skipped
 
 
-def _s3_dataset(uri: str) -> ds.Dataset:
-    # Open the uri in pyarrow's own S3 filesystem, so pyarrow's to_table call can
+def group_aoi_ids_by_type(subscriptions: list[Subscription]) -> dict[str, list[str]]:
+    """Group the subscribed AOI ids by their AOI type."""
+    aoi_ids_by_type: dict[str, set[str]] = defaultdict(set)
+    for subscription in subscriptions:
+        aoi_ids_by_type[subscription.aoi_type].add(subscription.aoi_id)
+    return {aoi_type: sorted(ids) for aoi_type, ids in aoi_ids_by_type.items()}
+
+
+def alert_results_uri(version: str, aoi_type: str) -> str:
+    file_name = EMAIL_AOI_TYPES[aoi_type].results_file_name
+    return f"{INTEGRATED_ALERTS_PREFIX}/{version}/{file_name}"
+
+
+def require_alert_results(version: str, aoi_types: set[str]) -> None:
+    """Raise if the version lacks the results of any of these AOI types, so no
+    subscriber is emailed without some of their dashboards. The flow can be re-run
+    once the results are written."""
+    missing = [
+        alert_results_uri(version, aoi_type)
+        for aoi_type in sorted(aoi_types)
+        if not s3_uri_exists(alert_results_uri(version, aoi_type))
+    ]
+    if missing:
+        raise FileNotFoundError(f"Alert results missing: {missing}")
+
+
+def _s3_dataset(uris: list[str]) -> ds.Dataset:
+    # Open the uris in pyarrow's own S3 filesystem, so pyarrow's to_table call can
     # read just the matching rows based on the filter spec.
-    bucket, key = parse_s3_uri(uri)
-    return ds.dataset(
-        f"{bucket}/{key}", filesystem=pafs.S3FileSystem(region="us-east-1")
-    )
+    paths = ["/".join(parse_s3_uri(uri)) for uri in uris]
+    return ds.dataset(paths, filesystem=pafs.S3FileSystem(region="us-east-1"))
 
 
 def read_alert_areas(
-    admin_results_uri: str, aoi_ids: list[str], start_date: date, end_date: date
+    results_uris: list[str], aoi_ids: list[str], start_date: date, end_date: date
 ) -> pd.DataFrame:
     """High and highest confidence alert areas (ha) of each AOI from start_date
     to end_date, as columns aoi_id, total_ha, natural_lands_ha and
-    natural_forest_ha. AOIs without alerts have no row."""
-    table = _s3_dataset(admin_results_uri).to_table(
+    natural_forest_ha, read from all the results files in one scan. AOIs without
+    alerts have no row."""
+    table = _s3_dataset(results_uris).to_table(
         columns=["aoi_id", "natural_lands_class", "area_ha"],
         filter=(
             ds.field("aoi_id").isin(aoi_ids)
@@ -182,11 +210,44 @@ def summarize_alert_areas(alerts: pd.DataFrame) -> pd.DataFrame:
 
 def read_aoi_names(aoi_ids: list[str]) -> dict[str, str]:
     """Display names like "Paraná, Brazil" for GADM aoi_ids."""
-    table = _s3_dataset(GADM_AOIS_URI).to_table(
+    table = _s3_dataset([GADM_AOIS_URI]).to_table(
         columns=["aoi_id", "adm_level", "country", "name_1", "name_2"],
         filter=ds.field("aoi_id").isin(aoi_ids),
     )
     return aoi_names(table.to_pandas())
+
+
+def read_custom_aoi_names(aoi_ids: list[str]) -> dict[str, str]:
+    """Read the names users gave their custom AOIs, as currently saved by the
+    API."""
+    table = load_catalog("aois").load_table("custom.custom_aois")
+    rows = table.scan(
+        row_filter=In("aoi_id", aoi_ids), selected_fields=("aoi_id", "name")
+    ).to_arrow()
+    return dict(zip(rows.column("aoi_id").to_pylist(), rows.column("name").to_pylist()))
+
+
+@dataclass(frozen=True)
+class EmailAoiType:
+    """Where the email reads one AOI type's alert areas and names."""
+
+    results_file_name: str  # in each integrated alerts version's folder
+    read_names: Callable[[list[str]], dict[str, str]]
+
+
+# The AOI types the email covers. Their results files share one schema.
+EMAIL_AOI_TYPES = {
+    "admin": EmailAoiType("admin-integrated-alerts.parquet", read_aoi_names),
+    "custom": EmailAoiType("custom-integrated-alerts.parquet", read_custom_aoi_names),
+}
+
+
+def read_names(aoi_ids_by_type: dict[str, list[str]]) -> dict[str, str]:
+    """Read the display names of these AOIs, each from its type's name source."""
+    names: dict[str, str] = {}
+    for aoi_type, aoi_ids in aoi_ids_by_type.items():
+        names.update(EMAIL_AOI_TYPES[aoi_type].read_names(aoi_ids))
+    return names
 
 
 def aoi_names(aois: pd.DataFrame) -> dict[str, str]:

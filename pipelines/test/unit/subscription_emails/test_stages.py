@@ -3,9 +3,13 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.dataset as ds
 import pytest
+from shapely.geometry import box
 
 from pipelines.subscription_emails import stages
+from pipelines.test.unit.conftest import custom_aoi_rows
 from pipelines.zeno_api import Subscription
 
 
@@ -71,14 +75,94 @@ def test_week_range_is_seven_days_ending_on_end_date():
     assert stages.week_range(date(2026, 9, 28)) == WEEK
 
 
-def test_email_subscriptions_keeps_only_admin_integrated_alerts():
+def test_email_subscriptions_keeps_integrated_alerts_on_admin_and_custom_aois():
     admin = _subscription("a@x.org", "d1", "BRA.16")
-    protected_area = _subscription("a@x.org", "d2", "555", aoi_type="protected_area")
+    custom = _subscription("a@x.org", "d2", "8f0c-saved", aoi_type="custom")
+    protected_area = _subscription("a@x.org", "d3", "555", aoi_type="protected_area")
 
-    assert stages.email_subscriptions([admin, protected_area]) == (
-        [admin],
+    assert stages.email_subscriptions([admin, custom, protected_area]) == (
+        [admin, custom],
         [protected_area],
     )
+
+
+def test_missing_results_of_a_subscribed_aoi_type_stop_the_emails(monkeypatch):
+    monkeypatch.setattr(stages, "s3_uri_exists", lambda uri: "custom" not in uri)
+
+    with pytest.raises(FileNotFoundError, match="custom-integrated-alerts.parquet"):
+        stages.require_alert_results("v20261108", {"admin", "custom"})
+
+
+def test_custom_aoi_names_are_their_saved_names(custom_aoi_table):
+    rows = custom_aoi_rows({"a1": box(0, 0, 1, 1), "b2": box(0, 0, 1, 1)})
+    name = rows.schema.field("name")
+    names = pa.array(["My farm", "River buffer"], type=name.type)
+    custom_aoi_table.append(rows.set_column(1, name, names))
+
+    assert stages.read_custom_aoi_names(["a1"]) == {"a1": "My farm"}
+
+
+def test_aoi_ids_are_grouped_by_their_type():
+    subscriptions = [
+        _subscription("a@x.org", "d1", "BRA.16"),
+        _subscription("b@x.org", "d2", "BRA.16"),
+        _subscription("a@x.org", "d3", "8f0c-saved", aoi_type="custom"),
+    ]
+
+    assert stages.group_aoi_ids_by_type(subscriptions) == {
+        "admin": ["BRA.16"],
+        "custom": ["8f0c-saved"],
+    }
+
+
+@pytest.fixture
+def results_files(tmp_path, monkeypatch):
+    """An admin and a custom results file with one alert each, read in place of
+    the version's files on S3."""
+
+    def results(aoi_id, aoi_type):
+        return pd.DataFrame(
+            {
+                "aoi_id": [aoi_id],
+                "aoi_type": [aoi_type],
+                "natural_lands_class": pd.array([2], dtype="uint8"),
+                "alert_date": [date(2026, 9, 23)],
+                "alert_confidence": ["high"],
+                "area_ha": [5.0],
+            }
+        )
+
+    admin, custom = tmp_path / "admin.parquet", tmp_path / "custom.parquet"
+    results("BRA.16", "admin").to_parquet(admin)
+    results("8f0c-saved", "custom").to_parquet(custom)
+    paths = [str(admin), str(custom)]
+    monkeypatch.setattr(stages, "_s3_dataset", lambda uris: ds.dataset(paths))
+
+
+def test_alert_areas_cover_aois_from_every_results_file(results_files):
+    areas = stages.read_alert_areas(
+        ["admin-results", "custom-results"], ["BRA.16", "8f0c-saved"], *WEEK
+    )
+
+    assert sorted(areas["aoi_id"]) == ["8f0c-saved", "BRA.16"]
+
+
+def test_names_are_read_from_each_types_own_source(monkeypatch):
+    def names_of(aoi_ids):
+        return {aoi_id: f"name of {aoi_id}" for aoi_id in aoi_ids}
+
+    monkeypatch.setattr(
+        stages,
+        "EMAIL_AOI_TYPES",
+        {
+            "admin": stages.EmailAoiType("admin.parquet", names_of),
+            "custom": stages.EmailAoiType("custom.parquet", lambda ids: {}),
+        },
+    )
+
+    assert stages.read_names({"admin": ["BRA.16"], "custom": ["8f0c-saved"]}) == {
+        "BRA.16": "name of BRA.16"
+    }
 
 
 def test_summarize_alert_areas_splits_natural_lands_and_forest():

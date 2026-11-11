@@ -33,16 +33,13 @@ def list_subscriptions_task() -> list[Subscription]:
 
 
 @task
-def read_alert_areas_task(version, aoi_ids, start_date, end_date):
-    admin_results_uri = (
-        f"{stages.INTEGRATED_ALERTS_PREFIX}/{version}/admin-integrated-alerts.parquet"
-    )
-    return stages.read_alert_areas(admin_results_uri, aoi_ids, start_date, end_date)
+def read_alert_areas_task(results_uris, aoi_ids, start_date, end_date):
+    return stages.read_alert_areas(results_uris, aoi_ids, start_date, end_date)
 
 
 @task
-def read_aoi_names_task(aoi_ids):
-    return stages.read_aoi_names(aoi_ids)
+def read_aoi_names_task(aoi_ids_by_type):
+    return stages.read_names(aoi_ids_by_type)
 
 
 def retry_if_transient(task, task_run, state) -> bool:
@@ -96,7 +93,7 @@ def subscription_emails_flow(
     send_emails: bool = False, test_recipient: Optional[str] = None
 ) -> int:
     """Email each subscriber a Wednesday to Tuesday week's integrated alerts in
-    the admin AOIs of their subscribed dashboards.
+    the admin and custom AOIs of their subscribed dashboards.
 
     The week is the one after the last week emailed, once the latest integrated
     alerts version is far enough past it (see stages.next_week_end); otherwise
@@ -137,13 +134,20 @@ def subscription_emails_flow(
     if skipped:
         logger.warning(
             f"Skipping {len(skipped)} subscriptions that aren't integrated alerts "
-            "on admin AOIs"
+            "on admin or custom AOIs"
         )
     emails = {}
     if subscriptions:
+        aoi_ids_by_type = stages.group_aoi_ids_by_type(subscriptions)
+        # Checked before any email is sent, so a re-run can still send every one.
+        stages.require_alert_results(version, set(aoi_ids_by_type))
+        results_uris = [
+            stages.alert_results_uri(version, aoi_type)
+            for aoi_type in sorted(aoi_ids_by_type)
+        ]
         aoi_ids = sorted({s.aoi_id for s in subscriptions})
-        areas = read_alert_areas_task(version, aoi_ids, start_date, end_date)
-        names = read_aoi_names_task(aoi_ids)
+        areas = read_alert_areas_task(results_uris, aoi_ids, start_date, end_date)
+        names = read_aoi_names_task(aoi_ids_by_type)
         emails = stages.build_emails(
             subscriptions, areas, names, start_date, end_date, alerts_version_date
         )
