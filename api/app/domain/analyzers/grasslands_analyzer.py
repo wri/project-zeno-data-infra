@@ -52,7 +52,7 @@ class GrasslandsAnalyzer(Analyzer):
 
         grasslands_analytics_in = GrasslandsAnalyticsIn(**analysis.metadata)
 
-        if grasslands_analytics_in.aoi.type == "admin":
+        if grasslands_analytics_in.aoi.has_precomputed_results():
             gadm_ids: List = grasslands_analytics_in.aoi.ids
             results: Dict = await self.analyze_admin_areas(
                 gadm_ids,

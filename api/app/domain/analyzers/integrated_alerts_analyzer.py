@@ -15,6 +15,7 @@ from app.analysis.common.analysis import (
 from app.domain.analyzers.zonal_statistics_analyzer import ZonalStatisticsAnalyzer
 from app.domain.models.dataset import Dataset
 from app.domain.models.environment import Environment, resolve_uris
+from app.domain.repositories.precomputed_table import sql_string_list
 from app.domain.repositories.zarr_dataset_repository import ZarrDatasetRepository
 from app.models.land_change.integrated_alerts import IntegratedAlertsAnalyticsIn
 
@@ -24,7 +25,7 @@ ALERTS_CONFIDENCE = {2: "low", 3: "high", 4: "highest"}
 # before the 2020-12-31 base), shifting alert dates 6 years earlier.
 JULIAN_DATE_2015 = JULIAN_DATE_2021 - 2192
 
-# Version-independent inputs only. The zarr and admin parquet are versioned; their
+# Version-independent inputs only. The zarr and results parquets are versioned; their
 # version comes from the `latest` marker in S3, resolved at the router (the edge)
 # and passed to build_input_uris.
 INPUT_URIS = {
@@ -39,7 +40,7 @@ INPUT_URIS = {
 def build_input_uris(version: str, environment: Environment) -> Dict[str, str]:
     """Resolve the full input-URI set for a given data version.
 
-    The zarr and admin parquet live under the version prefix; pixel area is
+    The zarr and results parquets live under the version prefix; pixel area is
     version-independent. ``version`` is read from the ``latest`` marker in S3 at
     the router and threaded in here so nothing hardcodes a single version.
     """
@@ -52,6 +53,10 @@ def build_input_uris(version: str, environment: Environment) -> Dict[str, str]:
             f"s3://lcl-analytics/zonal-statistics/integrated-alerts/{version}/"
             "admin-integrated-alerts.parquet"
         ),
+        "custom_results_table_uri": (
+            f"s3://lcl-analytics/zonal-statistics/integrated-alerts/{version}/"
+            "custom-integrated-alerts.parquet"
+        ),
     }
     return {**resolve_uris(INPUT_URIS, environment), **versioned}
 
@@ -61,14 +66,15 @@ class IntegratedAlertsAnalyzer(ZonalStatisticsAnalyzer):
 
     model = IntegratedAlertsAnalyticsIn
 
-    def build_admin_query(self, analytics_in) -> str:
-        # The precomputed parquet is keyed by aoi_id and preaggregated to each
-        # GADM level, so a single scan filtered by aoi_id serves every request.
+    def build_precomputed_query(self, analytics_in, aoi_ids) -> str:
+        # The precomputed parquets are keyed by aoi_id (preaggregated to each GADM
+        # level for admin areas), so a single scan filtered by aoi_id serves every
+        # request.
         # Rows are also split by natural_lands_class (the raw SBTN class code), so
         # sum over it to get one row per aoi_id, alert_date and alert_confidence.
         start_date = analytics_in.start_date
         end_date = analytics_in.end_date
-        id_list = ", ".join(f"'{aoi_id}'" for aoi_id in analytics_in.aoi.ids)
+        id_list = sql_string_list(aoi_ids)
         land_filter_clause = ""
         if analytics_in.land_filter is not None:
             classes = LAND_FILTER_CLASSES[analytics_in.land_filter]

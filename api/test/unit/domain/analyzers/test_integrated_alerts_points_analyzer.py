@@ -12,10 +12,11 @@ from test.unit.alert_points import (
 
 import pandas as pd
 import pytest
-from shapely.geometry import mapping
 
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
+)
+from app.domain.analyzers.integrated_alerts_points_analyzer_helpers import (
     served_dates,
 )
 from app.domain.models.analysis import Analysis
@@ -25,6 +26,7 @@ from app.domain.repositories.alert_points_repository import (
     AlertPointsRepository,
     AlertPointsSource,
 )
+from app.domain.repositories.aoi_geometry_repository import AoiNotFoundError
 from app.infrastructure.persistence.parquet_alert_points_repository import (
     ParquetAlertPointsRepository,
     day_to_date,
@@ -32,6 +34,7 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
 )
 from app.models.common.areas_of_interest import (
     AdminAreaOfInterest,
+    SavedCustomAreaOfInterest,
 )
 from app.models.land_change.integrated_alerts import (
     IntegratedAlertsPointsAnalyticsIn,
@@ -48,9 +51,9 @@ class FakeGeometryRepository:
         self.geometries = geometries
         self.requests = []
 
-    async def load(self, aoi_type, aoi_ids):
-        self.requests.append((aoi_type, list(aoi_ids)))
-        return [self.geometries[i] for i in aoi_ids], [0] * len(aoi_ids)
+    async def load(self, aoi):
+        self.requests.append(aoi)
+        return [self.geometries[i] for i in aoi.ids], [0] * len(aoi.ids)
 
 
 @pytest.fixture
@@ -130,6 +133,32 @@ async def test_admin_points_with_filters_and_metadata(table_uri, points):
 
 
 @pytest.mark.asyncio
+async def test_saved_custom_aoi_points_come_from_its_stored_geometry(table_uri, points):
+    aoi_id = "0b6c1f8e-3d2a-4c55-9a8e-2f4d6b7c9e10"
+    geom = aoi_polygon()
+    geometry_repository = FakeGeometryRepository({aoi_id: geom})
+    analyzer = IntegratedAlertsPointsAnalyzer(
+        points_repository=ParquetAlertPointsRepository(table_uri),
+        geometry_repository=geometry_repository,
+    )
+    analytics_in = IntegratedAlertsPointsAnalyticsIn(
+        aoi=SavedCustomAreaOfInterest(ids=[aoi_id]), limit=25
+    )
+    analysis = _analysis(analytics_in)
+
+    await analyzer.analyze(analysis)
+
+    expected = _expected_rows(
+        points, geom, FIRST_DAY, LATEST_DAY, [2, 3, 4], None
+    ).head(25)
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(analysis.result), expected, check_dtype=False
+    )
+    assert [aoi.type for aoi in geometry_repository.requests] == ["custom_aoi"]
+    assert analysis.metadata["truncated"] == {aoi_id: True}
+
+
+@pytest.mark.asyncio
 async def test_limit_returns_the_newest_points_and_marks_truncation(table_uri, points):
     geom = aoi_polygon()
     analytics_in = IntegratedAlertsPointsAnalyticsIn(
@@ -167,8 +196,8 @@ async def test_dates_outside_the_stored_window_return_no_points(table_uri):
 @pytest.mark.asyncio
 async def test_aoi_without_geometry_fails(table_uri):
     class MissingGeometryRepository:
-        async def load(self, aoi_type, aoi_ids):
-            return [], []
+        async def load(self, aoi):
+            raise AoiNotFoundError(f"AOI ids not found: {aoi.ids}")
 
     analyzer = IntegratedAlertsPointsAnalyzer(
         points_repository=ParquetAlertPointsRepository(table_uri),
@@ -178,7 +207,7 @@ async def test_aoi_without_geometry_fails(table_uri):
         aoi=AdminAreaOfInterest(ids=["BRA.99"])
     )
 
-    with pytest.raises(ValueError, match="Expected 1 geometries"):
+    with pytest.raises(AoiNotFoundError, match="BRA.99"):
         await analyzer.analyze(_analysis(analytics_in))
 
 
@@ -217,28 +246,6 @@ def test_points_request_validation():
         IntegratedAlertsPointsAnalyticsIn(
             aoi=AdminAreaOfInterest(ids=["BRA"]), alert_confidence=["medium"]
         )
-
-
-@pytest.mark.parametrize(
-    "aoi",
-    [
-        {"type": "protected_area", "ids": ["555758964"]},
-        {"type": "key_biodiversity_area", "ids": ["1"]},
-        {"type": "indigenous_land", "ids": ["MEX11287"]},
-        {
-            "type": "feature_collection",
-            "feature_collection": {
-                "type": "FeatureCollection",
-                "features": [
-                    {"type": "Feature", "id": "a", "geometry": mapping(aoi_polygon())}
-                ],
-            },
-        },
-    ],
-)
-def test_points_request_takes_only_gadm_aois(aoi):
-    with pytest.raises(ValueError):
-        IntegratedAlertsPointsAnalyticsIn(aoi=aoi)
 
 
 def test_points_request_takes_exactly_one_aoi():
@@ -304,6 +311,7 @@ def test_cursor_round_trips_and_rejects_garbage():
     "changed",
     [
         {"aoi": AdminAreaOfInterest(ids=["BRA.2"])},
+        {"aoi": SavedCustomAreaOfInterest(ids=["BRA.1"])},
         {"start_date": "2026-10-14"},
         {"end_date": "2026-10-15"},
         {"alert_confidence": ["highest"]},

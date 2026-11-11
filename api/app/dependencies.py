@@ -9,10 +9,6 @@ from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepositor
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
-from app.domain.repositories.custom_aoi_geometry_repository import (
-    CustomAoiGeometryRepository,
-)
-from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 from app.domain.services.aoi_name_ranking import AoiNameRanking
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
@@ -67,7 +63,7 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
             "indigenous_land": GeoParquetAoiGeometryRepository(
                 f"{vectors}/landmark/v20260617/aois.parquet"
             ),
-            "custom_aoi": CustomAoiGeometryRepository(get_custom_aoi_repository),
+            "custom_aoi": get_custom_aoi_repository(),
         }
     )
 
@@ -90,9 +86,9 @@ def get_custom_aoi_catalog() -> Catalog:
 
 
 @lru_cache
-def get_custom_aoi_repository() -> CustomAoiRepository:
+def get_custom_aoi_repository() -> IcebergCustomAoiRepository:
     """One repository per process, so its cached tables are reused across
     requests."""
     return IcebergCustomAoiRepository(
-        get_custom_aoi_catalog(), "custom.custom_aois", "custom.custom_aoi_cells"
+        get_custom_aoi_catalog, "custom.custom_aois", "custom.custom_aoi_cells"
     )
