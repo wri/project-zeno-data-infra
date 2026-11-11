@@ -150,17 +150,22 @@ def alert_results_uri(version: str, aoi_type: str) -> str:
     return f"{INTEGRATED_ALERTS_PREFIX}/{version}/{file_name}"
 
 
-def require_alert_results(version: str, aoi_types: set[str]) -> None:
-    """Raise if the version lacks the results of any of these AOI types, so no
-    subscriber is emailed without some of their dashboards. The flow can be re-run
-    once the results are written."""
-    missing = [
-        alert_results_uri(version, aoi_type)
-        for aoi_type in sorted(aoi_types)
+def list_aoi_types_without_results(version: str, aoi_types: set[str]) -> set[str]:
+    """List the AOI types whose results file is missing from the version, e.g.
+    when that type's zonal statistics failed in the weekly update."""
+    return {
+        aoi_type
+        for aoi_type in aoi_types
         if not s3_uri_exists(alert_results_uri(version, aoi_type))
-    ]
-    if missing:
-        raise FileNotFoundError(f"Alert results missing: {missing}")
+    }
+
+
+def list_held_back_emails(
+    subscriptions: list[Subscription], missing_types: set[str]
+) -> set[str]:
+    """List the subscribers with a dashboard of a type whose results are
+    missing, so they aren't emailed without it."""
+    return {s.user_email for s in subscriptions if s.aoi_type in missing_types}
 
 
 def _s3_dataset(uris: list[str]) -> ds.Dataset:

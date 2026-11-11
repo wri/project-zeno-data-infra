@@ -86,11 +86,22 @@ def test_email_subscriptions_keeps_integrated_alerts_on_admin_and_custom_aois():
     )
 
 
-def test_missing_results_of_a_subscribed_aoi_type_stop_the_emails(monkeypatch):
+def test_aoi_types_without_results_in_the_version_are_listed(monkeypatch):
     monkeypatch.setattr(stages, "s3_uri_exists", lambda uri: "custom" not in uri)
 
-    with pytest.raises(FileNotFoundError, match="custom-integrated-alerts.parquet"):
-        stages.require_alert_results("v20261108", {"admin", "custom"})
+    assert stages.list_aoi_types_without_results("v20261108", {"admin", "custom"}) == {
+        "custom"
+    }
+
+
+def test_subscribers_with_a_dashboard_missing_results_are_held_back():
+    a_admin = _subscription("a@x.org", "d1", "BRA.16")
+    a_custom = _subscription("a@x.org", "d2", "8f0c-saved", aoi_type="custom")
+    b_admin = _subscription("b@x.org", "d3", "PER.17")
+
+    assert stages.list_held_back_emails([a_admin, a_custom, b_admin], {"custom"}) == {
+        "a@x.org"
+    }
 
 
 def test_custom_aoi_names_are_their_saved_names(custom_aoi_table):

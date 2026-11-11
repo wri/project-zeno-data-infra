@@ -101,7 +101,8 @@ def subscription_emails_flow(
     filled in with the substitution data built by stages.build_emails. Each sent
     email is recorded in S3, so re-running the flow (e.g. after a failure) only
     sends the emails not yet sent, and the week is recorded as emailed once they
-    all have been.
+    all have been. A subscriber with a dashboard whose AOI type has no results in
+    the version isn't emailed that week, rather than emailed without it.
 
     Args:
         send_emails: Only if True are the emails sent; otherwise each email's
@@ -136,11 +137,19 @@ def subscription_emails_flow(
             f"Skipping {len(skipped)} subscriptions that aren't integrated alerts "
             "on admin or custom AOIs"
         )
+    missing_types = stages.list_aoi_types_without_results(
+        version, {s.aoi_type for s in subscriptions}
+    )
+    held_back = stages.list_held_back_emails(subscriptions, missing_types)
+    subscriptions = [s for s in subscriptions if s.user_email not in held_back]
+    if held_back:
+        logger.warning(
+            f"Not emailing {len(held_back)} subscribers this week: version "
+            f"{version} has no results for {sorted(missing_types)}"
+        )
     emails = {}
     if subscriptions:
         aoi_ids_by_type = stages.group_aoi_ids_by_type(subscriptions)
-        # Checked before any email is sent, so a re-run can still send every one.
-        stages.require_alert_results(version, set(aoi_ids_by_type))
         results_uris = [
             stages.alert_results_uri(version, aoi_type)
             for aoi_type in sorted(aoi_ids_by_type)
