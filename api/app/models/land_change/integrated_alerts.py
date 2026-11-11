@@ -38,6 +38,7 @@ AoiUnion = Union[
     ProtectedAreaOfInterest,
     IndigenousAreaOfInterest,
     CustomAreaOfInterest,
+    SavedCustomAreaOfInterest,
 ]
 
 

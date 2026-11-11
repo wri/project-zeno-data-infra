@@ -394,3 +394,30 @@ def test_points_request_for_an_unsaved_custom_aoi_gets_404_without_an_analysis(
 
     assert response.status_code == 404
     assert "not-yet-saved" in response.json()["detail"]
+
+
+def test_analytics_request_for_an_unsaved_custom_aoi_gets_404_without_an_analysis(
+    monkeypatch,
+):
+    class SavedIds:
+        async def list_saved_ids(self, aoi_ids):
+            return {"saved"} & set(aoi_ids)
+
+    app.dependency_overrides[get_latest_integrated_alerts_version] = lambda: "v1"
+    # Building an analysis would fail, so a 404 shows the request stopped first.
+    app.dependency_overrides[integrated_alerts.create_analysis_service] = lambda: None
+    monkeypatch.setattr(integrated_alerts, "get_custom_aoi_repository", SavedIds)
+    try:
+        response = client.post(
+            "/v0/land_change/integrated_alerts/analytics",
+            json={
+                "aoi": {"type": "custom_aoi", "ids": ["saved", "not-yet-saved"]},
+                "start_date": "2026-01-01",
+                "end_date": "2026-10-31",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert "not-yet-saved" in response.json()["detail"]
