@@ -113,42 +113,6 @@ class TestTreeCoverGainAnalyzerAdminAOIs:
         mock_query_service.reset_mock()
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail
-    async def test_analyzer_adds_intact_forest_when_filtered(self):
-        mock_query_service = MagicMock(spec=DuckDbPrecalcQueryService)
-        compute_engine = ComputeEngine(
-            handler=TreeCoverGainPrecalcHandler(
-                precalc_query_builder=PrecalcSqlQueryBuilder(),
-                precalc_query_service=mock_query_service,
-                next_handler=None,
-            )
-        )
-
-        analyzer = TreeCoverGainAnalyzer(
-            compute_engine=compute_engine,
-            input_uris=INPUT_URIS[Environment.production],
-        )
-        metadata = TreeCoverGainAnalyticsIn(
-            aoi=AdminAreaOfInterest(ids=["BRA.12.1"]),
-            start_year="2000",
-            end_year="2005",
-            forest_filter="intact_forest",
-        )
-        analysis = Analysis(
-            result=None, metadata=metadata.model_dump(), status=AnalysisStatus.pending
-        )
-
-        await analyzer.analyze(analysis)
-
-        mock_query_service.execute.assert_called_once()
-        args, _ = mock_query_service.execute.call_args
-        sql_query = args[0]
-
-        assert "AND is_intact_forest = True" in sql_query
-
-        mock_query_service.reset_mock()
-
-    @pytest.mark.asyncio
     async def test_analyzer_adds_primary_forest_when_filtered(self):
         mock_query_service = MagicMock(spec=DuckDbPrecalcQueryService)
         compute_engine = ComputeEngine(

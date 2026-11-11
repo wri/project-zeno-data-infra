@@ -29,7 +29,6 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedForestFilter = Literal["primary_forest", "natural_forest", "intact_forest"]
 AllowedIntersections = List[Literal["driver", "fire"]]
 
 
@@ -65,8 +64,6 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     )
     # natural_forest is a breakdown by SBTN natural forest class (kept for an
     # existing app), while natural_forest_only filters to SBTN Natural Forest.
-    # natural_forest_only is only implemented for tree cover loss, so it isn't in
-    # the shared AllowedForestFilter used by tree cover and tree cover gain.
     forest_filter: Optional[
         Literal[
             "primary_forest", "natural_forest", "intact_forest", "natural_forest_only"
