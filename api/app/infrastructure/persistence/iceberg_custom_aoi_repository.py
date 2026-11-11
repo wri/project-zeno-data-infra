@@ -2,7 +2,7 @@ import asyncio
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Set, Tuple
 
 import pyarrow as pa
 import s2sphere
@@ -31,6 +31,10 @@ from pyiceberg.types import (
 from shapely.geometry.base import BaseGeometry
 
 from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, CustomAoiName
+from app.domain.repositories.aoi_geometry_repository import (
+    AoiGeometryRepository,
+    AoiNotFoundError,
+)
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
 
 
@@ -61,8 +65,13 @@ class CachedTables:
     """Loaded Iceberg tables, reused until they are older than max_age_seconds so
     reads don't fetch table metadata from storage every time."""
 
-    def __init__(self, catalog: Catalog, max_age_seconds: float, clock=time.monotonic):
-        self.catalog = catalog
+    def __init__(
+        self,
+        load_catalog: Callable[[], Catalog],
+        max_age_seconds: float,
+        clock=time.monotonic,
+    ):
+        self.load_catalog = load_catalog
         self.max_age_seconds = max_age_seconds
         self.clock = clock
         self.loaded: Dict[str, Tuple[Table, float]] = {}
@@ -73,32 +82,35 @@ class CachedTables:
             cached = self.loaded.get(name)
         if not fresh and cached and self.clock() - cached[1] < self.max_age_seconds:
             return cached[0]
-        table = self.catalog.load_table(name)
+        table = self.load_catalog().load_table(name)
         with self.lock:
             self.loaded[name] = (table, self.clock())
         return table
 
 
-class IcebergCustomAoiRepository(CustomAoiRepository):
+class IcebergCustomAoiRepository(CustomAoiRepository, AoiGeometryRepository):
     """Stores custom AOIs in an Iceberg table with WKB geometries. Utilizes
     Iceberg partitions by Google S2 cell ID for fast spatial reads, and a
-    separate aoi_id -> partition table for fast lookup by ID."""
+    separate aoi_id -> partition table for fast lookup by ID.
+
+    The catalog is opened on first use, so requests for other AOI types never
+    depend on it."""
 
     def __init__(
         self,
-        catalog: Catalog,
+        load_catalog: Callable[[], Catalog],
         table_name: str,
         index_table_name: str,
         cell_level: int = 5,
         commit_attempts: int = 3,
         max_table_age_seconds: float = 30,
     ):
-        self.catalog = catalog
+        self.load_catalog = load_catalog
         self.table_name = table_name
         self.index_table_name = index_table_name
         self.cell_level = cell_level
         self.commit_attempts = commit_attempts
-        self.tables = CachedTables(catalog, max_table_age_seconds)
+        self.tables = CachedTables(load_catalog, max_table_age_seconds)
 
     async def upsert(self, aois: List[CustomAoi]) -> None:
         await asyncio.to_thread(self._upsert, aois)
@@ -106,14 +118,29 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
     async def delete(self, aoi_id: str) -> None:
         await asyncio.to_thread(self._delete, aoi_id)
 
-    async def get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
-        return await asyncio.to_thread(self._get, aoi_ids)
+    async def list_saved_ids(self, aoi_ids: List[str]) -> Set[str]:
+        rows = await asyncio.to_thread(self.read_rows, aoi_ids, ("aoi_id",))
+        return set(rows.column("aoi_id").to_pylist())
 
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._intersecting, geometry)
 
     async def names_owned_by(self, user_id: str) -> List[CustomAoiName]:
         return await asyncio.to_thread(self._names_owned_by, user_id)
+
+    async def load(self, aoi) -> Tuple[List[BaseGeometry], List[float]]:
+        rows = await asyncio.to_thread(
+            self.read_rows, aoi.ids, ("aoi_id", "geometry", "area_ha")
+        )
+        by_id = {row["aoi_id"]: row for row in rows.to_pylist()}
+        missing = [aoi_id for aoi_id in aoi.ids if aoi_id not in by_id]
+        if missing:
+            raise AoiNotFoundError(f"AOI ids not found: {missing}")
+        found = [by_id[aoi_id] for aoi_id in aoi.ids]
+        return (
+            [shapely.from_wkb(row["geometry"]) for row in found],
+            [row["area_ha"] for row in found],
+        )
 
     def _upsert(self, aois: List[CustomAoi]) -> None:
         rows = to_arrow(aois, self.cell_level)
@@ -145,13 +172,23 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
             self.index_table, lambda index: index.delete(EqualTo("aoi_id", aoi_id))
         )
 
-    def _get(self, aoi_ids: List[str]) -> List[CustomAoiGeometry]:
-        rows = self.table().scan(
-            row_filter=self.rows_with_ids(aoi_ids),
-            selected_fields=("aoi_id", "geometry"),
+    def read_rows(self, aoi_ids: List[str], fields: Tuple[str, ...]) -> pa.Table:
+        """Read these ids' rows, reloading the tables once if any are missing."""
+        rows = self.scan_rows(aoi_ids, fields, fresh=False)
+        if len(set(rows.column("aoi_id").to_pylist())) < len(set(aoi_ids)):
+            # The cached tables can predate an AOI another process just saved.
+            rows = self.scan_rows(aoi_ids, fields, fresh=True)
+        return rows
+
+    def scan_rows(
+        self, aoi_ids: List[str], fields: Tuple[str, ...], fresh: bool
+    ) -> pa.Table:
+        """Scan these ids' rows, reading the tables from the catalog if fresh."""
+        return (
+            self.table(fresh)
+            .scan(row_filter=self.rows_with_ids(aoi_ids, fresh), selected_fields=fields)
+            .to_arrow()
         )
-        by_id = {aoi.aoi_id: aoi for aoi in geometries_from_arrow(rows.to_arrow())}
-        return [by_id[aoi_id] for aoi_id in aoi_ids if aoi_id in by_id]
 
     def _names_owned_by(self, user_id: str) -> List[CustomAoiName]:
         rows = self.table().scan(
@@ -232,7 +269,7 @@ class IcebergCustomAoiRepository(CustomAoiRepository):
                     update.add_identity("s2_cell")
                 return
             except CommitFailedException:
-                table = self.catalog.load_table(self.table_name)
+                table = self.load_catalog().load_table(self.table_name)
                 if is_partitioned(table):
                     return
                 if attempt == self.commit_attempts:

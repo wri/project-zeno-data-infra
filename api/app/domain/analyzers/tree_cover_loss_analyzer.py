@@ -34,6 +34,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
                 Dataset.area_hectares,
                 Dataset.canopy_cover,
                 Dataset.carbon_emissions,
+                Dataset.intact_forest,
                 Dataset.natural_forests,
                 Dataset.primary_forest,
                 Dataset.tree_cover_loss,
@@ -48,6 +49,7 @@ INPUT_URIS: Dict[Environment, Dict[str, str]] = {
                 Dataset.area_hectares,
                 Dataset.canopy_cover,
                 Dataset.carbon_emissions,
+                Dataset.intact_forest,
                 Dataset.natural_forests,
                 Dataset.primary_forest,
                 Dataset.tree_cover_loss,
@@ -161,7 +163,7 @@ class TreeCoverLossAnalyzer(Analyzer):
 
         analytics_in = TreeCoverLossAnalyticsIn(**analysis.metadata)
 
-        if analytics_in.aoi.type == "admin":
+        if analytics_in.aoi.has_precomputed_results():
             results = await self.analyze_admin_areas(analytics_in)
         else:
             results = await self.analyze_otf(analytics_in)

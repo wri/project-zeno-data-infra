@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
+from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
+    IntegratedAlertsPointsExportAnalyzer,
+)
 from app.domain.models.environment import Environment
+from app.infrastructure.export.alert_points_files import CsvAlertPointsFile
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
 )
@@ -19,6 +23,7 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
 from app.main import app
 from app.models.land_change.integrated_alerts import (
     POINTS_ANALYTICS_NAME,
+    POINTS_EXPORT_ANALYTICS_NAME,
     IntegratedAlertsPointsAnalyticsIn,
     PointsCursor,
     encode_cursor,
@@ -183,8 +188,8 @@ def test_points_post_then_get_returns_points(tmp_path):
     repository = FileSystemAnalysisRepository(POINTS_ANALYTICS_NAME)
 
     class FakeGeometryRepository:
-        async def load(self, aoi_type, aoi_ids):
-            return [aoi_polygon()] * len(aoi_ids), [0] * len(aoi_ids)
+        async def load(self, aoi):
+            return [aoi_polygon()] * len(aoi.ids), [0] * len(aoi.ids)
 
     def points_service():
         return AnalysisService(
@@ -233,3 +238,186 @@ def test_points_post_then_get_returns_points(tmp_path):
     assert data["metadata"]["truncated"] == {"BRA.14.87": True}
     assert data["metadata"]["limit"] == 3
     assert data["metadata"]["next_cursor"] is not None
+
+
+class FakeExportFileStore:
+    def __init__(self):
+        self.files = {}
+
+    async def write_file(self, key, path, content_type):
+        self.files[key] = path.read_bytes()
+
+    async def presign_download_url(self, key, filename, expires_seconds):
+        return (
+            f"https://downloads.test/{key}?filename={filename}"
+            f"&expires={expires_seconds}"
+        )
+
+
+@pytest.mark.parametrize(
+    "request_body",
+    [
+        {"aoi": {"type": "admin", "ids": ["BRA.14.87"]}},
+        {"aoi": {"type": "admin", "ids": ["BRA.14.87", "BRA.1"]}, "format": "csv"},
+        {"aoi": {"type": "admin", "ids": ["BRA.14.87"]}, "format": "geojson"},
+    ],
+    ids=["no_format", "two_aois", "unknown_format"],
+)
+def test_export_request_without_one_aoi_and_a_known_format_gets_422(
+    request_body,
+):
+    app.dependency_overrides[integrated_alerts.get_latest_integrated_alerts_version] = (
+        lambda: "v20261018"
+    )
+    app.dependency_overrides[
+        integrated_alerts.create_points_export_analysis_service
+    ] = lambda: None
+    try:
+        response = client.post(
+            "/v0/land_change/integrated_alerts/points/exports", json=request_body
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
+
+
+def test_export_post_then_get_returns_a_fresh_download_url(tmp_path):
+    load_alert_points_table.cache_clear()
+    table_uri = write_points_table(tmp_path / "by-date.parquet", make_points())
+    repository = FileSystemAnalysisRepository(POINTS_EXPORT_ANALYTICS_NAME)
+    file_store = FakeExportFileStore()
+
+    class FakeGeometryRepository:
+        async def load(self, aoi):
+            return [aoi_polygon()] * len(aoi.ids), [0] * len(aoi.ids)
+
+    def export_service():
+        return AnalysisService(
+            analysis_repository=repository,
+            analyzer=IntegratedAlertsPointsExportAnalyzer(
+                points_repository=ParquetAlertPointsRepository(table_uri),
+                file_store=file_store,
+                input_uris={"alert_points_table_uri": table_uri},
+                geometry_repository=FakeGeometryRepository(),
+                file_types={"csv": CsvAlertPointsFile},
+                page_size=1000,
+            ),
+            event=POINTS_EXPORT_ANALYTICS_NAME,
+        )
+
+    request = {"aoi": {"type": "admin", "ids": ["BRA.14.87"]}, "format": "csv"}
+    app.dependency_overrides[integrated_alerts.get_latest_integrated_alerts_version] = (
+        lambda: "v20261018"
+    )
+    app.dependency_overrides[
+        integrated_alerts.create_points_export_analysis_service
+    ] = export_service
+    app.dependency_overrides[
+        integrated_alerts.get_points_export_analysis_repository
+    ] = lambda: repository
+    app.dependency_overrides[integrated_alerts.get_export_file_store] = (
+        lambda: file_store
+    )
+    try:
+        created = client.post(
+            "/v0/land_change/integrated_alerts/points/exports", json=request
+        )
+        link = created.json()["data"]["link"]
+        resource_id = link.rsplit("/", 1)[1]
+        result = client.get(
+            f"/v0/land_change/integrated_alerts/points/exports/{resource_id}"
+        )
+    finally:
+        app.dependency_overrides.clear()
+        load_alert_points_table.cache_clear()
+        delete_resource_files(POINTS_EXPORT_ANALYTICS_NAME, resource_id)
+
+    assert created.status_code == 202
+    assert link.startswith(
+        "http://testserver/v0/land_change/integrated_alerts/points/exports/"
+    )
+    data = result.json()["data"]
+    assert data["status"] == "saved"
+    (file_key,) = file_store.files
+    filename = data["result"]["filename"]
+    assert data["result"] == {
+        "download_url": (
+            f"https://downloads.test/{file_key}?filename={filename}&expires=3600"
+        ),
+        "filename": filename,
+        "format": "csv",
+        "point_count": data["result"]["point_count"],
+    }
+    assert data["result"]["point_count"] > 0
+    assert filename.endswith("_2026-10-16.csv")
+    assert data["metadata"]["alerts"]["version"] == "v20261018"
+    assert data["metadata"]["truncated"] == {"BRA.14.87": False}
+
+
+@pytest.mark.parametrize(
+    "path, request_body",
+    [
+        ("/points", {}),
+        ("/points/exports", {"format": "csv"}),
+    ],
+)
+def test_points_request_for_an_unsaved_custom_aoi_gets_404_without_an_analysis(
+    monkeypatch, path, request_body
+):
+    class SavedIds:
+        async def list_saved_ids(self, aoi_ids):
+            return set()
+
+    monkeypatch.setattr(integrated_alerts, "get_custom_aoi_repository", SavedIds)
+    app.dependency_overrides[integrated_alerts.get_points_request_version] = lambda: (
+        "v1"
+    )
+    app.dependency_overrides[get_latest_integrated_alerts_version] = lambda: "v1"
+    # Building an analysis would fail, so a 404 shows the request stopped first.
+    app.dependency_overrides[integrated_alerts.create_points_analysis_service] = (
+        lambda: None
+    )
+    app.dependency_overrides[
+        integrated_alerts.create_points_export_analysis_service
+    ] = lambda: None
+    try:
+        response = client.post(
+            f"/v0/land_change/integrated_alerts{path}",
+            json={
+                "aoi": {"type": "custom_aoi", "ids": ["not-yet-saved"]},
+                **request_body,
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert "not-yet-saved" in response.json()["detail"]
+
+
+def test_analytics_request_for_an_unsaved_custom_aoi_gets_404_without_an_analysis(
+    monkeypatch,
+):
+    class SavedIds:
+        async def list_saved_ids(self, aoi_ids):
+            return {"saved"} & set(aoi_ids)
+
+    app.dependency_overrides[get_latest_integrated_alerts_version] = lambda: "v1"
+    # Building an analysis would fail, so a 404 shows the request stopped first.
+    app.dependency_overrides[integrated_alerts.create_analysis_service] = lambda: None
+    monkeypatch.setattr(integrated_alerts, "get_custom_aoi_repository", SavedIds)
+    try:
+        response = client.post(
+            "/v0/land_change/integrated_alerts/analytics",
+            json={
+                "aoi": {"type": "custom_aoi", "ids": ["saved", "not-yet-saved"]},
+                "start_date": "2026-01-01",
+                "end_date": "2026-10-31",
+            },
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert "not-yet-saved" in response.json()["detail"]

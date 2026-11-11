@@ -9,11 +9,9 @@ import shapely
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
+from app.dependencies import get_aoi_geometry_repository
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
-)
-from app.domain.repositories.gadm_aoi_geometry_repository import (
-    GadmAoiGeometryRepository,
 )
 from app.infrastructure.persistence.file_system_analysis_repository import (
     FileSystemAnalysisRepository,
@@ -25,6 +23,7 @@ from app.infrastructure.persistence.parquet_alert_points_repository import (
     load_alert_points_table,
 )
 from app.main import app
+from app.models.common.areas_of_interest import AdminAreaOfInterest
 from app.models.land_change.integrated_alerts import POINTS_ANALYTICS_NAME
 from app.routers.land_change.integrated_alerts import integrated_alerts
 from app.use_cases.analysis.analysis_service import AnalysisService
@@ -44,6 +43,7 @@ def create_points_analysis_service_for_tests() -> AnalysisService:
         analysis_repository=get_file_system_analysis_repository(),
         analyzer=IntegratedAlertsPointsAnalyzer(
             points_repository=ParquetAlertPointsRepository(TABLE_URI),
+            geometry_repository=get_aoi_geometry_repository(),
             input_uris=build_points_input_uris(VERSION),
         ),
         event=POINTS_ANALYTICS_NAME,
@@ -139,7 +139,9 @@ async def test_admin_points_match_brute_force(admin_points):
     assert admin_points["status"] == "saved"
     alerts = admin_points["metadata"]["alerts"]
     assert alerts["version"] == VERSION
-    geometries, _ = await GadmAoiGeometryRepository().load("admin", ["BRA.14.87"])
+    geometries, _ = await get_aoi_geometry_repository().load(
+        AdminAreaOfInterest(ids=["BRA.14.87"])
+    )
     expected = brute_force_rows(
         geometries[0], alerts["start_date"], alerts["end_date"]
     ).head(10_000)

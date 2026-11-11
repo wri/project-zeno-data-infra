@@ -8,7 +8,11 @@ from fastapi import Response as FastAPIResponse
 from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
-from app.dependencies import get_aoi_geometry_repository, get_environment
+from app.dependencies import (
+    get_aoi_geometry_repository,
+    get_custom_aoi_repository,
+    get_environment,
+)
 from app.domain.analyzers.integrated_alerts_analyzer import (
     IntegratedAlertsAnalyzer,
     build_input_uris,
@@ -16,24 +20,40 @@ from app.domain.analyzers.integrated_alerts_analyzer import (
 from app.domain.analyzers.integrated_alerts_points_analyzer import (
     IntegratedAlertsPointsAnalyzer,
 )
+from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
+    IntegratedAlertsPointsExportAnalyzer,
+)
 from app.domain.models.environment import Environment
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
+from app.domain.repositories.precomputed_table import (
+    PrecomputedAdminLevels,
+    PrecomputedSource,
+)
+from app.infrastructure.export.alert_points_files import ALERT_POINTS_FILE_TYPES
 from app.infrastructure.external_services.duck_db_query_service import (
     DuckDbPrecalcQueryService,
 )
 from app.infrastructure.persistence.aws_dynamodb_s3_analysis_repository import (
+    RESULTS_BUCKET_NAME,
     AwsDynamoDbS3AnalysisRepository,
 )
 from app.infrastructure.persistence.parquet_alert_points_repository import (
     ParquetAlertPointsRepository,
     build_points_input_uris,
 )
-from app.models.common.analysis import AnalyticsOut
+from app.infrastructure.persistence.results_table_coverage import (
+    ResultsTableCoverage,
+)
+from app.infrastructure.persistence.s3_export_file_store import (
+    S3ExportFileStore,
+)
+from app.models.common.analysis import AnalysisStatus, AnalyticsOut
 from app.models.common.base import DataMartResourceLinkResponse
 from app.models.land_change.integrated_alerts import (
     ANALYTICS_NAME,
     POINTS_ANALYTICS_NAME,
+    POINTS_EXPORT_ANALYTICS_NAME,
     IntegratedAlertsAnalytics,
     IntegratedAlertsAnalyticsIn,
     IntegratedAlertsAnalyticsResponse,
@@ -41,10 +61,17 @@ from app.models.land_change.integrated_alerts import (
     IntegratedAlertsLatestResponse,
     IntegratedAlertsPoints,
     IntegratedAlertsPointsAnalyticsIn,
+    IntegratedAlertsPointsExport,
+    IntegratedAlertsPointsExportIn,
+    IntegratedAlertsPointsExportResponse,
     IntegratedAlertsPointsResponse,
     decode_cursor,
 )
-from app.routers.common_analytics import create_analysis, get_analysis
+from app.routers.common_analytics import (
+    create_analysis,
+    get_analysis,
+    reject_unsaved_custom_aois,
+)
 from app.use_cases.analysis.analysis_service import AnalysisService
 from app.use_cases.integrated_alerts.latest_alert_date import (
     IntegratedAlertsLatestDate,
@@ -85,14 +112,23 @@ def create_analysis_service(
     version: str = Depends(get_latest_integrated_alerts_version),
 ) -> AnalysisService:
     input_uris = build_input_uris(version, environment)
+    admin_results = DuckDbPrecalcQueryService(
+        table_uri=input_uris["admin_results_table_uri"]
+    )
+    custom_results = DuckDbPrecalcQueryService(
+        table_uri=input_uris["custom_results_table_uri"]
+    )
     return AnalysisService(
         analysis_repository=analysis_repository,
         analyzer=IntegratedAlertsAnalyzer(
+            precomputed_sources={
+                "admin": PrecomputedSource(admin_results, PrecomputedAdminLevels()),
+                "custom_aoi": PrecomputedSource(
+                    custom_results, ResultsTableCoverage(custom_results)
+                ),
+            },
             aoi_geometry_repository=aoi_geometry_repository,
             compute_engine=request.app.state.dask_client,
-            duckdb_query_service=DuckDbPrecalcQueryService(
-                table_uri=input_uris["admin_results_table_uri"]
-            ),
             input_uris=input_uris,
             otf_timeout_seconds=float(os.environ.get("OTF_TIMEOUT_SECONDS", 600)),
         ),
@@ -125,6 +161,7 @@ async def create(
     service: AnalysisService = Depends(create_analysis_service),
     version: str = Depends(get_latest_integrated_alerts_version),
 ):
+    await reject_unsaved_custom_aois(data.aoi, get_custom_aoi_repository)
     data._version = version
     return await create_analysis(
         data=data,
@@ -231,6 +268,9 @@ async def get_points_request_version(
 
 def create_points_analysis_service(
     analysis_repository: AnalysisRepository = Depends(get_points_analysis_repository),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
     version: str = Depends(get_points_request_version),
 ) -> AnalysisService:
     input_uris = build_points_input_uris(version)
@@ -240,6 +280,7 @@ def create_points_analysis_service(
             points_repository=ParquetAlertPointsRepository(
                 input_uris["alert_points_table_uri"]
             ),
+            geometry_repository=aoi_geometry_repository,
             input_uris=input_uris,
         ),
         event=POINTS_ANALYTICS_NAME,
@@ -253,7 +294,7 @@ def create_points_analysis_service(
     status_code=202,
     summary="Create Integrated Alerts Points Task",
     description=(
-        "List the newest integrated alerts in one AOI (one id, or one feature), "
+        "List the newest integrated alerts in one admin or saved custom area, "
         "one row per alert pixel with its pixel center (lat, lon), date, "
         "confidence and SBTN natural lands class, newest date first. Only the "
         "most recent alerts are stored; the result metadata gives the stored and "
@@ -269,6 +310,7 @@ async def create_points(
     service: AnalysisService = Depends(create_points_analysis_service),
     version: str = Depends(get_points_request_version),
 ):
+    await reject_unsaved_custom_aois(data.aoi, get_custom_aoi_repository)
     data._version = version
     return await create_analysis(
         data=data,
@@ -308,3 +350,133 @@ async def get_integrated_alerts_points_result(
     return IntegratedAlertsPointsResponse(
         data=IntegratedAlertsPoints(**analytics_out.model_dump()), status="success"
     )
+
+
+# Long enough to start a large download, short enough that a shared link lapses.
+DOWNLOAD_URL_EXPIRES_SECONDS = 3600
+
+
+def get_points_export_analysis_repository(request: Request) -> AnalysisRepository:
+    return AwsDynamoDbS3AnalysisRepository(
+        POINTS_EXPORT_ANALYTICS_NAME,
+        request.app.state.dynamodb_table,
+        request.app.state.s3_client,
+    )
+
+
+def get_export_file_store(request: Request) -> S3ExportFileStore:
+    if RESULTS_BUCKET_NAME is None:
+        raise RuntimeError("ANALYSIS_RESULTS_BUCKET_NAME is not set.")
+    return S3ExportFileStore(request.app.state.s3_client, RESULTS_BUCKET_NAME)
+
+
+def create_points_export_analysis_service(
+    analysis_repository: AnalysisRepository = Depends(
+        get_points_export_analysis_repository
+    ),
+    file_store: S3ExportFileStore = Depends(get_export_file_store),
+    aoi_geometry_repository: AoiGeometryRepository = Depends(
+        get_aoi_geometry_repository
+    ),
+    version: str = Depends(get_latest_integrated_alerts_version),
+) -> AnalysisService:
+    input_uris = build_points_input_uris(version)
+    return AnalysisService(
+        analysis_repository=analysis_repository,
+        analyzer=IntegratedAlertsPointsExportAnalyzer(
+            points_repository=ParquetAlertPointsRepository(
+                input_uris["alert_points_table_uri"]
+            ),
+            file_store=file_store,
+            geometry_repository=aoi_geometry_repository,
+            file_types=ALERT_POINTS_FILE_TYPES,
+            page_size=100_000,
+            input_uris=input_uris,
+        ),
+        event=POINTS_EXPORT_ANALYTICS_NAME,
+    )
+
+
+@router.post(
+    "/points/exports",
+    response_class=ORJSONResponse,
+    response_model=DataMartResourceLinkResponse,
+    status_code=202,
+    summary="Create Integrated Alerts Points Export Task",
+    description=(
+        "Write the integrated alerts in one admin or saved custom area to a CSV "
+        "or zipped shapefile, one row per alert pixel with the same columns as "
+        "`/points`, "
+        "newest first. Only the most recent alerts are stored, and at most "
+        "1,000,000 are written; the result metadata gives the stored and served "
+        "date ranges and whether the file was cut at that cap. Once saved, the "
+        "result's `download_url` fetches the file for an hour; poll again for a "
+        "fresh one."
+    ),
+)
+async def create_points_export(
+    *,
+    data: IntegratedAlertsPointsExportIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    service: AnalysisService = Depends(create_points_export_analysis_service),
+    version: str = Depends(get_latest_integrated_alerts_version),
+):
+    await reject_unsaved_custom_aois(data.aoi, get_custom_aoi_repository)
+    data._version = version
+    return await create_analysis(
+        data=data,
+        service=service,
+        request=request,
+        background_tasks=background_tasks,
+        resource_link_callback=_points_export_resource_link_response,
+    )
+
+
+def _points_export_resource_link_response(request, service) -> str:
+    return str(
+        request.url_for(
+            "get_integrated_alerts_points_export_result",
+            resource_id=service.resource_thumbprint(),
+        )
+    )
+
+
+@router.get(
+    "/points/exports/{resource_id}",
+    response_class=ORJSONResponse,
+    response_model=IntegratedAlertsPointsExportResponse,
+    status_code=200,
+)
+async def get_integrated_alerts_points_export_result(
+    resource_id: UUID5,
+    response: FastAPIResponse,
+    analysis_repository: AnalysisRepository = Depends(
+        get_points_export_analysis_repository
+    ),
+    file_store: S3ExportFileStore = Depends(get_export_file_store),
+):
+    analytics_out: AnalyticsOut = await get_analysis(
+        resource_id=resource_id,
+        analysis_repository=analysis_repository,
+        response=response,
+    )
+    points_export = IntegratedAlertsPointsExport(**analytics_out.model_dump())
+    if (
+        points_export.status == AnalysisStatus.saved
+        and points_export.result is not None
+    ):
+        # The stored result keeps the file's key; links are made per request so
+        # a cached result never hands out an expired one.
+        stored = points_export.result
+        points_export.result = {
+            "download_url": await file_store.presign_download_url(
+                stored["file_key"],
+                stored["filename"],
+                DOWNLOAD_URL_EXPIRES_SECONDS,
+            ),
+            "filename": stored["filename"],
+            "format": stored["format"],
+            "point_count": stored["point_count"],
+        }
+    return IntegratedAlertsPointsExportResponse(data=points_export, status="success")

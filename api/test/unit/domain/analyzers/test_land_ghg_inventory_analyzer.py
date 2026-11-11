@@ -16,11 +16,13 @@ from app.infrastructure.external_services.duck_db_query_service import (
 )
 from app.models.common.analysis import AnalysisStatus
 from app.models.common.areas_of_interest import (
-    AdminAreaOfInterest,
     GlobalAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
 )
-from app.models.land_change.land_ghg_inventory import LandGHGInventoryAnalyticsIn
+from app.models.land_change.land_ghg_inventory import (
+    LandGHGInventoryAdminAreaOfInterest,
+    LandGHGInventoryAnalyticsIn,
+)
 
 EXPECTED_VEGETATION_COLUMNS = {
     "aoi_id",
@@ -159,7 +161,7 @@ async def test_result_has_a_table_per_category(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+        aoi=LandGHGInventoryAdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
@@ -183,7 +185,7 @@ async def test_vegetation_query_returns_flux_by_land_state_and_year(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+        aoi=LandGHGInventoryAdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
@@ -212,7 +214,7 @@ async def test_agriculture_query_broadcasts_snapshot_to_years(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+        aoi=LandGHGInventoryAdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
@@ -245,7 +247,7 @@ async def test_mineral_soil_query_broadcasts_snapshot_to_years(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+        aoi=LandGHGInventoryAdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
@@ -274,7 +276,7 @@ async def test_organic_soil_query_broadcasts_blocks_to_years(
     vegetation_parquet, agriculture_parquet, mineral_soil_parquet, organic_soil_parquet
 ):
     analytics_in = LandGHGInventoryAnalyticsIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.1", "COL"])
+        aoi=LandGHGInventoryAdminAreaOfInterest(ids=["BRA.1", "COL"])
     ).model_dump()
     analysis = Analysis(None, analytics_in, AnalysisStatus.saved)
 
@@ -319,7 +321,9 @@ def test_global_and_admin_thumbprints_differ():
     # Why _version is not bumped for the global AOI: the thumbprint already
     # separates the two, so a global result can never collide with a cached
     # admin one.
-    admin = LandGHGInventoryAnalyticsIn(aoi=AdminAreaOfInterest(ids=["BRA"]))
+    admin = LandGHGInventoryAnalyticsIn(
+        aoi=LandGHGInventoryAdminAreaOfInterest(ids=["BRA"])
+    )
     world = LandGHGInventoryAnalyticsIn(aoi=GlobalAreaOfInterest())
 
     assert admin.thumbprint() != world.thumbprint()

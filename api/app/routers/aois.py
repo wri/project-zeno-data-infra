@@ -23,6 +23,7 @@ from app.models.aois import (
     AoiMatchOut,
     AoiSearchResponse,
     AoiType,
+    SearchableAoiType,
     aoi_by_type,
 )
 from app.use_cases.aois.aoi_name_search import AoiNameSearch
@@ -53,7 +54,7 @@ def get_custom_aoi_repository_factory() -> Callable[[], CustomAoiRepository]:
 )
 async def search_aois(
     q: str = Query(..., min_length=1, max_length=100),
-    type: Optional[List[AoiType]] = Query(None),
+    type: Optional[List[SearchableAoiType]] = Query(None),
     limit: int = Query(10, ge=1, le=50),
     user_id: Optional[str] = Query(None, min_length=1),
     name_search: AoiNameSearch = Depends(get_aoi_name_search),

@@ -8,11 +8,8 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
-
 from pipelines.aois.prefect_flows import aois_flow
+from pipelines.aois.prefect_flows.aoi_name_index_flow import aoi_name_index_flow
 from pipelines.aois.sources import aoi_sources
 from pipelines.carbon_flux.prefect_flows import carbon_flow
 from pipelines.disturbance.prefect_flows import dist_flow
@@ -20,8 +17,12 @@ from pipelines.grasslands.prefect_flows import grasslands_flow
 from pipelines.integrated_alerts.prefect_flows import integrated_alerts_flow
 from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
+from pipelines.subscription_emails.prefect_flows import subscription_emails_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
 from pipelines.wur_alert_drivers.prefect_flows import wur_flow
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -83,12 +84,16 @@ def run_tcl_update(version, overwrite=False, is_latest=False) -> list[str]:
 
 @flow
 def run_integrated_alerts_update(
-    version, overwrite=False, is_latest=False, bbox=None
+    version, overwrite=False, is_latest=False, bbox=None, send_emails=False
 ) -> list[str]:
     result_uris = []
 
     result = integrated_alerts_flow.compute_integrated_alerts_zonal_stats(
-        version, overwrite=overwrite, is_latest=is_latest, bbox=bbox
+        version,
+        overwrite=overwrite,
+        is_latest=is_latest,
+        bbox=bbox,
+        send_emails=send_emails,
     )
     result_uris.append(result)
 
@@ -126,20 +131,23 @@ def run_land_ghg_inventory_update(
 
 @flow
 def run_aois_update(
-    version=None,
-    overwrite=False,
-    is_latest=False,
-    aoi_source=None,
-    refresh_importance=False,
-    index_only=False,
+    version=None, overwrite=False, is_latest=False, aoi_source=None
 ) -> list[str]:
-    return aois_flow.aois_update(
-        date.today(),
-        aoi_source,
-        overwrite=overwrite,
-        refresh_importance=refresh_importance,
-        index_only=index_only,
-    )
+    return aois_flow.aois_update(aoi_source, overwrite=overwrite)
+
+
+def run_aoi_name_index_update(
+    version=None, overwrite=False, is_latest=False, refresh_importance=False
+) -> list[str]:
+    # version and is_latest aren't used: the index is versioned by its build date.
+    return [
+        aoi_name_index_flow(
+            aoi_sources(),
+            date.today(),
+            overwrite=overwrite,
+            refresh_importance=refresh_importance,
+        )
+    ]
 
 
 def run_wur_update(
@@ -149,6 +157,21 @@ def run_wur_update(
     return wur_flow.wur_alert_drivers_flow(
         content_date=content_date, version=version, is_latest=is_latest
     )
+
+
+def run_subscription_emails(
+    version=None,
+    overwrite=False,
+    is_latest=False,
+    send_emails=False,
+    test_recipient=None,
+) -> list[str]:
+    # version, overwrite and is_latest aren't used: the emails are always for the
+    # latest integrated alerts version, and re-running only sends unsent emails.
+    count = subscription_emails_flow.subscription_emails_flow(
+        send_emails=send_emails, test_recipient=test_recipient
+    )
+    return [f"{count} subscription emails"]
 
 
 def _parse_bbox(bbox):
@@ -174,8 +197,13 @@ class UpdateFlow(str, Enum):
     LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE = "land_ghg_inventory_organic_soil_update"
     # Run once, until a new AOI dataset version happens
     AOIS_UPDATE = "aois_update"
+    # Run by hand after an AOI dataset update, to rebuild the AOI name search index
+    AOI_NAME_INDEX = "aoi_name_index"
     # Currently run by hand about once a month when new WUR drivers data is available
     WUR_UPDATE = "wur_update"
+    # Run as a subflow at the end of integrated_alerts_update with send_emails; run
+    # by hand (with --send-emails) to send emails left unsent after a failure
+    SUBSCRIPTION_EMAILS = "subscription_emails"
 
 
 update_flows = {
@@ -188,7 +216,9 @@ update_flows = {
     UpdateFlow.LAND_GHG_INVENTORY_MINERAL_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.LAND_GHG_INVENTORY_ORGANIC_SOIL_UPDATE: run_land_ghg_inventory_update,
     UpdateFlow.AOIS_UPDATE: run_aois_update,
+    UpdateFlow.AOI_NAME_INDEX: run_aoi_name_index_update,
     UpdateFlow.WUR_UPDATE: run_wur_update,
+    UpdateFlow.SUBSCRIPTION_EMAILS: run_subscription_emails,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -205,7 +235,9 @@ VERSION_REQUIRED_FLOWS = (
 # flows that don't use Dask, so run on the flow's own machine
 CLUSTERLESS_FLOWS = (
     UpdateFlow.AOIS_UPDATE,
+    UpdateFlow.AOI_NAME_INDEX,
     UpdateFlow.WUR_UPDATE,
+    UpdateFlow.SUBSCRIPTION_EMAILS,
 )
 
 # flow_name values that route into run_land_ghg_inventory_update
@@ -258,6 +290,8 @@ def _is_iso_date(value) -> bool:
         "all necessary updates for TCL."
         "-'wur_update' will create a new Data API version of the WUR alert drivers "
         "dataset (needs version and content_date)."
+        "-'subscription_emails' will email subscribers the past week's integrated "
+        "alerts in their dashboards' areas."
     ),
 )
 def run_updates(
@@ -271,7 +305,8 @@ def run_updates(
     performance_report_path=None,
     content_date=None,
     refresh_importance=False,
-    index_only=False,
+    send_emails=False,
+    test_recipient=None,
 ) -> list[str]:
     logger = get_run_logger()
     dask_client = None
@@ -283,7 +318,7 @@ def run_updates(
     overwrite = str(overwrite).lower() == "true"
     local = str(local).lower() == "true"
     refresh_importance = str(refresh_importance).lower() == "true"
-    index_only = str(index_only).lower() == "true"
+    send_emails = str(send_emails).lower() == "true"
     # bbox (land_ghg_inventory and integrated_alerts flows only) clips the reduce
     # to one area. It is independent of where compute runs: Coiled by default, or
     # local when local=True.
@@ -318,12 +353,16 @@ def run_updates(
             kwargs["flow_name"] = flow_name.value
         if flow_name == UpdateFlow.AOIS_UPDATE:
             kwargs["aoi_source"] = aoi_source
+        elif flow_name == UpdateFlow.AOI_NAME_INDEX:
             kwargs["refresh_importance"] = refresh_importance
-            kwargs["index_only"] = index_only
         elif flow_name == UpdateFlow.INTEGRATED_ALERTS_UPDATE:
             kwargs["bbox"] = bbox_geom
+            kwargs["send_emails"] = send_emails
         elif flow_name == UpdateFlow.WUR_UPDATE:
             kwargs["content_date"] = content_date
+        elif flow_name == UpdateFlow.SUBSCRIPTION_EMAILS:
+            kwargs["send_emails"] = send_emails
+            kwargs["test_recipient"] = test_recipient or None
         with report:
             result_uris = flow_fn(**kwargs)
 
@@ -372,14 +411,8 @@ def run_updates(
     is_flag=True,
     help=(
         "Download the external sources of AOI importance again instead of "
-        "using their cached copies (aois_update only)."
+        "using their cached copies (aoi_name_index only)."
     ),
-)
-@click.option(
-    "--index-only",
-    is_flag=True,
-    help="Build only the AOI name index, from the existing AOI GeoParquets "
-    "(aois_update only).",
 )
 @click.option(
     "--content-date",
@@ -387,6 +420,22 @@ def run_updates(
     help=(
         "YYYY-MM-DD date up to which the data has been calculated (required for "
         "wur_update)."
+    ),
+)
+@click.option(
+    "--send-emails",
+    is_flag=True,
+    help=(
+        "Actually send the subscription emails (integrated_alerts_update and "
+        "subscription_emails only); without it, subscription_emails only logs them."
+    ),
+)
+@click.option(
+    "--test-recipient",
+    default=None,
+    help=(
+        "Send every email to this address instead of the subscriber's "
+        "(subscription_emails only)."
     ),
 )
 @click.option(
@@ -409,8 +458,9 @@ def cli(
     bbox,
     aoi_source,
     refresh_importance,
-    index_only,
     content_date,
+    send_emails,
+    test_recipient,
     local,
     performance_report_path,
 ):
@@ -425,7 +475,8 @@ def cli(
         performance_report_path=performance_report_path,
         content_date=content_date,
         refresh_importance=refresh_importance,
-        index_only=index_only,
+        send_emails=send_emails,
+        test_recipient=test_recipient,
     )
 
 
