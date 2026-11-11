@@ -1,9 +1,13 @@
+from test.unit.alert_points import aoi_polygon
+
 import pytest
 from pydantic import ValidationError
+from shapely.geometry import mapping
 
 from app.models.land_change.integrated_alerts import (
     ANALYTICS_NAME,
     IntegratedAlertsAnalyticsIn,
+    IntegratedAlertsPointsAnalyticsIn,
 )
 
 
@@ -70,3 +74,40 @@ class TestIntegratedAlertsAnalyticsIn:
                 end_date="2024-12-31",
                 land_filter="primary_forest",
             )
+
+
+class TestIntegratedAlertsPointsAnalyticsIn:
+    @pytest.mark.parametrize(
+        "aoi",
+        [
+            {"type": "admin", "ids": ["BRA.1"]},
+            {"type": "custom_aoi", "ids": ["0b6c1f8e-3d2a-4c55-9a8e-2f4d6b7c9e10"]},
+        ],
+    )
+    def test_takes_admin_or_saved_custom_aois(self, aoi):
+        assert IntegratedAlertsPointsAnalyticsIn(aoi=aoi).aoi.type == aoi["type"]
+
+    @pytest.mark.parametrize(
+        "aoi",
+        [
+            {"type": "protected_area", "ids": ["555758964"]},
+            {"type": "key_biodiversity_area", "ids": ["1"]},
+            {"type": "indigenous_land", "ids": ["MEX11287"]},
+            {
+                "type": "feature_collection",
+                "feature_collection": {
+                    "type": "FeatureCollection",
+                    "features": [
+                        {
+                            "type": "Feature",
+                            "id": "a",
+                            "geometry": mapping(aoi_polygon()),
+                        }
+                    ],
+                },
+            },
+        ],
+    )
+    def test_rejects_other_aoi_types(self, aoi):
+        with pytest.raises(ValidationError):
+            IntegratedAlertsPointsAnalyticsIn(aoi=aoi)

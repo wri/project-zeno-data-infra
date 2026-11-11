@@ -9,12 +9,12 @@ class S3ExportFileStore:
         self._bucket = bucket
 
     async def write_file(self, key: str, path: Path, content_type: str) -> None:
-        """Upload a local file to key."""
-        await self._s3.put_object(
+        """Upload a local file to key, streaming it from disk in parts."""
+        await self._s3.upload_file(
+            Filename=str(path),
             Bucket=self._bucket,
             Key=key,
-            Body=path.read_bytes(),
-            ContentType=content_type,
+            ExtraArgs={"ContentType": content_type},
         )
 
     async def presign_download_url(
