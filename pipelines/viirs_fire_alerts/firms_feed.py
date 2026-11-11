@@ -7,6 +7,8 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.csv as csv
 
+from pipelines.viirs_fire_alerts.alerts import alert_key_columns
+
 
 def download_feed(url: str) -> bytes:
     response = httpx.get(url, timeout=300, follow_redirects=True)
@@ -45,7 +47,7 @@ def parse_feed(content: bytes) -> pa.Table:
             "frp",
         ]
     )
-    for key in ["latitude", "longitude", "acq_date", "acq_time"]:
+    for key in alert_key_columns():
         if columns.column(key).null_count > 0:
             raise ValueError(f"Feed has alerts without {key}")
     short_confidence = pc.utf8_slice_codeunits(columns.column("confidence"), 0, 1)

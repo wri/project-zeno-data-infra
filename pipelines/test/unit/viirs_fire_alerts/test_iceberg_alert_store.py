@@ -2,6 +2,7 @@ import datetime
 
 import pyarrow as pa
 import pytest
+import s2sphere
 from pyiceberg.catalog.sql import SqlCatalog
 from pyiceberg.exceptions import CommitFailedException
 
@@ -23,7 +24,11 @@ def catalog(tmp_path) -> SqlCatalog:
 
 @pytest.fixture
 def store(catalog) -> IcebergAlertStore:
-    return IcebergAlertStore(catalog, TABLE)
+    return new_store(catalog)
+
+
+def new_store(catalog) -> IcebergAlertStore:
+    return IcebergAlertStore(catalog, TABLE, coarse_cell_level=2, fine_cell_level=13)
 
 
 class RacingCatalog:
@@ -36,7 +41,7 @@ class RacingCatalog:
 
     def create_table_if_not_exists(self, *args, **kwargs):
         table = self.catalog.create_table_if_not_exists(*args, **kwargs)
-        IcebergAlertStore(self.catalog, TABLE).append_unseen(self.other_alerts)
+        new_store(self.catalog).append_new(self.other_alerts)
         return table
 
 
@@ -52,8 +57,6 @@ def alerts(*keys) -> pa.Table:
             "bright_ti4": [300.0] * len(keys),
             "bright_ti5": [290.0] * len(keys),
             "frp": [5.0] * len(keys),
-            "s2_cell": [1] * len(keys),
-            "s2_cell_fine": [2] * len(keys),
         }
     )
 
@@ -83,19 +86,19 @@ def test_table_is_partitioned_by_month_and_coarse_cell(store):
 def test_same_feed_twice_stores_each_alert_once(store):
     feed = alerts((1, 3, "0005"), (2, 4, "1210"))
 
-    first = store.append_unseen(feed)
-    second = store.append_unseen(feed)
+    first = store.append_new(feed)
+    second = store.append_new(feed)
 
     assert (first, second) == (2, 0)
     assert stored_keys(store) == [(1.0, 3, "0005"), (2.0, 4, "1210")]
 
 
 def test_overlapping_feed_appends_only_unseen_alerts(store):
-    store.append_unseen(alerts((1, 3, "0005"), (2, 4, "1210")))
+    store.append_new(alerts((1, 3, "0005"), (2, 4, "1210")))
     # same place and day as a stored alert, but a later overpass
     newer = alerts((2, 4, "1210"), (2, 4, "1352"), (3, 9, "0130"))
 
-    store.append_unseen(newer)
+    store.append_new(newer)
 
     assert stored_keys(store) == [
         (1.0, 3, "0005"),
@@ -105,26 +108,20 @@ def test_overlapping_feed_appends_only_unseen_alerts(store):
     ]
 
 
-def test_repeated_alerts_within_a_feed_are_stored_once(store):
-    store.append_unseen(alerts((1, 3, "0005"), (1, 3, "0005")))
-
-    assert stored_keys(store) == [(1.0, 3, "0005")]
-
-
 def test_appending_nothing_adds_no_snapshot(store):
-    store.append_unseen(alerts((1, 3, "0005")))
+    store.append_new(alerts((1, 3, "0005")))
     snapshot = store.table().current_snapshot().snapshot_id
 
-    store.append_unseen(alerts((1, 3, "0005")))
+    store.append_new(alerts((1, 3, "0005")))
 
     assert store.table().current_snapshot().snapshot_id == snapshot
 
 
 def test_write_fails_when_another_writer_commits_after_the_read(catalog, store):
-    racing = IcebergAlertStore(RacingCatalog(catalog, alerts((1, 3, "0005"))), TABLE)
+    racing = new_store(RacingCatalog(catalog, alerts((1, 3, "0005"))))
 
     with pytest.raises(CommitFailedException):
-        racing.append_unseen(alerts((1, 3, "0005")))
+        racing.append_new(alerts((1, 3, "0005")))
 
     assert stored_keys(store) == [(1.0, 3, "0005")]
 
@@ -132,6 +129,26 @@ def test_write_fails_when_another_writer_commits_after_the_read(catalog, store):
 def test_latest_date_is_the_newest_stored_alert_date(store):
     assert store.latest_date() is None
 
-    store.append_unseen(alerts((1, 3, "0005"), (2, 9, "1210")))
+    store.append_new(alerts((1, 3, "0005"), (2, 9, "1210")))
 
     assert store.latest_date() == datetime.date(2026, 11, 9)
+
+
+def unsigned(cell: int) -> int:
+    return cell + 2**64 if cell < 0 else cell
+
+
+def test_alerts_are_stored_with_signed_coarse_cells_containing_their_fine_cells(
+    store,
+):
+    # Peru's S2 ids are above 2**63, so they must wrap to fit a signed long.
+    feed = alerts((-8.1, 3, "0005"))
+    feed = feed.set_column(1, "longitude", pa.array([-75.0]))
+
+    store.append_new(feed)
+
+    row = store.table().scan().to_arrow().to_pylist()[0]
+    fine = s2sphere.CellId(unsigned(row["s2_cell_fine"]))
+    assert row["s2_cell"] < 0
+    assert fine.level() == 13
+    assert fine.parent(2).id() == unsigned(row["s2_cell"])

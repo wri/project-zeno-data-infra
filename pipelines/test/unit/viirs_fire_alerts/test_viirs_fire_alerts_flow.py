@@ -2,7 +2,7 @@ import pytest
 from prefect.logging import disable_run_logger
 from pyiceberg.catalog.sql import SqlCatalog
 
-from pipelines.viirs_fire_alerts.feed_continuity import FeedGapError
+from pipelines.viirs_fire_alerts.alerts import FeedGapError
 from pipelines.viirs_fire_alerts.prefect_flows import viirs_fire_alerts_flow
 
 HEADER = (
@@ -12,6 +12,8 @@ HEADER = (
 FEED = HEADER + (
     "19.39964,-155.28406,346.91,0.43,0.46,2026-11-03,0005,N20,nominal,2.0NRT,"
     "304.81,74.87,D\n"
+    "-8.1,-60.2,330.1,0.4,0.4,2026-11-04,1730,N20,high,2.0NRT,295.0,10.0,D\n"
+    # a repeated alert
     "-8.1,-60.2,330.1,0.4,0.4,2026-11-04,1730,N20,high,2.0NRT,295.0,10.0,D\n"
 )
 TABLE = "alerts.viirs_fire_alerts"
