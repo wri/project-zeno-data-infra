@@ -39,7 +39,7 @@ class FakeCustomAoiRepository:
 
 class FakeGeometryRepository:
     async def load(self, aoi):
-        if aoi.ids != ["BRA.14"] and aoi.ids != ["home"]:
+        if aoi.ids != ["BRA.14"]:
             raise AoiNotFoundError(f"AOI ids not found: {aoi.ids}")
         return [box(0, 0, 1, 1)], [12.5]
 
@@ -101,20 +101,32 @@ def test_search_includes_the_users_own_custom_aois(name_index):
     assert name_index.searches[0][3] == [CustomAoiName("home", "Home farm")]
 
 
-@pytest.mark.parametrize(
-    "aoi_type, aoi_id", [("admin", "BRA.14"), ("custom_aoi", "home")]
-)
-def test_aoi_geometry_is_returned_as_a_geojson_feature(name_index, aoi_type, aoi_id):
-    response = client.get(f"/v0/aois/{aoi_type}/{aoi_id}", headers=ADMIN)
+def test_aoi_geometry_is_returned_as_a_geojson_feature(name_index):
+    response = client.get("/v0/aois/admin/BRA.14", headers=ADMIN)
 
     assert response.status_code == 200
     feature = response.json()["data"]
-    assert (feature["type"], feature["id"]) == ("Feature", aoi_id)
+    assert (feature["type"], feature["id"]) == ("Feature", "BRA.14")
     assert feature["geometry"]["type"] == "Polygon"
-    assert feature["properties"] == {"aoi_type": aoi_type, "area_ha": 12.5}
+    assert feature["properties"] == {"aoi_type": "admin", "area_ha": 12.5}
 
 
 def test_unknown_aoi_is_not_found(name_index):
     response = client.get("/v0/aois/admin/BRA.99", headers=ADMIN)
 
     assert response.status_code == 404
+
+
+def test_custom_aois_are_not_yet_supported(name_index):
+    response = client.get("/v0/aois/custom_aoi/home", headers=ADMIN)
+
+    assert response.status_code == 422
+
+
+def test_search_can_be_limited_to_custom_aois(name_index):
+    response = client.get(
+        "/v0/aois/search", params={"q": "home", "type": "custom_aoi"}, headers=ADMIN
+    )
+
+    assert response.status_code == 200
+    assert name_index.searches[0][1] == ["custom_aoi"]

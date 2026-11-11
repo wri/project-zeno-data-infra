@@ -7,11 +7,11 @@ from .common.areas_of_interest import (
     IndigenousAreaOfInterest,
     KeyBiodiversityAreaOfInterest,
     ProtectedAreaOfInterest,
-    SavedCustomAreaOfInterest,
 )
 from .common.base import Response, StrictBaseModel
 
-AoiType = Literal[
+AoiType = Literal["admin", "key_biodiversity_area", "protected_area", "indigenous_land"]
+SearchableAoiType = Literal[
     "admin", "key_biodiversity_area", "protected_area", "indigenous_land", "custom_aoi"
 ]
 
@@ -22,7 +22,6 @@ aoi_by_type = TypeAdapter(
             KeyBiodiversityAreaOfInterest,
             ProtectedAreaOfInterest,
             IndigenousAreaOfInterest,
-            SavedCustomAreaOfInterest,
         ],
         Field(discriminator="type"),
     ]
@@ -30,7 +29,7 @@ aoi_by_type = TypeAdapter(
 
 
 class AoiMatchOut(StrictBaseModel):
-    aoi_type: AoiType
+    aoi_type: SearchableAoiType
     aoi_id: str
     name: str
     display_name: str
