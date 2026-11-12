@@ -89,9 +89,7 @@ def test_email_subscriptions_keeps_integrated_alerts_on_admin_and_custom_aois():
 def test_aoi_types_without_results_in_the_version_are_listed(monkeypatch):
     monkeypatch.setattr(stages, "s3_uri_exists", lambda uri: "custom" not in uri)
 
-    assert stages.list_aoi_types_without_results("v20261108", {"admin", "custom"}) == {
-        "custom"
-    }
+    assert stages.list_aoi_types_without_results("v20261108") == {"custom"}
 
 
 def test_dashboards_already_sent_this_week_are_left_out():

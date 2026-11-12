@@ -94,11 +94,9 @@ def email_week(
     # Test sends aren't recorded, so they ignore what was sent.
     sent_markers = set() if test_recipient else stages.list_sent_markers(week_end)
     unsent = stages.select_unsent_subscriptions(subscriptions, week_end, sent_markers)
-    missing_types = stages.list_aoi_types_without_results(
-        version, {s.aoi_type for s in unsent}
-    )
-    subscriptions = [s for s in unsent if s.aoi_type not in missing_types]
-    waiting_count = len(unsent) - len(subscriptions)
+    missing_types = stages.list_aoi_types_without_results(version)
+    ready_to_send = [s for s in unsent if s.aoi_type not in missing_types]
+    waiting_count = len(unsent) - len(ready_to_send)
     if waiting_count:
         logger.warning(
             f"Not yet sending {waiting_count} dashboards of the week ending "
@@ -106,26 +104,26 @@ def email_week(
             f"{sorted(missing_types)}. Later runs will send them once it has."
         )
     emails = {}
-    if subscriptions:
-        aoi_ids_by_type = stages.group_aoi_ids_by_type(subscriptions)
+    if ready_to_send:
+        aoi_ids_by_type = stages.group_aoi_ids_by_type(ready_to_send)
         results_uris = [
             stages.alert_results_uri(version, aoi_type)
             for aoi_type in sorted(aoi_ids_by_type)
         ]
-        aoi_ids = sorted({s.aoi_id for s in subscriptions})
+        aoi_ids = sorted({s.aoi_id for s in ready_to_send})
         areas = read_alert_areas_task(results_uris, aoi_ids, start_date, end_date)
         names = read_aoi_names_task(aoi_ids_by_type)
         emails = stages.build_emails(
-            subscriptions, areas, names, start_date, end_date, alerts_version_date
+            ready_to_send, areas, names, start_date, end_date, alerts_version_date
         )
-    logger.info(f"{len(emails)} emails for {len(subscriptions)} subscriptions")
+    logger.info(f"{len(emails)} emails for {len(ready_to_send)} subscriptions")
 
     if not send_emails:
         for email, substitution_data in emails.items():
             print(f"{email}: {json.dumps(substitution_data, ensure_ascii=False)}")
         return len(emails), waiting_count > 0
 
-    aoi_types_by_email = stages.group_aoi_types_by_email(subscriptions)
+    aoi_types_by_email = stages.group_aoi_types_by_email(ready_to_send)
     # Send every email even if some fail, then fail the flow if any did.
     futures = {
         email: send_email_task.submit(

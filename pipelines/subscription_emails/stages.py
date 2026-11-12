@@ -185,12 +185,12 @@ def alert_results_uri(version: str, aoi_type: str) -> str:
     return f"{INTEGRATED_ALERTS_PREFIX}/{version}/{file_name}"
 
 
-def list_aoi_types_without_results(version: str, aoi_types: set[str]) -> set[str]:
+def list_aoi_types_without_results(version: str) -> set[str]:
     """List the AOI types whose results file is missing from the version, e.g.
     when that type's zonal statistics failed in the weekly update."""
     return {
         aoi_type
-        for aoi_type in aoi_types
+        for aoi_type in EMAIL_AOI_TYPES
         if not s3_uri_exists(alert_results_uri(version, aoi_type))
     }
 
