@@ -52,15 +52,13 @@ def retry_if_transient(task, task_run, state) -> bool:
 def send_email_task(
     week_end: date,
     email: str,
+    aoi_types: list[str],
     substitution_data: dict,
     test_recipient: Optional[str],
 ) -> str:
-    """Send one email, and return "sent", "rejected" or "already sent"."""
+    """Send one email of a subscriber's dashboards of these AOI types, and return
+    "sent" or "rejected"."""
     logger = get_run_logger()
-    # Test sends aren't recorded, so they never stop the real email being sent.
-    if test_recipient is None and stages.was_sent(week_end, email):
-        logger.info("Already sent this week's email; skipping")
-        return "already sent"
     client = SparkPostClient(api_key=get_secret(SPARKPOST_API_KEY_SECRET_ID))
     recipient = test_recipient or email
     try:
@@ -73,8 +71,9 @@ def send_email_task(
         results = {"rejected": str(e)}
         status = "rejected"
         logger.warning(f"SparkPost rejected recipient {recipient}: {e}")
+    # Test sends aren't recorded, so they never stop the real email being sent.
     if test_recipient is None:
-        stages.mark_sent(week_end, email, results)
+        stages.mark_sent(week_end, email, aoi_types, results)
     return status
 
 
@@ -85,23 +84,26 @@ def email_week(
     subscriptions: list[Subscription],
     send_emails: bool,
     test_recipient: Optional[str],
-) -> tuple[int, set[str]]:
-    """Email one week's alerts to each subscriber not yet sent it, holding back
-    those with a dashboard whose AOI type has no results in the version. Returns
-    how many emails there were and the addresses held back."""
+) -> tuple[int, bool]:
+    """Email each subscriber the week's dashboards not yet sent to them whose AOI
+    type has results in the version. Returns how many emails there were and
+    whether any dashboards are left to send once their results exist."""
     logger = get_run_logger()
     start_date, end_date = stages.week_range(week_end)
     logger.info(f"Integrated alerts version {version}, week {start_date}-{end_date}")
+    # Test sends aren't recorded, so they ignore what was sent.
+    sent_markers = set() if test_recipient else stages.list_sent_markers(week_end)
+    unsent = stages.select_unsent_subscriptions(subscriptions, week_end, sent_markers)
     missing_types = stages.list_aoi_types_without_results(
-        version, {s.aoi_type for s in subscriptions}
+        version, {s.aoi_type for s in unsent}
     )
-    held_back = stages.list_held_back_emails(subscriptions, missing_types)
-    subscriptions = [s for s in subscriptions if s.user_email not in held_back]
-    if held_back:
+    subscriptions = [s for s in unsent if s.aoi_type not in missing_types]
+    waiting_count = len(unsent) - len(subscriptions)
+    if waiting_count:
         logger.warning(
-            f"Not emailing {len(held_back)} subscribers the week ending {end_date}: "
-            f"version {version} has no results for {sorted(missing_types)}. Later "
-            "runs will email them once it has."
+            f"Not yet sending {waiting_count} dashboards of the week ending "
+            f"{end_date}: version {version} has no results for "
+            f"{sorted(missing_types)}. Later runs will send them once it has."
         )
     emails = {}
     if subscriptions:
@@ -121,12 +123,17 @@ def email_week(
     if not send_emails:
         for email, substitution_data in emails.items():
             print(f"{email}: {json.dumps(substitution_data, ensure_ascii=False)}")
-        return len(emails), held_back
+        return len(emails), waiting_count > 0
 
+    aoi_types_by_email = stages.group_aoi_types_by_email(subscriptions)
     # Send every email even if some fail, then fail the flow if any did.
     futures = {
         email: send_email_task.submit(
-            end_date, email, substitution_data, test_recipient
+            end_date,
+            email,
+            aoi_types_by_email[email],
+            substitution_data,
+            test_recipient,
         )
         for email, substitution_data in emails.items()
     }
@@ -137,7 +144,7 @@ def email_week(
         raise RuntimeError(f"{len(failed)} of {len(emails)} emails failed to send")
     statuses = Counter(future.result() for future in futures.values())
     logger.info(f"Emails: {dict(statuses)}")
-    return len(emails), held_back
+    return len(emails), waiting_count > 0
 
 
 @flow(
@@ -161,11 +168,11 @@ def subscription_emails_flow(
     alerts version is far enough past it (see stages.next_week_end); otherwise
     nothing is sent. Emails are sent through a SparkPost template (TEMPLATE_ID),
     filled in with the substitution data built by stages.build_emails. Each sent
-    email is recorded in S3, so re-running the flow (e.g. after a failure) only
-    sends the emails not yet sent, and the week is recorded as emailed once they
-    all have been. A subscriber with a dashboard whose AOI type has no results in
-    the version isn't emailed that week; the week is recorded as skipped, and
-    later runs email them once the results exist.
+    email is recorded in S3 per AOI type, so re-running the flow (e.g. after a
+    failure) only sends the dashboards not yet sent. When an AOI type has no
+    results in the version, the other types' dashboards are still sent; the week
+    is recorded as skipped, and later runs send that type's dashboards in a
+    separate email once its results exist.
 
     Args:
         send_emails: Only if True are the emails sent; otherwise each email's
@@ -203,7 +210,7 @@ def subscription_emails_flow(
         )
     email_count, still_skipped_weeks = 0, []
     for each_week_end in week_ends:
-        count, held_back = email_week(
+        count, has_waiting_dashboards = email_week(
             version,
             alerts_version_date,
             each_week_end,
@@ -212,7 +219,7 @@ def subscription_emails_flow(
             test_recipient,
         )
         email_count += count
-        if held_back:
+        if has_waiting_dashboards:
             still_skipped_weeks.append(each_week_end)
 
     if send_emails and test_recipient is None:

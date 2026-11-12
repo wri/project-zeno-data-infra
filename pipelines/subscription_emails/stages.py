@@ -170,6 +170,16 @@ def group_aoi_ids_by_type(subscriptions: list[Subscription]) -> dict[str, list[s
     return {aoi_type: sorted(ids) for aoi_type, ids in aoi_ids_by_type.items()}
 
 
+def group_aoi_types_by_email(
+    subscriptions: list[Subscription],
+) -> dict[str, list[str]]:
+    """Group the AOI types of each subscriber's dashboards by their email."""
+    aoi_types_by_email: dict[str, set[str]] = defaultdict(set)
+    for subscription in subscriptions:
+        aoi_types_by_email[subscription.user_email].add(subscription.aoi_type)
+    return {email: sorted(types) for email, types in aoi_types_by_email.items()}
+
+
 def alert_results_uri(version: str, aoi_type: str) -> str:
     file_name = EMAIL_AOI_TYPES[aoi_type].results_file_name
     return f"{INTEGRATED_ALERTS_PREFIX}/{version}/{file_name}"
@@ -183,14 +193,6 @@ def list_aoi_types_without_results(version: str, aoi_types: set[str]) -> set[str
         for aoi_type in aoi_types
         if not s3_uri_exists(alert_results_uri(version, aoi_type))
     }
-
-
-def list_held_back_emails(
-    subscriptions: list[Subscription], missing_types: set[str]
-) -> set[str]:
-    """List the subscribers with a dashboard of a type whose results are
-    missing, so they aren't emailed without it."""
-    return {s.user_email for s in subscriptions if s.aoi_type in missing_types}
 
 
 def _s3_dataset(uris: list[str]) -> ds.Dataset:
@@ -391,30 +393,55 @@ def build_emails(
     return emails
 
 
-def sent_marker_uri(week_end: date, email: str) -> str:
-    """Where a week's sent email is recorded, so a re-run doesn't send it again.
-    Keyed by a hash, to keep email addresses out of S3 keys."""
+def sent_marker_uri(week_end: date, email: str, aoi_type: str) -> str:
+    """Return the uri that marks a subscriber's dashboards of one AOI type as
+    sent for a week. The email is hashed to keep addresses out of S3 keys."""
     email_hash = hashlib.sha256(email.encode("utf-8")).hexdigest()[:16]
-    return f"{SENT_MARKERS_PREFIX}/{week_end.isoformat()}/{email_hash}.json"
+    return f"{SENT_MARKERS_PREFIX}/{week_end.isoformat()}/{email_hash}-{aoi_type}.json"
 
 
-def was_sent(week_end: date, email: str) -> bool:
-    return s3_uri_exists(sent_marker_uri(week_end, email))
-
-
-def mark_sent(week_end: date, email: str, results: dict) -> None:
-    bucket, key = parse_s3_uri(sent_marker_uri(week_end, email))
-    boto3.client("s3").put_object(
-        Bucket=bucket,
-        Key=key,
-        Body=json.dumps(results).encode("utf-8"),
-        ContentType="application/json",
+def _list_keys(bucket: str, prefix: str) -> list[str]:
+    pages = (
+        boto3.client("s3")
+        .get_paginator("list_objects_v2")
+        .paginate(Bucket=bucket, Prefix=prefix)
     )
+    return [obj["Key"] for page in pages for obj in page.get("Contents", [])]
+
+
+def list_sent_markers(week_end: date) -> set[str]:
+    """List the uris of a week's sent markers."""
+    bucket, prefix = parse_s3_uri(f"{SENT_MARKERS_PREFIX}/{week_end.isoformat()}/")
+    return {f"s3://{bucket}/{key}" for key in _list_keys(bucket, prefix)}
+
+
+def select_unsent_subscriptions(
+    subscriptions: list[Subscription], week_end: date, sent_markers: set[str]
+) -> list[Subscription]:
+    """Select the subscriptions whose dashboards weren't yet sent for the week."""
+    return [
+        s
+        for s in subscriptions
+        if sent_marker_uri(week_end, s.user_email, s.aoi_type) not in sent_markers
+    ]
+
+
+def mark_sent(week_end: date, email: str, aoi_types: list[str], results: dict) -> None:
+    """Record that a week's dashboards of these AOI types were sent to email."""
+    s3_client = boto3.client("s3")
+    for aoi_type in aoi_types:
+        bucket, key = parse_s3_uri(sent_marker_uri(week_end, email, aoi_type))
+        s3_client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=json.dumps(results).encode("utf-8"),
+            ContentType="application/json",
+        )
 
 
 def old_sent_marker_keys(keys: list[str], today: date) -> list[str]:
-    """The sent marker keys (.../sent/{week_end}/{hash}.json) of weeks that ended
-    more than SENT_MARKER_DAYS days before today."""
+    """The sent marker keys (.../sent/{week_end}/{hash}-{aoi_type}.json) of
+    weeks that ended more than SENT_MARKER_DAYS days before today."""
     cutoff = today - timedelta(days=SENT_MARKER_DAYS)
     return [key for key in keys if date.fromisoformat(key.split("/")[-2]) < cutoff]
 
@@ -424,14 +451,7 @@ def delete_old_sent_markers(today: date) -> int:
     before today, and return how many were deleted."""
     bucket, prefix = parse_s3_uri(f"{SENT_MARKERS_PREFIX}/")
     s3_client = boto3.client("s3")
-    keys = [
-        obj["Key"]
-        for page in s3_client.get_paginator("list_objects_v2").paginate(
-            Bucket=bucket, Prefix=prefix
-        )
-        for obj in page.get("Contents", [])
-    ]
-    old_keys = old_sent_marker_keys(keys, today)
+    old_keys = old_sent_marker_keys(_list_keys(bucket, prefix), today)
     # delete_objects takes at most 1000 keys at a time.
     for start in range(0, len(old_keys), 1000):
         batch = old_keys[start:][:1000]

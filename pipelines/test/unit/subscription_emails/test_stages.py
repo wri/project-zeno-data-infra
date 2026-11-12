@@ -94,13 +94,32 @@ def test_aoi_types_without_results_in_the_version_are_listed(monkeypatch):
     }
 
 
-def test_subscribers_with_a_dashboard_missing_results_are_held_back():
+def test_dashboards_already_sent_this_week_are_left_out():
     a_admin = _subscription("a@x.org", "d1", "BRA.16")
     a_custom = _subscription("a@x.org", "d2", "8f0c-saved", aoi_type="custom")
     b_admin = _subscription("b@x.org", "d3", "PER.17")
+    week_end = date(2026, 11, 3)
+    sent_markers = {
+        stages.sent_marker_uri(week_end, "a@x.org", "admin"),
+        stages.sent_marker_uri(date(2026, 10, 27), "b@x.org", "admin"),
+    }
 
-    assert stages.list_held_back_emails([a_admin, a_custom, b_admin], {"custom"}) == {
-        "a@x.org"
+    assert stages.select_unsent_subscriptions(
+        [a_admin, a_custom, b_admin], week_end, sent_markers
+    ) == [a_custom, b_admin]
+
+
+def test_aoi_types_are_grouped_by_subscriber():
+    subscriptions = [
+        _subscription("a@x.org", "d1", "BRA.16"),
+        _subscription("a@x.org", "d2", "8f0c-saved", aoi_type="custom"),
+        _subscription("a@x.org", "d3", "PER.17"),
+        _subscription("b@x.org", "d4", "PER.17"),
+    ]
+
+    assert stages.group_aoi_types_by_email(subscriptions) == {
+        "a@x.org": ["admin", "custom"],
+        "b@x.org": ["admin"],
     }
 
 
@@ -361,23 +380,24 @@ def test_build_emails_shows_top_dashboards_and_counts_the_rest():
     ]
 
 
-def test_sent_marker_uri_hides_email_address():
-    uri = stages.sent_marker_uri(date(2026, 10, 20), "a@x.org")
+def test_sent_marker_uri_is_per_aoi_type_and_hides_email_address():
+    uri = stages.sent_marker_uri(date(2026, 10, 20), "a@x.org", "custom")
 
     assert uri.startswith(
         "s3://lcl-analytics/zonal-statistics/integrated-alerts/"
         "subscription-emails/sent/2026-10-20/"
     )
+    assert uri.endswith("-custom.json")
     assert "a@x.org" not in uri
 
 
 def test_old_sent_marker_keys_are_weeks_ended_over_30_days_ago():
     prefix = "zonal-statistics/integrated-alerts/subscription-emails/sent"
     keys = [
-        f"{prefix}/2026-09-29/aaaa.json",
-        f"{prefix}/2026-09-29/bbbb.json",
-        f"{prefix}/2026-10-06/aaaa.json",  # exactly 30 days before: kept
-        f"{prefix}/2026-10-13/aaaa.json",
+        f"{prefix}/2026-09-29/aaaa-admin.json",
+        f"{prefix}/2026-09-29/bbbb-custom.json",
+        f"{prefix}/2026-10-06/aaaa-admin.json",  # exactly 30 days before: kept
+        f"{prefix}/2026-10-13/aaaa-admin.json",
     ]
 
     assert stages.old_sent_marker_keys(keys, date(2026, 11, 5)) == keys[:2]
