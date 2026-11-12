@@ -2,7 +2,12 @@ import httpx
 import pytest
 
 from analytics_tools.analysis_runner import AnalysisRunner
-from analytics_tools.analytics_client import AnalysisState, AreaMatch
+from analytics_tools.analytics_client import (
+    AnalysisState,
+    AreaMatch,
+    Subregion,
+    SubregionList,
+)
 from analytics_tools.server import AnalyticsTools, build_server
 
 LINK = "http://api/v0/land_change/tree_cover_loss/analytics/abc"
@@ -37,6 +42,13 @@ class FakeClient:
 
     async def openapi_document(self):
         return OPENAPI_DOCUMENT
+
+    async def subregions(self, aoi, area_type, level, limit):
+        self.listed = (aoi, area_type, level, limit)
+        return SubregionList(
+            total=34,
+            areas=[Subregion("Papua", {"type": "admin", "ids": ["IDN.24"]})],
+        )
 
     async def create_analysis(self, path, payload):
         self.created.append((path, payload))
@@ -147,3 +159,19 @@ async def test_api_calls_use_the_callers_authorization():
     await call_tool(server, "list_datasets", {})
 
     assert authorizations == ["Bearer caller-token"]
+
+
+@pytest.mark.asyncio
+async def test_list_subregions_returns_areas_ready_for_analysis():
+    client = FakeClient()
+    server = server_with(client)
+
+    result = await call_tool(
+        server, "list_subregions", {"aoi": {"type": "admin", "ids": ["IDN"]}}
+    )
+
+    assert client.listed == ({"type": "admin", "ids": ["IDN"]}, "admin", None, 50)
+    assert result["structuredContent"] == {
+        "total": 34,
+        "areas": [{"name": "Papua", "aoi": {"type": "admin", "ids": ["IDN.24"]}}],
+    }

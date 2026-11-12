@@ -13,8 +13,9 @@ INSTRUCTIONS = """Land change analytics for areas of interest.
 Call search_areas to find the area a question is about, list_datasets, then
 describe_dataset for the request schema of the chosen dataset, then
 run_analysis with a payload matching that schema, using the aoi returned by
-search_areas. If the analysis is still pending when run_analysis returns, call
-get_analysis with its link."""
+search_areas. For questions about the regions or protected areas of a place,
+call list_subregions and analyze them together in one payload. If the analysis
+is still pending when run_analysis returns, call get_analysis with its link."""
 
 
 @contextmanager
@@ -51,6 +52,27 @@ class AnalyticsTools:
             client = self.caller_client(ctx)
             matches = await client.search_areas(name, area_types, limit)
             return [asdict(match) for match in matches]
+
+    async def list_subregions(
+        self,
+        aoi: dict[str, Any],
+        ctx: Context,
+        area_type: str = "admin",
+        level: int | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """List the areas within an area, largest first, with how many there
+        are in all, as aois to use in run_analysis payloads. Use it for
+        questions about the regions, states, counties or protected areas of a
+        place. area_type is admin, key_biodiversity_area, protected_area or
+        indigenous_land; for admin, level is the admin level to list (default:
+        one below the area). The admin aoi WLD lists countries. When total is
+        larger than the areas returned, ask for a higher level or a smaller
+        area instead of more results."""
+        with errors_visible_to_model():
+            client = self.caller_client(ctx)
+            listed = await client.subregions(aoi, area_type, level, limit)
+            return asdict(listed)
 
     async def list_datasets(self, ctx: Context) -> list[dict[str, Any]]:
         """List the datasets that can be analyzed."""
@@ -90,6 +112,7 @@ class AnalyticsTools:
 def build_server(tools: AnalyticsTools) -> MCPServer:
     server = MCPServer(name="gnw-analytics", instructions=INSTRUCTIONS)
     server.add_tool(tools.search_areas)
+    server.add_tool(tools.list_subregions)
     server.add_tool(tools.list_datasets)
     server.add_tool(tools.describe_dataset)
     server.add_tool(tools.run_analysis)

@@ -11,6 +11,7 @@ from app.dependencies import (
     get_aoi_geometry_repository,
     get_aoi_name_search,
     get_custom_aoi_repository,
+    get_list_subregions,
 )
 from app.domain.repositories.aoi_geometry_repository import (
     AoiGeometryRepository,
@@ -22,11 +23,17 @@ from app.models.aois import (
     AoiFeatureResponse,
     AoiMatchOut,
     AoiSearchResponse,
+    AoiSubregionOut,
+    AoiSubregionsResponse,
     AoiType,
     SearchableAoiType,
     aoi_by_type,
 )
 from app.use_cases.aois.aoi_name_search import AoiNameSearch
+from app.use_cases.aois.list_subregions import (
+    ListSubregions,
+    UnsupportedSubregionsError,
+)
 
 router = APIRouter(
     prefix="/v0/aois",
@@ -96,4 +103,44 @@ async def get_aoi(
             geometry=mapping(geometries[0]),
             properties={"aoi_type": aoi_type, "area_ha": areas_ha[0]},
         )
+    )
+
+
+@router.get(
+    "/{aoi_type}/{aoi_id}/subregions",
+    response_class=ORJSONResponse,
+    response_model=AoiSubregionsResponse,
+    summary="List the AOIs within an AOI",
+    description=(
+        "The AOIs of `type` that lie within this AOI, largest first, up to "
+        "`limit`, with how many there are in all. Admin subregions are those at "
+        "`level` (default: the next level down); the admin id WLD lists "
+        "countries. Other types are those whose area lies inside this AOI, so "
+        "neighbors that only share a border are left out."
+    ),
+)
+async def list_subregions(
+    aoi_type: AoiType,
+    aoi_id: str,
+    type: AoiType = Query("admin"),
+    level: Optional[int] = Query(None, ge=0, le=2),
+    limit: int = Query(50, ge=1, le=1000),
+    subregions: ListSubregions = Depends(get_list_subregions),
+):
+    try:
+        parent = aoi_by_type.validate_python({"type": aoi_type, "ids": [aoi_id]})
+    except ValidationError:
+        raise HTTPException(status_code=422, detail=f"Invalid {aoi_type} id.")
+    try:
+        found = await subregions.within(parent, type, level, limit)
+    except AoiNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No {aoi_type} AOI {aoi_id}.")
+    except UnsupportedSubregionsError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    return AoiSubregionsResponse(
+        total=found.total,
+        data=[
+            AoiSubregionOut(aoi_type=area.aoi_type, aoi_id=area.aoi_id, name=area.name)
+            for area in found.subregions
+        ],
     )

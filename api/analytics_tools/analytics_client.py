@@ -32,12 +32,37 @@ class AreaMatch:
     aoi: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class Subregion:
+    """An area within another, with the area of interest to request analyses
+    for it."""
+
+    name: str
+    aoi: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class SubregionList:
+    """The largest subregions of an area, and how many it has in all."""
+
+    total: int
+    areas: list[Subregion]
+
+
 class AnalyticsClient(Protocol):
     async def openapi_document(self) -> dict[str, Any]: ...
 
     async def search_areas(
         self, name: str, area_types: list[str] | None, limit: int
     ) -> list[AreaMatch]: ...
+
+    async def subregions(
+        self,
+        aoi: dict[str, Any],
+        area_type: str,
+        level: int | None,
+        limit: int,
+    ) -> SubregionList: ...
 
     async def create_analysis(self, path: str, payload: dict[str, Any]) -> str:
         """Start an analysis and return the link to poll for its state."""

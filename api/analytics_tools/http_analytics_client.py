@@ -1,4 +1,5 @@
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -6,6 +7,8 @@ from analytics_tools.analytics_client import (
     AnalysisState,
     AnalyticsRequestError,
     AreaMatch,
+    Subregion,
+    SubregionList,
 )
 
 
@@ -41,6 +44,30 @@ class HttpAnalyticsClient:
                 )
             )
         return matches
+
+    async def subregions(
+        self,
+        aoi: dict[str, Any],
+        area_type: str,
+        level: int | None,
+        limit: int,
+    ) -> SubregionList:
+        parent_type = quote(aoi["type"], safe="")
+        parent_id = quote(aoi["ids"][0], safe="")
+        params: dict[str, Any] = {"type": area_type, "limit": limit}
+        if level is not None:
+            params["level"] = level
+        response = await self.http_client.get(
+            f"/v0/aois/{parent_type}/{parent_id}/subregions",
+            params=params,
+            headers=self.headers,
+        )
+        body = self.json_or_raise(response)
+        areas = []
+        for area in body["data"]:
+            aoi_of_area = {"type": area["aoi_type"], "ids": [area["aoi_id"]]}
+            areas.append(Subregion(name=area["name"], aoi=aoi_of_area))
+        return SubregionList(total=body["total"], areas=areas)
 
     async def create_analysis(self, path: str, payload: dict[str, Any]) -> str:
         response = await self.http_client.post(path, json=payload, headers=self.headers)

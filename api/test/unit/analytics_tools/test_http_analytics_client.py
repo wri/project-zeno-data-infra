@@ -84,3 +84,22 @@ async def test_forbidden_search_carries_the_api_detail():
 
     with pytest.raises(AnalyticsRequestError, match="admin account"):
         await client.search_areas("Acre", None, limit=5)
+
+
+@pytest.mark.asyncio
+async def test_subregions_are_returned_as_areas_ready_for_analysis():
+    body = {
+        "total": 34,
+        "data": [{"aoi_type": "admin", "aoi_id": "IDN.24", "name": "Papua"}],
+    }
+    client, requests = client_returning(httpx.Response(200, json=body))
+
+    subregions = await client.subregions(
+        {"type": "admin", "ids": ["IDN"]}, "admin", level=1, limit=1
+    )
+
+    assert requests[0].url.path == "/v0/aois/admin/IDN/subregions"
+    assert requests[0].url.params["level"] == "1"
+    assert subregions.total == 34
+    assert subregions.areas[0].aoi == {"type": "admin", "ids": ["IDN.24"]}
+    assert subregions.areas[0].name == "Papua"
