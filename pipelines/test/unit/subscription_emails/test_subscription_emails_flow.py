@@ -148,9 +148,30 @@ def _subscription(email, aoi_type, aoi_id):
     )
 
 
-def test_subscribers_missing_results_skip_the_week_and_the_rest_are_emailed(
-    prefect_server, monkeypatch, sparkpost, markers
-):
+class FakeS3:
+    """The S3 state the flow reads and writes, in memory: the last week recorded
+    as sent, the weeks recorded as skipped, and which AOI type's results are
+    missing from the version."""
+
+    def __init__(self):
+        self.last_sent_week_end = None
+        self.skipped_weeks = []
+        self.missing_type = None
+        self.weeks_recorded = []
+
+    def write_skipped_weeks(self, weeks):
+        self.skipped_weeks = list(weeks)
+
+
+# The latest ready week of version v20261108.
+LATEST_WEEK_END = date(2026, 11, 3)
+
+
+@pytest.fixture
+def s3(monkeypatch):
+    """Run the flow for two subscribers, a@x.org with an admin and a custom
+    dashboard and b@x.org with an admin one, against in-memory S3 state."""
+    fake = FakeS3()
     stages = subscription_emails_flow.stages
     subscriptions = [
         _subscription("a@x.org", "admin", "BRA.16"),
@@ -165,9 +186,14 @@ def test_subscribers_missing_results_skip_the_week_and_the_rest_are_emailed(
     monkeypatch.setattr(
         stages, "read_latest_integrated_alerts_version", lambda: "v20261108"
     )
-    monkeypatch.setattr(stages, "read_last_sent_week_end", lambda: None)
-    # The custom results weren't written for this version.
-    monkeypatch.setattr(stages, "s3_uri_exists", lambda uri: "custom" not in uri)
+    monkeypatch.setattr(
+        stages, "read_last_sent_week_end", lambda: fake.last_sent_week_end
+    )
+    monkeypatch.setattr(
+        stages,
+        "s3_uri_exists",
+        lambda uri: fake.missing_type is None or fake.missing_type not in uri,
+    )
     monkeypatch.setattr(
         stages,
         "read_alert_areas",
@@ -183,13 +209,54 @@ def test_subscribers_missing_results_skip_the_week_and_the_rest_are_emailed(
     monkeypatch.setattr(
         stages, "read_names", lambda by_type: {"BRA.16": "Paraná", "PER.17": "Loreto"}
     )
-    weeks_recorded = []
-    monkeypatch.setattr(stages, "write_last_sent_week_end", weeks_recorded.append)
-
-    flow = subscription_emails_flow.subscription_emails_flow.with_options(retries=0)
+    monkeypatch.setattr(stages, "write_last_sent_week_end", fake.weeks_recorded.append)
     monkeypatch.setattr(stages, "delete_old_sent_markers", lambda today: 0)
+    monkeypatch.setattr(stages, "read_skipped_weeks", lambda: fake.skipped_weeks)
+    monkeypatch.setattr(stages, "write_skipped_weeks", fake.write_skipped_weeks)
+    return fake
 
-    assert flow(send_emails=True) == 1
+
+def _run_flow(**parameters):
+    flow = subscription_emails_flow.subscription_emails_flow.with_options(retries=0)
+    return flow(send_emails=True, **parameters)
+
+
+def test_a_week_with_skipped_subscribers_is_recorded(
+    prefect_server, s3, sparkpost, markers
+):
+    s3.missing_type = "custom"
+
+    _run_flow()
 
     assert sparkpost.sent_to == ["b@x.org"]
-    assert len(weeks_recorded) == 1
+    assert s3.weeks_recorded == [LATEST_WEEK_END]
+    assert s3.skipped_weeks == [LATEST_WEEK_END]
+
+
+def test_a_skipped_week_is_sent_to_those_missed_once_results_exist(
+    prefect_server, s3, sparkpost, markers
+):
+    # The latest week was sent, except to a@x.org, so no next week is ready.
+    s3.last_sent_week_end = LATEST_WEEK_END
+    s3.skipped_weeks = [LATEST_WEEK_END]
+    markers[(LATEST_WEEK_END, "b@x.org")] = {"id": "earlier"}
+
+    _run_flow()
+
+    assert sparkpost.sent_to == ["a@x.org"]
+    assert s3.skipped_weeks == []
+    assert s3.weeks_recorded == []
+
+
+def test_a_skipped_week_stays_recorded_while_results_are_still_missing(
+    prefect_server, s3, sparkpost, markers
+):
+    s3.last_sent_week_end = LATEST_WEEK_END
+    s3.skipped_weeks = [LATEST_WEEK_END]
+    s3.missing_type = "custom"
+    markers[(LATEST_WEEK_END, "b@x.org")] = {"id": "earlier"}
+
+    _run_flow()
+
+    assert sparkpost.sent_to == []
+    assert s3.skipped_weeks == [LATEST_WEEK_END]

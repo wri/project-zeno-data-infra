@@ -78,6 +78,68 @@ def send_email_task(
     return status
 
 
+def email_week(
+    version: str,
+    alerts_version_date: date,
+    week_end: date,
+    subscriptions: list[Subscription],
+    send_emails: bool,
+    test_recipient: Optional[str],
+) -> tuple[int, set[str]]:
+    """Email one week's alerts to each subscriber not yet sent it, holding back
+    those with a dashboard whose AOI type has no results in the version. Returns
+    how many emails there were and the addresses held back."""
+    logger = get_run_logger()
+    start_date, end_date = stages.week_range(week_end)
+    logger.info(f"Integrated alerts version {version}, week {start_date}-{end_date}")
+    missing_types = stages.list_aoi_types_without_results(
+        version, {s.aoi_type for s in subscriptions}
+    )
+    held_back = stages.list_held_back_emails(subscriptions, missing_types)
+    subscriptions = [s for s in subscriptions if s.user_email not in held_back]
+    if held_back:
+        logger.warning(
+            f"Not emailing {len(held_back)} subscribers the week ending {end_date}: "
+            f"version {version} has no results for {sorted(missing_types)}. Later "
+            "runs will email them once it has."
+        )
+    emails = {}
+    if subscriptions:
+        aoi_ids_by_type = stages.group_aoi_ids_by_type(subscriptions)
+        results_uris = [
+            stages.alert_results_uri(version, aoi_type)
+            for aoi_type in sorted(aoi_ids_by_type)
+        ]
+        aoi_ids = sorted({s.aoi_id for s in subscriptions})
+        areas = read_alert_areas_task(results_uris, aoi_ids, start_date, end_date)
+        names = read_aoi_names_task(aoi_ids_by_type)
+        emails = stages.build_emails(
+            subscriptions, areas, names, start_date, end_date, alerts_version_date
+        )
+    logger.info(f"{len(emails)} emails for {len(subscriptions)} subscriptions")
+
+    if not send_emails:
+        for email, substitution_data in emails.items():
+            print(f"{email}: {json.dumps(substitution_data, ensure_ascii=False)}")
+        return len(emails), held_back
+
+    # Send every email even if some fail, then fail the flow if any did.
+    futures = {
+        email: send_email_task.submit(
+            end_date, email, substitution_data, test_recipient
+        )
+        for email, substitution_data in emails.items()
+    }
+    for future in futures.values():
+        future.wait()
+    failed = [email for email, future in futures.items() if future.state.is_failed()]
+    if failed:
+        raise RuntimeError(f"{len(failed)} of {len(emails)} emails failed to send")
+    statuses = Counter(future.result() for future in futures.values())
+    logger.info(f"Emails: {dict(statuses)}")
+    return len(emails), held_back
+
+
 @flow(
     name="Subscription emails",
     log_prints=True,
@@ -102,7 +164,8 @@ def subscription_emails_flow(
     email is recorded in S3, so re-running the flow (e.g. after a failure) only
     sends the emails not yet sent, and the week is recorded as emailed once they
     all have been. A subscriber with a dashboard whose AOI type has no results in
-    the version isn't emailed that week, rather than emailed without it.
+    the version isn't emailed that week; the week is recorded as skipped, and
+    later runs email them once the results exist.
 
     Args:
         send_emails: Only if True are the emails sent; otherwise each email's
@@ -120,16 +183,17 @@ def subscription_emails_flow(
     alerts_version_date = stages.version_date(version)
     last_sent_week_end = stages.read_last_sent_week_end()
     week_end = stages.next_week_end(last_sent_week_end, alerts_version_date)
+    skipped_weeks = stages.read_skipped_weeks()
     if week_end is None:
         logger.info(
             f"The week after {last_sent_week_end} isn't ready yet in integrated "
-            f"alerts version {version}; nothing to send"
+            f"alerts version {version}"
         )
-        return 0
-    start_date, end_date = stages.week_range(week_end)
-    logger.info(f"Integrated alerts version {version}, week {start_date}-{end_date}")
-    if end_date < stages.latest_ready_week_end(alerts_version_date):
+    elif week_end < stages.latest_ready_week_end(alerts_version_date):
         logger.warning("Later weeks are also ready; they'll be sent by later runs")
+    week_ends = skipped_weeks + ([week_end] if week_end is not None else [])
+    if not week_ends:
+        return 0
 
     subscriptions, skipped = stages.email_subscriptions(list_subscriptions_task())
     if skipped:
@@ -137,52 +201,25 @@ def subscription_emails_flow(
             f"Skipping {len(skipped)} subscriptions that aren't integrated alerts "
             "on admin or custom AOIs"
         )
-    missing_types = stages.list_aoi_types_without_results(
-        version, {s.aoi_type for s in subscriptions}
-    )
-    held_back = stages.list_held_back_emails(subscriptions, missing_types)
-    subscriptions = [s for s in subscriptions if s.user_email not in held_back]
-    if held_back:
-        logger.warning(
-            f"Not emailing {len(held_back)} subscribers this week: version "
-            f"{version} has no results for {sorted(missing_types)}"
+    email_count, still_skipped_weeks = 0, []
+    for each_week_end in week_ends:
+        count, held_back = email_week(
+            version,
+            alerts_version_date,
+            each_week_end,
+            subscriptions,
+            send_emails,
+            test_recipient,
         )
-    emails = {}
-    if subscriptions:
-        aoi_ids_by_type = stages.group_aoi_ids_by_type(subscriptions)
-        results_uris = [
-            stages.alert_results_uri(version, aoi_type)
-            for aoi_type in sorted(aoi_ids_by_type)
-        ]
-        aoi_ids = sorted({s.aoi_id for s in subscriptions})
-        areas = read_alert_areas_task(results_uris, aoi_ids, start_date, end_date)
-        names = read_aoi_names_task(aoi_ids_by_type)
-        emails = stages.build_emails(
-            subscriptions, areas, names, start_date, end_date, alerts_version_date
-        )
-    logger.info(f"{len(emails)} emails for {len(subscriptions)} subscriptions")
+        email_count += count
+        if held_back:
+            still_skipped_weeks.append(each_week_end)
 
-    if not send_emails:
-        for email, substitution_data in emails.items():
-            print(f"{email}: {json.dumps(substitution_data, ensure_ascii=False)}")
-        return len(emails)
-
-    # Send every email even if some fail, then fail the flow if any did.
-    futures = {
-        email: send_email_task.submit(
-            end_date, email, substitution_data, test_recipient
-        )
-        for email, substitution_data in emails.items()
-    }
-    for future in futures.values():
-        future.wait()
-    failed = [email for email, future in futures.items() if future.state.is_failed()]
-    if failed:
-        raise RuntimeError(f"{len(failed)} of {len(emails)} emails failed to send")
-    statuses = Counter(future.result() for future in futures.values())
-    logger.info(f"Emails: {dict(statuses)}")
-    if test_recipient is None:
-        stages.write_last_sent_week_end(end_date)
-        deleted = stages.delete_old_sent_markers(date.today())
-        logger.info(f"Deleted {deleted} sent markers of old weeks")
-    return len(emails)
+    if send_emails and test_recipient is None:
+        if still_skipped_weeks != skipped_weeks:
+            stages.write_skipped_weeks(still_skipped_weeks)
+        if week_end is not None:
+            stages.write_last_sent_week_end(week_end)
+            deleted = stages.delete_old_sent_markers(date.today())
+            logger.info(f"Deleted {deleted} sent markers of old weeks")
+    return email_count

@@ -42,9 +42,11 @@ WEEK_END_WEEKDAY = 1  # Tuesday
 # many days after its Tuesday, since alerts reach the data a few days after
 # their alert date. (The version is usually Sunday's, 5 days after.)
 MIN_DAYS_AFTER_WEEK = 4
-# The last week emailed, and a marker for each email sent, live here.
+# The last week emailed, the weeks whose emails some subscribers were skipped
+# for, and a marker for each email sent, live here.
 SUBSCRIPTION_EMAILS_PREFIX = f"{INTEGRATED_ALERTS_PREFIX}/subscription-emails"
 LAST_SENT_WEEK_URI = f"{SUBSCRIPTION_EMAILS_PREFIX}/last_sent_week_end"
+SKIPPED_WEEKS_URI = f"{SUBSCRIPTION_EMAILS_PREFIX}/skipped_weeks"
 SENT_MARKERS_PREFIX = f"{SUBSCRIPTION_EMAILS_PREFIX}/sent"
 # A week's sent markers are only needed while the week is being sent, so they're
 # deleted once the week ended this many days ago (keeping them a while for
@@ -112,6 +114,29 @@ def write_last_sent_week_end(week_end: date) -> None:
         Key=key,
         Body=week_end.isoformat().encode("utf-8"),
         ContentType="text/plain",
+    )
+
+
+def read_skipped_weeks() -> list[date]:
+    """Read the ends of the weeks that some subscribers weren't yet emailed,
+    because their dashboards' results were missing."""
+    bucket, key = parse_s3_uri(SKIPPED_WEEKS_URI)
+    try:
+        body = boto3.client("s3").get_object(Bucket=bucket, Key=key)["Body"]
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "NoSuchKey":
+            return []
+        raise
+    return [date.fromisoformat(day) for day in json.loads(body.read())]
+
+
+def write_skipped_weeks(week_ends: list[date]) -> None:
+    bucket, key = parse_s3_uri(SKIPPED_WEEKS_URI)
+    boto3.client("s3").put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=json.dumps([day.isoformat() for day in week_ends]).encode("utf-8"),
+        ContentType="application/json",
     )
 
 
