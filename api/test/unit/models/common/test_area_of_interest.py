@@ -35,6 +35,13 @@ class TestAdminAreaOfInterest:
     def test_aaoi_happy_path(self):
         assert AdminAreaOfInterest(type="admin", ids=["ETH"])
 
+    def test_aaoi_accepts_the_global_area(self):
+        assert AdminAreaOfInterest(type="admin", ids=["global"]).covers_globe()
+
+    def test_aaoi_rejects_the_global_area_with_other_areas(self):
+        with pytest.raises(ValueError):
+            _ = AdminAreaOfInterest(type="admin", ids=["global", "BRA"])
+
     def test_aaoi_regex_consecutive_periods(self):
         with pytest.raises(ValueError):
             _ = AdminAreaOfInterest(type="admin", ids=["ETH.1..2"])

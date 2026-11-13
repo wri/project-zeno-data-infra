@@ -114,7 +114,7 @@ async def get_aoi(
     description=(
         "The AOIs of `type` that lie within this AOI, largest first, up to "
         "`limit`, with how many there are in all. Admin subregions are those at "
-        "`level` (default: the next level down); the admin id WLD lists "
+        "`level` (default: the next level down); the admin id global lists "
         "countries. Other types are those whose area lies inside this AOI, so "
         "neighbors that only share a border are left out."
     ),

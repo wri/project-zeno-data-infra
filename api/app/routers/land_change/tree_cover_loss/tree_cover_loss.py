@@ -74,8 +74,9 @@ def create_analysis_service(
                 "forest filter uses the 2020 natural forest map instead"
             ),
             "prefer_for": (
-                "Attributing tree cover loss to a cause, using the driver "
-                "intersection"
+                "Forest or tree cover loss, including loss in a named forest "
+                "using the forest filter, and attributing loss to a cause "
+                "using the driver intersection"
             ),
         }
     },

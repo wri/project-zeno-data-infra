@@ -9,7 +9,8 @@ from app.domain.repositories.aoi_subregions import AdminSubregions
 
 class GeoParquetAdminSubregions(AdminSubregions):
     """Reads admin areas from the GADM GeoParquet, which holds every level
-    with `adm_level`, the country id `gid_0`, and names per level. An admin
+    with `adm_level`, the country id `gid_0`, `is_disputed`, and names per
+    level. Disputed areas are left out. An admin
     id holds its parents' ids, so children are found by id prefix."""
 
     def __init__(self, uri: str, timeout_seconds: float = 60):
@@ -18,13 +19,17 @@ class GeoParquetAdminSubregions(AdminSubregions):
 
     async def within(self, parent_id: Optional[str], level: int) -> List[AoiSubregion]:
         return await asyncio.wait_for(
-            asyncio.to_thread(self._read, parent_id, level),
+            asyncio.to_thread(self.read, parent_id, level),
             timeout=self.timeout_seconds,
         )
 
-    def _read(self, parent_id: Optional[str], level: int) -> List[AoiSubregion]:
+    def read(self, parent_id: Optional[str], level: int) -> List[AoiSubregion]:
         name_column = "country" if level == 0 else f"name_{level}"
-        filters: List[Tuple[str, str, Any]] = [("adm_level", "=", level)]
+        # Disputed areas have no admin id the analyses accept.
+        filters: List[Tuple[str, str, Any]] = [
+            ("adm_level", "=", level),
+            ("is_disputed", "=", False),
+        ]
         if parent_id is not None:
             filters.append(("gid_0", "=", parent_id.split(".")[0]))
         table = parquet.read_table(

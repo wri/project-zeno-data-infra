@@ -74,6 +74,13 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
     return AoiTypeRoutingGeometryRepository(repositories)
 
 
+@lru_cache(maxsize=1)
+def get_country_ids() -> tuple[str, ...]:
+    """Every country's admin id, read on first use and kept for the process."""
+    countries = GeoParquetAdminSubregions(predefined_aoi_uris()["admin"]).read(None, 0)
+    return tuple(country.aoi_id for country in countries)
+
+
 def get_list_subregions() -> ListSubregions:
     """Lists predefined AOIs within an AOI. Name columns differ per dataset."""
     uris = predefined_aoi_uris()

@@ -7,7 +7,7 @@ backed by a tool result. Start the API first, then from the
 api directory run:
     uv run --env-file ../.env python scripts/run_evals.py
 
-Requires ANTHROPIC_API_KEY and RW_AUTH_TOKEN.
+Requires ANTHROPIC_API_KEY and WRI_BEARER_TOKEN.
 """
 
 import argparse
@@ -350,7 +350,7 @@ async def run(arguments: argparse.Namespace) -> None:
         async with connect_agent(
             arguments.server_url,
             arguments.model,
-            os.environ["RW_AUTH_TOKEN"],
+            os.environ["WRI_BEARER_TOKEN"],
             arguments.programmatic_tools,
         ) as agent:
             results = await asyncio.gather(

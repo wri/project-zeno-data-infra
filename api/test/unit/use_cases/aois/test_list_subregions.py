@@ -61,11 +61,11 @@ async def test_admin_subregions_default_to_the_next_level_largest_first():
 
 
 @pytest.mark.asyncio
-async def test_world_lists_countries():
+async def test_the_global_area_lists_countries():
     admin = FakeAdminSubregions()
 
     await list_subregions(admin=admin).within(
-        AdminAreaOfInterest(ids=["WLD"]), "admin", level=None, limit=50
+        AdminAreaOfInterest(ids=["global"]), "admin", level=None, limit=50
     )
 
     assert admin.requests == [(None, 0)]

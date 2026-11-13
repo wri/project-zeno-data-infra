@@ -7,7 +7,9 @@ from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from .base import StrictBaseModel
 
-ADMIN_REGEX = r"^[A-Z]{3}(\.\d+)*$"
+# The admin id for the whole world, analyzed as every country.
+GLOBAL_ADMIN_ID = "global"
+ADMIN_REGEX = rf"^([A-Z]{{3}}(\.\d+)*|{GLOBAL_ADMIN_ID})$"
 MAX_OTF_FEATURES = 50
 # Deeper admin areas have no precomputed results, so they're computed on the fly
 DEEPEST_PRECOMPUTED_ADMIN_LEVEL = 2
@@ -32,6 +34,10 @@ class AreaOfInterest(StrictBaseModel):
         """Whether every area of the request has precomputed results."""
         return False
 
+    def covers_globe(self) -> bool:
+        """Whether the request is for the whole world."""
+        return False
+
 
 class AdminAreaOfInterest(AreaOfInterest):
     """Analyses supporting fewer admin levels subclass this with a lower
@@ -53,6 +59,9 @@ class AdminAreaOfInterest(AreaOfInterest):
     def has_precomputed_results(self) -> bool:
         return all(has_precomputed_level(admin_id) for admin_id in self.ids)
 
+    def covers_globe(self) -> bool:
+        return self.ids == [GLOBAL_ADMIN_ID]
+
     def get_ids_at_admin_level(self, admin_level):
         ids = []
         for id_str in self.ids:
@@ -70,6 +79,12 @@ class AdminAreaOfInterest(AreaOfInterest):
     def check_admin_levels(cls, v):
         if max(admin_level(admin_id) for admin_id in v) > cls.max_admin_level:
             raise ValueError(f"Maximum admin level allowed is {cls.max_admin_level}")
+        return v
+
+    @field_validator("ids", mode="after")
+    def check_global_alone(cls, v):
+        if GLOBAL_ADMIN_ID in v and len(v) > 1:
+            raise ValueError(f"'{GLOBAL_ADMIN_ID}' must be the only id")
         return v
 
     @field_validator("ids", mode="after")

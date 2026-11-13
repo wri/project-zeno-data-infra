@@ -45,14 +45,17 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         title="Start Date",
         description="Must be year in YYYY date format. Minimum year is 2001.",
         pattern=DATE_REGEX,
-        examples=["2020", "2024"],
+        examples=["2020", "2025"],
     )
     end_year: str = Field(
         ...,
         title="End Date",
-        description="Must be year in YYYY date format. Minimum year is 2001.",
+        description=(
+            "Must be year in YYYY date format. Minimum year is 2001; the latest "
+            "is 2025."
+        ),
         pattern=DATE_REGEX,
-        examples=["2023", "2024"],
+        examples=["2023", "2025"],
     )
     canopy_cover: Optional[AllowedCanopyCover] = Field(
         default=None,

@@ -1,11 +1,13 @@
+import asyncio
 import logging
 import traceback
-from typing import Callable
+from typing import Callable, Sequence
 from uuid import UUID
 
 from fastapi import BackgroundTasks, HTTPException, Request
 from fastapi import Response as FastAPIResponse
 
+from app.dependencies import get_country_ids
 from app.domain.models.analysis import Analysis
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
@@ -29,6 +31,17 @@ async def reject_unsaved_custom_aois(
         )
 
 
+def expand_global_area(
+    data: AnalyticsIn, country_ids: Callable[[], Sequence[str]]
+) -> AnalyticsIn:
+    """The request with the global admin area replaced by every country, so
+    analyses return a row per country."""
+    if not data.aoi.covers_globe():
+        return data
+    aoi = data.aoi.model_copy(update={"ids": list(country_ids())})
+    return data.model_copy(update={"aoi": aoi})
+
+
 async def create_analysis(
     data: AnalyticsIn,
     service: AnalysisService,
@@ -37,6 +50,7 @@ async def create_analysis(
     resource_link_callback: Callable,
 ) -> DataMartResourceLinkResponse:
     try:
+        data = await asyncio.to_thread(expand_global_area, data, get_country_ids)
         await service.set_resource_from(data)
 
         logging.info(

@@ -3,7 +3,7 @@
 Start the API first, then from the api directory run:
     uv run --env-file ../.env python scripts/mcp_chat.py
 
-Requires ANTHROPIC_API_KEY and RW_AUTH_TOKEN, which is forwarded to the API.
+Requires ANTHROPIC_API_KEY and WRI_BEARER_TOKEN, which is forwarded to the API.
 """
 
 import argparse
@@ -67,7 +67,7 @@ def main() -> None:
         chat(
             arguments.server_url,
             arguments.model,
-            os.environ["RW_AUTH_TOKEN"],
+            os.environ["WRI_BEARER_TOKEN"],
             arguments.programmatic_tools,
         )
     )

@@ -66,7 +66,7 @@ class AnalyticsTools:
         questions about the regions, states, counties or protected areas of a
         place. area_type is admin, key_biodiversity_area, protected_area or
         indigenous_land; for admin, level is the admin level to list (default:
-        one below the area). The admin aoi WLD lists countries. When total is
+        one below the area). The admin aoi global lists countries. When total is
         larger than the areas returned, ask for a higher level or a smaller
         area instead of more results."""
         with errors_visible_to_model():
