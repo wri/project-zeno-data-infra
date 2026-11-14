@@ -3,7 +3,7 @@ from prefect import flow
 from prefect.logging import get_run_logger
 from pyiceberg.catalog import load_catalog
 
-from pipelines.viirs_fire_alerts.alerts import check_continuity, drop_repeated_alerts
+from pipelines.viirs_fire_alerts.alerts import check_continuity
 from pipelines.viirs_fire_alerts.firms_feed import download_feed, parse_feed
 from pipelines.viirs_fire_alerts.iceberg_alert_store import IcebergAlertStore
 
@@ -33,7 +33,7 @@ def viirs_fire_alerts_flow(
         The number of alerts appended.
     """
     logger = get_run_logger()
-    alerts = drop_repeated_alerts(parse_feed(download_feed(feed_url)))
+    alerts = parse_feed(download_feed(feed_url))
     if alerts.num_rows == 0:
         logger.info("no new alerts")
         return 0

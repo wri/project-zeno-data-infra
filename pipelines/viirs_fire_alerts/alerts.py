@@ -9,8 +9,6 @@ from an archive.
 from datetime import date, timedelta
 from typing import List, Optional
 
-import pyarrow as pa
-
 
 class FeedGapError(Exception):
     pass
@@ -18,15 +16,6 @@ class FeedGapError(Exception):
 
 def alert_key_columns() -> List[str]:
     return ["latitude", "longitude", "acq_date", "acq_time"]
-
-
-def drop_repeated_alerts(alerts: pa.Table) -> pa.Table:
-    """The alerts with only the first row of each key kept."""
-    numbered = alerts.append_column("row", pa.array(range(alerts.num_rows)))
-    firsts = numbered.group_by(alert_key_columns(), use_threads=False).aggregate(
-        [("row", "min")]
-    )
-    return alerts.take(firsts.column("row_min"))
 
 
 def check_continuity(latest_stored: Optional[date], earliest_in_feed: date) -> None:
