@@ -45,14 +45,17 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         title="Start Date",
         description="Must be year in YYYY date format. Minimum year is 2001.",
         pattern=DATE_REGEX,
-        examples=["2020", "2024"],
+        examples=["2020", "2025"],
     )
     end_year: str = Field(
         ...,
         title="End Date",
-        description="Must be year in YYYY date format. Minimum year is 2001.",
+        description=(
+            "Must be year in YYYY date format. Minimum year is 2001; the latest "
+            "is 2025."
+        ),
         pattern=DATE_REGEX,
-        examples=["2023", "2024"],
+        examples=["2023", "2025"],
     )
     canopy_cover: Optional[AllowedCanopyCover] = Field(
         default=None,
@@ -60,6 +63,10 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
             "Minimum percent of area covered by tree canopy to count as forest. "
             "Carbon model is only valid for carbon threshold 30% or greater, and "
             "will return NaN for carbon emissions if set lower."
+        ),
+        description=(
+            "Use 30 by default, or 10 with natural_forest_only. Only use another "
+            "threshold when one is asked for."
         ),
     )
     # natural_forest is a breakdown by SBTN natural forest class (kept for an
@@ -71,6 +78,21 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     ] = Field(
         default=None,
         title="Forest Filter",
+        description=(
+            "Which forest to count loss in. "
+            "primary_forest: humid tropical primary forest; the default for "
+            "general deforestation or forest loss questions about areas in the "
+            "pan-tropics. "
+            "intact_forest: intact forest landscapes, large undisturbed natural "
+            "forests; for intact forest questions, or deforestation questions "
+            "about areas outside primary forest's extent. "
+            "natural_forest_only: SBTN natural forest (2020 baseline, so loss "
+            "from 2021 on), which includes secondary natural forest and "
+            "excludes plantations; for natural forest, EUDR, supply chain or "
+            "deforestation-free questions. "
+            "natural_forest: loss broken down by SBTN natural forest class. "
+            "Leave unset when all tree cover, including plantations, is wanted."
+        ),
     )
     intersections: AllowedIntersections = Field(
         ...,

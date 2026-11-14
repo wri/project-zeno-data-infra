@@ -3,13 +3,19 @@ from fastapi.testclient import TestClient
 from shapely.geometry import box
 
 from app.authentication import get_authenticator
-from app.dependencies import get_aoi_geometry_repository, get_aoi_name_search
+from app.dependencies import (
+    get_aoi_geometry_repository,
+    get_aoi_name_search,
+    get_list_subregions,
+)
 from app.domain.models.aoi_match import AoiMatch
+from app.domain.models.aoi_subregion import AoiSubregion
 from app.domain.models.custom_aoi import CustomAoiName
 from app.domain.repositories.aoi_geometry_repository import AoiNotFoundError
 from app.main import app
 from app.models.common.authentication import User
 from app.routers.aois import get_custom_aoi_repository_factory
+from app.use_cases.aois.list_subregions import Subregions
 
 client = TestClient(app)
 ADMIN = {"Authorization": "Bearer admin"}
@@ -44,6 +50,19 @@ class FakeGeometryRepository:
         return [box(0, 0, 1, 1)], [12.5]
 
 
+class FakeListSubregions:
+    def __init__(self):
+        self.requests = []
+
+    async def within(self, parent, area_type, level, limit):
+        if parent.ids != ["IDN"]:
+            raise AoiNotFoundError(f"AOI ids not found: {parent.ids}")
+        self.requests.append((parent.type, parent.ids, area_type, level, limit))
+        return Subregions(
+            total=34, subregions=[AoiSubregion("admin", "IDN.24", "Papua", 3.2e7)]
+        )
+
+
 @pytest.fixture
 def name_index():
     index = FakeNameSearch()
@@ -53,6 +72,7 @@ def name_index():
         FakeCustomAoiRepository
     )
     app.dependency_overrides[get_aoi_geometry_repository] = FakeGeometryRepository
+    app.dependency_overrides[get_list_subregions] = FakeListSubregions
     yield index
     app.dependency_overrides.clear()
 
@@ -130,3 +150,23 @@ def test_search_can_be_limited_to_custom_aois(name_index):
 
     assert response.status_code == 200
     assert name_index.searches[0][1] == ["custom_aoi"]
+
+
+def test_subregions_are_listed_with_their_total(name_index):
+    response = client.get(
+        "/v0/aois/admin/IDN/subregions",
+        params={"type": "admin", "level": 1, "limit": 1},
+        headers=ADMIN,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 34
+    assert response.json()["data"] == [
+        {"aoi_type": "admin", "aoi_id": "IDN.24", "name": "Papua"}
+    ]
+
+
+def test_subregions_of_an_unknown_aoi_are_not_found(name_index):
+    response = client.get("/v0/aois/admin/XYZ/subregions", headers=ADMIN)
+
+    assert response.status_code == 404

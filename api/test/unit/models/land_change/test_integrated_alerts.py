@@ -6,6 +6,7 @@ from shapely.geometry import mapping
 
 from app.models.land_change.integrated_alerts import (
     ANALYTICS_NAME,
+    IntegratedAlertsAnalytics,
     IntegratedAlertsAnalyticsIn,
     IntegratedAlertsPointsAnalyticsIn,
 )
@@ -74,6 +75,14 @@ class TestIntegratedAlertsAnalyticsIn:
                 end_date="2024-12-31",
                 land_filter="primary_forest",
             )
+
+
+def test_result_without_a_status_yet_is_reported_as_still_initializing():
+    analytics = IntegratedAlertsAnalytics(
+        result=None, metadata={}, message="Resource is initializing", status=None
+    )
+
+    assert analytics.status is None
 
 
 class TestIntegratedAlertsPointsAnalyticsIn:

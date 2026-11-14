@@ -43,6 +43,10 @@ class TreeCoverAnalyticsIn(AnalyticsIn):
     forest_filter: Literal["primary_forest"] | None = Field(
         default=None,
         title="Forest Filter",
+        description=(
+            "primary_forest: only count humid tropical primary forest, in the "
+            "pan-tropics. Leave unset for all tree cover."
+        ),
     )
 
 

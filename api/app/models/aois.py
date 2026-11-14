@@ -39,6 +39,17 @@ class AoiSearchResponse(Response):
     data: List[AoiMatchOut]
 
 
+class AoiSubregionOut(StrictBaseModel):
+    aoi_type: AoiType
+    aoi_id: str
+    name: str
+
+
+class AoiSubregionsResponse(Response):
+    total: int = Field(..., description="How many subregions there are in all.")
+    data: List[AoiSubregionOut]
+
+
 class AoiFeature(StrictBaseModel):
     type: Literal["Feature"] = "Feature"
     id: str
