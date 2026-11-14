@@ -30,10 +30,11 @@ dependencies = [
     "earthengine-api",
     "xee",
     "distributed==2025.5.1",
-    "pyiceberg[pyarrow]>=0.9",
+    "pyiceberg[pyarrow,pyiceberg-core]>=0.9",
     "cogeo-mosaic>=9.2.0",
     "tifffile>=2026.10.15",
     "imagecodecs>=2026.10.10",
+    "s2sphere>=0.2.5",
 ]
 
 [dependency-groups]

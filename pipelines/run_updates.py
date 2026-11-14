@@ -22,6 +22,7 @@ from pipelines.land_ghg_inventory.prefect_flows import land_ghg_inventory_flow
 from pipelines.natural_lands.prefect_flows import nl_flow as nl_prefect_flow
 from pipelines.subscription_emails.prefect_flows import subscription_emails_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
+from pipelines.viirs_fire_alerts.prefect_flows import viirs_fire_alerts_flow
 from pipelines.wur_alert_drivers.prefect_flows import wur_flow
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
@@ -160,6 +161,22 @@ def run_subscription_emails(
     return [f"{count} subscription emails"]
 
 
+def run_viirs_fire_alerts_update(
+    version=None, overwrite=False, is_latest=False
+) -> list[str]:
+    # version, overwrite and is_latest aren't used: each run appends the alerts in
+    # FIRMS' latest 7-day NOAA-20 VIIRS file that aren't already stored.
+    count = viirs_fire_alerts_flow.viirs_fire_alerts_flow(
+        feed_url=(
+            "https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2"
+            "/csv/J1_VIIRS_C2_Global_7d.csv"
+        ),
+        catalog_name="tables",
+        table_name="alerts.viirs_fire_alerts",
+    )
+    return [f"{count} new VIIRS fire alerts"]
+
+
 def _parse_bbox(bbox):
     """Parse a 'minx,miny,maxx,maxy' string into a shapely box (or None)."""
     if not bbox:
@@ -188,6 +205,8 @@ class UpdateFlow(str, Enum):
     # Run as a subflow at the end of integrated_alerts_update with send_emails; run
     # by hand (with --send-emails) to send emails left unsent after a failure
     SUBSCRIPTION_EMAILS = "subscription_emails"
+    # Run automatically every day
+    VIIRS_FIRE_ALERTS_UPDATE = "viirs_fire_alerts_update"
 
 
 update_flows = {
@@ -202,6 +221,7 @@ update_flows = {
     UpdateFlow.AOIS_UPDATE: run_aois_update,
     UpdateFlow.WUR_UPDATE: run_wur_update,
     UpdateFlow.SUBSCRIPTION_EMAILS: run_subscription_emails,
+    UpdateFlow.VIIRS_FIRE_ALERTS_UPDATE: run_viirs_fire_alerts_update,
 }
 
 # flows that produce versioned outputs and therefore require an explicit version
@@ -220,6 +240,7 @@ CLUSTERLESS_FLOWS = (
     UpdateFlow.AOIS_UPDATE,
     UpdateFlow.WUR_UPDATE,
     UpdateFlow.SUBSCRIPTION_EMAILS,
+    UpdateFlow.VIIRS_FIRE_ALERTS_UPDATE,
 )
 
 # flow_name values that route into run_land_ghg_inventory_update
@@ -274,6 +295,8 @@ def _is_iso_date(value) -> bool:
         "dataset (needs version and content_date)."
         "-'subscription_emails' will email subscribers the past week's integrated "
         "alerts in their dashboards' areas."
+        "-'viirs_fire_alerts_update' will append new VIIRS fire alerts to the "
+        "alerts Iceberg table."
     ),
 )
 def run_updates(

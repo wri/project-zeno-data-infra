@@ -921,6 +921,13 @@ resource "aws_s3tables_table_bucket" "tables" {
   name = "lcl-tables${local.name_suffix}"
 }
 
+# Alert points written by the pipelines, such as VIIRS fire alerts. The pipelines
+# create the tables, since this provider can't declare their partitions.
+resource "aws_s3tables_namespace" "alerts" {
+  namespace        = "alerts"
+  table_bucket_arn = aws_s3tables_table_bucket.tables.arn
+}
+
 resource "aws_s3tables_namespace" "custom" {
   namespace        = "custom"
   table_bucket_arn = aws_s3tables_table_bucket.tables.arn
