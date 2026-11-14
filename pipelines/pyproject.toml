@@ -31,6 +31,7 @@ dependencies = [
     "xee",
     "distributed==2025.5.1",
     "pyiceberg[pyarrow]>=0.9",
+    "tantivy==0.27.0",
     "cogeo-mosaic>=9.2.0",
     "tifffile>=2026.10.15",
     "imagecodecs>=2026.10.10",

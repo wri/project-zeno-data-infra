@@ -1,11 +1,10 @@
-from prefect import flow, task
-
 from pipelines.aois import stages
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.geometry_repair import repair_geometries
 from pipelines.aois.sources import aoi_sources, select_aoi_sources
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.utils import s3_uri_exists
+from prefect import flow, task
 
 
 @flow(name="AOI vectors")

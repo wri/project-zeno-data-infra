@@ -3,7 +3,7 @@ from typing import List, Set
 
 from shapely.geometry.base import BaseGeometry
 
-from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, CustomAoiName
 
 
 class CustomAoiRepository(ABC):
@@ -22,3 +22,7 @@ class CustomAoiRepository(ABC):
     @abstractmethod
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         """The geometries of the stored AOIs that intersect this geometry."""
+
+    @abstractmethod
+    async def names_owned_by(self, user_id: str) -> List[CustomAoiName]:
+        """The ids and names of the AOIs this user owns."""

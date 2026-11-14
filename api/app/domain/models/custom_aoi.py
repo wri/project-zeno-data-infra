@@ -18,3 +18,9 @@ class CustomAoiGeometry:
 
     aoi_id: str
     geometry: MultiPolygon
+
+
+@dataclass(frozen=True)
+class CustomAoiName:
+    aoi_id: str
+    name: str

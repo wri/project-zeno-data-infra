@@ -6,7 +6,7 @@ from pyiceberg.expressions import EqualTo
 from shapely import from_wkb
 from shapely.geometry import MultiPolygon, Polygon, box
 
-from app.domain.models.custom_aoi import CustomAoi
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiName
 from app.domain.repositories.aoi_geometry_repository import AoiNotFoundError
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
@@ -36,14 +36,14 @@ def repository(catalog):
     return IcebergCustomAoiRepository(lambda: catalog, TABLE, INDEX)
 
 
-def aoi(aoi_id, size=1, origin=(0, 0)):
+def aoi(aoi_id, size=1, origin=(0, 0), user_id="user-1"):
     x, y = origin
     return CustomAoi(
         aoi_id,
         MultiPolygon([box(x, y, x + size, y + size)]),
         float(size),
         name=f"Area {aoi_id}",
-        user_id="user-1",
+        user_id=user_id,
     )
 
 
@@ -169,6 +169,15 @@ async def test_intersecting_returns_only_aois_touching_the_geometry(repository):
     found = await repository.intersecting(l_shape)
 
     assert [stored.aoi_id for stored in found] == ["touched"]
+
+
+@pytest.mark.asyncio
+async def test_names_owned_by_returns_only_that_users_aois(repository):
+    await repository.upsert([aoi("mine"), aoi("theirs", user_id="user-2")])
+
+    owned = await repository.names_owned_by("user-1")
+
+    assert owned == [CustomAoiName("mine", "Area mine")]
 
 
 @pytest.mark.asyncio

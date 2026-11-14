@@ -30,7 +30,7 @@ from pyiceberg.types import (
 )
 from shapely.geometry.base import BaseGeometry
 
-from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry
+from app.domain.models.custom_aoi import CustomAoi, CustomAoiGeometry, CustomAoiName
 from app.domain.repositories.aoi_geometry_repository import (
     AoiGeometryRepository,
     AoiNotFoundError,
@@ -125,6 +125,9 @@ class IcebergCustomAoiRepository(CustomAoiRepository, AoiGeometryRepository):
     async def intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         return await asyncio.to_thread(self._intersecting, geometry)
 
+    async def names_owned_by(self, user_id: str) -> List[CustomAoiName]:
+        return await asyncio.to_thread(self._names_owned_by, user_id)
+
     async def load(self, aoi) -> Tuple[List[BaseGeometry], List[float]]:
         rows = await asyncio.to_thread(
             self.read_rows, aoi.ids, ("aoi_id", "geometry", "area_ha")
@@ -186,6 +189,15 @@ class IcebergCustomAoiRepository(CustomAoiRepository, AoiGeometryRepository):
             .scan(row_filter=self.rows_with_ids(aoi_ids, fresh), selected_fields=fields)
             .to_arrow()
         )
+
+    def _names_owned_by(self, user_id: str) -> List[CustomAoiName]:
+        rows = self.table().scan(
+            row_filter=EqualTo("user_id", user_id), selected_fields=("aoi_id", "name")
+        )
+        return [
+            CustomAoiName(row["aoi_id"], row["name"])
+            for row in rows.to_arrow().to_pylist()
+        ]
 
     def _intersecting(self, geometry: BaseGeometry) -> List[CustomAoiGeometry]:
         """Prunes files and rows by bounding box, then keeps the AOIs that

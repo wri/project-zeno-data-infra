@@ -9,12 +9,17 @@ from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepositor
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
+from app.domain.services.aoi_name_ranking import AoiNameRanking
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
 )
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
 )
+from app.infrastructure.persistence.tantivy_aoi_name_candidates import (
+    TantivyAoiNameCandidates,
+)
+from app.use_cases.aois.aoi_name_search import AoiNameSearch
 
 
 async def get_environment(
@@ -60,6 +65,16 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
             ),
             "custom_aoi": get_custom_aoi_repository(),
         }
+    )
+
+
+@lru_cache(maxsize=1)
+def get_aoi_name_search() -> AoiNameSearch:
+    """Searches the names of every predefined AOI, in the index the AOI pipeline
+    built on a pinned date, loaded once per process."""
+    return AoiNameSearch(
+        TantivyAoiNameCandidates("s3://lcl-analytics/vectors/aois/search/v20261105"),
+        AoiNameRanking(),
     )
 
 
