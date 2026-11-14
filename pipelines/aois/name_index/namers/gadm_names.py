@@ -6,12 +6,12 @@ from pipelines.aois.name_index.namers.aoi_namer import AoiNamer, present, text
 
 class GadmNames(AoiNamer):
     """Names each admin area by its own level's name, displayed with the
-        names of the areas containing it, plus the whole world as the admin area
+    names of the areas containing it, plus the whole world as the admin area
     "global". Disputed areas are left out.
 
-        Admin areas down to level 2 fall back to being more important than
-        protected areas, and smaller ones, mostly towns no outside source knows,
-        to being less."""
+    Admin areas down to level 2 fall back to being more important than
+    protected areas, and smaller ones, mostly towns no outside source knows,
+    to being less."""
 
     aoi_type = "admin"
     source = "gadm"
