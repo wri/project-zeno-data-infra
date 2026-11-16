@@ -31,10 +31,14 @@ NATURAL_LANDS_CLASSES = list(range(2, 12))
 NATURAL_FOREST_CLASSES = [2, 5, 8, 9]
 # Dashboards shown in the email's table; the rest are only counted.
 MAX_DASHBOARDS = 10
-# Links in the email, to all of the user's dashboards and to each one.
+# Links in the email, to all of the user's dashboards, to each one, and to the
+# page for managing their alert emails.
 # (These may later come with the subscriptions from the API instead.)
 DASHBOARDS_URL = "https://horizon.globalnaturewatch.org/dashboards"
 DASHBOARD_URL = "https://horizon.globalnaturewatch.org/dashboards/{dashboard_id}"
+MANAGE_URL = (
+    "https://horizon.globalnaturewatch.org/subscriptions?ff=email-subscriptions"
+)
 # Each email covers a fixed Wednesday to Tuesday week.
 WEEK_DAYS = 7
 WEEK_END_WEEKDAY = 1  # Tuesday
@@ -367,6 +371,7 @@ def build_emails(
             "dashboard_count": len(ranked),
             "more_dashboard_count": len(ranked) - len(shown),
             "dashboards_url": DASHBOARDS_URL,
+            "manage_url": MANAGE_URL,
             "dashboards": [
                 {
                     "dashboard_id": d["dashboard_id"],
