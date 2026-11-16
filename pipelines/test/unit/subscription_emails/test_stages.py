@@ -276,6 +276,10 @@ def test_build_emails_matches_sample_email():
         "dashboard_count": 2,
         "more_dashboard_count": 0,
         "dashboards_url": "https://horizon.globalnaturewatch.org/dashboards",
+        "manage_url": (
+            "https://horizon.globalnaturewatch.org/subscriptions"
+            "?ff=email-subscriptions"
+        ),
         "dashboards": [
             {
                 "dashboard_id": "d2",
@@ -308,8 +312,8 @@ def test_build_emails_matches_sample_email():
 
 
 TEMPLATE_PATH = Path(stages.__file__).parent / "templates" / "gnw_weekly_alerts.html"
-# Links the template only shows when they're given, which aren't yet.
-OPTIONAL_TEMPLATE_FIELDS = {"download_url", "manage_url", "unsubscribe_url"}
+# A link the template only shows when it's given, which it isn't yet.
+OPTIONAL_TEMPLATE_FIELDS = {"download_url"}
 TEMPLATE_KEYWORDS = {"if", "elseif", "else", "end", "each", "and", "or", "not"}
 
 
