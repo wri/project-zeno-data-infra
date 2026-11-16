@@ -1,5 +1,5 @@
 """A Claude agent that answers land change questions using the analytics MCP
-tools. Shared by the chat CLI and the evals."""
+tools, used by the chat CLI."""
 
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Callable

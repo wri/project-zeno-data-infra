@@ -15,8 +15,8 @@ class McpApplication:
     """Serves the analytics tools over the streamable HTTP transport, calling
     the analytics API at the given base URL with each caller's bearer token.
 
-    Mounted applications don't run their own lifespan, so the host runs
-    `running()` in its lifespan; each run starts a fresh server, since its
+    Mounted applications don't run their own lifespan, so the host application
+    runs this one in its lifespan. Each run starts a fresh server, since its
     connection pool and session manager can only be started once."""
 
     def __init__(self, base_url: str, max_wait_seconds: float):
