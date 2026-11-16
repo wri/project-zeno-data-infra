@@ -3,43 +3,56 @@ from contextlib import asynccontextmanager
 
 import httpx
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.responses import PlainTextResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from mcp_server.analysis_runner import AnalysisRunner
-from mcp_server.analytics_client import AnalyticsClient
-from mcp_server.http_analytics_client import HttpAnalyticsClient
-from mcp_server.server import AnalyticsTools, build_server
+from mcp_server.http_analytics_client import HttpAnalyticsClients
+from mcp_server.server import McpTools, build_server
 
 
-class AnalyticsToolsApplication:
+class McpApplication:
     """Serves the analytics tools over the streamable HTTP transport, calling
     the analytics API at the given base URL with each caller's bearer token.
 
-    Must be run inside the host application's lifespan, since mounted
-    applications don't run their own."""
+    Mounted applications don't run their own lifespan, so the host runs
+    `running()` in its lifespan; each run starts a fresh server, since its
+    connection pool and session manager can only be started once."""
 
     def __init__(self, base_url: str, max_wait_seconds: float):
-        self.http_client = httpx.AsyncClient(base_url=base_url, timeout=30)
+        self.base_url = base_url
+        self.max_wait_seconds = max_wait_seconds
+        self.running_app: ASGIApp | None = None
 
-        def client_for(authorization: str | None) -> AnalyticsClient:
-            return HttpAnalyticsClient(self.http_client, authorization)
-
-        def runner_for(client: AnalyticsClient) -> AnalysisRunner:
-            return AnalysisRunner(client, asyncio.sleep, max_wait_seconds)
-
-        self.server = build_server(AnalyticsTools(client_for, runner_for))
-        # Stateless so any instance behind the load balancer can serve a call.
-        # Host checks guard local servers against DNS rebinding; this one is
-        # public like the rest of the API.
-        self.asgi_app = self.server.streamable_http_app(
-            streamable_http_path="/",
-            stateless_http=True,
-            json_response=True,
-            transport_security=TransportSecuritySettings(
-                enable_dns_rebinding_protection=False
-            ),
-        )
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if self.running_app is None:
+            response = PlainTextResponse("MCP server is not running", 503)
+            await response(scope, receive, send)
+            return
+        await self.running_app(scope, receive, send)
 
     @asynccontextmanager
     async def running(self):
-        async with self.http_client, self.server.session_manager.run():
-            yield
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=30) as http:
+            tools = McpTools(
+                HttpAnalyticsClients(http),
+                AnalysisRunner(asyncio.sleep, self.max_wait_seconds),
+            )
+            server = build_server(tools)
+            # Stateless so any instance behind the load balancer can serve a
+            # call. Host checks guard local servers against DNS rebinding; this
+            # one is public like the rest of the API.
+            app = server.streamable_http_app(
+                streamable_http_path="/",
+                stateless_http=True,
+                json_response=True,
+                transport_security=TransportSecuritySettings(
+                    enable_dns_rebinding_protection=False
+                ),
+            )
+            async with server.session_manager.run():
+                self.running_app = app
+                try:
+                    yield
+                finally:
+                    self.running_app = None

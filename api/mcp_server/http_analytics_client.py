@@ -67,3 +67,13 @@ class HttpAnalyticsClient:
                 f"Analytics API returned {response.status_code}: {response.text}"
             )
         return response.json()
+
+
+class HttpAnalyticsClients:
+    """Clients for each caller, sharing one connection pool to the API."""
+
+    def __init__(self, http_client: httpx.AsyncClient):
+        self.http_client = http_client
+
+    def for_caller(self, authorization: str | None) -> HttpAnalyticsClient:
+        return HttpAnalyticsClient(self.http_client, authorization)

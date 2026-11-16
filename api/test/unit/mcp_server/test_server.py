@@ -6,7 +6,7 @@ from mcp_server.analytics_client import (
     AnalysisState,
     AreaMatch,
 )
-from mcp_server.server import AnalyticsTools, build_server
+from mcp_server.server import McpTools, build_server
 
 LINK = "http://api/v0/land_change/tree_cover_loss/analytics/abc"
 OPENAPI_DOCUMENT = {
@@ -60,16 +60,19 @@ async def no_sleep(seconds):
     pass
 
 
-def server_with(client, authorizations=None):
-    def client_for(authorization):
-        if authorizations is not None:
-            authorizations.append(authorization)
-        return client
+class FakeClients:
+    def __init__(self, client):
+        self.client = client
+        self.authorizations = []
 
-    def runner_for(analytics_client):
-        return AnalysisRunner(analytics_client, no_sleep, max_wait_seconds=10)
+    def for_caller(self, authorization):
+        self.authorizations.append(authorization)
+        return self.client
 
-    return build_server(AnalyticsTools(client_for, runner_for))
+
+def server_with(client):
+    runner = AnalysisRunner(no_sleep, max_wait_seconds=10)
+    return build_server(McpTools(FakeClients(client), runner))
 
 
 async def call_tool(server, name, arguments):

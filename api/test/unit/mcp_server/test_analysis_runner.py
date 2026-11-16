@@ -45,23 +45,23 @@ class RecordingSleep:
 async def test_polls_following_retry_after_until_saved():
     client = FakeClient([state("pending", 2), state("pending", 3), state("saved")])
     sleep = RecordingSleep()
-    runner = AnalysisRunner(client, sleep, max_wait_seconds=30)
+    runner = AnalysisRunner(sleep, max_wait_seconds=30)
 
-    final_state = await runner.run("/path", {"aoi": {}})
+    final_state = await runner.run(client, "/path", {"aoi": {}})
 
     assert final_state.status == "saved"
     assert final_state.result == {"value": [1]}
-    assert sleep.calls == [2, 3]
+    assert sleep.calls == [1, 2, 3]
 
 
 @pytest.mark.asyncio
 async def test_returns_pending_link_instead_of_waiting_past_the_limit():
     client = FakeClient([state("pending", 5), state("pending", 5), state("saved")])
     sleep = RecordingSleep()
-    runner = AnalysisRunner(client, sleep, max_wait_seconds=8)
+    runner = AnalysisRunner(sleep, max_wait_seconds=8)
 
-    final_state = await runner.run("/path", {"aoi": {}})
+    final_state = await runner.run(client, "/path", {"aoi": {}})
 
     assert final_state.status == "pending"
     assert final_state.link == LINK
-    assert sleep.calls == [5]
+    assert sleep.calls == [1, 5]

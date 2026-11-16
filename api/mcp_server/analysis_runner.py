@@ -10,26 +10,29 @@ class AnalysisRunner:
 
     def __init__(
         self,
-        client: AnalyticsClient,
         sleep: Callable[[float], Awaitable[None]],
         max_wait_seconds: float,
     ):
-        self.client = client
         self.sleep = sleep
         self.max_wait_seconds = max_wait_seconds
 
-    async def run(self, path: str, payload: dict[str, Any]) -> AnalysisState:
-        link = await self.client.create_analysis(path, payload)
-        return await self.wait(link)
+    async def run(
+        self, client: AnalyticsClient, path: str, payload: dict[str, Any]
+    ) -> AnalysisState:
+        link = await client.create_analysis(path, payload)
+        # Give the analysis a moment to start, since it isn't reported as
+        # pending until then.
+        await self.sleep(1)
+        return await self.wait(client, link)
 
-    async def wait(self, link: str) -> AnalysisState:
+    async def wait(self, client: AnalyticsClient, link: str) -> AnalysisState:
         remaining_seconds = self.max_wait_seconds
-        state = await self.client.get_analysis(link)
+        state = await client.get_analysis(link)
         while not state.is_finished:
             delay = state.retry_after_seconds or 1
             if delay > remaining_seconds:
                 break
             await self.sleep(delay)
             remaining_seconds -= delay
-            state = await self.client.get_analysis(link)
+            state = await client.get_analysis(link)
         return state

@@ -1,12 +1,16 @@
 from contextlib import contextmanager
 from dataclasses import asdict
-from typing import Any, Callable
+from typing import Any
 
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
 from mcp_server.analysis_runner import AnalysisRunner
-from mcp_server.analytics_client import AnalyticsClient, AnalyticsRequestError
+from mcp_server.analytics_client import (
+    AnalyticsClient,
+    AnalyticsClients,
+    AnalyticsRequestError,
+)
 from mcp_server.catalog import ApiCatalog, UnknownDatasetError
 
 INSTRUCTIONS = """Land change analytics for areas of interest.
@@ -25,17 +29,13 @@ def errors_visible_to_model():
         raise ToolError(str(error)) from error
 
 
-class AnalyticsTools:
+class McpTools:
     """Tools that call the analytics API as the caller, using the
     authorization their MCP request carried."""
 
-    def __init__(
-        self,
-        client_for: Callable[[str | None], AnalyticsClient],
-        runner_for: Callable[[AnalyticsClient], AnalysisRunner],
-    ):
-        self.client_for = client_for
-        self.runner_for = runner_for
+    def __init__(self, clients: AnalyticsClients, runner: AnalysisRunner):
+        self.clients = clients
+        self.runner = runner
 
     async def search_areas(
         self,
@@ -71,23 +71,23 @@ class AnalyticsTools:
         with errors_visible_to_model():
             client = self.caller_client(ctx)
             path = (await self.catalog(client)).describe(dataset).path
-            return asdict(await self.runner_for(client).run(path, payload))
+            return asdict(await self.runner.run(client, path, payload))
 
     async def get_analysis(self, link: str, ctx: Context) -> dict[str, Any]:
         """Check on an analysis that was still pending, using its link."""
         with errors_visible_to_model():
-            runner = self.runner_for(self.caller_client(ctx))
-            return asdict(await runner.wait(link))
+            client = self.caller_client(ctx)
+            return asdict(await self.runner.wait(client, link))
 
     def caller_client(self, ctx: Context) -> AnalyticsClient:
         headers = ctx.headers or {}
-        return self.client_for(headers.get("authorization"))
+        return self.clients.for_caller(headers.get("authorization"))
 
     async def catalog(self, client: AnalyticsClient) -> ApiCatalog:
         return ApiCatalog(await client.openapi_document())
 
 
-def build_server(tools: AnalyticsTools) -> MCPServer:
+def build_server(tools: McpTools) -> MCPServer:
     server = MCPServer(name="gnw-analytics", instructions=INSTRUCTIONS)
     server.add_tool(tools.search_areas)
     server.add_tool(tools.list_datasets)

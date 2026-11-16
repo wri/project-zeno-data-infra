@@ -44,3 +44,9 @@ class AnalyticsClient(Protocol):
         ...
 
     async def get_analysis(self, link: str) -> AnalysisState: ...
+
+
+class AnalyticsClients(Protocol):
+    def for_caller(self, authorization: str | None) -> AnalyticsClient:
+        """A client that calls the API with the caller's authorization."""
+        ...
