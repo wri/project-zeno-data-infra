@@ -1,5 +1,3 @@
-from shapely.geometry.base import BaseGeometry
-
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.domain.services.deforestation_forest import DeforestationForest
 from app.models.land_change.deforestation import DeforestationAnalyticsIn
@@ -17,7 +15,5 @@ class DeforestationRequest:
     async def tree_cover_loss_request(
         self, request: DeforestationAnalyticsIn
     ) -> TreeCoverLossAnalyticsIn:
-        geometries: list[BaseGeometry] = []
-        if not request.aoi.covers_globe():
-            geometries, _ = await self.geometries.load(request.aoi)
+        geometries, _ = await self.geometries.load(request.aoi)
         return request.tree_cover_loss_request(self.forest.forest_filter(geometries))

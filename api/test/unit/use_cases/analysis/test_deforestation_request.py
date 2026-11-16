@@ -29,22 +29,3 @@ async def test_the_area_location_chooses_the_forest():
 
     assert loss.forest_filter == "intact_forest"
     assert loss.aoi.ids == ["RUS"]
-
-
-class MissingGeometries(AoiGeometryRepository):
-    async def load(self, aoi):
-        raise AssertionError("The global area has no geometry to load")
-
-
-@pytest.mark.asyncio
-async def test_the_global_area_uses_intact_forest():
-    deforestation = DeforestationRequest(
-        MissingGeometries(), DeforestationForest(tropics_latitude=30)
-    )
-    request = DeforestationAnalyticsIn(
-        aoi={"type": "admin", "ids": ["global"]}, start_year="2010", end_year="2024"
-    )
-
-    loss = await deforestation.tree_cover_loss_request(request)
-
-    assert loss.forest_filter == "intact_forest"

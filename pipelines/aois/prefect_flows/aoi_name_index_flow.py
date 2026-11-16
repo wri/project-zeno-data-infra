@@ -53,10 +53,7 @@ def aoi_name_index_flow(
         return prefix
 
     word_pattern = r"[^\s,.;:()\[\]/'\"-]+"
-    gadm = GadmNames(
-        global_alternate_names=("World", "Worldwide", "The world", "Earth", "Globe")
-    )
-    namers = (gadm, KbaNames(), WdpaNames(), LandmarkNames())
+    namers = (GadmNames(), KbaNames(), WdpaNames(), LandmarkNames())
     external_importance = wikipedia_importance(refresh_importance)
 
     aoi_files = aoi_files_for(namers, sources)
