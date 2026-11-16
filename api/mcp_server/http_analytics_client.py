@@ -1,4 +1,5 @@
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -10,13 +11,22 @@ from mcp_server.analytics_client import (
 
 
 class HttpAnalyticsClient:
-    """Talks to the analytics API over HTTP on behalf of one caller, whose
-    authorization is sent with every request. Only links on the API's own base
-    URL are followed, since links can come from untrusted tool input."""
+    """Talks to the analytics API over HTTP on behalf of one caller, sending
+    the caller's authorization and host, so the API builds links the same way
+    it does for direct callers. Links are followed by their path only, and only
+    when they are on the caller's host, since they come from tool input."""
 
-    def __init__(self, http_client: httpx.AsyncClient, authorization: str | None):
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient,
+        authorization: str | None,
+        host: str | None,
+    ):
         self.http_client = http_client
-        self.headers = {"Authorization": authorization} if authorization else {}
+        self.host = host or http_client.base_url.netloc.decode()
+        self.headers = {"Host": self.host}
+        if authorization:
+            self.headers["Authorization"] = authorization
 
     async def openapi_document(self) -> dict[str, Any]:
         response = await self.http_client.get("/openapi.json", headers=self.headers)
@@ -47,9 +57,10 @@ class HttpAnalyticsClient:
         return self.json_or_raise(response)["data"]["link"]
 
     async def get_analysis(self, link: str) -> AnalysisState:
-        if not link.startswith(str(self.http_client.base_url)):
+        parts = urlsplit(link)
+        if parts.netloc != self.host:
             raise AnalyticsRequestError(f"Link is not an analytics API link: {link}")
-        response = await self.http_client.get(link, headers=self.headers)
+        response = await self.http_client.get(parts.path, headers=self.headers)
         data = self.json_or_raise(response)["data"]
         retry_after = response.headers.get("Retry-After")
         return AnalysisState(
@@ -75,5 +86,7 @@ class HttpAnalyticsClients:
     def __init__(self, http_client: httpx.AsyncClient):
         self.http_client = http_client
 
-    def for_caller(self, authorization: str | None) -> HttpAnalyticsClient:
-        return HttpAnalyticsClient(self.http_client, authorization)
+    def for_caller(
+        self, authorization: str | None, host: str | None
+    ) -> HttpAnalyticsClient:
+        return HttpAnalyticsClient(self.http_client, authorization, host)

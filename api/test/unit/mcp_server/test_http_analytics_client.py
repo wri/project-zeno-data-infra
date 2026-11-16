@@ -7,7 +7,7 @@ from mcp_server.http_analytics_client import HttpAnalyticsClient
 BASE_URL = "http://analytics-api"
 
 
-def client_returning(response, authorization=None):
+def client_returning(response, authorization=None, host=None):
     requests = []
 
     def handler(request):
@@ -17,7 +17,7 @@ def client_returning(response, authorization=None):
     http_client = httpx.AsyncClient(
         base_url=BASE_URL, transport=httpx.MockTransport(handler)
     )
-    return HttpAnalyticsClient(http_client, authorization), requests
+    return HttpAnalyticsClient(http_client, authorization, host), requests
 
 
 @pytest.mark.asyncio
@@ -28,6 +28,30 @@ async def test_refuses_links_outside_the_api():
         await client.get_analysis("http://169.254.169.254/latest/meta-data")
 
     assert requests == []
+
+
+@pytest.mark.asyncio
+async def test_the_api_builds_links_for_the_callers_host():
+    body = {"data": {"link": "http://analytics.example.org/v0/x/analytics/1"}}
+    client, requests = client_returning(
+        httpx.Response(202, json=body), host="analytics.example.org"
+    )
+
+    await client.create_analysis("/v0/land_change/x/analytics", {})
+
+    assert requests[0].headers["host"] == "analytics.example.org"
+
+
+@pytest.mark.asyncio
+async def test_follows_links_on_the_callers_host_through_the_api():
+    body = {"data": {"status": "saved"}}
+    client, requests = client_returning(
+        httpx.Response(200, json=body), host="analytics.example.org"
+    )
+
+    await client.get_analysis("http://analytics.example.org/v0/x/analytics/1")
+
+    assert str(requests[0].url) == f"{BASE_URL}/v0/x/analytics/1"
 
 
 @pytest.mark.asyncio

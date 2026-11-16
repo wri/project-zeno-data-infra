@@ -65,7 +65,7 @@ class FakeClients:
         self.client = client
         self.authorizations = []
 
-    def for_caller(self, authorization):
+    def for_caller(self, authorization, host):
         self.authorizations.append(authorization)
         return self.client
 

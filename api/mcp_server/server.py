@@ -81,7 +81,9 @@ class McpTools:
 
     def caller_client(self, ctx: Context) -> AnalyticsClient:
         headers = ctx.headers or {}
-        return self.clients.for_caller(headers.get("authorization"))
+        return self.clients.for_caller(
+            headers.get("authorization"), headers.get("host")
+        )
 
     async def catalog(self, client: AnalyticsClient) -> ApiCatalog:
         return ApiCatalog(await client.openapi_document())

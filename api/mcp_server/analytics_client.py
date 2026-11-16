@@ -47,6 +47,9 @@ class AnalyticsClient(Protocol):
 
 
 class AnalyticsClients(Protocol):
-    def for_caller(self, authorization: str | None) -> AnalyticsClient:
-        """A client that calls the API with the caller's authorization."""
+    def for_caller(
+        self, authorization: str | None, host: str | None
+    ) -> AnalyticsClient:
+        """A client that calls the API with the caller's authorization and
+        host."""
         ...
