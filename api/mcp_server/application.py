@@ -6,7 +6,6 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from mcp_server.analysis_runner import AnalysisRunner
 from mcp_server.analytics_client import AnalyticsClient
-from mcp_server.bearer_token import RequireBearerToken
 from mcp_server.http_analytics_client import HttpAnalyticsClient
 from mcp_server.server import AnalyticsTools, build_server
 
@@ -31,15 +30,13 @@ class AnalyticsToolsApplication:
         # Stateless so any instance behind the load balancer can serve a call.
         # Host checks guard local servers against DNS rebinding; this one is
         # public like the rest of the API.
-        self.asgi_app = RequireBearerToken(
-            self.server.streamable_http_app(
-                streamable_http_path="/",
-                stateless_http=True,
-                json_response=True,
-                transport_security=TransportSecuritySettings(
-                    enable_dns_rebinding_protection=False
-                ),
-            )
+        self.asgi_app = self.server.streamable_http_app(
+            streamable_http_path="/",
+            stateless_http=True,
+            json_response=True,
+            transport_security=TransportSecuritySettings(
+                enable_dns_rebinding_protection=False
+            ),
         )
 
     @asynccontextmanager

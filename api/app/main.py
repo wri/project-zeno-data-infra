@@ -15,6 +15,7 @@ from pyinstrument import Profiler
 
 from mcp_server.application import AnalyticsToolsApplication
 
+from .authentication import ResourceWatchAdminOnly, get_authenticator
 from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .request_size_limit import RequestSizeLimit
 from .routers import aois, custom_aois, land_change
@@ -157,7 +158,7 @@ app.add_middleware(
     RequestSizeLimit, max_bytes=250 * 2**20, path_prefix="/v0/custom_aois"
 )
 app.include_router(aois.router)
-app.mount("/mcp", mcp_application.asgi_app)
+app.mount("/mcp", ResourceWatchAdminOnly(mcp_application.asgi_app, get_authenticator()))
 
 
 @app.get("/")
