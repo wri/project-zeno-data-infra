@@ -1,10 +1,8 @@
-from shapely.geometry import box
-
 from app.domain.services.deforestation_forest import DeforestationForest
 
 forest = DeforestationForest(tropics_latitude=30)
-brazil_like = box(-74, -34, -34, 5)
-russia_like = box(27, 41, 180, 82)
+brazil_like = (-74, -34, -34, 5)
+russia_like = (27, 41, 180, 82)
 
 
 def test_area_centred_in_the_tropics_uses_primary_forest():

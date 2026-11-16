@@ -1,6 +1,7 @@
 from typing import Any, Sequence
 
 import pandas as pd
+
 from pipelines.aois.name_index.namers.aoi_namer import AoiNamer, present, text
 
 

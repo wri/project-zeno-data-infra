@@ -2,7 +2,6 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-from shapely.geometry import box
 
 from app.dependencies import get_aoi_geometry_repository
 from app.domain.repositories.aoi_geometry_repository import (
@@ -24,15 +23,18 @@ REQUEST = {
 }
 
 
-class FixedGeometries(AoiGeometryRepository):
-    def __init__(self, geometries):
-        self.geometries = geometries
+class FixedBounds(AoiGeometryRepository):
+    def __init__(self, bounds):
+        self.fixed = bounds
 
     async def load(self, aoi):
-        return self.geometries, [1.0] * len(self.geometries)
+        raise AssertionError("only bounds are needed")
+
+    async def bounds(self, aoi):
+        return self.fixed
 
 
-class MissingGeometries(AoiGeometryRepository):
+class MissingAreas(AoiGeometryRepository):
     async def load(self, aoi):
         raise AoiNotFoundError("AOI ids not found: IDN")
 
@@ -48,8 +50,8 @@ def service():
 
 
 def test_deforestation_runs_tree_cover_loss_in_the_area_forest(service):
-    indonesia_like = box(95, -11, 141, 6)
-    app.dependency_overrides[get_aoi_geometry_repository] = lambda: FixedGeometries(
+    indonesia_like = (95, -11, 141, 6)
+    app.dependency_overrides[get_aoi_geometry_repository] = lambda: FixedBounds(
         [indonesia_like]
     )
 
@@ -62,9 +64,32 @@ def test_deforestation_runs_tree_cover_loss_in_the_area_forest(service):
 
 
 def test_deforestation_of_an_unknown_area_is_not_found(service):
-    app.dependency_overrides[get_aoi_geometry_repository] = MissingGeometries
+    app.dependency_overrides[get_aoi_geometry_repository] = MissingAreas
 
     response = client.post("/v0/land_change/deforestation/analytics", json=REQUEST)
 
     assert response.status_code == 404
     service.set_resource_from.assert_not_called()
+
+
+def test_deforestation_of_drawn_polygons_uses_their_location(service):
+    ghana_square = {
+        "type": "Polygon",
+        "coordinates": [[[-2, 6], [-1, 6], [-1, 7], [-2, 7], [-2, 6]]],
+    }
+    request = {
+        **REQUEST,
+        "aoi": {
+            "type": "feature_collection",
+            "feature_collection": {
+                "type": "FeatureCollection",
+                "features": [{"type": "Feature", "id": "a", "geometry": ghana_square}],
+            },
+        },
+    }
+
+    response = client.post("/v0/land_change/deforestation/analytics", json=request)
+
+    assert response.status_code == 202
+    loss = service.set_resource_from.call_args[0][0]
+    assert loss.forest_filter == "primary_forest"

@@ -4,6 +4,8 @@ from functools import partial
 from typing import Sequence
 
 import fsspec
+from prefect import flow, task
+
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.name_index.aoi_attributes import read_aoi_attributes
 from pipelines.aois.name_index.external_importance import ExternalImportance
@@ -31,7 +33,6 @@ from pipelines.aois.name_index.wikipedia.wikipedia_importance import (
 from pipelines.aois.sources import aoi_prefix
 from pipelines.globals import ANALYTICS_BUCKET
 from pipelines.utils import s3_uri_exists
-from prefect import flow, task
 
 
 @flow(name="AOI name index")

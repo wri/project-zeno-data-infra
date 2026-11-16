@@ -1,6 +1,6 @@
 from typing import Literal, Sequence
 
-from shapely.geometry.base import BaseGeometry
+from app.domain.repositories.aoi_geometry_repository import Bounds
 
 DeforestationForestFilter = Literal["primary_forest", "intact_forest"]
 
@@ -13,12 +13,11 @@ class DeforestationForest:
     def __init__(self, tropics_latitude: float):
         self.tropics_latitude = tropics_latitude
 
-    def forest_filter(
-        self, geometries: Sequence[BaseGeometry]
-    ) -> DeforestationForestFilter:
-        if geometries and all(self.in_tropics(area) for area in geometries):
+    def forest_filter(self, bounds: Sequence[Bounds]) -> DeforestationForestFilter:
+        if bounds and all(self.in_tropics(area) for area in bounds):
             return "primary_forest"
         return "intact_forest"
 
-    def in_tropics(self, area: BaseGeometry) -> bool:
-        return abs(area.centroid.y) <= self.tropics_latitude
+    def in_tropics(self, area: Bounds) -> bool:
+        _, min_latitude, _, max_latitude = area
+        return abs((min_latitude + max_latitude) / 2) <= self.tropics_latitude

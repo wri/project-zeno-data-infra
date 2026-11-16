@@ -26,7 +26,7 @@ mcp_application = McpApplication(
     base_url=os.environ.get("ANALYTICS_API_BASE_URL", "http://localhost:8000"),
     # Kept under the load balancer's 60 s idle timeout; slower analyses come
     # back pending with a link to check later.
-    max_wait_seconds=float(os.environ.get("MCP_MAX_WAIT_SECONDS", 55)),
+    max_wait_seconds=float(os.environ.get("MCP_MAX_WAIT_SECONDS", 45)),
 )
 
 
