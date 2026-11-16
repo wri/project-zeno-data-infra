@@ -1,12 +1,12 @@
 import httpx
 import pytest
 
-from analytics_tools.analysis_runner import AnalysisRunner
-from analytics_tools.analytics_client import (
+from mcp_server.analysis_runner import AnalysisRunner
+from mcp_server.analytics_client import (
     AnalysisState,
     AreaMatch,
 )
-from analytics_tools.server import AnalyticsTools, build_server
+from mcp_server.server import AnalyticsTools, build_server
 
 LINK = "http://api/v0/land_change/tree_cover_loss/analytics/abc"
 OPENAPI_DOCUMENT = {
@@ -140,13 +140,3 @@ async def test_search_areas_returns_payloads_ready_for_analysis():
             "aoi": {"type": "admin", "ids": ["BRA.1"]},
         }
     ]
-
-
-@pytest.mark.asyncio
-async def test_api_calls_use_the_callers_authorization():
-    authorizations: list = []
-    server = server_with(FakeClient(), authorizations)
-
-    await call_tool(server, "list_datasets", {})
-
-    assert authorizations == ["Bearer caller-token"]

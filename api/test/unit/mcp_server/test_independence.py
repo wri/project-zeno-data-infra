@@ -1,7 +1,7 @@
 import ast
 from pathlib import Path
 
-import analytics_tools
+import mcp_server
 
 
 def imported_modules(source_file):
@@ -14,7 +14,7 @@ def imported_modules(source_file):
 
 
 def test_package_does_not_depend_on_the_api_application():
-    package_directory = Path(analytics_tools.__file__).parent
+    package_directory = Path(mcp_server.__file__).parent
 
     for source_file in package_directory.rglob("*.py"):
         for module in imported_modules(source_file):

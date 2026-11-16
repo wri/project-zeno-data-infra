@@ -1,7 +1,7 @@
 import pytest
 
-from analytics_tools.analysis_runner import AnalysisRunner
-from analytics_tools.analytics_client import AnalysisState
+from mcp_server.analysis_runner import AnalysisRunner
+from mcp_server.analytics_client import AnalysisState
 
 LINK = "http://api/v0/land_change/tree_cover_loss/analytics/abc"
 

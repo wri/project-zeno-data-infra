@@ -3,7 +3,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from analytics_tools.bearer_token import RequireBearerToken
+from mcp_server.bearer_token import RequireBearerToken
 
 
 def protected_client():

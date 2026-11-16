@@ -4,11 +4,11 @@ from contextlib import asynccontextmanager
 import httpx
 from mcp.server.transport_security import TransportSecuritySettings
 
-from analytics_tools.analysis_runner import AnalysisRunner
-from analytics_tools.analytics_client import AnalyticsClient
-from analytics_tools.bearer_token import RequireBearerToken
-from analytics_tools.http_analytics_client import HttpAnalyticsClient
-from analytics_tools.server import AnalyticsTools, build_server
+from mcp_server.analysis_runner import AnalysisRunner
+from mcp_server.analytics_client import AnalyticsClient
+from mcp_server.bearer_token import RequireBearerToken
+from mcp_server.http_analytics_client import HttpAnalyticsClient
+from mcp_server.server import AnalyticsTools, build_server
 
 
 class AnalyticsToolsApplication:

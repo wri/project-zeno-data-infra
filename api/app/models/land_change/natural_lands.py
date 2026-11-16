@@ -37,7 +37,7 @@ class NaturalLandsAnalytics(StrictBaseModel):
     result: Optional[dict] = None
     metadata: Optional[dict] = None
     message: Optional[str] = None
-    status: Optional[AnalysisStatus] = None
+    status: AnalysisStatus
 
     model_config = {
         "from_attributes": True,

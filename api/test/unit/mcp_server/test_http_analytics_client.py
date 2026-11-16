@@ -1,8 +1,8 @@
 import httpx
 import pytest
 
-from analytics_tools.analytics_client import AnalyticsRequestError
-from analytics_tools.http_analytics_client import HttpAnalyticsClient
+from mcp_server.analytics_client import AnalyticsRequestError
+from mcp_server.http_analytics_client import HttpAnalyticsClient
 
 BASE_URL = "http://analytics-api"
 

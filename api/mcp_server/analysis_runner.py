@@ -1,6 +1,6 @@
 from typing import Any, Awaitable, Callable
 
-from analytics_tools.analytics_client import AnalysisState, AnalyticsClient
+from mcp_server.analytics_client import AnalysisState, AnalyticsClient
 
 
 class AnalysisRunner:

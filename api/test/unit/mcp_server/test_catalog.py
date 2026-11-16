@@ -1,6 +1,6 @@
 import pytest
 
-from analytics_tools.catalog import ApiCatalog, UnknownDatasetError
+from mcp_server.catalog import ApiCatalog, UnknownDatasetError
 
 
 def openapi_document():

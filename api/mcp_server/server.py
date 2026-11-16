@@ -5,9 +5,9 @@ from typing import Any, Callable
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 
-from analytics_tools.analysis_runner import AnalysisRunner
-from analytics_tools.analytics_client import AnalyticsClient, AnalyticsRequestError
-from analytics_tools.catalog import ApiCatalog, UnknownDatasetError
+from mcp_server.analysis_runner import AnalysisRunner
+from mcp_server.analytics_client import AnalyticsClient, AnalyticsRequestError
+from mcp_server.catalog import ApiCatalog, UnknownDatasetError
 
 INSTRUCTIONS = """Land change analytics for areas of interest.
 Call search_areas to find the area a question is about, list_datasets, then

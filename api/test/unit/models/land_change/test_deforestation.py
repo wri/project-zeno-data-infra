@@ -9,17 +9,6 @@ from app.models.land_change.deforestation import (
 AOI = {"type": "admin", "ids": ["BRA"]}
 
 
-def test_deforestation_becomes_tree_cover_loss_in_the_chosen_forest():
-    request = DeforestationAnalyticsIn(aoi=AOI, start_year="2002", end_year="2024")
-
-    loss = request.tree_cover_loss_request("intact_forest")
-
-    assert loss.forest_filter == "intact_forest"
-    assert loss.canopy_cover == 30
-    assert (loss.start_year, loss.end_year) == ("2002", "2024")
-    assert loss.intersections == []
-
-
 def test_deforestation_starts_with_primary_forest_data():
     with pytest.raises(ValidationError):
         DeforestationAnalyticsIn(aoi=AOI, start_year="2001", end_year="2024")

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
-from analytics_tools.application import AnalyticsToolsApplication
+from mcp_server.application import AnalyticsToolsApplication
 
 from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .request_size_limit import RequestSizeLimit
@@ -21,7 +21,7 @@ from .routers import aois, custom_aois, land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
 
-analytics_tools = AnalyticsToolsApplication(
+mcp_application = AnalyticsToolsApplication(
     base_url=os.environ.get("ANALYTICS_API_BASE_URL", "http://localhost:8000"),
     max_wait_seconds=float(os.environ.get("ANALYTICS_TOOLS_MAX_WAIT_SECONDS", 60)),
 )
@@ -107,7 +107,7 @@ async def lifespan(app: FastAPI):
         async with session.resource("dynamodb", region_name="us-east-1") as dynamo:
             app.state.dynamodb_table = await dynamo.Table(ANALYSES_TABLE_NAME)
             app.state.s3_client = s3_client
-            async with analytics_tools.running():
+            async with mcp_application.running():
                 yield
 
 
@@ -157,7 +157,7 @@ app.add_middleware(
     RequestSizeLimit, max_bytes=250 * 2**20, path_prefix="/v0/custom_aois"
 )
 app.include_router(aois.router)
-app.mount("/mcp", analytics_tools.asgi_app)
+app.mount("/mcp", mcp_application.asgi_app)
 
 
 @app.get("/")

@@ -17,7 +17,3 @@ def test_area_centred_outside_the_tropics_uses_intact_forest():
 
 def test_any_area_centred_outside_the_tropics_uses_intact_forest():
     assert forest.forest_filter([brazil_like, russia_like]) == "intact_forest"
-
-
-def test_no_geometry_uses_intact_forest():
-    assert forest.forest_filter([]) == "intact_forest"

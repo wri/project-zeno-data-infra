@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from analytics_tools.analytics_client import (
+from mcp_server.analytics_client import (
     AnalysisState,
     AnalyticsRequestError,
     AreaMatch,

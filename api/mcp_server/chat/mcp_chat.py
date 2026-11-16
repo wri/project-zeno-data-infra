@@ -1,7 +1,7 @@
 """Chat in the terminal with Claude, which can call the analytics MCP tools.
 
 Start the API first, then from the api directory run:
-    uv run --env-file ../.env python scripts/mcp_chat.py
+    uv run --env-file ../.env python -m mcp_server.chat.mcp_chat
 
 Requires ANTHROPIC_API_KEY and WRI_BEARER_TOKEN, which is forwarded to the API.
 """
@@ -11,7 +11,7 @@ import asyncio
 import json
 import os
 
-from analytics_agent import connect_agent
+from mcp_server.chat.analytics_agent import connect_agent
 
 
 def show(message) -> None:
