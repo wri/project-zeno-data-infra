@@ -71,7 +71,9 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
         description=(
             "Only count alerts on these SBTN natural lands classes: "
             "natural_lands = classes 2-11; "
-            "natural_forests = classes 2, 5, 8, 9."
+            "natural_forests = classes 2, 5, 8, 9. "
+            "natural_lands covers all natural ecosystems; natural_forests "
+            "covers natural forests only."
         ),
     )
 
@@ -183,7 +185,9 @@ class IntegratedAlertsPointsFilterIn(AnalyticsIn):
         description=(
             "Only list alerts on these SBTN natural lands classes: "
             "natural_lands = classes 2-11; "
-            "natural_forests = classes 2, 5, 8, 9."
+            "natural_forests = classes 2, 5, 8, 9. "
+            "natural_lands covers all natural ecosystems; natural_forests "
+            "covers natural forests only."
         ),
     )
 

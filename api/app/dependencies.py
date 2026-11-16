@@ -73,7 +73,7 @@ def get_aoi_name_search() -> AoiNameSearch:
     """Searches the names of every predefined AOI, in the index the AOI pipeline
     built on a pinned date, loaded once per process."""
     return AoiNameSearch(
-        TantivyAoiNameCandidates("s3://lcl-analytics/vectors/aois/search/v20261105"),
+        TantivyAoiNameCandidates("s3://lcl-analytics/vectors/aois/search/v20261113"),
         AoiNameRanking(),
     )
 
