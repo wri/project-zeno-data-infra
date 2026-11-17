@@ -30,6 +30,21 @@ def show(message) -> None:
         print("\n  [the model declined to answer this request]")
 
 
+def result_text(content) -> str:
+    if isinstance(content, str):
+        return content
+    return "\n".join(block.get("text", "") for block in content)
+
+
+def show_tool_results(response: dict, max_chars: int = 2000) -> None:
+    for result in response["content"]:
+        text = result_text(result.get("content", ""))
+        label = "tool error" if result.get("is_error") else "tool result"
+        print(f"\n  [{label}]\n{text[:max_chars]}")
+        if len(text) > max_chars:
+            print(f"  ... {len(text) - max_chars} more characters")
+
+
 async def read_line(prompt: str) -> str | None:
     try:
         return await asyncio.to_thread(input, prompt)
@@ -50,7 +65,9 @@ async def chat(
             if not user_input.strip():
                 continue
             messages.append({"role": "user", "content": user_input})
-            await agent.reply(messages, on_message=show)
+            await agent.reply(
+                messages, on_message=show, on_tool_results=show_tool_results
+            )
 
 
 def main() -> None:

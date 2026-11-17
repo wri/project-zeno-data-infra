@@ -4,7 +4,11 @@ from fastapi.responses import ORJSONResponse
 from pydantic import UUID5
 
 from app.dependencies import get_aoi_geometry_repository, get_environment
-from app.domain.analyzers.natural_lands_analyzer import INPUT_URIS, NaturalLandsAnalyzer
+from app.domain.analyzers.natural_lands_analyzer import (
+    INPUT_URIS,
+    NATURAL_LANDS_CLASSES,
+    NaturalLandsAnalyzer,
+)
 from app.domain.models.environment import Environment, resolve_uris
 from app.domain.repositories.analysis_repository import AnalysisRepository
 from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
@@ -58,7 +62,10 @@ def create_analysis_service(
     summary="Create Natural Lands Analysis Task",
     openapi_extra={
         "x-dataset": {
-            "measures": "Area of natural and non-natural land classes (ha)",
+            "measures": (
+                "Area (ha) of each SBTN natural lands class: "
+                + ", ".join(NATURAL_LANDS_CLASSES.values())
+            ),
             "time_basis": "single snapshot",
             "coverage": "2020",
         }
