@@ -111,3 +111,14 @@ class TestIntegratedAlertsPointsAnalyticsIn:
     def test_rejects_other_aoi_types(self, aoi):
         with pytest.raises(ValidationError):
             IntegratedAlertsPointsAnalyticsIn(aoi=aoi)
+
+
+@pytest.mark.parametrize(
+    "model", [IntegratedAlertsAnalyticsIn, IntegratedAlertsPointsAnalyticsIn]
+)
+def test_land_filter_names_the_classes_it_keeps(model):
+    description = model.model_json_schema()["properties"]["land_filter"]["description"]
+
+    assert "Mangroves" in description
+    assert "peat" in description
+    assert "classes 2" not in description

@@ -117,3 +117,18 @@ class TestTreeCoverLossAnalyticsIn:
                 forest_filter="natural_forest_only",
                 intersections=["driver"],
             )
+
+
+def test_intersections_default_to_none_and_share_its_cache_entry():
+    request = {
+        "aoi": {"type": "admin", "ids": ["BRA"]},
+        "start_year": "2020",
+        "end_year": "2023",
+        "canopy_cover": 30,
+    }
+
+    omitted = TreeCoverLossAnalyticsIn(**request)
+    explicit = TreeCoverLossAnalyticsIn(**request, intersections=[])
+
+    assert omitted.intersections == []
+    assert omitted.thumbprint() == explicit.thumbprint()

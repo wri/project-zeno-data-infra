@@ -86,14 +86,14 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
         ),
     )
     intersections: AllowedIntersections = Field(
-        ...,
+        default_factory=list,
         min_length=0,
         max_length=1,
         description=(
-            "List of intersection types. Drivers intersections refers to dominant "
-            "driver across all years of loss, and will return results aggregated "
-            "across all years. Fire intersection returns fire-driven tree cover "
-            "loss area AND non-fire loss, by year"
+            "Leave empty for total tree cover loss. Use 'driver' only to "
+            "attribute loss to its causes; it returns one total per dominant "
+            "driver for the whole period. Use 'fire' only for questions about "
+            "fires; it splits loss by year into fire and non-fire loss."
         ),
     )
 

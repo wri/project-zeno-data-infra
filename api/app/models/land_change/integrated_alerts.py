@@ -69,11 +69,12 @@ class IntegratedAlertsAnalyticsIn(AnalyticsIn):
         title="Land Filter",
         # Keep in sync with LAND_FILTER_CLASSES in app/analysis/common/analysis.py
         description=(
-            "Only count alerts on these SBTN natural lands classes: "
-            "natural_lands = classes 2-11; "
-            "natural_forests = classes 2, 5, 8, 9. "
-            "natural_lands covers all natural ecosystems; natural_forests "
-            "covers natural forests only."
+            "Only count alerts on SBTN natural lands, the no-conversion "
+            "baseline. natural_lands keeps every natural class: natural "
+            "forests, natural short vegetation, natural water, Mangroves, "
+            "bare, snow, and wetland and peat forests and short vegetation. "
+            "natural_forests keeps natural forests, Mangroves, wetland "
+            "natural forests and natural peat forests."
         ),
     )
 
@@ -183,11 +184,12 @@ class IntegratedAlertsPointsFilterIn(AnalyticsIn):
         title="Land Filter",
         # Keep in sync with LAND_FILTER_CLASSES in app/analysis/common/analysis.py
         description=(
-            "Only list alerts on these SBTN natural lands classes: "
-            "natural_lands = classes 2-11; "
-            "natural_forests = classes 2, 5, 8, 9. "
-            "natural_lands covers all natural ecosystems; natural_forests "
-            "covers natural forests only."
+            "Only list alerts on SBTN natural lands, the no-conversion "
+            "baseline. natural_lands keeps every natural class: natural "
+            "forests, natural short vegetation, natural water, Mangroves, "
+            "bare, snow, and wetland and peat forests and short vegetation. "
+            "natural_forests keeps natural forests, Mangroves, wetland "
+            "natural forests and natural peat forests."
         ),
     )
 

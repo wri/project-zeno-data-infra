@@ -32,7 +32,12 @@ class AnalyticsAgent:
         self.tools = tools
         self.model = model
 
-    async def reply(self, messages: list, on_message: Callable | None = None) -> None:
+    async def reply(
+        self,
+        messages: list,
+        on_message: Callable | None = None,
+        on_tool_results: Callable | None = None,
+    ) -> None:
         """Answers the conversation's last user message, appending each
         assistant turn and tool result to the messages."""
         runner = self.anthropic_client.beta.messages.tool_runner(
@@ -61,6 +66,8 @@ class AnalyticsAgent:
                 )
             tool_response = await runner.generate_tool_call_response()
             if tool_response is not None:
+                if on_tool_results is not None:
+                    on_tool_results(tool_response)
                 messages.append(tool_response)
 
 
