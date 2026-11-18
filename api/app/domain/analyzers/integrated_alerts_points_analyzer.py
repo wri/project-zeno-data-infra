@@ -8,7 +8,7 @@ from app.domain.analyzers.integrated_alerts_points_analyzer_helpers import (
     POINTS_RESULT_COLUMNS,
     confidence_codes,
     format_points,
-    read_admin_geometries,
+    read_aoi_geometry,
     served_alerts_metadata,
     served_dates,
 )
@@ -17,9 +17,7 @@ from app.domain.repositories.alert_points_repository import (
     AlertPointsQuery,
     AlertPointsRepository,
 )
-from app.domain.repositories.gadm_aoi_geometry_repository import (
-    GadmAoiGeometryRepository,
-)
+from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepository
 from app.models.land_change.integrated_alerts import (
     IntegratedAlertsPointsAnalyticsIn,
     PointsCursor,
@@ -29,24 +27,24 @@ from app.models.land_change.integrated_alerts import (
 
 
 class IntegratedAlertsPointsAnalyzer(Analyzer):
-    """List the newest integrated alert pixels in a GADM area (one per request),
-    with their pixel center, date, confidence and SBTN natural lands class, from
-    an alert points repository serving one alerts version."""
+    """List the newest integrated alert pixels in an admin or saved custom area
+    (one per request), with their pixel center, date, confidence and SBTN natural
+    lands class, from an alert points repository serving one alerts version."""
 
     def __init__(
         self,
         points_repository: AlertPointsRepository,
+        geometry_repository: AoiGeometryRepository,
         input_uris: Dict[str, str] | None = None,
-        geometry_repository=None,
     ):
         self.points_repository = points_repository
+        self.geometry_repository = geometry_repository
         self.input_uris = input_uris
-        self.geometry_repository = geometry_repository or GadmAoiGeometryRepository()
 
     @nr_agent.function_trace(name="IntegratedAlertsPointsAnalyzer.analyze")
     async def analyze(self, analysis: Analysis) -> None:
         analytics_in = IntegratedAlertsPointsAnalyticsIn(**analysis.metadata)
-        aoi_ids, geometries = await read_admin_geometries(
+        aoi_id, geometry = await read_aoi_geometry(
             self.geometry_repository, analytics_in
         )
         source = await self.points_repository.source()
@@ -63,16 +61,12 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                 )
             after = cursor.position
 
-        result: Dict[str, list] = {column: [] for column in POINTS_RESULT_COLUMNS}
-        truncated: Dict[str, bool] = {}
         next_cursor = None
-        # One AOI per request (validated), so one list and at most one cursor.
-        for aoi_id, geometry in zip(aoi_ids, geometries):
-            # The requested dates lie outside the stored window, so nothing is
-            # served.
-            if start_date > end_date:
-                truncated[aoi_id] = False
-                continue
+        # The requested dates lie outside the stored window, so nothing is served.
+        if start_date > end_date:
+            result: Dict[str, list] = {column: [] for column in POINTS_RESULT_COLUMNS}
+            more = False
+        else:
             page = await self.points_repository.read_most_recent_points(
                 AlertPointsQuery(
                     geometry=geometry,
@@ -88,21 +82,20 @@ class IntegratedAlertsPointsAnalyzer(Analyzer):
                     after=after,
                 )
             )
-            truncated[aoi_id] = page.more
+            result = format_points(page.points).to_dict(orient="list")
+            more = page.more
             if page.more and page.last_position is not None:
                 next_cursor = encode_cursor(
                     PointsCursor(
                         source.version, page.last_position, analytics_in.list_id()
                     )
                 )
-            for column, values in format_points(page.points).items():
-                result[column] += values
 
         analysis.result = result
         analysis.metadata = {
             **analysis.metadata,
             "alerts": served_alerts_metadata(source, start_date, end_date),
-            "truncated": truncated,
+            "truncated": {aoi_id: more},
             # Pass back as `cursor` for the next page; None when the list is done.
             "next_cursor": next_cursor,
         }

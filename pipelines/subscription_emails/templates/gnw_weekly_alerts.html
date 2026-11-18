@@ -125,9 +125,7 @@
       <td style="padding:18px 20px; font-size:15px; line-height:22px; color:#374151;">&#9432;&nbsp; Also following the same area on Global Forest Watch (myGFW)? You may get a separate GFW email about the same alerts.</td>
     </tr>
     </table>
-    {{if manage_url or unsubscribe_url}}
-    <p style="margin:24px 0 0 0; font-size:15px; color:#4b5563;">{{if manage_url}}<a href="{{{manage_url}}}" style="color:#0b4db3; text-decoration:underline;">Manage alert emails</a>{{end}}{{if manage_url and unsubscribe_url}} &nbsp;&middot;&nbsp; {{end}}{{if unsubscribe_url}}<a href="{{{unsubscribe_url}}}" style="color:#0b4db3; text-decoration:underline;">Turn off all alert emails</a>{{end}}</p>
-    {{end}}
+    <p style="margin:24px 0 0 0; font-size:15px; color:#4b5563;"><a href="{{{manage_url}}}" style="color:#0b4db3; text-decoration:underline;">Manage alert emails</a></p>
     <p style="margin:24px 0 0 0; font-size:12px; line-height:18px; color:#4b5563;">You're getting this because you turned on alert emails for one or more of your dashboards. We send it once a week, after the integrated alerts data updates, and only when there are new alerts.</p>
     <p style="margin:20px 0 0 0; font-size:12px; color:#4b5563;">Global Nature Watch &middot; A partnership convened by the World Resources Institute</p>
   </td>

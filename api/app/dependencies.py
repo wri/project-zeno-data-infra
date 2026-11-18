@@ -9,13 +9,17 @@ from app.domain.repositories.aoi_geometry_repository import AoiGeometryRepositor
 from app.domain.repositories.aoi_type_routing_geometry_repository import (
     AoiTypeRoutingGeometryRepository,
 )
-from app.domain.repositories.custom_aoi_repository import CustomAoiRepository
+from app.domain.services.aoi_name_ranking import AoiNameRanking
 from app.infrastructure.persistence.geoparquet_aoi_geometry_repository import (
     GeoParquetAoiGeometryRepository,
 )
 from app.infrastructure.persistence.iceberg_custom_aoi_repository import (
     IcebergCustomAoiRepository,
 )
+from app.infrastructure.persistence.tantivy_aoi_name_candidates import (
+    TantivyAoiNameCandidates,
+)
+from app.use_cases.aois.aoi_name_search import AoiNameSearch
 
 
 async def get_environment(
@@ -43,7 +47,7 @@ async def get_environment(
 
 def get_aoi_geometry_repository() -> AoiGeometryRepository:
     """Geometries for predefined AOIs, from the pipeline's GeoParquet copy of
-    each dataset at a pinned version."""
+    each dataset at a pinned version, and for stored custom AOIs."""
     vectors = "s3://lcl-analytics/vectors/aois"
     return AoiTypeRoutingGeometryRepository(
         {
@@ -59,7 +63,18 @@ def get_aoi_geometry_repository() -> AoiGeometryRepository:
             "indigenous_land": GeoParquetAoiGeometryRepository(
                 f"{vectors}/landmark/v20260617/aois.parquet"
             ),
+            "custom_aoi": get_custom_aoi_repository(),
         }
+    )
+
+
+@lru_cache(maxsize=1)
+def get_aoi_name_search() -> AoiNameSearch:
+    """Searches the names of every predefined AOI, in the index the AOI pipeline
+    built on a pinned date, loaded once per process."""
+    return AoiNameSearch(
+        TantivyAoiNameCandidates("s3://lcl-analytics/vectors/aois/search/v20261113"),
+        AoiNameRanking(),
     )
 
 
@@ -71,9 +86,9 @@ def get_custom_aoi_catalog() -> Catalog:
 
 
 @lru_cache
-def get_custom_aoi_repository() -> CustomAoiRepository:
+def get_custom_aoi_repository() -> IcebergCustomAoiRepository:
     """One repository per process, so its cached tables are reused across
     requests."""
     return IcebergCustomAoiRepository(
-        get_custom_aoi_catalog(), "custom.custom_aois", "custom.custom_aoi_cells"
+        get_custom_aoi_catalog, "custom.custom_aois", "custom.custom_aoi_cells"
     )

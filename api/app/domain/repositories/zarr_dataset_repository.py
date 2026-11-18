@@ -24,7 +24,7 @@ class ZarrDatasetRepository:
             Dataset.pixel_area_m2_10m: "s3://gfw-data-lake/umd_area_2013/v1.10/raster/epsg-4326/zarr/area_m_10m_f32",  # noqa: E501
             Dataset.canopy_cover: "s3://lcl-analytics/zarr/umd_tree_cover_density_2000/v1.8/threshold.zarr",  # noqa: E501
             Dataset.carbon_emissions: "s3://lcl-analytics/zarr/gfw-carbon-gross-emissions/v20260327/Mg_CO2e.zarr",  # noqa: E501
-            Dataset.intact_forest: "s3://lcl-analytics/zarr/ifl-intact-forest-landscapes-2000/v2021.1/is.zarr",  # noqa: E501
+            Dataset.intact_forest: "s3://lcl-analytics/zarr/ifl-intact-forest-landscapes-2000/v2021.2/is.zarr",  # noqa: E501
             Dataset.natural_forests: "s3://lcl-analytics/zarr/sbtn-natural-forests/sbtn_natural_forests_class.zarr",  # noqa: E501
             Dataset.natural_lands: "s3://lcl-analytics/zarr/sbtn-natural-lands/sbtn_natural_lands_all_classes.zarr",  # noqa: E501
             Dataset.primary_forest: "s3://lcl-analytics/zarr/umd-regional-primary-forest-2001/v201901/is.zarr",  # noqa: E501

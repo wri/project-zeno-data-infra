@@ -62,6 +62,16 @@ def create_analysis_service(
     response_model=DataMartResourceLinkResponse,
     status_code=202,
     summary="Start analysis tasks for deforestation-related statistical land use change (sLUC) emissions factors.",
+    openapi_extra={
+        "x-dataset": {
+            "measures": (
+                "Emissions factors from deforestation-related land use "
+                "change, per crop and gas"
+            ),
+            "time_basis": "annual",
+            "coverage": "2020-2024",
+        }
+    },
 )
 async def create(
     *,

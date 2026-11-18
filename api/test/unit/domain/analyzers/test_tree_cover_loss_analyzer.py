@@ -531,6 +531,12 @@ async def test_flox_handler_tree_cover_loss_from_fires():
     )
 
 
+def test_input_uris_include_intact_forest():
+    # Results are cached by input URIs, so every dataset a request can read
+    # must be listed for a change to it to invalidate cached results.
+    assert str(Dataset.intact_forest) in INPUT_URIS[Environment.production]
+
+    
 @pytest.mark.asyncio
 async def test_admin_areas_below_precomputed_levels_are_computed_on_the_fly():
     analytics_in = TreeCoverLossAnalyticsIn(

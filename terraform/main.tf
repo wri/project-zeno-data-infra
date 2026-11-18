@@ -827,6 +827,30 @@ resource "aws_s3_bucket" "analysis_results" {
   }
 }
 
+# A points export is tied to the alerts version it was made from, and a new
+# version each week means a new export, so older files are only reached through
+# stale links.
+resource "aws_s3_bucket_lifecycle_configuration" "analysis_results" {
+  bucket = aws_s3_bucket.analysis_results.id
+
+  rule {
+    id     = "expire-points-exports"
+    status = "Enabled"
+
+    filter {
+      prefix = "integrated_alerts_points_export/"
+    }
+
+    expiration {
+      days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
 resource "aws_dynamodb_table" "analyses" {
   name         = "Analyses${local.name_suffix}"
   billing_mode = "PAY_PER_REQUEST" # On-demand, scales automatically. Suitable for variable workloads.
