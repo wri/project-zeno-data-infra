@@ -19,7 +19,7 @@ from pyiceberg.table.sorting import SortField, SortOrder
 from pyiceberg.transforms import IdentityTransform, MonthTransform
 from pyiceberg.types import DateType, DoubleType, LongType, NestedField, StringType
 
-from pipelines.viirs_fire_alerts.alerts import alert_key_columns
+from pipelines.viirs_fire_alerts.firms_feed import alert_key_columns
 
 
 def alert_schema() -> Schema:

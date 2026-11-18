@@ -171,7 +171,7 @@ def run_viirs_fire_alerts_update(
             "https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2"
             "/csv/J1_VIIRS_C2_Global_7d.csv"
         ),
-        catalog_name="tables",
+        catalog_name="aois",
         table_name="alerts.viirs_fire_alerts",
     )
     return [f"{count} new VIIRS fire alerts"]

@@ -2,7 +2,7 @@ import pytest
 from prefect.logging import disable_run_logger
 from pyiceberg.catalog.sql import SqlCatalog
 
-from pipelines.viirs_fire_alerts.alerts import FeedGapError
+from pipelines.viirs_fire_alerts.firms_feed import FeedGapError
 from pipelines.viirs_fire_alerts.prefect_flows import viirs_fire_alerts_flow
 
 HEADER = (

@@ -3,7 +3,11 @@ import datetime
 import pyarrow as pa
 import pytest
 
-from pipelines.viirs_fire_alerts.firms_feed import parse_feed
+from pipelines.viirs_fire_alerts.firms_feed import (
+    FeedGapError,
+    check_continuity,
+    parse_feed,
+)
 
 HEADER = (
     "latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,"
@@ -53,3 +57,23 @@ def test_parse_feed_rejects_alerts_missing_a_key_value():
 def test_parse_feed_rejects_empty_content():
     with pytest.raises(pa.ArrowInvalid):
         parse_feed(b"")
+
+
+NOV_3 = datetime.date(2026, 11, 3)
+
+
+def test_feed_continuing_from_the_day_after_the_stored_alerts_is_accepted():
+    check_continuity(
+        latest_stored=NOV_3, earliest_in_feed=NOV_3 + datetime.timedelta(1)
+    )
+
+
+def test_first_feed_is_accepted():
+    check_continuity(latest_stored=None, earliest_in_feed=NOV_3)
+
+
+def test_feed_leaving_a_missing_day_is_rejected_with_backfill_instructions():
+    with pytest.raises(FeedGapError, match="gfw-data-lake"):
+        check_continuity(
+            latest_stored=NOV_3, earliest_in_feed=NOV_3 + datetime.timedelta(2)
+        )

@@ -1,13 +1,39 @@
-"""Reads NASA FIRMS active fire CSV files, such as the global VIIRS 7-day file."""
+"""Reads NASA FIRMS active fire CSV files, such as the global VIIRS 7-day file,
+and checks a file continues on from the alerts already stored."""
 
 import io
+from datetime import date, timedelta
+from typing import List, Optional
 
 import httpx
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.csv as csv
 
-from pipelines.viirs_fire_alerts.alerts import alert_key_columns
+
+class FeedGapError(Exception):
+    pass
+
+
+def alert_key_columns() -> List[str]:
+    """Alerts have no ids, so an alert is identified by its point and
+    acquisition time."""
+    return ["latitude", "longitude", "acq_date", "acq_time"]
+
+
+def check_continuity(latest_stored: Optional[date], earliest_in_feed: date) -> None:
+    """Raise FeedGapError if days are missing between the stored alerts and the
+    feed, which only holds recent days. Any feed is accepted when nothing is
+    stored yet."""
+    if latest_stored is None:
+        return
+    if earliest_in_feed > latest_stored + timedelta(days=1):
+        raise FeedGapError(
+            f"No alerts between {latest_stored} (newest stored) and "
+            f"{earliest_in_feed} (earliest in feed). Append the missing days from "
+            "the daily TSVs in s3://gfw-data-lake/nasa_viirs_fire_alerts/v1/vector/"
+            "epsg-4326/tsv/near_real_time/ with the alert store, then re-run."
+        )
 
 
 def download_feed(url: str) -> bytes:

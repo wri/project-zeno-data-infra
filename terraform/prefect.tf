@@ -127,21 +127,15 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       TF_WORKSPACE          = terraform.workspace
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
       GEE_SERVICE_ACCOUNT_JSON = var.gee_service_account_json
-      # Custom AOI catalog (S3 Tables), as configured for the API; run_updates
-      # passes PYICEBERG_* on to the Coiled cluster.
+      # S3 Tables catalog holding custom AOIs and pipeline-written tables, as
+      # configured for the API; run_updates passes PYICEBERG_* on to the Coiled
+      # cluster.
       PYICEBERG_CATALOG__AOIS__TYPE                 = "rest"
       PYICEBERG_CATALOG__AOIS__URI                  = "https://s3tables.${data.aws_region.current.name}.amazonaws.com/iceberg"
       PYICEBERG_CATALOG__AOIS__WAREHOUSE            = aws_s3tables_table_bucket.tables.arn
       PYICEBERG_CATALOG__AOIS__REST__SIGV4_ENABLED  = "true"
       PYICEBERG_CATALOG__AOIS__REST__SIGNING_NAME   = "s3tables"
       PYICEBERG_CATALOG__AOIS__REST__SIGNING_REGION = data.aws_region.current.name
-      # The same S3 Tables bucket, for tables written by the pipelines
-      PYICEBERG_CATALOG__TABLES__TYPE                 = "rest"
-      PYICEBERG_CATALOG__TABLES__URI                  = "https://s3tables.${data.aws_region.current.name}.amazonaws.com/iceberg"
-      PYICEBERG_CATALOG__TABLES__WAREHOUSE            = aws_s3tables_table_bucket.tables.arn
-      PYICEBERG_CATALOG__TABLES__REST__SIGV4_ENABLED  = "true"
-      PYICEBERG_CATALOG__TABLES__REST__SIGNING_NAME   = "s3tables"
-      PYICEBERG_CATALOG__TABLES__REST__SIGNING_REGION = data.aws_region.current.name
     }
   })
 

@@ -3,8 +3,11 @@ from prefect import flow
 from prefect.logging import get_run_logger
 from pyiceberg.catalog import load_catalog
 
-from pipelines.viirs_fire_alerts.alerts import check_continuity
-from pipelines.viirs_fire_alerts.firms_feed import download_feed, parse_feed
+from pipelines.viirs_fire_alerts.firms_feed import (
+    check_continuity,
+    download_feed,
+    parse_feed,
+)
 from pipelines.viirs_fire_alerts.iceberg_alert_store import IcebergAlertStore
 
 
@@ -24,7 +27,8 @@ def viirs_fire_alerts_flow(
     Args:
         feed_url: URL of a FIRMS VIIRS CSV file, such as the global 7-day file.
         catalog_name: Iceberg catalog, configured through
-            PYICEBERG_CATALOG__{CATALOG}__* environment variables.
+            PYICEBERG_CATALOG__<NAME>__* environment variables. Deployed flows
+            use the S3 Tables catalog terraform sets as PYICEBERG_CATALOG__AOIS__*.
         table_name: The alerts table, as namespace.table.
         coarse_cell_level: S2 level of the table's spatial partitions.
         fine_cell_level: S2 level used to order rows within files.
