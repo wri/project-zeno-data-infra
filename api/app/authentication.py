@@ -2,6 +2,8 @@ import os
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.infrastructure.external_services.resource_watch_authenticator import (
     ResourceWatchAuthenticator,
@@ -36,7 +38,14 @@ async def require_resource_watch_admin(
     401 when the token is missing or invalid; 403 when the token is valid but the
     user is not an admin.
     """
-    if credentials is None:
+    token = credentials.credentials if credentials else None
+    return await resource_watch_admin(token, authenticator)
+
+
+async def resource_watch_admin(
+    token: str | None, authenticator: ResourceWatchAuthenticator
+) -> User:
+    if token is None:
         raise HTTPException(
             status_code=401,
             detail="Missing bearer token",
@@ -44,7 +53,7 @@ async def require_resource_watch_admin(
         )
 
     try:
-        user = await authenticator.get_user(credentials.credentials)
+        user = await authenticator.get_user(token)
     except UpstreamAuthError:
         raise HTTPException(
             status_code=502, detail="Could not reach the authorization server"
@@ -58,3 +67,34 @@ async def require_resource_watch_admin(
         )
 
     return user
+
+
+class ResourceWatchAdminOnly:
+    """The same guard for an application mounted outside FastAPI's dependency
+    injection, such as the MCP server."""
+
+    def __init__(self, app: ASGIApp, authenticator: ResourceWatchAuthenticator):
+        self.app = app
+        self.authenticator = authenticator
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            try:
+                await resource_watch_admin(bearer_token(scope), self.authenticator)
+            except HTTPException as error:
+                response = JSONResponse(
+                    {"detail": error.detail}, error.status_code, error.headers
+                )
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
+def bearer_token(scope: Scope) -> str | None:
+    for name, value in scope["headers"]:
+        if name.lower() == b"authorization":
+            scheme, _, token = value.decode().partition(" ")
+            if scheme.lower() != "bearer" or not token.strip():
+                return None
+            return token.strip()
+    return None

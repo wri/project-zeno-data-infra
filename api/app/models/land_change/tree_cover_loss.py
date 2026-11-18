@@ -29,7 +29,6 @@ AoiUnion = Union[
 
 DATE_REGEX = r"^\d{4}$"
 AllowedCanopyCover = Literal[10, 15, 20, 25, 30, 50, 75]
-AllowedForestFilter = Literal["primary_forest", "natural_forest", "intact_forest"]
 AllowedIntersections = List[Literal["driver", "fire"]]
 
 
@@ -62,11 +61,13 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
             "Carbon model is only valid for carbon threshold 30% or greater, and "
             "will return NaN for carbon emissions if set lower."
         ),
+        description=(
+            "Use 30 by default, or 10 with natural_forest_only. Only use another "
+            "threshold when one is asked for."
+        ),
     )
     # natural_forest is a breakdown by SBTN natural forest class (kept for an
     # existing app), while natural_forest_only filters to SBTN Natural Forest.
-    # natural_forest_only is only implemented for tree cover loss, so it isn't in
-    # the shared AllowedForestFilter used by tree cover and tree cover gain.
     forest_filter: Optional[
         Literal[
             "primary_forest", "natural_forest", "intact_forest", "natural_forest_only"
@@ -74,6 +75,15 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     ] = Field(
         default=None,
         title="Forest Filter",
+        description=(
+            "Which forest to count loss in. "
+            "primary_forest: humid tropical primary forest. "
+            "intact_forest: intact forest landscapes. "
+            "natural_forest_only: SBTN natural forest, mapped in 2020, so loss "
+            "from 2021 on. "
+            "natural_forest: loss broken down by SBTN natural forest class. "
+            "Leave unset for all tree cover, including plantations."
+        ),
     )
     intersections: AllowedIntersections = Field(
         ...,

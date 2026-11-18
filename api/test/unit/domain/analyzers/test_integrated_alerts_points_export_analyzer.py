@@ -20,20 +20,25 @@ from app.domain.analyzers.integrated_alerts_points_export_analyzer import (
     IntegratedAlertsPointsExportAnalyzer,
 )
 from app.domain.models.analysis import Analysis
+from app.infrastructure.export.alert_points_files import ALERT_POINTS_FILE_TYPES
 from app.infrastructure.persistence.parquet_alert_points_repository import (
     ParquetAlertPointsRepository,
     day_to_date,
     load_alert_points_table,
 )
-from app.models.common.areas_of_interest import AdminAreaOfInterest
+from app.models.common.areas_of_interest import (
+    AdminAreaOfInterest,
+    SavedCustomAreaOfInterest,
+)
 from app.models.land_change.integrated_alerts import IntegratedAlertsPointsExportIn
 
 FIRST_DAY = LATEST_DAY - DAYS_STORED + 1
+PAGE_SIZE = 500
 
 
 class FakeGeometryRepository:
-    async def load(self, aoi_type, aoi_ids):
-        return [aoi_polygon()] * len(aoi_ids), [0] * len(aoi_ids)
+    async def load(self, aoi):
+        return [aoi_polygon()] * len(aoi.ids), [0] * len(aoi.ids)
 
 
 class InMemoryFileStore:
@@ -62,9 +67,11 @@ async def _export(table_uri, **request):
         points_repository=ParquetAlertPointsRepository(table_uri),
         file_store=file_store,
         geometry_repository=FakeGeometryRepository(),
+        file_types=ALERT_POINTS_FILE_TYPES,
+        page_size=PAGE_SIZE,
     )
     analytics_in = IntegratedAlertsPointsExportIn(
-        aoi=AdminAreaOfInterest(ids=["BRA.14.87"]), **request
+        **{"aoi": AdminAreaOfInterest(ids=["BRA.14.87"]), **request}
     )
     analysis = Analysis(metadata=analytics_in.model_dump(), result=None, status=None)
     await analyzer.analyze(analysis)
@@ -142,16 +149,18 @@ async def test_export_shapefile_zip_holds_point_layer_with_short_column_names(
 
 
 @pytest.mark.asyncio
-async def test_export_is_truncated_past_max_points(table_uri, points, monkeypatch):
+async def test_export_is_truncated_past_max_points_across_pages(
+    table_uri, points, monkeypatch
+):
     monkeypatch.setattr(
-        integrated_alerts_points_export_analyzer, "POINTS_EXPORT_MAX_POINTS", 25
+        integrated_alerts_points_export_analyzer, "POINTS_EXPORT_MAX_POINTS", 1200
     )
 
     analysis, content, _ = await _export(table_uri, format="csv")
 
     csv = pd.read_csv(io.BytesIO(content))
     expected = _expected_rows(points, FIRST_DAY, LATEST_DAY, [2, 3, 4], None)
-    pd.testing.assert_frame_equal(csv, expected.head(25), check_dtype=False)
+    pd.testing.assert_frame_equal(csv, expected.head(1200), check_dtype=False)
     assert analysis.metadata["truncated"] == {"BRA.14.87": True}
 
 
@@ -186,3 +195,18 @@ async def test_export_outside_stored_window_writes_an_empty_file(
     assert analysis.result["point_count"] == 0
     assert analysis.result["filename"].startswith("integrated_alerts_BRA.14.87_none_")
     assert len(content) > 0
+
+
+@pytest.mark.asyncio
+async def test_saved_custom_aoi_export_is_named_for_its_id(table_uri, points):
+    aoi_id = "0b6c1f8e-3d2a-4c55-9a8e-2f4d6b7c9e10"
+
+    analysis, content, _ = await _export(
+        table_uri, aoi=SavedCustomAreaOfInterest(ids=[aoi_id]), format="csv"
+    )
+
+    expected = _expected_rows(points, FIRST_DAY, LATEST_DAY, [2, 3, 4], None)
+    pd.testing.assert_frame_equal(
+        pd.read_csv(io.BytesIO(content)), expected, check_dtype=False
+    )
+    assert analysis.result["filename"].startswith(f"integrated_alerts_{aoi_id}_")

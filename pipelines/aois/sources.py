@@ -4,6 +4,7 @@ import pandas as pd
 from pipelines.aois.aoi_source import AoiSource
 from pipelines.aois.gadm import GadmSource
 from pipelines.aois.vector_file_source import VectorFileSource
+from pipelines.globals import ANALYTICS_BUCKET
 
 
 def aoi_sources() -> tuple[AoiSource, ...]:
@@ -58,3 +59,8 @@ def select_aoi_sources(
             f"Unknown AOI source '{name}'. Accepted values: {', '.join(by_name)}"
         )
     return (by_name[name],)
+
+
+def aoi_prefix(source: AoiSource) -> str:
+    """Where the pipeline writes one AOI source's outputs."""
+    return f"s3://{ANALYTICS_BUCKET}/vectors/aois/{source.source}/{source.version}"

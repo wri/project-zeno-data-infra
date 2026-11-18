@@ -10,14 +10,22 @@ from .land_ghg_inventory import land_ghg_inventory
 from .natural_lands import natural_lands
 from .tree_cover import tree_cover
 from .tree_cover_gain import tree_cover_gain
-from .tree_cover_loss import tree_cover_loss
+from .tree_cover_loss import (
+    deforestation,
+    eudr_supply_chain_deforestation,
+    tree_cover_loss,
+)
 
 router = APIRouter(prefix="/v0/land_change", tags=["β Land Change"])
-router.include_router(dist_alerts.router)
+# hidden from the public OpenAPI docs, and so from the analytics tools, for now
+# (routes still functional)
+router.include_router(dist_alerts.router, include_in_schema=False)
 router.include_router(integrated_alerts.router)
 router.include_router(grasslands.router)
 router.include_router(tree_cover.router)
 router.include_router(tree_cover_loss.router)
+router.include_router(deforestation.router)
+router.include_router(eudr_supply_chain_deforestation.router)
 router.include_router(tree_cover_gain.router)
 router.include_router(land_cover_change.router)
 router.include_router(land_cover_composition.router)

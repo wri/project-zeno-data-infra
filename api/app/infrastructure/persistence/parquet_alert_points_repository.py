@@ -334,14 +334,16 @@ class ParquetAlertPointsRepository(AlertPointsRepository):
             query.limit,
             after,
         )
-        days = rows["alert_date"].to_numpy()
-        dates = {d: day_to_date(d) for d in np.unique(days)}
+        # A page holds a few dozen distinct days, so convert those once and index
+        # into them rather than converting every row.
+        day_positions, days = pd.factorize(rows["alert_date"].to_numpy())
+        dates = np.array([day_to_date(day) for day in days], dtype=object)
         return AlertPointsPage(
             points=pd.DataFrame(
                 {
                     "lat": table.lat(rows["row"].to_numpy()),
                     "lon": table.lon(rows["col"].to_numpy()),
-                    "alert_date": [dates[d] for d in days],
+                    "alert_date": dates[day_positions],
                     "confidence": rows["confidence"].to_numpy(),
                     "natural_lands_class": rows["natural_lands_class"].to_numpy(),
                 }
