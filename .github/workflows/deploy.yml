@@ -68,6 +68,8 @@ on:
         required: true
       GEE_SERVICE_ACCOUNT_JSON:
         required: true
+      FIRMS_MAP_KEY:
+        required: true
 
 env:
   CONTAINER_REGISTRY: ${{ secrets.AWS_ZENO_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
