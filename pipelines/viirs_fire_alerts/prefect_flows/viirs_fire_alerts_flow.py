@@ -7,8 +7,8 @@ from prefect import flow
 from prefect.logging import get_run_logger
 from pyiceberg.catalog import load_catalog
 
-from pipelines.viirs_fire_alerts.firms_area_api import FirmsAreaApi
-from pipelines.viirs_fire_alerts.firms_feed import (
+from pipelines.viirs_fire_alerts.firms_area_api import (
+    FirmsAreaApi,
     check_continuity,
     parse_feed,
     request_windows,
