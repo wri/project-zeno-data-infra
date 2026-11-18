@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 from prefect.logging import disable_run_logger
 from pyiceberg.catalog.sql import SqlCatalog
@@ -17,6 +19,25 @@ FEED = HEADER + (
 TABLE = "alerts.viirs_fire_alerts"
 
 
+class FakeFirmsApi:
+    """Serves one CSV for the first window requested and no alerts for the rest,
+    recording each window."""
+
+    def __init__(self, content: str, first_available: datetime.date):
+        self.content = content
+        self.first_available = first_available
+        self.windows: list[tuple[datetime.date, int]] = []
+
+    def first_available_date(self) -> datetime.date:
+        return self.first_available
+
+    def download(self, start: datetime.date, days: int) -> bytes:
+        self.windows.append((start, days))
+        if len(self.windows) == 1:
+            return self.content.encode()
+        return HEADER.encode()
+
+
 @pytest.fixture
 def catalog(tmp_path, monkeypatch) -> SqlCatalog:
     catalog = SqlCatalog(
@@ -29,16 +50,18 @@ def catalog(tmp_path, monkeypatch) -> SqlCatalog:
     return catalog
 
 
-def serve_feed(monkeypatch, content: str):
-    monkeypatch.setattr(
-        viirs_fire_alerts_flow, "download_feed", lambda url: content.encode()
-    )
+def serve_feed(
+    monkeypatch, content: str, first_available=datetime.date(2026, 8, 1)
+) -> FakeFirmsApi:
+    api = FakeFirmsApi(content, first_available)
+    monkeypatch.setattr(viirs_fire_alerts_flow, "connect_firms", lambda source: api)
+    return api
 
 
 def run_flow():
     with disable_run_logger():
         return viirs_fire_alerts_flow.viirs_fire_alerts_flow.fn(
-            feed_url="https://example.com/feed.csv",
+            source="VIIRS_NOAA20_NRT",
             catalog_name="test",
             table_name=TABLE,
         )
@@ -68,16 +91,23 @@ def test_malformed_feed_fails_and_leaves_the_table_unchanged(catalog, monkeypatc
     assert catalog.load_table(TABLE).current_snapshot().snapshot_id == snapshot
 
 
-def test_feed_leaving_missing_days_fails_and_leaves_the_table_unchanged(
+def test_flow_fetches_from_the_newest_stored_day(catalog, monkeypatch):
+    serve_feed(monkeypatch, FEED)
+    run_flow()
+    api = serve_feed(monkeypatch, HEADER)
+
+    run_flow()
+
+    assert api.windows[0] == (datetime.date(2026, 11, 4), 5)
+
+
+def test_missing_days_older_than_the_source_fail_and_leave_the_table_unchanged(
     catalog, monkeypatch
 ):
     serve_feed(monkeypatch, FEED)
     run_flow()
     snapshot = catalog.load_table(TABLE).current_snapshot().snapshot_id
-    serve_feed(
-        monkeypatch,
-        HEADER + "1.0,2.0,330.1,0.4,0.4,2026-11-20,1730,N20,low,2.0NRT,295.0,10.0,N\n",
-    )
+    serve_feed(monkeypatch, FEED, first_available=datetime.date(2026, 11, 20))
 
     with pytest.raises(FeedGapError):
         run_flow()

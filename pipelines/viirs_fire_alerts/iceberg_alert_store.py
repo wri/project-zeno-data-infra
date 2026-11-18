@@ -1,7 +1,8 @@
 """An Iceberg table of fire alert points.
 
-The table is partitioned by month and coarse Google S2 cell, and each write is
-sorted by fine S2 cell so file statistics prune spatial reads.
+The table is partitioned by month, so compaction can merge each month into a few
+large files. Rows are sorted by Google S2 cell so file and row group statistics
+prune spatial reads.
 """
 
 from datetime import date
@@ -33,39 +34,28 @@ def alert_schema() -> Schema:
         NestedField(7, "bright_ti5", DoubleType(), required=False),
         NestedField(8, "frp", DoubleType(), required=False),
         NestedField(9, "s2_cell", LongType(), required=True),
-        NestedField(10, "s2_cell_fine", LongType(), required=True),
     )
 
 
 def alert_partition_spec() -> PartitionSpec:
-    return PartitionSpec(
-        PartitionField(3, 1000, MonthTransform(), "acq_date_month"),
-        PartitionField(9, 1001, IdentityTransform(), "s2_cell"),
-    )
+    return PartitionSpec(PartitionField(3, 1000, MonthTransform(), "acq_date_month"))
 
 
 def alert_sort_order() -> SortOrder:
     return SortOrder(
-        SortField(10, IdentityTransform()),
+        SortField(9, IdentityTransform()),
         SortField(3, IdentityTransform()),
     )
 
 
 class IcebergAlertStore:
     """Stores alert points in an Iceberg table, created on first use, adding
-    each alert's S2 cells at these levels for partitioning and ordering."""
+    each alert's S2 cell at this level for ordering."""
 
-    def __init__(
-        self,
-        catalog: Catalog,
-        table_name: str,
-        coarse_cell_level: int,
-        fine_cell_level: int,
-    ):
+    def __init__(self, catalog: Catalog, table_name: str, cell_level: int):
         self.catalog = catalog
         self.table_name = table_name
-        self.coarse_cell_level = coarse_cell_level
-        self.fine_cell_level = fine_cell_level
+        self.cell_level = cell_level
 
     def table(self) -> Table:
         return self.catalog.create_table_if_not_exists(
@@ -103,10 +93,8 @@ class IcebergAlertStore:
         )
         if new_alerts.num_rows == 0:
             return 0
-        rows = add_s2_cells(new_alerts, self.coarse_cell_level, self.fine_cell_level)
-        ordered = rows.sort_by(
-            [("s2_cell_fine", "ascending"), ("acq_date", "ascending")]
-        )
+        rows = add_s2_cells(new_alerts, self.cell_level)
+        ordered = rows.sort_by([("s2_cell", "ascending"), ("acq_date", "ascending")])
         table.append(ordered.cast(alert_schema().as_arrow()))
         return new_alerts.num_rows
 
@@ -124,23 +112,19 @@ def stored_keys(table: Table, alerts: pa.Table) -> pa.Table:
     )
 
 
-def add_s2_cells(alerts: pa.Table, coarse_level: int, fine_level: int) -> pa.Table:
-    """Add s2_cell and s2_cell_fine columns: the S2 cells at these levels
-    containing each alert's point, as signed 64-bit integers to fit Iceberg's
-    long type."""
-    fine_cells = [
+def add_s2_cells(alerts: pa.Table, level: int) -> pa.Table:
+    """Add an s2_cell column: the S2 cell at this level containing each alert's
+    point, as a signed 64-bit integer to fit Iceberg's long type."""
+    cells = [
         s2sphere.CellId.from_lat_lng(s2sphere.LatLng.from_degrees(lat, lon)).parent(
-            fine_level
+            level
         )
         for lat, lon in zip(
             alerts.column("latitude").to_pylist(),
             alerts.column("longitude").to_pylist(),
         )
     ]
-    coarse_cells = [cell.parent(coarse_level) for cell in fine_cells]
-    return alerts.append_column(
-        "s2_cell", pa.array(signed_ids(coarse_cells), pa.int64())
-    ).append_column("s2_cell_fine", pa.array(signed_ids(fine_cells), pa.int64()))
+    return alerts.append_column("s2_cell", pa.array(signed_ids(cells), pa.int64()))
 
 
 def signed_ids(cells) -> list:

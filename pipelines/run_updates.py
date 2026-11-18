@@ -164,13 +164,10 @@ def run_subscription_emails(
 def run_viirs_fire_alerts_update(
     version=None, overwrite=False, is_latest=False
 ) -> list[str]:
-    # version, overwrite and is_latest aren't used: each run appends the alerts in
-    # FIRMS' latest 7-day NOAA-20 VIIRS file that aren't already stored.
+    # version, overwrite and is_latest aren't used: each run appends NOAA-20 VIIRS
+    # alerts from the newest stored day on that aren't already stored.
     count = viirs_fire_alerts_flow.viirs_fire_alerts_flow(
-        feed_url=(
-            "https://firms.modaps.eosdis.nasa.gov/data/active_fire/noaa-20-viirs-c2"
-            "/csv/J1_VIIRS_C2_Global_7d.csv"
-        ),
+        source="VIIRS_NOAA20_NRT",
         catalog_name="aois",
         table_name="alerts.viirs_fire_alerts",
     )

@@ -7,6 +7,7 @@ from pipelines.viirs_fire_alerts.firms_feed import (
     FeedGapError,
     check_continuity,
     parse_feed,
+    request_windows,
 )
 
 HEADER = (
@@ -73,7 +74,21 @@ def test_first_feed_is_accepted():
 
 
 def test_feed_leaving_a_missing_day_is_rejected_with_backfill_instructions():
-    with pytest.raises(FeedGapError, match="gfw-data-lake"):
+    with pytest.raises(FeedGapError, match="firms.modaps"):
         check_continuity(
             latest_stored=NOV_3, earliest_in_feed=NOV_3 + datetime.timedelta(2)
         )
+
+
+def test_request_windows_cover_every_day_in_windows_of_at_most_five_days():
+    windows = request_windows(NOV_3, datetime.date(2026, 11, 14))
+
+    assert windows == [
+        (NOV_3, 5),
+        (datetime.date(2026, 11, 8), 5),
+        (datetime.date(2026, 11, 13), 2),
+    ]
+
+
+def test_request_windows_for_a_single_day():
+    assert request_windows(NOV_3, NOV_3) == [(NOV_3, 1)]

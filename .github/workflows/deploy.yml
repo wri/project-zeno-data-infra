@@ -134,6 +134,7 @@ jobs:
             -var="new_relic_license_key=${{ secrets.NEW_RELIC_LICENSE_KEY }}" \
             -var="coiled_token=${{ secrets.DASK_COILED_TOKEN }}" \
             -var="gee_service_account_json=${{ secrets.GEE_SERVICE_ACCOUNT_JSON }}" \
+            -var="firms_map_key=${{ secrets.FIRMS_MAP_KEY }}" \
             -var="prefect_api_key=${{ secrets.PREFECT_API_KEY }}" \
             -var="prefect_account_id=${{ secrets.PREFECT_ACCOUNT_ID }}" \
             -var="prefect_workspace_id=${{ secrets.PREFECT_WORKSPACE_ID }}" \

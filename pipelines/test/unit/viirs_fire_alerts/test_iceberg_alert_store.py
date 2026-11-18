@@ -28,7 +28,7 @@ def store(catalog) -> IcebergAlertStore:
 
 
 def new_store(catalog) -> IcebergAlertStore:
-    return IcebergAlertStore(catalog, TABLE, coarse_cell_level=2, fine_cell_level=13)
+    return IcebergAlertStore(catalog, TABLE, cell_level=13)
 
 
 class RacingCatalog:
@@ -77,10 +77,10 @@ def stored_keys(store: IcebergAlertStore):
     )
 
 
-def test_table_is_partitioned_by_month_and_coarse_cell(store):
+def test_table_is_partitioned_by_month_only(store):
     fields = [field.name for field in store.table().spec().fields]
 
-    assert fields == ["acq_date_month", "s2_cell"]
+    assert fields == ["acq_date_month"]
 
 
 def test_same_feed_twice_stores_each_alert_once(store):
@@ -138,9 +138,7 @@ def unsigned(cell: int) -> int:
     return cell + 2**64 if cell < 0 else cell
 
 
-def test_alerts_are_stored_with_signed_coarse_cells_containing_their_fine_cells(
-    store,
-):
+def test_alerts_are_stored_with_signed_cells_containing_their_point(store):
     # Peru's S2 ids are above 2**63, so they must wrap to fit a signed long.
     feed = alerts((-8.1, 3, "0005"))
     feed = feed.set_column(1, "longitude", pa.array([-75.0]))
@@ -148,7 +146,8 @@ def test_alerts_are_stored_with_signed_coarse_cells_containing_their_fine_cells(
     store.append_new(feed)
 
     row = store.table().scan().to_arrow().to_pylist()[0]
-    fine = s2sphere.CellId(unsigned(row["s2_cell_fine"]))
+    cell = s2sphere.CellId(unsigned(row["s2_cell"]))
+    point = s2sphere.CellId.from_lat_lng(s2sphere.LatLng.from_degrees(-8.1, -75.0))
     assert row["s2_cell"] < 0
-    assert fine.level() == 13
-    assert fine.parent(2).id() == unsigned(row["s2_cell"])
+    assert cell.level() == 13
+    assert point.parent(13) == cell

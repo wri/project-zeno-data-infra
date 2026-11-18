@@ -127,6 +127,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       TF_WORKSPACE          = terraform.workspace
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
       GEE_SERVICE_ACCOUNT_JSON = var.gee_service_account_json
+      FIRMS_MAP_KEY         = var.firms_map_key
       # S3 Tables catalog holding custom AOIs and pipeline-written tables, as
       # configured for the API; run_updates passes PYICEBERG_* on to the Coiled
       # cluster.
