@@ -185,3 +185,29 @@ To change the image:
 ### Automatic Triggers
 
 A **webhook + automation** is configured so that when a new DIST alerts version is published, the `dist_update` flow is triggered automatically with the version from the event payload. This is defined in `terraform/prefect.tf` as the `run-gnw-zonal-stats-on-dist-update` automation.
+
+## VIIRS Fire Alerts
+
+The `viirs_fire_alerts_update` flow runs daily and appends NOAA-20 VIIRS active fire
+alerts from NASA FIRMS to the `alerts.viirs_fire_alerts` Iceberg table. Each run starts
+from the newest stored day, so missed days are filled automatically. It needs a FIRMS
+map key, requested at https://firms.modaps.eosdis.nasa.gov/api/map_key/, in the
+`FIRMS_MAP_KEY` environment variable.
+
+### Requesting a FIRMS Archive
+
+History older than the table's first day comes from a FIRMS archive download:
+
+1. Go to https://firms.modaps.eosdis.nasa.gov/download/ and sign in with Earthdata
+   Login or an emailed code.
+2. Create a request for the whole world, source "VIIRS NOAA-20 375m", the date range
+   needed, and Shapefile format.
+3. FIRMS emails a download link once the request is processed. A year of global
+   alerts is about 5 GB.
+4. The download holds `fire_archive_*` files, with reprocessed science-quality alerts
+   (available about 5 months after acquisition), and `fire_nrt_*` files, with
+   near-real-time alerts for later days.
+5. Load both sets of shapefiles into the table with the alert store, renaming columns
+   to the API's names (`BRIGHTNESS` to `bright_ti4`, `BRIGHT_T31` to `bright_ti5`) and
+   writing `acq_time` without leading zeros (`434`, not `0434`), as the API returns it.
+   Alerts already stored are skipped.

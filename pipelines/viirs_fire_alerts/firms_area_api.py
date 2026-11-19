@@ -33,8 +33,17 @@ class FirmsAreaApi:
 
     def get(self, path: str) -> httpx.Response:
         response = self.client.get(f"https://firms.modaps.eosdis.nasa.gov/api/{path}")
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            # The map key is part of the URL, so it's masked to keep it out of logs.
+            masked = str(error).replace(self.map_key, "***")
+            raise FirmsRequestError(masked) from None
         return response
+
+
+class FirmsRequestError(Exception):
+    pass
 
 
 class FeedGapError(Exception):

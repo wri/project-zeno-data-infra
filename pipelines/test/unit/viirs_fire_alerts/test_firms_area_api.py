@@ -7,6 +7,7 @@ import pytest
 from pipelines.viirs_fire_alerts.firms_area_api import (
     FeedGapError,
     FirmsAreaApi,
+    FirmsRequestError,
     check_continuity,
     parse_feed,
     request_windows,
@@ -126,3 +127,16 @@ def test_download_requests_world_alerts_for_the_window():
     api = FirmsAreaApi(client, "KEY", "VIIRS_NOAA20_NRT")
 
     assert api.download(datetime.date(2026, 11, 3), 5) == b"latitude\n1.0\n"
+
+
+def test_failed_request_error_hides_the_map_key():
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(403))
+    )
+    api = FirmsAreaApi(client, "SECRETKEY", "VIIRS_NOAA20_NRT")
+
+    with pytest.raises(FirmsRequestError, match="403") as error:
+        api.download(NOV_3, 5)
+
+    assert "SECRETKEY" not in str(error.value)
+    assert error.value.__suppress_context__
