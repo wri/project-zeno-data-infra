@@ -128,6 +128,12 @@ variable "gee_service_account_json" {
   sensitive   = true
 }
 
+variable "firms_map_key" {
+  description = "NASA FIRMS API key for downloading active fire alerts"
+  type        = string
+  sensitive   = true
+}
+
 variable "region" {
   description = "AWS region"
   type = string
