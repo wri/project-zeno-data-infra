@@ -193,6 +193,19 @@ def test_names_are_read_from_each_types_own_source(monkeypatch):
     }
 
 
+def test_email_subscriptions_leaves_revision_suffix_out_of_admin_aoi_ids():
+    subscriptions = [
+        _subscription("a@x.org", "d1", "BRA.22.10_2"),
+        _subscription("a@x.org", "d2", "BRA"),
+        # Not an admin AOI, so kept as is.
+        _subscription("a@x.org", "d3", "my_area_2", aoi_type="custom"),
+    ]
+
+    handled, _ = stages.email_subscriptions(subscriptions)
+
+    assert [s.aoi_id for s in handled] == ["BRA.22.10", "BRA", "my_area_2"]
+
+
 def test_summarize_alert_areas_splits_natural_lands_and_forest():
     alerts = pd.DataFrame(
         {
