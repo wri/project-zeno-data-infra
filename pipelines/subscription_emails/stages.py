@@ -1,7 +1,8 @@
 import hashlib
 import json
+import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from typing import Callable, Optional
 
@@ -153,13 +154,18 @@ def email_subscriptions(
     subscriptions: list[Subscription],
 ) -> tuple[list[Subscription], list[Subscription]]:
     """Split subscriptions into those the email handles (integrated alerts on
-    admin and custom AOIs) and the rest."""
+    admin and custom AOIs) and the rest. The handled admin subscriptions' aoi_ids
+    leave out the GADM GID's revision suffix (BRA.22.10_2 -> BRA.22.10), to match
+    the results and the AOI names, as pipelines.aois.gadm.gadm_ids does."""
     handled, skipped = [], []
     for subscription in subscriptions:
         if (
             subscription.dataset == "integrated_alerts"
             and subscription.aoi_type in EMAIL_AOI_TYPES
         ):
+            if subscription.aoi_type == "admin":
+                aoi_id = re.sub(r"_\d+$", "", subscription.aoi_id)
+                subscription = replace(subscription, aoi_id=aoi_id)
             handled.append(subscription)
         else:
             skipped.append(subscription)
