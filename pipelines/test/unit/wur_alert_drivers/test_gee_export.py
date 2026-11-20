@@ -1,7 +1,11 @@
+from datetime import date, timedelta
+
+import numpy as np
 import pytest
 
 from pipelines.wur_alert_drivers.gee_export import (
     ExportError,
+    encode_driver_alerts,
     file_name_prefix,
     latest_asset_path,
     latest_end,
@@ -168,3 +172,115 @@ def test_wait_raises_on_timeout():
     client = FakeGeeClient(states={"a": ["SUCCEEDED"], "b": ["RUNNING"]})
     with pytest.raises(ExportError, match="unfinished after 900s: b RUNNING"):
         _wait(client, ["a", "b"], timeout_seconds=900)
+
+
+class FakeImage:
+    """numpy-backed stand-in for the ee.Image methods encode_driver_alerts uses,
+    so the (server-side) date arithmetic can be checked locally."""
+
+    def __init__(self, bands):
+        self.bands = {k: np.asarray(v) for k, v in bands.items()}
+
+    def _value(self):
+        (value,) = self.bands.values()
+        return value
+
+    def _new(self, value):
+        return FakeImage({"value": value})
+
+    @staticmethod
+    def _operand(other):
+        return other._value() if isinstance(other, FakeImage) else other
+
+    def select(self, name):
+        return FakeImage({name: self.bands[name]})
+
+    def add(self, other):
+        return self._new(self._value() + self._operand(other))
+
+    def subtract(self, other):
+        return self._new(self._value() - self._operand(other))
+
+    def multiply(self, other):
+        return self._new(self._value() * self._operand(other))
+
+    def divide(self, other):
+        # Like ee, divide is floating-point division.
+        return self._new(self._value() / self._operand(other))
+
+    def floor(self):
+        return self._new(np.floor(self._value()))
+
+    def gt(self, other):
+        return self._new((self._value() > self._operand(other)).astype(int))
+
+    def toInt32(self):
+        return self._new(self._value().astype(np.int32))
+
+    def rename(self, name):
+        return FakeImage({name: self._value()})
+
+
+# Downstream code decodes the date part as days since this date.
+ALERT_EPOCH = date(2014, 12, 31)
+
+# Year starts and ends, and the days around leap days, from the first year of
+# WUR's historical data through years after the current latest data.
+ENCODING_DATES = [
+    date(2015, 1, 1),
+    date(2016, 12, 31),
+    date(2022, 1, 1),
+    date(2023, 12, 31),
+    date(2024, 1, 1),
+    date(2024, 2, 28),
+    date(2024, 2, 29),
+    date(2024, 3, 1),
+    date(2024, 12, 31),
+    date(2025, 1, 1),
+    date(2025, 12, 31),
+    date(2026, 1, 1),
+    date(2026, 10, 31),
+    date(2027, 1, 1),
+    date(2028, 12, 31),
+    date(2029, 1, 1),
+    date(2049, 12, 31),
+]
+
+
+def _yyddd(d):
+    return (d.year - 2000) * 1000 + d.timetuple().tm_yday
+
+
+def _encode(classes, dates):
+    image = FakeImage(
+        {"class": np.array(classes), "date": np.array([_yyddd(d) for d in dates])}
+    )
+    encoded = encode_driver_alerts(image)
+    assert list(encoded.bands) == ["alert_drivers_encoded"]
+    assert encoded.bands["alert_drivers_encoded"].dtype == np.int32
+    return encoded.bands["alert_drivers_encoded"].tolist()
+
+
+def test_encoded_dates_decode_to_the_original_dates():
+    encoded = _encode([1] * len(ENCODING_DATES), ENCODING_DATES)
+    decoded = [ALERT_EPOCH + timedelta(days=v % 100000) for v in encoded]
+    assert decoded == ENCODING_DATES
+
+
+def test_encoding_known_values():
+    # 2015-01-01 is day 1, and 2026-01-01 is 11 years (3 of them leap years:
+    # 2016, 2020, 2024) after that: 1 + 11 * 365 + 3 = 4019.
+    assert _encode([1, 5], [date(2015, 1, 1), date(2026, 1, 1)]) == [
+        100001,
+        504019,
+    ]
+
+
+def test_consecutive_days_encode_to_consecutive_values():
+    # Every day 2022-2030 is one more than the day before, so no day is skipped
+    # or repeated at a year boundary or leap day.
+    start = date(2022, 1, 1)
+    dates = [start + timedelta(days=i) for i in range(9 * 366)]
+    encoded = _encode([3] * len(dates), dates)
+    assert np.all(np.diff(encoded) == 1)
+    assert encoded[0] == 300000 + (start - ALERT_EPOCH).days
