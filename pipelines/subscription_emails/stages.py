@@ -1,7 +1,8 @@
 import hashlib
 import json
+import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from typing import Callable, Optional
 
@@ -31,10 +32,14 @@ NATURAL_LANDS_CLASSES = list(range(2, 12))
 NATURAL_FOREST_CLASSES = [2, 5, 8, 9]
 # Dashboards shown in the email's table; the rest are only counted.
 MAX_DASHBOARDS = 10
-# Links in the email, to all of the user's dashboards and to each one.
+# Links in the email, to all of the user's dashboards, to each one, and to the
+# page for managing their alert emails.
 # (These may later come with the subscriptions from the API instead.)
 DASHBOARDS_URL = "https://horizon.globalnaturewatch.org/dashboards"
 DASHBOARD_URL = "https://horizon.globalnaturewatch.org/dashboards/{dashboard_id}"
+MANAGE_URL = (
+    "https://horizon.globalnaturewatch.org/subscriptions?ff=email-subscriptions"
+)
 # Each email covers a fixed Wednesday to Tuesday week.
 WEEK_DAYS = 7
 WEEK_END_WEEKDAY = 1  # Tuesday
@@ -149,13 +154,18 @@ def email_subscriptions(
     subscriptions: list[Subscription],
 ) -> tuple[list[Subscription], list[Subscription]]:
     """Split subscriptions into those the email handles (integrated alerts on
-    admin and custom AOIs) and the rest."""
+    admin and custom AOIs) and the rest. The handled admin subscriptions' aoi_ids
+    leave out the GADM GID's revision suffix (BRA.22.10_2 -> BRA.22.10), to match
+    the results and the AOI names, as pipelines.aois.gadm.gadm_ids does."""
     handled, skipped = [], []
     for subscription in subscriptions:
         if (
             subscription.dataset == "integrated_alerts"
             and subscription.aoi_type in EMAIL_AOI_TYPES
         ):
+            if subscription.aoi_type == "admin":
+                aoi_id = re.sub(r"_\d+$", "", subscription.aoi_id)
+                subscription = replace(subscription, aoi_id=aoi_id)
             handled.append(subscription)
         else:
             skipped.append(subscription)
@@ -367,6 +377,7 @@ def build_emails(
             "dashboard_count": len(ranked),
             "more_dashboard_count": len(ranked) - len(shown),
             "dashboards_url": DASHBOARDS_URL,
+            "manage_url": MANAGE_URL,
             "dashboards": [
                 {
                     "dashboard_id": d["dashboard_id"],

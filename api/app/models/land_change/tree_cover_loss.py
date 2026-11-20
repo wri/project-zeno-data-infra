@@ -61,6 +61,10 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
             "Carbon model is only valid for carbon threshold 30% or greater, and "
             "will return NaN for carbon emissions if set lower."
         ),
+        description=(
+            "Use 30 by default, or 10 with natural_forest_only. Only use another "
+            "threshold when one is asked for."
+        ),
     )
     # natural_forest is a breakdown by SBTN natural forest class (kept for an
     # existing app), while natural_forest_only filters to SBTN Natural Forest.
@@ -71,6 +75,15 @@ class TreeCoverLossAnalyticsIn(AnalyticsIn):
     ] = Field(
         default=None,
         title="Forest Filter",
+        description=(
+            "Which forest to count loss in. "
+            "primary_forest: humid tropical primary forest. "
+            "intact_forest: intact forest landscapes. "
+            "natural_forest_only: SBTN natural forest, mapped in 2020, so loss "
+            "from 2021 on. "
+            "natural_forest: loss broken down by SBTN natural forest class. "
+            "Leave unset for all tree cover, including plantations."
+        ),
     )
     intersections: AllowedIntersections = Field(
         ...,

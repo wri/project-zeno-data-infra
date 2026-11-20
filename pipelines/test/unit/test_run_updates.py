@@ -1,5 +1,5 @@
 import pytest
-
+from pipelines import run_updates
 from pipelines.globals import gadm_country_code_count
 from pipelines.prefect_flows.common_stages import numeric_to_alpha3
 from pipelines.run_updates import (
@@ -8,6 +8,7 @@ from pipelines.run_updates import (
     _parse_bbox,
     _validate_flow_args,
     needs_cluster,
+    update_flows,
 )
 
 
@@ -51,6 +52,7 @@ def test_country_expected_groups_covers_every_iso_code():
     # axis must exceed the largest numeric ISO code we map.
     assert max(numeric_to_alpha3) < gadm_country_code_count
 
+
 @pytest.mark.parametrize(
     "content_date", [None, "2026-9-30", "09/30/2026", "2026-02-30"]
 )
@@ -65,3 +67,18 @@ def test_wur_update_accepts_iso_content_date():
     _validate_flow_args(
         UpdateFlow.WUR_UPDATE, version="v20261018", content_date="2026-09-30"
     )
+
+
+def test_aoi_name_index_is_its_own_flow_run_without_a_cluster(monkeypatch):
+    built = []
+    monkeypatch.setattr(
+        run_updates,
+        "aoi_name_index_flow",
+        lambda sources, build_date, **options: built.append(options) or "s3://index",
+    )
+
+    uris = update_flows[UpdateFlow("aoi_name_index")](refresh_importance=True)
+
+    assert not needs_cluster(UpdateFlow("aoi_name_index"), local=False)
+    assert uris == ["s3://index"]
+    assert built == [{"overwrite": False, "refresh_importance": True}]

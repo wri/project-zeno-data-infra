@@ -10,6 +10,12 @@ class AoiTypeRoutingGeometryRepository(AoiGeometryRepository):
         self.repositories = repositories
 
     async def load(self, aoi):
+        return await self.repository_for(aoi).load(aoi)
+
+    async def bounds(self, aoi):
+        return await self.repository_for(aoi).bounds(aoi)
+
+    def repository_for(self, aoi) -> AoiGeometryRepository:
         if aoi.type not in self.repositories:
             raise ValueError(f"No geometry source for AOI type {aoi.type}.")
-        return await self.repositories[aoi.type].load(aoi)
+        return self.repositories[aoi.type]

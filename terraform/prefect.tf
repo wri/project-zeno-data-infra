@@ -127,8 +127,10 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
       TF_WORKSPACE          = terraform.workspace
       AWS_REQUEST_PAYER     = "requester"  # for reading COGS from gfw account
       GEE_SERVICE_ACCOUNT_JSON = var.gee_service_account_json
-      # Custom AOI catalog (S3 Tables), as configured for the API; run_updates
-      # passes PYICEBERG_* on to the Coiled cluster.
+      FIRMS_MAP_KEY         = var.firms_map_key
+      # S3 Tables catalog holding custom AOIs and pipeline-written tables, as
+      # configured for the API; run_updates passes PYICEBERG_* on to the Coiled
+      # cluster.
       PYICEBERG_CATALOG__AOIS__TYPE                 = "rest"
       PYICEBERG_CATALOG__AOIS__URI                  = "https://s3tables.${data.aws_region.current.name}.amazonaws.com/iceberg"
       PYICEBERG_CATALOG__AOIS__WAREHOUSE            = aws_s3tables_table_bucket.tables.arn
@@ -168,7 +170,7 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         title   = "Flow Name"
         type    = "string"
         default = "dist_update"
-        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update", "subscription_emails"]
+        enum    = ["dist_update", "tcl_update", "integrated_alerts_update", "land_ghg_inventory_update", "land_ghg_inventory_vegetation_update", "land_ghg_inventory_agriculture_update", "land_ghg_inventory_mineral_soil_update", "land_ghg_inventory_organic_soil_update", "wur_update", "subscription_emails", "viirs_fire_alerts_update"]
       }
       content_date = {
         title       = "Content date"
@@ -189,6 +191,18 @@ resource "prefect_deployment" "gnw_zonal_stats_update" {
         default     = null
       }
     }
+  })
+}
+
+
+# FIRMS refreshes its 7-day file several times a day
+resource "prefect_deployment_schedule" "viirs_fire_alerts_daily" {
+  deployment_id = prefect_deployment.gnw_zonal_stats_update.id
+  active        = terraform.workspace == "default"
+  cron          = "0 6 * * *"
+  timezone      = "UTC"
+  parameters = jsonencode({
+    flow_name = "viirs_fire_alerts_update"
   })
 }
 

@@ -1,7 +1,14 @@
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from starlette.applications import Starlette
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route
 
-from app.authentication import get_authenticator, require_resource_watch_admin
+from app.authentication import (
+    ResourceWatchAdminOnly,
+    get_authenticator,
+    require_resource_watch_admin,
+)
 from app.models.common.authentication import User
 
 _app = FastAPI()
@@ -55,3 +62,20 @@ def test_admin_token_passes():
     r = _client.get("/protected", headers={"Authorization": "Bearer t"})
     assert r.status_code == 200
     assert r.json()["role"] == "ADMIN"
+
+
+def mounted_client(users):
+    mounted = Starlette(routes=[Route("/", lambda request: PlainTextResponse("ok"))])
+    return TestClient(ResourceWatchAdminOnly(mounted, FakeAuthenticator(users)))
+
+
+def test_mounted_app_rejects_non_admin_tokens():
+    client = mounted_client({"t": User(id="u", role="USER", extraUserData={})})
+
+    assert client.get("/", headers={"Authorization": "Bearer t"}).status_code == 403
+
+
+def test_mounted_app_lets_admins_through():
+    client = mounted_client({"t": User(id="u", role="ADMIN", extraUserData={})})
+
+    assert client.get("/", headers={"Authorization": "Bearer t"}).status_code == 200

@@ -13,11 +13,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pyinstrument import Profiler
 
+from mcp_server.application import McpApplication
+
+from .authentication import ResourceWatchAdminOnly, get_authenticator
 from .domain.compute_engines.dask_client_router import DaskClientRouter
 from .request_size_limit import RequestSizeLimit
 from .routers import aois, custom_aois, land_change
 
 ANALYSES_TABLE_NAME = os.environ.get("ANALYSES_TABLE_NAME")
+
+mcp_application = McpApplication(
+    base_url=os.environ.get("ANALYTICS_API_BASE_URL", "http://localhost:8000"),
+    # Kept under the load balancer's 60 s idle timeout; slower analyses come
+    # back pending with a link to check later.
+    max_wait_seconds=float(os.environ.get("MCP_MAX_WAIT_SECONDS", 45)),
+)
 
 
 # Configure logging
@@ -100,7 +110,8 @@ async def lifespan(app: FastAPI):
         async with session.resource("dynamodb", region_name="us-east-1") as dynamo:
             app.state.dynamodb_table = await dynamo.Table(ANALYSES_TABLE_NAME)
             app.state.s3_client = s3_client
-            yield
+            async with mcp_application.running():
+                yield
 
 
 app = FastAPI(lifespan=lifespan)
@@ -149,6 +160,7 @@ app.add_middleware(
     RequestSizeLimit, max_bytes=250 * 2**20, path_prefix="/v0/custom_aois"
 )
 app.include_router(aois.router)
+app.mount("/mcp", ResourceWatchAdminOnly(mcp_application, get_authenticator()))
 
 
 @app.get("/")

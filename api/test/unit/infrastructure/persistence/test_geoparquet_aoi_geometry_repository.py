@@ -37,3 +37,12 @@ async def test_unknown_ids_raise(geoparquet_uri):
 
     with pytest.raises(ValueError, match="99"):
         await repository.load(ProtectedAreaOfInterest(ids=["1", "99"]))
+
+
+@pytest.mark.asyncio
+async def test_bounds_are_read_without_geometries(geoparquet_uri):
+    repository = GeoParquetAoiGeometryRepository(geoparquet_uri)
+
+    bounds = await repository.bounds(ProtectedAreaOfInterest(ids=["3", "1"]))
+
+    assert bounds == [(0, 0, 3, 3), (0, 0, 1, 1)]
