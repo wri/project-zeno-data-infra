@@ -50,6 +50,19 @@ def catalog(tmp_path, monkeypatch) -> SqlCatalog:
     return catalog
 
 
+@pytest.fixture(autouse=True)
+def admin_counts(monkeypatch) -> list[dict]:
+    """Record the admin counts subflow's calls instead of running it."""
+    calls: list[dict] = []
+
+    def record(**kwargs):
+        calls.append(kwargs)
+        return "counts.parquet"
+
+    monkeypatch.setattr(viirs_fire_alerts_flow, "viirs_admin_counts_flow", record)
+    return calls
+
+
 def serve_feed(
     monkeypatch, content: str, first_available=datetime.date(2026, 8, 1)
 ) -> FakeFirmsApi:
@@ -58,12 +71,13 @@ def serve_feed(
     return api
 
 
-def run_flow():
+def run_flow(overwrite_admin_counts=False):
     with disable_run_logger():
         return viirs_fire_alerts_flow.viirs_fire_alerts_flow.fn(
             source="VIIRS_NOAA20_NRT",
             catalog_name="test",
             table_name=TABLE,
+            overwrite_admin_counts=overwrite_admin_counts,
         )
 
 
@@ -74,9 +88,38 @@ def test_flow_appends_new_alerts_then_nothing_on_the_same_feed(catalog, monkeypa
     snapshot = catalog.load_table(TABLE).current_snapshot().snapshot_id
     second = run_flow()
 
-    assert (first, second) == (2, 0)
+    assert (first, second) == ((2, "counts.parquet"), (0, "counts.parquet"))
     assert catalog.load_table(TABLE).current_snapshot().snapshot_id == snapshot
     assert catalog.load_table(TABLE).scan().to_arrow().num_rows == 2
+
+
+def test_admin_counts_are_recomputed_only_after_new_alerts_or_when_asked(
+    catalog, monkeypatch, admin_counts
+):
+    serve_feed(monkeypatch, FEED)
+
+    run_flow()
+    run_flow()
+    run_flow(overwrite_admin_counts=True)
+
+    assert admin_counts == [
+        {
+            "catalog_name": "test",
+            "table_name": TABLE,
+            "cell_level": 13,
+            "overwrite": overwrite,
+        }
+        for overwrite in (True, False, True)
+    ]
+
+
+def test_failed_append_skips_the_admin_counts(catalog, monkeypatch, admin_counts):
+    serve_feed(monkeypatch, "latitude,longitude\n1.0,2.0\n")
+
+    with pytest.raises(Exception):
+        run_flow()
+
+    assert admin_counts == []
 
 
 def test_malformed_feed_fails_and_leaves_the_table_unchanged(catalog, monkeypatch):

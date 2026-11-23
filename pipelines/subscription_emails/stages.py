@@ -14,12 +14,11 @@ from pyarrow import fs as pafs
 from pyiceberg.catalog import load_catalog
 from pyiceberg.expressions import In
 
-from pipelines.globals import ANALYTICS_BUCKET
+from pipelines.globals import ANALYTICS_BUCKET, GADM_AOIS_URI
 from pipelines.utils import parse_s3_uri, s3_uri_exists
 from pipelines.zeno_api import Subscription
 
 INTEGRATED_ALERTS_PREFIX = f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts"
-GADM_AOIS_URI = f"s3://{ANALYTICS_BUCKET}/vectors/aois/gadm/v4.1.85/aois.parquet"
 
 # The email only counts high and highest confidence alerts.
 EMAIL_CONFIDENCES = ["high", "highest"]
