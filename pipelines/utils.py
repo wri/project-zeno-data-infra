@@ -18,6 +18,18 @@ def parse_s3_uri(s3_uri):
     return match.groups()
 
 
+def write_version(s3_path: str, version: str) -> None:
+    """Write a version string as a small text object at s3_path, such as the
+    latest marker that tells the API which version of a dataset to serve."""
+    bucket_name, object_key = parse_s3_uri(s3_path)
+    boto3.client("s3").put_object(
+        Bucket=bucket_name,
+        Key=object_key,
+        Body=version.encode("utf-8"),
+        ContentType="text/plain",
+    )
+
+
 def s3_uri_exists(s3_uri):
     bucket_name, object_key = parse_s3_uri(s3_uri)
     try:
@@ -50,7 +62,7 @@ def copy_s3_directory(src_uri, dst_uri, max_workers=100):
     paginator = s3_client.get_paginator("list_objects_v2")
 
     def copy_one(key):
-        dst_key = dst_prefix + key[len(src_prefix):]
+        dst_key = dst_prefix + key[len(src_prefix) :]
         s3_client.copy_object(
             Bucket=dst_bucket,
             Key=dst_key,

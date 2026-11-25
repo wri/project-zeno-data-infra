@@ -1,6 +1,5 @@
 import logging
 
-import boto3
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
@@ -8,6 +7,7 @@ from pipelines.data_api import DataApiClient
 from pipelines.disturbance import prefect_flows, validate_zonal_statistics
 from pipelines.disturbance.create_zarr import create_zarr as create_zarr_func
 from pipelines.globals import ANALYTICS_BUCKET
+from pipelines.utils import write_version
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -29,17 +29,6 @@ def run_validation_suite(
 ) -> dict[str, object]:
     return validate_zonal_statistics.validate(
         gadm_dist_result, version=version, contextual_layer=contextual_layer
-    )
-
-
-@task
-def write_dist_latest_version(dist_version) -> None:
-    s3_client = boto3.client("s3")
-    s3_client.put_object(
-        Bucket=ANALYTICS_BUCKET,
-        Key="zonal-statistics/dist-alerts/latest",
-        Body=dist_version.encode("utf-8"),
-        ContentType="text/plain",
     )
 
 
@@ -131,7 +120,10 @@ def dist_alerts_flow(dist_version=None, overwrite=False, is_latest=False) -> lis
     result_uris.append(gadm_dist_by_land_cover_result)
 
     if is_latest:
-        write_dist_latest_version(dist_version)
+        write_version(
+            f"s3://{ANALYTICS_BUCKET}/zonal-statistics/dist-alerts/latest",
+            dist_version,
+        )
 
     return result_uris
 

@@ -1,6 +1,5 @@
 import logging
 
-import boto3
 from prefect import flow, task
 from prefect.logging import get_run_logger
 
@@ -24,6 +23,7 @@ from pipelines.integrated_alerts.prefect_flows.vector_zonal_stats import (
 from pipelines.subscription_emails.prefect_flows.subscription_emails_flow import (
     subscription_emails_flow,
 )
+from pipelines.utils import write_version
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -41,17 +41,6 @@ def create_zarr_task(dist_version: str, overwrite=False) -> tuple[str, bool]:
 @task
 def extra_processing_task(version, zarr_uri) -> None:
     extra_processing_tasks(version, zarr_uri)
-
-
-@task
-def write_int_latest_version(version) -> None:
-    s3_client = boto3.client("s3")
-    s3_client.put_object(
-        Bucket=ANALYTICS_BUCKET,
-        Key="zonal-statistics/integrated-alerts/latest",
-        Body=version.encode("utf-8"),
-        ContentType="text/plain",
-    )
 
 
 @flow(
@@ -120,7 +109,10 @@ def compute_integrated_alerts_zonal_stats(
     # Don't mark a version as latest from a bbox run, since the API would then
     # look for a global parquet for this version that may not exist.
     if is_latest and bbox is None:
-        write_int_latest_version(version)
+        write_version(
+            f"s3://{ANALYTICS_BUCKET}/zonal-statistics/integrated-alerts/latest",
+            version,
+        )
 
     # Zonal stats for vector AOIs run after the version is marked latest, and a
     # failure (e.g. the custom AOI catalog being unreachable) is logged without

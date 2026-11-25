@@ -8,6 +8,10 @@ from enum import Enum
 import click
 import coiled
 from dask.distributed import performance_report
+from prefect import flow, task
+from prefect.logging import get_run_logger
+from shapely.geometry import box
+
 from pipelines.aois.prefect_flows import aois_flow
 from pipelines.aois.prefect_flows.aoi_name_index_flow import aoi_name_index_flow
 from pipelines.aois.sources import aoi_sources
@@ -21,9 +25,6 @@ from pipelines.subscription_emails.prefect_flows import subscription_emails_flow
 from pipelines.tree_cover_loss.prefect_flows import tcl_flow
 from pipelines.viirs_fire_alerts.prefect_flows import viirs_fire_alerts_flow
 from pipelines.wur_alert_drivers.prefect_flows import wur_flow
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from shapely.geometry import box
 
 logging.getLogger("distributed.client").setLevel(logging.ERROR)
 
@@ -178,14 +179,17 @@ def run_subscription_emails(
 def run_viirs_fire_alerts_update(
     version=None, overwrite=False, is_latest=False
 ) -> list[str]:
-    # version, overwrite and is_latest aren't used: each run appends NOAA-20 VIIRS
-    # alerts from the newest stored day on that aren't already stored.
-    count = viirs_fire_alerts_flow.viirs_fire_alerts_flow(
+    # version and is_latest aren't used: each run appends NOAA-20 VIIRS alerts
+    # from the newest stored day on that aren't already stored, then counts the
+    # last year of alerts by admin area as version v<newest alert date> and marks
+    # it latest. overwrite recomputes the counts even if that version exists.
+    count, counts_uri = viirs_fire_alerts_flow.viirs_fire_alerts_flow(
         source="VIIRS_NOAA20_NRT",
         catalog_name="aois",
         table_name="alerts.viirs_fire_alerts",
+        overwrite_admin_counts=overwrite,
     )
-    return [f"{count} new VIIRS fire alerts"]
+    return [f"{count} new VIIRS fire alerts", f"admin counts: {counts_uri}"]
 
 
 def _parse_bbox(bbox):
@@ -311,7 +315,7 @@ def _is_iso_date(value) -> bool:
         "-'subscription_emails' will email subscribers the past week's integrated "
         "alerts in their dashboards' areas."
         "-'viirs_fire_alerts_update' will append new VIIRS fire alerts to the "
-        "alerts Iceberg table."
+        "alerts Iceberg table, then count the last year of alerts by admin area."
     ),
 )
 def run_updates(

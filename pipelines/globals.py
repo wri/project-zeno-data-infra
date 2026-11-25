@@ -2,6 +2,8 @@ DATA_LAKE_BUCKET = "gfw-data-lake"
 ANALYTICS_BUCKET = "lcl-analytics"
 COGS_BUCKET = "lcl-cogs"
 GADM_VERSION = "v4.1.85"
+# GADM units at every level as GeoParquet, written by the aois_update flow
+GADM_AOIS_URI = f"s3://{ANALYTICS_BUCKET}/vectors/aois/gadm/{GADM_VERSION}/aois.parquet"
 
 country_zarr_uri = f"s3://{ANALYTICS_BUCKET}/zarr/gadm-administrative-boundaries/{GADM_VERSION}/adm0.zarr"
 country_10m_zarr_uri = "s3://gfw-data-lake/gadm_administrative_boundaries/v4.1.85/raster/epsg-4326/zarr/adm0.10m.zarr"
