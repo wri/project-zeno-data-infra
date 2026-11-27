@@ -69,17 +69,54 @@ A Dask dataframe groupby gives the same result but has to move every row across
 the network twice (the groupby shuffle, then the sort by `aoi_id`), since it
 can't know the parts are already sorted. See "Alternatives considered".
 
+**Limit: ids that aren't spatially ordered.** Pruning relies on AOIs that are
+near each other in space being near each other in `aoi_id` order. GADM ids
+start with the country code, so a tile's AOIs fall in a few narrow id ranges.
+WDPA, KBA and LandMark ids are numbers and custom AOI ids are UUIDs, with no
+spatial order: each part file spans most of the id range, so once a run has
+more than one bucket, every bucket reads row groups from most part files. The
+result is still correct, only the combine reads more. A run that fits in one
+bucket (fewer than `AOIS_PER_BUCKET` AOIs, as custom AOIs do today) is
+unaffected.
+
 ### AOI sources
 
 An `AOISource` returns every AOI's bounding box (`read_bounds`), the polygons
 near a tile (`read`) and where they came from (`provenance`, written into the
-result's metadata).
+result's metadata). `aoi_source_for(aoi_type)` builds the source of one AOI
+type; the flow calls it inside each type's task, so only requested types are
+built and a source that can't be read fails only its type.
 
+- `GeoParquetSource` reads a GeoParquet with `aoi_id`, `geometry` and a
+  covering `bbox` column, such as the AOI pipeline's `aois.parquet` for GADM,
+  WDPA, KBA and LandMark (`predefined_aoi_sources()`). A tile's read filters
+  row groups by bbox and `aoi_id`.
 - `IcebergSource` reads the custom AOI table (`custom.custom_aois`) that the
   API writes. Users can change AOIs during a run, so the source is pinned to
   the table's snapshot when the run starts (`custom_aoi_source()` returns it
   pinned); every read uses that snapshot, an unpinned source refuses to read,
   and the snapshot id is recorded as `aoi_snapshot_id` in the result.
+
+### Admin units (GADM)
+
+GADM units nest (`AFG` ⊃ `AFG.1` ⊃ `AFG.1.5`), and the results must give
+every level the API serves (0–2, `MAX_ADMIN_LEVEL`), as the rasterized GADM
+results do; the AOI table's deeper units (levels 3–5) aren't computed.
+`compute_admin_zonal_stats` computes only units without children from pixels
+and sums every parent from its children:
+
+- `exclude_ids` drops the parents and the deeper units from the run, so no
+  pixel is tested against a country or region polygon;
+- `bucket_key=country` keeps all of a country's units in one bucket (a bucket
+  never splits a key), so the bucket's `finish` step sees the whole country;
+- `finish` rolls each bucket's sums up to regions and countries with
+  `rollup_by_gadm_and_convert_to_aoi`, the same roll-up as the rasterized
+  pipeline, then labels them.
+
+A parent whose children don't cover all of it gets only its children's totals.
+The release flow runs `aoi_types=["admin"]` and writes
+`{version}/coverage/admin-integrated-alerts.parquet`; the other types run on
+demand.
 
 ### Adding a dataset
 

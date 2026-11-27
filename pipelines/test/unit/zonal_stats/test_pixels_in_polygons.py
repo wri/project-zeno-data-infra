@@ -13,6 +13,8 @@ from shapely.geometry import Polygon, box
 from pipelines.zonal_stats import pixels_in_polygons
 from pipelines.zonal_stats.pixels_in_polygons import (
     TileTask,
+    _select_tiles_with_aois,
+    _split_into_buckets,
     compute_tile_sums,
     compute_zonal_stats,
     sum_pixels_in_polygons,
@@ -68,13 +70,14 @@ class FakeSource:
             }
         )
 
-    def read(self, bounds) -> gpd.GeoDataFrame:
+    def read(self, bounds, aoi_ids) -> gpd.GeoDataFrame:
         aois = gpd.GeoDataFrame(
             {"aoi_id": list(self.aois)},
             geometry=list(self.aois.values()),
             crs="EPSG:4326",
         )
-        return aois[aois.intersects(box(*bounds))].reset_index(drop=True)
+        wanted = aois.intersects(box(*bounds)) & aois["aoi_id"].isin(aoi_ids)
+        return aois[wanted].reset_index(drop=True)
 
     @property
     def provenance(self) -> Dict[str, str]:
@@ -84,7 +87,10 @@ class FakeSource:
 def first_tile_task(aoi_source: FakeSource, part_uri: str) -> TileTask:
     """Build the task of the top-left tile (rows 0-3, cols 0-3)."""
     ys, xs, bounds = grid_tiles()[0]
-    return TileTask(ys, xs, bounds, aoi_source, read_grid_pixels, ["g"], "v", part_uri)
+    aoi_ids = list(aoi_source.aois)
+    return TileTask(
+        ys, xs, bounds, aoi_source, aoi_ids, read_grid_pixels, ["g"], "v", part_uri
+    )
 
 
 def sum_by_brute_force(aois: Dict[str, Polygon]) -> pd.DataFrame:
@@ -241,3 +247,60 @@ def test_compute_zonal_stats_without_aois_writes_an_empty_result(tmp_path):
     assert result.num_rows == 0
     assert result.schema.remove_metadata().equals(SCHEMA)
     assert summary["tiles"] == 0
+
+
+def test_tiles_carry_the_ids_of_the_aois_they_intersect():
+    aois = FakeSource(
+        {"a": box(0, 0, 2, 2), "b": box(3, 3, 5, 5), "c": box(30, 30, 31, 31)}
+    )
+
+    tiles = _select_tiles_with_aois(grid_tiles(), aois.read_bounds())
+
+    by_tile = {(tile[0].start, tile[1].start): ids for tile, ids in tiles}
+    assert by_tile == {(8, 0): ["a", "b"], (4, 0): ["b"], (8, 4): ["b"], (4, 4): ["b"]}
+
+
+def test_split_into_buckets_never_splits_a_key(monkeypatch):
+    monkeypatch.setattr(pixels_in_polygons, "AOIS_PER_BUCKET", 3)
+    ids = np.array(["A", "A.1", "A.2", "A.3", "B", "C", "C.1", "D", "D.1", "D.2"])
+    keys = np.array([i.split(".")[0] for i in ids])
+
+    buckets = _split_into_buckets(ids, keys)
+
+    # a key goes in the bucket of its first id's position: A at 0, B at 4 and
+    # C at 5 in the second bucket, D at 7 in the third
+    assert [b.tolist() for b in buckets] == [
+        ["A", "A.1", "A.2", "A.3"],
+        ["B", "C", "C.1"],
+        ["D", "D.1", "D.2"],
+    ]
+    assert [b.tolist() for b in _split_into_buckets(ids, ids)] == [
+        ids[:3].tolist(),
+        ids[3:6].tolist(),
+        ids[6:9].tolist(),
+        ids[9:].tolist(),
+    ]
+
+
+def test_compute_zonal_stats_leaves_out_excluded_aois(tmp_path):
+    aois = {"kept": box(0, 0, 2.2, 2.2), "excluded": box(0, 0, 3.2, 3.2)}
+    result_uri = str(tmp_path / "result.parquet")
+
+    summary = compute_zonal_stats(
+        FakeSource(aois),
+        grid_tiles(),
+        read_pixels=read_grid_pixels,
+        by=["g"],
+        sum_column="v",
+        finish=lambda sums: sums,
+        schema=SCHEMA,
+        result_uri=result_uri,
+        metadata={},
+        exclude_ids=["excluded"],
+    )
+
+    result = pd.read_parquet(result_uri)
+    pd.testing.assert_frame_equal(
+        result, sum_by_brute_force({"kept": aois["kept"]}), check_dtype=False
+    )
+    assert summary["aois"] == 1
